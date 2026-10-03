@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Playfair Display", Georgia, Cambria, serif;
+  --font-sans: "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
+  
+  --color-warm-bg: #FAFAF8;
+  --color-warm-dark: #0B0F17;
+  
+  --color-academic-50: #F0F4F8;
+  --color-academic-100: #D9E2EC;
+  --color-academic-500: #334E68;
+  --color-academic-700: #102A43;
+  --color-academic-900: #0B1B2B;
+
+  --color-amber-accent: #D97706;
+  --color-amber-accent-hover: #B45309;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-warm-bg);
+    color: #1E293B;
+    overflow-x: hidden;
+  }
+
+  .dark body {
+    background-color: var(--color-warm-dark);
+    color: #F1F5F9;
+  }
+
+  h1, h2, h3, .font-serif-heading {
+    font-family: var(--font-serif);
+  }
+}
+
+/* Custom Utilities for AI Gradients & Glassmorphism */
+.bg-ai-gradient {
+  background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%);
+}
+
+.bg-ai-subtle {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(124, 58, 237, 0.08) 50%, rgba(236, 72, 153, 0.05) 100%);
+}
+
+.dark .bg-ai-subtle {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.2) 0%, rgba(124, 58, 237, 0.2) 50%, rgba(236, 72, 153, 0.15) 100%);
+}
+
+.text-ai-gradient {
+  background: linear-gradient(135deg, #4F46E5 0%, #9333EA 50%, #EC4899 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.glass-nav {
+  background: rgba(250, 250, 248, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dark .glass-nav {
+  background: rgba(11, 15, 23, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}

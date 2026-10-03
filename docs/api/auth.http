@@ -1,0 +1,51 @@
+### API Authentication Requests Sample File (REST Client / Postman)
+
+@baseUrl = http://localhost:5278/api/v1
+
+### 1. Đăng ký tài khoản độc giả (Reader)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "sinhvien.test@gmail.com",
+  "password": "Password123!",
+  "confirmPassword": "Password123!",
+  "fullName": "Nguyễn Văn Test",
+  "studentId": "SE179999"
+}
+
+### 2. Đăng nhập hệ thống (Web)
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "sinhvien.test@gmail.com",
+  "password": "Password123!"
+}
+
+### 3. Đăng nhập hệ thống (Mobile App)
+POST {{baseUrl}}/auth/login
+X-Client-Type: mobile
+Content-Type: application/json
+
+{
+  "email": "sinhvien.test@gmail.com",
+  "password": "Password123!"
+}
+
+### 4. Cấp lại Token (Refresh)
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "your_refresh_token_here"
+}
+
+### 5. Quên mật khẩu
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "sinhvien.test@gmail.com"
+}

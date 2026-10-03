@@ -1,0 +1,16 @@
+{
+  "name": "smartlibrary-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:api": "dotnet run --project apps/api/src/SmartLibrary.Api",
+    "build:api": "dotnet build apps/api/SmartLibrary.slnx",
+    "test:api": "dotnet test apps/api/SmartLibrary.slnx",
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:mobile": "npm --prefix apps/mobile start",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:mobile\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

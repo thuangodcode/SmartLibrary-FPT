@@ -1,0 +1,39 @@
+# Auto detect text files and normalise line endings
+* text=auto eol=lf
+
+# Source code
+*.cs        text diff=csharp
+*.tsx       text diff=tsx
+*.ts        text diff=tsx
+*.jsx       text
+*.js        text
+*.json      text
+*.sql       text
+*.md        text diff=markdown
+*.yml       text
+*.yaml      text
+*.xml       text
+*.html      text diff=html
+*.css       text diff=css
+*.toml      text
+
+# Shell scripts must use LF
+*.sh        text eol=lf
+
+# Windows scripts must use CRLF
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# Binary files
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.webp      binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.eot       binary
+*.pdf       binary

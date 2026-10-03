@@ -1,0 +1,130 @@
+{
+  "info": {
+    "_postman_id": "a9182374-1234-4567-8901-abcdef123456",
+    "name": "SmartLibrary Auth API",
+    "description": "Bộ Request Postman thử nghiệm các API Xác thực & Phân quyền cho SmartLibrary FPT",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Đăng ký tài khoản",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"thuanntse183670@fpt.edu.vn\",\n  \"password\": \"SmartLibrary2026!\",\n  \"confirmPassword\": \"SmartLibrary2026!\",\n  \"fullName\": \"Nguyễn Tấn Thuận\",\n  \"studentId\": \"SE183670\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5278/api/v1/auth/register",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5278",
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "register"
+          ]
+        }
+      }
+    },
+    {
+      "name": "2. Đăng nhập hệ thống (Web)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"thuanntse183670@fpt.edu.vn\",\n  \"password\": \"SmartLibrary2026!\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5278/api/v1/auth/login",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5278",
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "3. Quên mật khẩu",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"thuanntse183670@fpt.edu.vn\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5278/api/v1/auth/forgot-password",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5278",
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "forgot-password"
+          ]
+        }
+      }
+    },
+    {
+      "name": "4. Đặt lại mật khẩu (Reset Password)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"PASTE_OTP_HOAC_TOKEN_TU_EMAIL\",\n  \"newPassword\": \"NewPassword2026!\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5278/api/v1/auth/reset-password",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5278",
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "reset-password"
+          ]
+        }
+      }
+    }
+  ]
+}

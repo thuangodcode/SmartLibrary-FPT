@@ -1,0 +1,81 @@
+# ============================================================
+# SmartLibrary – .gitignore
+# ============================================================
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+
+# ── IDE ──
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.idea/
+
+# ── .NET ──
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+**/Properties/launchSettings.json
+
+# User Secrets
+secrets.json
+
+# ── Node / Web / Mobile ──
+node_modules/
+dist/
+.next/
+.cache/
+*.tsbuildinfo
+
+# Expo
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# ── Environment ──
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ── Supabase ──
+supabase/.temp/
+supabase/.branches/
+
+# ── Docker ──
+docker-compose.override.yml
+
+# ── Logs ──
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Coverage ──
+coverage/
+*.lcov
+TestResults/
+
+# ── Build artifacts ──
+*.dll
+*.exe
+*.pdb
