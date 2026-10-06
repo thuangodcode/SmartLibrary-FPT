@@ -226,18 +226,27 @@ public class AuthController : ControllerBase
         return Ok(ApiResponse<object>.Ok(new { verified = true, message = "Xác minh email thành công!" }));
     }
 
+    public class RegisterReaderForm : SmartLibrary.Application.Interfaces.RegisterExternalReaderRequest
+    {
+        public IFormFile? Front { get; set; }
+        public IFormFile? Back { get; set; }
+        public IFormFile? Selfie { get; set; }
+        public string? Otp { get; set; }
+    }
+
     /// <summary>
     /// Đăng ký tài khoản độc giả ngoài kèm tài liệu xác thực
     /// </summary>
     [HttpPost("register-reader")]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> RegisterReader(
-        [FromForm] RegisterExternalReaderRequest request,
-        [FromForm] IFormFile? front,
-        [FromForm] IFormFile? back,
-        [FromForm] IFormFile? selfie,
-        [FromForm] string? otp)
+    public async Task<IActionResult> RegisterReader([FromForm] RegisterReaderForm form)
     {
+        var request = (SmartLibrary.Application.Interfaces.RegisterExternalReaderRequest)form;
+        var front = form.Front;
+        var back = form.Back;
+        var selfie = form.Selfie;
+        var otp = form.Otp;
+
         if (string.IsNullOrWhiteSpace(request.Email))
             return BadRequest(ApiResponse<object>.Fail("Vui lòng nhập địa chỉ email."));
 
