@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy solution and project files for restore
-COPY SmartLibrary.sln .
+COPY SmartLibrary.slnx .
 COPY src/SmartLibrary.Domain/SmartLibrary.Domain.csproj src/SmartLibrary.Domain/
 COPY src/SmartLibrary.Application/SmartLibrary.Application.csproj src/SmartLibrary.Application/
 COPY src/SmartLibrary.Infrastructure/SmartLibrary.Infrastructure.csproj src/SmartLibrary.Infrastructure/
