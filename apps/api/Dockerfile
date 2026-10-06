@@ -19,15 +19,13 @@ RUN dotnet publish src/SmartLibrary.Api/SmartLibrary.Api.csproj -c Release -o /a
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Create non-root user
-RUN adduser --disabled-password --gecos '' appuser
-
 COPY --from=build /app/publish .
 
-# Create logs directory
-RUN mkdir -p logs && chown -R appuser:appuser /app
+# The .NET 8/9/10 base images already include a non-root user named 'app'
+# Create logs directory and assign ownership to the 'app' user
+RUN mkdir -p logs && chown -R app:app /app
 
-USER appuser
+USER app
 
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
