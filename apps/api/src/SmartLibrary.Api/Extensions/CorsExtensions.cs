@@ -10,8 +10,10 @@ public static class CorsExtensions
         {
             options.AddPolicy(PolicyName, builder =>
             {
-                var origins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-                    ?? new[] { "http://localhost:5173", "http://localhost:3000" };
+                var allowedOriginsString = configuration["Cors:AllowedOrigins"];
+                var origins = string.IsNullOrEmpty(allowedOriginsString)
+                    ? new[] { "http://localhost:5173", "http://localhost:3000" }
+                    : allowedOriginsString.Split(',', StringSplitOptions.RemoveEmptyEntries);
 
                 builder
                     .WithOrigins(origins)

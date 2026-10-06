@@ -7,7 +7,7 @@ import { ToastNotification } from '../../../components/ui/ToastNotification';
 import { registerSchema, type RegisterInput } from '../schemas/authSchemas';
 import { DocumentUploader } from '../components/DocumentUploader';
 
-const API_BASE_URL = 'http://localhost:5278';
+const API_BASE_URL = `${import.meta.env.VITE_API_URL}`;
 
 export const RegisterPage: React.FC = () => {
   const [step, setStep] = useState(1);
@@ -39,7 +39,7 @@ export const RegisterPage: React.FC = () => {
 
   // Countdown timer for Resend OTP
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     if (resendCountdown > 0) {
       timer = setTimeout(() => setResendCountdown((prev) => prev - 1), 1000);
     }

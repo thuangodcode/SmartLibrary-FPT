@@ -6,7 +6,6 @@ import {
   Clock,
   Search,
   RefreshCw,
-  Mail,
   Phone,
   MapPin,
   Calendar,
@@ -94,7 +93,7 @@ export const ReadersManagementPage: React.FC = () => {
   
   // Selected Reader for Detail Modal
   const [selectedReader, setSelectedReader] = useState<ReaderItem | null>(null);
-  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [, setIsDetailLoading] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
   
   // Extend Membership Modal
@@ -123,11 +122,11 @@ export const ReadersManagementPage: React.FC = () => {
       if (statusFilter !== 'All') params.append('status', statusFilter);
       if (typeFilter !== 'All') params.append('readerType', typeFilter);
 
-      let res = await fetch(`http://localhost:5278/api/v1/readers?${params.toString()}`, { headers });
+      let res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/readers?${params.toString()}`, { headers });
       
       // If ReadersController is 404 (e.g. backend process not restarted yet), fallback to registrations/dashboard
       if (res.status === 404) {
-        const regRes = await fetch(`http://localhost:5278/api/v1/registrations?status=All`, { headers });
+        const regRes = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/registrations?status=All`, { headers });
         const regJson = await regRes.json();
         if (regJson.success && regJson.data?.items) {
           const fallbackItems: ReaderItem[] = regJson.data.items.map((r: any) => ({
@@ -191,7 +190,7 @@ export const ReadersManagementPage: React.FC = () => {
       const headers: Record<string, string> = {};
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-      const res = await fetch(`http://localhost:5278/api/v1/readers/${reader.id}`, { headers });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/readers/${reader.id}`, { headers });
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data) {
@@ -219,7 +218,7 @@ export const ReadersManagementPage: React.FC = () => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-      const res = await fetch(`http://localhost:5278/api/v1/readers/${reader.id}/status`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/readers/${reader.id}/status`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({ status: newStatus }),
@@ -245,7 +244,7 @@ export const ReadersManagementPage: React.FC = () => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-      const res = await fetch(`http://localhost:5278/api/v1/readers/${selectedReader.id}/extend-membership`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/readers/${selectedReader.id}/extend-membership`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ months: extendMonths }),

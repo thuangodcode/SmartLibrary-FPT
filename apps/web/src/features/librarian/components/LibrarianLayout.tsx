@@ -24,7 +24,7 @@ export const LibrarianLayout: React.FC = () => {
         const token = useAuthStore.getState().accessToken;
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch('http://localhost:5278/api/v1/dashboard/stats', { headers });
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/dashboard/stats`, { headers });
         const json = await res.json();
         if (json.success && json.data) {
           setPendingCount(json.data.pendingRegistrations);

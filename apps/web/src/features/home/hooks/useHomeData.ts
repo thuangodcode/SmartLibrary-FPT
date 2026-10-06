@@ -45,9 +45,9 @@ export function useHomeData() {
     queryKey: ['homeData'],
     queryFn: async () => {
       const [booksRes, categoriesRes, statsRes] = await Promise.allSettled([
-        fetch('http://localhost:5278/api/v1/books?pageSize=20').then((r) => r.json()),
-        fetch('http://localhost:5278/api/v1/categories').then((r) => r.json()),
-        fetch('http://localhost:5278/api/v1/dashboard/stats').then((r) => r.json()),
+        fetch(`${import.meta.env.VITE_API_URL}/api/v1/books?pageSize=20`).then((r) => r.json()),
+        fetch(`${import.meta.env.VITE_API_URL}/api/v1/categories`).then((r) => r.json()),
+        fetch(`${import.meta.env.VITE_API_URL}/api/v1/dashboard/stats`).then((r) => r.json()),
       ]);
 
       const rawBooks: any[] = booksRes.status === 'fulfilled' && booksRes.value?.success && booksRes.value?.data ? booksRes.value.data : [];

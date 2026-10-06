@@ -23,7 +23,7 @@ const LibrarianDashboard: React.FC = () => {
         const headers: Record<string, string> = {};
         if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-        const res = await fetch('http://localhost:5278/api/v1/dashboard/stats', { headers });
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/dashboard/stats`, { headers });
         const json = await res.json();
         if (json.success && json.data) {
           setStatsData(json.data);

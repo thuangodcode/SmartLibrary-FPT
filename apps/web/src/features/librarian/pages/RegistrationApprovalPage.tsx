@@ -77,7 +77,7 @@ const RegistrationApprovalPage: React.FC = () => {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
 
-      const response = await fetch(`http://localhost:5278/api/v1/registrations?${params.toString()}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/registrations?${params.toString()}`, {
         headers,
       });
 
@@ -123,7 +123,7 @@ const RegistrationApprovalPage: React.FC = () => {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
 
-      const response = await fetch(`http://localhost:5278/api/v1/registrations/${id}/approve`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/registrations/${id}/approve`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -157,7 +157,7 @@ const RegistrationApprovalPage: React.FC = () => {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
 
-      const response = await fetch(`http://localhost:5278/api/v1/registrations/${actionId}/reject`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/registrations/${actionId}/reject`, {
         method: 'POST',
         headers,
         body: JSON.stringify({

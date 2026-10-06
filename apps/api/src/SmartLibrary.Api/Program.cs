@@ -3,6 +3,8 @@ using SmartLibrary.Api.Extensions;
 using SmartLibrary.Api.Filters;
 using SmartLibrary.Api.Middlewares;
 using SmartLibrary.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using SmartLibrary.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,6 +50,12 @@ builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
+// ── Apply Migrations ──
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
 // ── Middleware pipeline ──
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<GlobalExceptionMiddleware>();

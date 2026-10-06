@@ -22,7 +22,7 @@ export const Header: React.FC = () => {
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch('http://localhost:5278/api/v1/categories')
+    fetch(`${import.meta.env.VITE_API_URL}/api/v1/categories`)
       .then((res) => res.json())
       .then((json) => {
         if (json.success && json.data) {
@@ -60,7 +60,7 @@ export const Header: React.FC = () => {
   const handleLogout = async () => {
     try {
       const token = useAuthStore.getState().accessToken;
-      await fetch('http://localhost:5278/api/v1/auth/logout', {
+      await fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/logout`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
