@@ -15,6 +15,12 @@ public static class SwaggerExtensions
                 Description = "RESTful API cho Hệ thống quản lý thư viện thông minh SmartLibrary"
             });
 
+            // Resolve any duplicate operationId conflicts
+            c.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
+
+            // Use fully-qualified type names to avoid schema conflicts for nested / same-named types
+            c.CustomSchemaIds(type => type.FullName?.Replace("+", "."));
+
             c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
                 Description = "Nhập Token vào ô theo định dạng: Bearer {token}",
@@ -43,3 +49,4 @@ public static class SwaggerExtensions
         return services;
     }
 }
+

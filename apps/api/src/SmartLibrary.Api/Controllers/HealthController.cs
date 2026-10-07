@@ -4,9 +4,10 @@ namespace SmartLibrary.Api.Controllers;
 
 [ApiController]
 [Route("[controller]")]
+[ApiExplorerSettings(IgnoreApi = true)]
 public class HealthController : ControllerBase
 {
-    [HttpGet("/health")]
+    [HttpGet("/api/health")]
     public IActionResult Health()
     {
         return Ok(new
@@ -75,7 +76,6 @@ public class HealthController : ControllerBase
     }
 
     [HttpPost("/db-seed")]
-    [HttpGet("/db-seed")]
     public async Task<IActionResult> DbSeed([FromServices] IConfiguration config)
     {
         var connStr = config.GetConnectionString("DefaultConnection");

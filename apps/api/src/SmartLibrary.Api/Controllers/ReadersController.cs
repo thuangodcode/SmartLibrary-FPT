@@ -217,7 +217,7 @@ public class ReadersController : ControllerBase
         }
 
         await _context.SaveChangesAsync(ct);
-        return Ok(ApiResponse<object>.Ok(user, new { message = "Cập nhật thông tin độc giả thành công!" }));
+        return Ok(ApiResponse<object>.Ok(new { user.Id, user.FullName, user.Phone, user.Address, user.StudentId, user.ReaderType }, new { message = "Cập nhật thông tin độc giả thành công!" }));
     }
 }
 

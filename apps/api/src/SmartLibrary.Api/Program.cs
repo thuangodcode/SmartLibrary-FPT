@@ -51,16 +51,23 @@ builder.Services.AddHealthChecks();
 var app = builder.Build();
 
 // ── Apply Migrations ──
-using (var scope = app.Services.CreateScope())
+try
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Database.Migrate();
+    }
 }
-// ── Middleware pipeline ──
-app.UseMiddleware<RequestLoggingMiddleware>();
-app.UseMiddleware<GlobalExceptionMiddleware>();
+catch (Exception ex)
+{
+    Log.Warning(ex, "Could not apply migrations at startup. The database may not be reachable yet.");
+}
 
-// Swagger (enabled in all environments for API testing)
+// ── Middleware pipeline ──
+
+// Swagger MUST be before GlobalExceptionMiddleware so that swagger.json
+// generation errors are not swallowed and turned into a generic 500 response.
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -68,10 +75,14 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
+app.UseMiddleware<RequestLoggingMiddleware>();
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
 app.UseCors(CorsExtensions.PolicyName);
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/api/health-check");
 
 app.Run();
+
