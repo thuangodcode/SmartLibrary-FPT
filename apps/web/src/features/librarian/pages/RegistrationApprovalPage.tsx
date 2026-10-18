@@ -575,9 +575,9 @@ export const RegistrationApprovalPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Buttons if Pending */}
+              {/* Action Buttons if Pending, or Status Confirmation Banner */}
               <div className="reg-detail-controls">
-                {normalizeStatus(selected.status) === 'Submitted' && (
+                {normalizeStatus(selected.status) === 'Submitted' ? (
                   <>
                     <button
                       className="reg-button reg-button--approve"
@@ -597,6 +597,14 @@ export const RegistrationApprovalPage: React.FC = () => {
                       <X size={15} /> Từ chối đơn
                     </button>
                   </>
+                ) : normalizeStatus(selected.status) === 'Approved' ? (
+                  <div className="reg-detail-badge reg-detail-badge--approved">
+                    <Check size={16} /> Hồ sơ này đã được phê duyệt thành công
+                  </div>
+                ) : (
+                  <div className="reg-detail-badge reg-detail-badge--rejected">
+                    <X size={16} /> Hồ sơ này đã bị từ chối
+                  </div>
                 )}
               </div>
             </div>

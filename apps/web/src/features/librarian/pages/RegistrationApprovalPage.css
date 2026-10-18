@@ -535,6 +535,29 @@
   gap: 10px;
 }
 
+.reg-detail-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 650;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.reg-detail-badge--approved {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.reg-detail-badge--rejected {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
 /* Grid Breakdown in Detail */
 .reg-detail-layout {
   display: grid;
