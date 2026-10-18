@@ -26,6 +26,21 @@ public class EmailService : IEmailService
         var resendApiKey = _configuration["Resend:ApiKey"];
         if (!string.IsNullOrWhiteSpace(resendApiKey))
         {
+            resendApiKey = resendApiKey.Trim();
+            if (!resendApiKey.StartsWith("re_") && resendApiKey.Length > 20)
+            {
+                try
+                {
+                    var bytes = Convert.FromBase64String(resendApiKey);
+                    var decoded = System.Text.Encoding.UTF8.GetString(bytes);
+                    if (decoded.StartsWith("re_"))
+                    {
+                        resendApiKey = decoded.Trim();
+                    }
+                }
+                catch { }
+            }
+
             try
             {
                 var from = _configuration["Resend:From"] ?? "SmartLibrary <onboarding@resend.dev>";
