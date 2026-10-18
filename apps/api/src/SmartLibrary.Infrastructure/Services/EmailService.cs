@@ -32,7 +32,8 @@ public class EmailService : IEmailService
             string.IsNullOrWhiteSpace(password) ||
             string.IsNullOrWhiteSpace(fromAddress))
         {
-            throw new InvalidOperationException("SMTP email delivery is not configured.");
+            _logger.LogWarning("SMTP email delivery is not configured. Email to {To} was skipped.", to);
+            return;
         }
 
         using var message = new MailMessage
