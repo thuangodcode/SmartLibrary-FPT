@@ -10,6 +10,7 @@ namespace SmartLibrary.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/[controller]")]
+[Authorize(Policy = "LibrarianOnly")]
 public class ReadersController : ControllerBase
 {
     private readonly AppDbContext _context;
@@ -30,7 +31,7 @@ public class ReadersController : ControllerBase
     {
         var query = _context.UserProfiles
             .Include(u => u.Role)
-            .Where(u => !u.IsDeleted)
+            .Where(u => !u.IsDeleted && u.Role.Name == "Reader")
             .AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(q))
@@ -89,9 +90,11 @@ public class ReadersController : ControllerBase
             .ToListAsync(ct);
 
         // Stats summary
-        var totalActive = await _context.UserProfiles.CountAsync(u => !u.IsDeleted && u.Status == AccountStatus.Active, ct);
-        var totalPending = await _context.UserProfiles.CountAsync(u => !u.IsDeleted && (u.Status == AccountStatus.PendingApproval || u.Status == AccountStatus.PendingVerification), ct);
-        var totalSuspended = await _context.UserProfiles.CountAsync(u => !u.IsDeleted && u.Status == AccountStatus.Suspended, ct);
+        var totalActive = await CountReadersByStatusAsync("Active", ct);
+        var totalPending = await _context.Database
+            .SqlQuery<int>($"SELECT COUNT(*)::int AS \"Value\" FROM profiles p JOIN roles r ON p.role_id = r.id WHERE p.is_deleted = false AND r.name = 'Reader' AND p.status::text IN ('PendingApproval', 'PendingVerification')")
+            .SingleAsync(ct);
+        var totalSuspended = await CountReadersByStatusAsync("Suspended", ct);
 
         return Ok(ApiResponse<object>.Ok(new
         {
@@ -102,7 +105,7 @@ public class ReadersController : ControllerBase
             totalPages = (int)Math.Ceiling(total / (double)pageSize),
             stats = new
             {
-                totalReaders = await _context.UserProfiles.CountAsync(u => !u.IsDeleted, ct),
+                totalReaders = await _context.UserProfiles.CountAsync(u => !u.IsDeleted && u.Role.Name == "Reader", ct),
                 activeReaders = totalActive,
                 pendingReaders = totalPending,
                 suspendedReaders = totalSuspended
@@ -110,12 +113,17 @@ public class ReadersController : ControllerBase
         }));
     }
 
+    private Task<int> CountReadersByStatusAsync(string status, CancellationToken ct) =>
+        _context.Database
+            .SqlQuery<int>($"SELECT COUNT(*)::int AS \"Value\" FROM profiles p JOIN roles r ON p.role_id = r.id WHERE p.is_deleted = false AND r.name = 'Reader' AND p.status::text = {status}")
+            .SingleAsync(ct);
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetReaderDetail(Guid id, CancellationToken ct = default)
     {
         var reader = await _context.UserProfiles
             .Include(u => u.Role)
-            .Where(u => u.Id == id && !u.IsDeleted)
+            .Where(u => u.Id == id && !u.IsDeleted && u.Role.Name == "Reader")
             .Select(u => new
             {
                 u.Id,

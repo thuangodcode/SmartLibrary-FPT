@@ -53,6 +53,19 @@ public class AppDbContext : DbContext
             entity.Property(u => u.ReaderType).HasConversion<string>();
         });
 
+        modelBuilder.Entity<Role>().ToTable("roles");
+
+        modelBuilder.Entity<UserImportBatch>(entity =>
+        {
+            entity.ToTable("user_import_batches");
+            entity.Property(batch => batch.CreatedById).HasColumnName("created_by");
+            entity.Property(batch => batch.Errors).HasColumnType("jsonb");
+            entity.Ignore(batch => batch.UpdatedAt);
+            entity.HasOne(batch => batch.CreatedBy)
+                .WithMany()
+                .HasForeignKey(batch => batch.CreatedById);
+        });
+
         modelBuilder.Entity<RegistrationRequest>(entity =>
         {
             entity.ToTable("registration_requests");

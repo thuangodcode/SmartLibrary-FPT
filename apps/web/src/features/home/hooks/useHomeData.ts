@@ -49,9 +49,30 @@ export function useHomeData() {
         fetch(`${import.meta.env.VITE_API_URL}/api/v1/categories`).then((r) => r.json()),
         fetch(`${import.meta.env.VITE_API_URL}/api/v1/dashboard/stats`).then((r) => r.json()),
       ]);
+      interface RawBookItem {
+        id: string;
+        title: string;
+        authorNames?: string[];
+        categoryNames?: string[];
+        isbn?: string;
+        publishedYear?: number;
+        averageRating?: number;
+        availableCopies: number;
+        totalCopies: number;
+        description?: string;
+      }
 
-      const rawBooks: any[] = booksRes.status === 'fulfilled' && booksRes.value?.success && booksRes.value?.data ? booksRes.value.data : [];
-      const rawCategories: any[] = categoriesRes.status === 'fulfilled' && categoriesRes.value?.success && categoriesRes.value?.data ? categoriesRes.value.data : [];
+      interface RawCategoryItem {
+        id: string;
+        name: string;
+        bookCount?: number;
+        description?: string;
+      }
+
+      const rawBooks: RawBookItem[] =
+        booksRes.status === 'fulfilled' && booksRes.value?.success && booksRes.value?.data ? booksRes.value.data : [];
+      const rawCategories: RawCategoryItem[] =
+        categoriesRes.status === 'fulfilled' && categoriesRes.value?.success && categoriesRes.value?.data ? categoriesRes.value.data : [];
       const rawStats = statsRes.status === 'fulfilled' && statsRes.value?.success && statsRes.value?.data ? statsRes.value.data : null;
 
       const books: Book[] = rawBooks.map((b, idx) => ({
@@ -63,7 +84,7 @@ export function useHomeData() {
         publishYear: b.publishedYear || 2024,
         publisher: 'FPT University Press',
         coverGradient: GRADIENTS[idx % GRADIENTS.length],
-        rating: b.averageRating > 0 ? b.averageRating : 4.8,
+        rating: typeof b.averageRating === 'number' && b.averageRating > 0 ? b.averageRating : 4.8,
         reviewCount: 15,
         availableCopies: b.availableCopies,
         totalCopies: b.totalCopies,

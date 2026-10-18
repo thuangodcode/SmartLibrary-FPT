@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Lock, ArrowRight } from 'lucide-react';
+import { Lock, ArrowRight, AlertCircle } from 'lucide-react';
 import { AuthLayout } from '../components/AuthLayout';
 import { resetPasswordSchema, type ResetPasswordInput } from '../schemas/authSchemas';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../../config';
+import { parseApiResponse } from '../../../lib/api';
 
 export const ResetPasswordPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const token = new URLSearchParams(window.location.hash.slice(1)).get('access_token');
   const navigate = useNavigate();
 
   const {
@@ -18,11 +22,27 @@ export const ResetPasswordPage: React.FC = () => {
     resolver: zodResolver(resetPasswordSchema),
   });
 
-  const onSubmit = async () => {
+  const onSubmit = async ({ password }: ResetPasswordInput) => {
+    if (!token) {
+      setRequestError('Liên kết đặt mật khẩu không hợp lệ hoặc đã hết hạn. Hãy yêu cầu email mới.');
+      return;
+    }
+
     setIsLoading(true);
+    setRequestError(null);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, newPassword: password }),
+      });
+      const result = await parseApiResponse<{ success?: boolean; error?: string }>(response);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || 'Không thể cập nhật mật khẩu.');
+      }
       navigate('/login?resetSuccess=true');
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : 'Không thể cập nhật mật khẩu.');
     } finally {
       setIsLoading(false);
     }
@@ -34,6 +54,12 @@ export const ResetPasswordPage: React.FC = () => {
       subtitle="Nhập mật khẩu mới cho tài khoản SmartLibrary của bạn"
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {!token && (
+          <p className="flex items-start gap-2 text-[11px] text-rose-500 font-medium" role="alert">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            Liên kết đặt mật khẩu không hợp lệ hoặc đã hết hạn. Hãy yêu cầu email mới.
+          </p>
+        )}
         <div>
           <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
             Mật khẩu mới
@@ -70,9 +96,11 @@ export const ResetPasswordPage: React.FC = () => {
           )}
         </div>
 
+        {requestError && token && <p className="text-[11px] text-rose-500 font-medium" role="alert">{requestError}</p>}
+
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || !token}
           className="w-full py-3.5 rounded-2xl bg-slate-900 dark:bg-indigo-600 text-white font-semibold text-xs sm:text-sm shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
         >
           {isLoading ? (

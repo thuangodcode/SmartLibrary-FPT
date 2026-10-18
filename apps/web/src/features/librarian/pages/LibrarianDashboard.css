@@ -1,0 +1,333 @@
+/* ==========================================================================
+   SmartLibrary FPT - Librarian Dashboard
+   Design System unified with Admin UI
+   ========================================================================== */
+
+.lib-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  color: #263247;
+}
+
+/* ─── Page Heading ─── */
+.lib-page-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.lib-eyebrow {
+  margin: 0 0 7px;
+  color: #e8783e;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.lib-page-heading h1 {
+  margin: 0;
+  color: #192235;
+  font-size: clamp(24px, 3vw, 30px);
+  font-weight: 750;
+  letter-spacing: -0.045em;
+}
+
+.lib-page-description {
+  margin: 7px 0 0;
+  color: #8790a0;
+  font-size: 13px;
+}
+
+.lib-refresh-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #8b94a3;
+  font-size: 12px;
+}
+
+.lib-spin {
+  animation: lib-spin-kf 1s linear infinite;
+}
+
+@keyframes lib-spin-kf {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Metric Cards Grid ─── */
+.lib-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.lib-metric-card {
+  min-width: 0;
+  padding: 18px 20px 17px;
+  border: 1px solid #e9ecf3;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(37, 48, 72, 0.03);
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.16s ease;
+}
+
+.lib-metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(37, 48, 72, 0.06);
+  border-color: #dbe1eb;
+}
+
+.lib-metric-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lib-metric-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.lib-tone-orange {
+  color: #e8783e;
+  background: #fff1e8;
+}
+
+.lib-tone-blue {
+  color: #3b82f6;
+  background: #eff6ff;
+}
+
+.lib-tone-green {
+  color: #10b981;
+  background: #ecfdf5;
+}
+
+.lib-tone-purple {
+  color: #8b5cf6;
+  background: #f5f3ff;
+}
+
+.lib-tone-red {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.lib-metric-arrow {
+  color: #b2b9c7;
+  transition: transform 0.16s ease, color 0.16s ease;
+}
+
+.lib-metric-card:hover .lib-metric-arrow {
+  color: #e8783e;
+  transform: translate(2px, -2px);
+}
+
+.lib-metric-value {
+  margin: 16px 0 0;
+  color: #192235;
+  font-size: 28px;
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.lib-metric-label {
+  margin: 6px 0 0;
+  color: #7b8595;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lib-metric-note {
+  margin: 6px 0 0;
+  color: #a0a8b7;
+  font-size: 11px;
+}
+
+/* ─── Two-Column Panels ─── */
+.lib-grid-two {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 18px;
+}
+
+.lib-panel {
+  border: 1px solid #e9ecf3;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(37, 48, 72, 0.03);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.lib-panel-header {
+  margin-bottom: 18px;
+}
+
+.lib-panel-kicker {
+  margin: 0 0 5px;
+  color: #e8783e;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lib-panel-header h2 {
+  margin: 0;
+  color: #192235;
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.lib-panel-header p {
+  margin: 4px 0 0;
+  color: #8790a0;
+  font-size: 12px;
+}
+
+/* ─── Action Cards Grid ─── */
+.lib-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.lib-action-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid #e9edf4;
+  border-radius: 11px;
+  background: #fafbfc;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.16s ease;
+}
+
+.lib-action-card:hover {
+  background: #fff;
+  border-color: #d95f27;
+  box-shadow: 0 4px 14px rgba(217, 95, 39, 0.08);
+  transform: translateY(-1px);
+}
+
+.lib-action-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.lib-action-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.lib-action-info strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #192235;
+}
+
+.lib-action-info p {
+  margin: 3px 0 0;
+  font-size: 11px;
+  color: #8790a0;
+  line-height: 1.35;
+}
+
+/* ─── Status Breakdown List ─── */
+.lib-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lib-breakdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lib-breakdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.lib-breakdown-name {
+  color: #536074;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lib-breakdown-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.lib-breakdown-val {
+  color: #192235;
+  font-weight: 750;
+}
+
+.lib-progress-bar {
+  height: 7px;
+  background: #f0f2f7;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.lib-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 1080px) {
+  .lib-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lib-grid-two {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .lib-metric-grid {
+    grid-template-columns: 1fr;
+  }
+  .lib-actions-grid {
+    grid-template-columns: 1fr;
+  }
+  .lib-page-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

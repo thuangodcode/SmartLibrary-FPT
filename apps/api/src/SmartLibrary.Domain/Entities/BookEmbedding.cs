@@ -11,5 +11,5 @@ public class BookEmbedding : BaseEntity
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation
-    public Book Book { get; set; } = null!;
+    public Book? Book { get; set; }
 }

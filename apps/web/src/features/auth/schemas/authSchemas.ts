@@ -3,8 +3,9 @@ import { z } from 'zod';
 export const loginSchema = z.object({
   email: z
     .string()
-    .min(1, 'Email không được để trống.')
-    .email('Định dạng email không hợp lệ.'),
+    .trim()
+    .min(1, 'Vui lòng nhập email hoặc tên đăng nhập.')
+    .max(320, 'Thông tin đăng nhập quá dài.'),
   password: z
     .string()
     .min(1, 'Mật khẩu không được để trống.'),
@@ -21,13 +22,7 @@ export const registerSchema = z
       .string()
       .min(1, 'Email không được để trống.')
       .email('Định dạng email không hợp lệ.'),
-    password: z
-      .string()
-      .min(8, 'Mật khẩu tối thiểu 8 ký tự.')
-      .regex(/[A-Z]/, 'Chứa ít nhất 1 chữ cái viết hoa.')
-      .regex(/[a-z]/, 'Chứa ít nhất 1 chữ cái viết thường.')
-      .regex(/[0-9]/, 'Chứa ít nhất 1 chữ số.')
-      .regex(/[^a-zA-Z0-9]/, 'Chứa ít nhất 1 ký tự đặc biệt.'),
+    password: z.string().min(1, 'Mật khẩu không được để trống.'),
     confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu.'),
     agreeTerms: z.boolean().refine((val) => val === true, {
       message: 'Bạn cần đồng ý với điều khoản sử dụng.',

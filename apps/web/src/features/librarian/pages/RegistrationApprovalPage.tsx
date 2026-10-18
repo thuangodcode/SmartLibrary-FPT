@@ -1,6 +1,33 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Check, X, Eye, Clock, Search, FileText, Calendar, Mail, Phone, MapPin, RefreshCw, Loader2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  Calendar,
+  Check,
+  Clock,
+  Download,
+  Eye,
+  FileSpreadsheet,
+  FileText,
+  LoaderCircle,
+  Mail,
+  MapPin,
+  Phone,
+  RefreshCw,
+  Search,
+  Upload,
+  User,
+  Users,
+  UserRoundCheck,
+  X,
+  ZoomIn,
+} from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
+import { parseApiResponse } from '../../../lib/api';
+import { API_BASE_URL } from '../../../config';
+import './RegistrationApprovalPage.css';
+
+/* ─── types ─── */
 
 interface RegistrationItem {
   id: string;
@@ -17,6 +44,27 @@ interface RegistrationItem {
   selfieUrl?: string | null;
 }
 
+interface ImportResult {
+  id: string;
+  totalRows: number;
+  successRows: number;
+  failedRows: number;
+  notificationFailureCount: number;
+  results: Array<{
+    row: number;
+    email: string;
+    success: boolean;
+    passwordSetupEmailSent: boolean;
+    message?: string | null;
+  }>;
+}
+
+interface ApiResult<T> {
+  success?: boolean;
+  data?: T;
+  error?: string;
+}
+
 const DOC_TYPE_LABELS: Record<string, string> = {
   NationalId: 'CCCD/CMND',
   StudentCard: 'Thẻ HSSV',
@@ -26,534 +74,832 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   '2': 'Bằng Lái Xe',
 };
 
-const normalizeStatus = (status: string | number): 'Submitted' | 'Approved' | 'Rejected' => {
-  if (status === 0 || status === 'Submitted') return 'Submitted';
-  if (status === 1 || status === 'Approved') return 'Approved';
-  if (status === 2 || status === 'Rejected') return 'Rejected';
-  return 'Submitted';
+const normalizeDocType = (dt: string | number): string => {
+  if (dt === 0 || dt === '0' || dt === 'NationalId') return 'NationalId';
+  if (dt === 1 || dt === '1' || dt === 'StudentCard') return 'StudentCard';
+  if (dt === 2 || dt === '2' || dt === 'DriverLicense') return 'DriverLicense';
+  return String(dt);
 };
 
-const normalizeDocType = (docType: string | number): string => {
-  if (docType === 0) return 'NationalId';
-  if (docType === 1) return 'StudentCard';
-  if (docType === 2) return 'DriverLicense';
-  return String(docType || 'NationalId');
+const normalizeStatus = (status: string | number): string => {
+  if (status === 0 || status === '0' || status === 'Submitted') return 'Submitted';
+  if (status === 1 || status === '1' || status === 'Approved') return 'Approved';
+  if (status === 2 || status === '2' || status === 'Rejected') return 'Rejected';
+  return String(status);
 };
 
-const RegistrationApprovalPage: React.FC = () => {
-  const [registrations, setRegistrations] = useState<RegistrationItem[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'Submitted' | 'Approved' | 'Rejected' | 'All'>('Submitted');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isActionLoading, setIsActionLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [actionId, setActionId] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+const statusLabels: Record<string, string> = {
+  Submitted: 'Chờ duyệt',
+  Approved: 'Đã duyệt',
+  Rejected: 'Đã từ chối',
+};
 
+const statusTones: Record<string, string> = {
+  Submitted: 'yellow',
+  Approved: 'green',
+  Rejected: 'red',
+};
+
+let registrationsCache: RegistrationItem[] | null = null;
+
+export const RegistrationApprovalPage: React.FC = () => {
+  const [registrations, setRegistrations] = useState<RegistrationItem[]>(() => registrationsCache || []);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const [loading, setLoading] = useState(() => !registrationsCache || registrationsCache.length === 0);
+  const [error, setError] = useState<string | null>(null);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  // View state: 'list' | 'detail'
+  const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Filters & Search
+  const [filter, setFilter] = useState<'All' | 'Submitted' | 'Approved' | 'Rejected'>('All');
+  const [search, setSearch] = useState('');
+
+  // Modals & Action states
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [isActionLoading, setIsActionLoading] = useState(false);
+
+  // Lightbox for document inspection
+  const [lightboxImg, setLightboxImg] = useState<{ src: string; caption: string } | null>(null);
+
+  const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
+
+  const showToast = useCallback((message: string, tone: 'success' | 'error' = 'success') => {
+    setToast({ message, tone });
+    setTimeout(() => setToast(null), 4000);
+  }, []);
 
   const fetchRegistrations = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    try {
-      const params = new URLSearchParams();
-      if (filter !== 'All') {
-        params.append('status', filter);
-      }
-      if (searchQuery.trim()) {
-        params.append('q', searchQuery.trim());
-      }
-
-      const headers: Record<string, string> = {};
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/registrations?${params.toString()}`, {
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Máy chủ trả về mã lỗi: ${response.status}`);
-      }
-
-      const json = await response.json();
-      if (json.success && json.data) {
-        const items: RegistrationItem[] = json.data.items || [];
-        setRegistrations(items);
-        setSelectedId((current) => {
-          if (items.length > 0) {
-            if (!current || !items.some((i) => i.id === current)) {
-              return items[0].id;
-            }
-            return current;
-          }
-          return null;
-        });
-      } else {
-        throw new Error(json.error || 'Không thể lấy dữ liệu đơn đăng ký');
-      }
-    } catch (err: unknown) {
-      const errStr = err instanceof Error ? err.message : 'Không thể kết nối đến Backend API';
-      setErrorMessage(errStr);
-    } finally {
-      setIsLoading(false);
+    if (!registrationsCache || registrationsCache.length === 0) {
+      setLoading(true);
     }
-  }, [filter, searchQuery, accessToken]);
+    setError(null);
+    try {
+      const headers: Record<string, string> = {};
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/registrations`, { headers });
+      const json = await parseApiResponse<{ success?: boolean; data?: { items?: RegistrationItem[] } | RegistrationItem[]; error?: string }>(res);
+      let list: RegistrationItem[] = [];
+      const d = json?.data;
+      if (Array.isArray(d)) {
+        list = d;
+      } else if (d && 'items' in d && Array.isArray(d.items)) {
+        list = d.items;
+      }
+      registrationsCache = list;
+      setRegistrations(list);
+    } catch {
+      if (!registrationsCache) {
+        setError('Không thể tải danh sách đơn đăng ký. Vui lòng thử lại.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken]);
 
   useEffect(() => {
-    fetchRegistrations();
+    void Promise.resolve().then(() => fetchRegistrations());
   }, [fetchRegistrations]);
 
+  // Actions
   const handleApprove = async (id: string) => {
     setIsActionLoading(true);
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/registrations/${id}/approve`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/registrations/${id}/approve`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          membershipExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-          note: 'Phê duyệt tài khoản độc giả thư viện FPT',
-        }),
+        body: JSON.stringify({}),
       });
 
-      const json = await response.json();
-      if (!response.ok || !json.success) {
-        throw new Error(json.error || 'Phê duyệt thất bại.');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Không thể phê duyệt đơn này');
       }
 
-      showToast('Đã phê duyệt tài khoản thành công!');
+      showToast('Đã phê duyệt tài khoản độc giả thành công!');
       await fetchRegistrations();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Lỗi khi phê duyệt');
+      showToast(err instanceof Error ? err.message : 'Lỗi phê duyệt', 'error');
     } finally {
       setIsActionLoading(false);
     }
   };
 
   const handleReject = async () => {
-    if (!actionId || !rejectReason.trim()) return;
+    if (!selectedId || !rejectReason.trim()) return;
     setIsActionLoading(true);
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
+      const token = useAuthStore.getState().accessToken;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/registrations/${actionId}/reject`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/registrations/${selectedId}/reject`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          reason: rejectReason.trim(),
-        }),
+        body: JSON.stringify({ reason: rejectReason }),
       });
 
-      const json = await response.json();
-      if (!response.ok || !json.success) {
-        throw new Error(json.error || 'Từ chối thất bại.');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Không thể từ chối đơn này');
       }
 
       showToast('Đã từ chối đơn đăng ký thành công!');
       setShowRejectModal(false);
-      setActionId(null);
       setRejectReason('');
       await fetchRegistrations();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Lỗi khi từ chối');
+      showToast(err instanceof Error ? err.message : 'Lỗi khi từ chối đơn', 'error');
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  const openRejectModal = (id: string) => {
-    setActionId(id);
-    setShowRejectModal(true);
+  const handleImport = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!importFile) return;
+
+    setImportBusy(true);
+    setImportResult(null);
+
+    const formData = new FormData();
+    formData.append('file', importFile);
+
+    try {
+      const token = useAuthStore.getState().accessToken;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/librarian/users/import`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      const result = await parseApiResponse<ApiResult<ImportResult>>(response);
+      if (!response.ok || !result?.data) {
+        throw new Error(result?.error || 'Không thể nhập tệp CSV.');
+      }
+
+      setImportResult(result.data);
+      setImportFile(null);
+      showToast(`Đã nhập thành công ${result.data.successRows}/${result.data.totalRows} độc giả!`);
+      await fetchRegistrations();
+    } catch (importError) {
+      showToast(importError instanceof Error ? importError.message : 'Không thể nhập tệp CSV.', 'error');
+    } finally {
+      setImportBusy(false);
+    }
   };
+
+  const downloadTemplate = () => {
+    const csvContent =
+      'fullName,email,studentId,phone,readerType,address,dateOfBirth\n' +
+      'Nguyen Van A,anguyen@fpt.edu.vn,SE123456,0987654321,Student,Ha Noi,2002-01-15\n' +
+      'Tran Thi B,btran@fpt.edu.vn,,0912345678,Lecturer,TP HCM,1988-06-20\n' +
+      'Le Van C,cle@gmail.com,,0909090909,External,Da Nang,1995-12-10\n';
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'template_import_readers.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Filtered registrations
+  const filtered = useMemo(() => {
+    return registrations.filter((reg) => {
+      const normStatus = normalizeStatus(reg.status);
+      if (filter !== 'All' && normStatus !== filter) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        return (
+          reg.fullName?.toLowerCase().includes(q) ||
+          reg.email?.toLowerCase().includes(q) ||
+          reg.phone?.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [registrations, filter, search]);
 
   const selected = registrations.find((r) => r.id === selectedId);
 
+  // Metrics
+  const stats = useMemo(() => {
+    const total = registrations.length;
+    const submitted = registrations.filter((r) => normalizeStatus(r.status) === 'Submitted').length;
+    const approved = registrations.filter((r) => normalizeStatus(r.status) === 'Approved').length;
+    const rejected = registrations.filter((r) => normalizeStatus(r.status) === 'Rejected').length;
+    return { total, submitted, approved, rejected };
+  }, [registrations]);
+
+  const openDetail = async (id: string) => {
+    setSelectedId(id);
+    setViewMode('detail');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    try {
+      const headers: Record<string, string> = {};
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+      const res = await fetch(`${API_BASE_URL}/api/v1/registrations/${id}`, { headers });
+      const json = await parseApiResponse<{ success?: boolean; data?: Partial<RegistrationItem> }>(res);
+      if (json?.data) {
+        setRegistrations((prev) =>
+          prev.map((item) => (item.id === id ? { ...item, ...json.data } : item))
+        );
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const backToList = () => {
+    setViewMode('list');
+  };
+
   return (
-    <div className="flex gap-6 h-[calc(100vh-8rem)] relative">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="absolute top-2 right-4 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-          <Check className="w-4 h-4" />
-          <span>{toastMessage}</span>
-        </div>
+    <section className="reg-page">
+      {/* ─── Mode: LIST VIEW (Table) ─── */}
+      {viewMode === 'list' && (
+        <>
+          {/* Header */}
+          <header className="reg-heading">
+            <div>
+              <p className="reg-eyebrow">THỦ THƯ / DUYỆT TÀI KHOẢN</p>
+              <h1>Duyệt Đăng Ký Độc Giả</h1>
+              <p className="reg-description">
+                Xét duyệt tài khoản bạn đọc đăng ký từ bên ngoài và nhập danh sách sinh viên/giảng viên hàng loạt.
+              </p>
+            </div>
+            <div className="reg-actions">
+              <button className="reg-button reg-button--secondary" onClick={fetchRegistrations} type="button">
+                <RefreshCw size={15} className={loading ? 'reg-spin' : ''} /> Làm mới
+              </button>
+              <button
+                className="reg-button reg-button--primary"
+                onClick={() => {
+                  setImportResult(null);
+                  setShowImportDialog(true);
+                }}
+                type="button"
+              >
+                <Upload size={15} /> Nhập danh sách
+              </button>
+            </div>
+          </header>
+
+          {/* Top 4 Metrics Cards */}
+          <div className="reg-metrics">
+            <article className="reg-metric">
+              <div>
+                <div className="reg-metric-num">{stats.total}</div>
+                <div className="reg-metric-label">Tổng số hồ sơ</div>
+              </div>
+              <span className="reg-metric-icon reg-tone-orange">
+                <Users size={18} />
+              </span>
+            </article>
+
+            <article className="reg-metric">
+              <div>
+                <div className="reg-metric-num">{stats.submitted}</div>
+                <div className="reg-metric-label">Chờ xét duyệt</div>
+              </div>
+              <span className="reg-metric-icon reg-tone-yellow">
+                <Clock size={18} />
+              </span>
+            </article>
+
+            <article className="reg-metric">
+              <div>
+                <div className="reg-metric-num">{stats.approved}</div>
+                <div className="reg-metric-label">Đã phê duyệt</div>
+              </div>
+              <span className="reg-metric-icon reg-tone-green">
+                <UserRoundCheck size={18} />
+              </span>
+            </article>
+
+            <article className="reg-metric">
+              <div>
+                <div className="reg-metric-num">{stats.rejected}</div>
+                <div className="reg-metric-label">Đã từ chối</div>
+              </div>
+              <span className="reg-metric-icon reg-tone-red">
+                <X size={18} />
+              </span>
+            </article>
+          </div>
+
+          {/* Table Panel */}
+          <section className="reg-table-panel">
+            {/* Toolbar */}
+            <div className="reg-table-toolbar">
+              <nav className="reg-filter-tabs" aria-label="Lọc trạng thái hồ sơ">
+                <button
+                  type="button"
+                  className={filter === 'All' ? 'is-active' : ''}
+                  onClick={() => setFilter('All')}
+                >
+                  Tất cả <span className="reg-tab-badge">{stats.total}</span>
+                </button>
+                <button
+                  type="button"
+                  className={filter === 'Submitted' ? 'is-active' : ''}
+                  onClick={() => setFilter('Submitted')}
+                >
+                  Chờ duyệt <span className="reg-tab-badge">{stats.submitted}</span>
+                </button>
+                <button
+                  type="button"
+                  className={filter === 'Approved' ? 'is-active' : ''}
+                  onClick={() => setFilter('Approved')}
+                >
+                  Đã duyệt <span className="reg-tab-badge">{stats.approved}</span>
+                </button>
+                <button
+                  type="button"
+                  className={filter === 'Rejected' ? 'is-active' : ''}
+                  onClick={() => setFilter('Rejected')}
+                >
+                  Đã từ chối <span className="reg-tab-badge">{stats.rejected}</span>
+                </button>
+              </nav>
+
+              <label className="reg-search">
+                <Search size={15} />
+                <input
+                  type="text"
+                  placeholder="Tìm theo họ tên, email, SĐT..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </label>
+            </div>
+
+            {/* Table */}
+            <div className="reg-table-scroll">
+              {loading ? (
+                <div className="reg-state-box">
+                  <LoaderCircle className="reg-spin" size={26} />
+                  <span>Đang tải danh sách hồ sơ...</span>
+                </div>
+              ) : error ? (
+                <div className="reg-state-box" style={{ color: '#dc2626' }}>
+                  <AlertCircle size={26} />
+                  <span>{error}</span>
+                  <button className="reg-button reg-button--secondary" onClick={fetchRegistrations} type="button">
+                    Thử lại
+                  </button>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="reg-state-box">
+                  <FileText size={26} />
+                  <span>Không tìm thấy hồ sơ đăng ký nào phù hợp.</span>
+                </div>
+              ) : (
+                <table className="reg-table">
+                  <thead>
+                    <tr>
+                      <th>Người Đăng Ký</th>
+                      <th>Số Điện Thoại</th>
+                      <th>Loại Giấy Tờ</th>
+                      <th>Ngày Nộp Đơn</th>
+                      <th>Trạng Thái</th>
+                      <th style={{ textAlign: 'right' }}>Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((reg) => {
+                      const normStatus = normalizeStatus(reg.status);
+                      const initials = reg.fullName
+                        ? reg.fullName
+                            .split(' ')
+                            .map((n) => n[0])
+                            .slice(-2)
+                            .join('')
+                            .toUpperCase()
+                        : 'ĐG';
+
+                      return (
+                        <tr key={reg.id} onClick={() => openDetail(reg.id)}>
+                          <td>
+                            <div className="reg-user-cell">
+                              <div className="reg-table-avatar">{initials}</div>
+                              <div className="reg-user-names">
+                                <strong>{reg.fullName}</strong>
+                                <span>{reg.email}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{reg.phone || '—'}</td>
+                          <td>
+                            <strong>{DOC_TYPE_LABELS[normalizeDocType(reg.documentType)] || 'Giấy tờ'}</strong>
+                          </td>
+                          <td>{new Date(reg.submittedAt).toLocaleString('vi-VN')}</td>
+                          <td>
+                            <span className={`reg-status reg-status--${statusTones[normStatus]}`}>
+                              {statusLabels[normStatus]}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="reg-table-action-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDetail(reg.id);
+                              }}
+                            >
+                              <Eye size={13} /> Xem & Duyệt
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </section>
+        </>
       )}
 
-      {/* Left Panel - List */}
-      <div className="w-[420px] shrink-0 flex flex-col bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-        {/* Filter Bar */}
-        <div className="p-4 border-b border-slate-100 dark:border-slate-800 space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchRegistrations()}
-                placeholder="Tìm theo tên, email, SĐT..."
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-white"
-              />
-            </div>
-            <button
-              onClick={fetchRegistrations}
-              title="Tải lại từ cơ sở dữ liệu"
-              className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+      {/* ─── Mode: DETAIL VIEW (Inspect full candidate details) ─── */}
+      {viewMode === 'detail' && selected && (
+        <div className="reg-detail-view">
+          {/* Top navigation */}
+          <div className="reg-back-bar">
+            <button type="button" className="reg-back-button" onClick={backToList}>
+              <ArrowLeft size={16} /> Quay lại danh sách đơn
             </button>
           </div>
 
-          <div className="flex gap-1.5">
-            {(['Submitted', 'Approved', 'Rejected', 'All'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                  filter === f
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                {f === 'Submitted'
-                  ? 'Chờ duyệt'
-                  : f === 'Approved'
-                  ? 'Đã duyệt'
-                  : f === 'Rejected'
-                  ? 'Từ chối'
-                  : 'Tất cả'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Registration List */}
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-              <p className="text-xs">Đang tải dữ liệu từ database...</p>
-            </div>
-          ) : errorMessage ? (
-            <div className="flex flex-col items-center justify-center h-full p-6 text-center text-rose-500">
-              <AlertCircle className="w-10 h-10 mb-2 opacity-80" />
-              <p className="text-xs font-semibold">{errorMessage}</p>
-              <button
-                onClick={fetchRegistrations}
-                className="mt-3 px-3 py-1.5 bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 rounded-lg text-xs font-bold hover:bg-rose-200 transition-colors"
-              >
-                Thử lại
-              </button>
-            </div>
-          ) : registrations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400">
-              <FileText className="w-10 h-10 mb-2 opacity-50" />
-              <p className="text-xs font-medium">Không có hồ sơ nào</p>
-              <p className="text-[10px] text-slate-500 mt-1">Dữ liệu thực từ PostgreSQL</p>
-            </div>
-          ) : (
-            registrations.map((reg) => {
-              const normStatus = normalizeStatus(reg.status);
-              const normDoc = normalizeDocType(reg.documentType);
-              const isSelected = selectedId === reg.id;
-
-              return (
-                <button
-                  key={reg.id}
-                  onClick={() => setSelectedId(reg.id)}
-                  className={`w-full text-left p-4 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${
-                    isSelected
-                      ? 'bg-indigo-50 dark:bg-indigo-500/10 border-l-4 border-l-indigo-600'
-                      : ''
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300">
-                        {reg.fullName
-                          .split(' ')
-                          .map((n) => n[0])
-                          .join('')
-                          .slice(0, 2)}
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-900 dark:text-white">
-                          {reg.fullName}
-                        </p>
-                        <p className="text-[10px] text-slate-500">{reg.email}</p>
-                      </div>
-                    </div>
-                    <span
-                      className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                        normStatus === 'Submitted'
-                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
-                          : normStatus === 'Approved'
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                          : 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
-                      }`}
-                    >
-                      {normStatus === 'Submitted'
-                        ? 'Chờ duyệt'
-                        : normStatus === 'Approved'
-                        ? 'Đã duyệt'
-                        : 'Từ chối'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {new Date(reg.submittedAt).toLocaleDateString('vi-VN')}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <FileText className="w-3 h-3" />
-                      {DOC_TYPE_LABELS[normDoc] || normDoc}
-                    </span>
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* Right Panel - Detail */}
-      <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-y-auto shadow-sm">
-        {!selected ? (
-          <div className="flex flex-col items-center justify-center h-full text-slate-400">
-            <Eye className="w-12 h-12 mb-3 opacity-50" />
-            <p className="text-sm font-medium">Chọn một đơn để xem chi tiết</p>
-            <p className="text-xs mt-1">Nhấn vào đơn đăng ký bên trái để xem hồ sơ và giấy tờ</p>
-          </div>
-        ) : (
-          <div className="p-6 space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-xl font-bold text-indigo-600">
+          <article className="reg-detail-card">
+            {/* Candidate Header Banner */}
+            <div className="reg-detail-banner">
+              <div className="reg-detail-candidate">
+                <div className="reg-detail-avatar-lg">
                   {selected.fullName
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')
-                    .slice(0, 2)}
+                    ? selected.fullName
+                        .split(' ')
+                        .map((n) => n[0])
+                        .slice(-2)
+                        .join('')
+                        .toUpperCase()
+                    : 'ĐG'}
                 </div>
                 <div>
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                      {selected.fullName}
-                    </h2>
-                    <span
-                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                        normalizeStatus(selected.status) === 'Submitted'
-                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
-                          : normalizeStatus(selected.status) === 'Approved'
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                          : 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
-                      }`}
-                    >
-                      {normalizeStatus(selected.status) === 'Submitted'
-                        ? 'Chờ duyệt'
-                        : normalizeStatus(selected.status) === 'Approved'
-                        ? 'Đã duyệt'
-                        : 'Từ chối'}
+                  <h2>
+                    {selected.fullName}
+                    <span className={`reg-status reg-status--${statusTones[normalizeStatus(selected.status)]}`}>
+                      {statusLabels[normalizeStatus(selected.status)]}
                     </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Đăng ký lúc: {new Date(selected.submittedAt).toLocaleString('vi-VN')}
-                  </p>
+                  </h2>
+                  <p>Mã đơn: #{selected.id.slice(0, 8).toUpperCase()} · Nộp ngày {new Date(selected.submittedAt).toLocaleString('vi-VN')}</p>
                 </div>
               </div>
 
-              {normalizeStatus(selected.status) === 'Submitted' && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleApprove(selected.id)}
-                    disabled={isActionLoading}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50"
-                  >
-                    {isActionLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Check className="w-4 h-4" />
-                    )}
-                    Phê duyệt
-                  </button>
-                  <button
-                    onClick={() => openRejectModal(selected.id)}
-                    disabled={isActionLoading}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all disabled:opacity-50"
-                  >
-                    <X className="w-4 h-4" /> Từ chối
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Personal Info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                <Mail className="w-4 h-4 text-slate-400" />
-                <div>
-                  <p className="text-[10px] text-slate-500 font-medium">Email</p>
-                  <p className="text-xs font-semibold text-slate-900 dark:text-white">
-                    {selected.email}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                <Phone className="w-4 h-4 text-slate-400" />
-                <div>
-                  <p className="text-[10px] text-slate-500 font-medium">Số điện thoại</p>
-                  <p className="text-xs font-semibold text-slate-900 dark:text-white">
-                    {selected.phone || 'Chưa cập nhật'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                <Calendar className="w-4 h-4 text-slate-400" />
-                <div>
-                  <p className="text-[10px] text-slate-500 font-medium">Ngày sinh</p>
-                  <p className="text-xs font-semibold text-slate-900 dark:text-white">
-                    {selected.dateOfBirth
-                      ? new Date(selected.dateOfBirth).toLocaleDateString('vi-VN')
-                      : 'Chưa cập nhật'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                <MapPin className="w-4 h-4 text-slate-400" />
-                <div>
-                  <p className="text-[10px] text-slate-500 font-medium">Địa chỉ</p>
-                  <p className="text-xs font-semibold text-slate-900 dark:text-white">
-                    {selected.address || 'Chưa cập nhật'}
-                  </p>
-                </div>
+              {/* Action Buttons if Pending */}
+              <div className="reg-detail-controls">
+                {normalizeStatus(selected.status) === 'Submitted' && (
+                  <>
+                    <button
+                      className="reg-button reg-button--approve"
+                      disabled={isActionLoading}
+                      onClick={() => handleApprove(selected.id)}
+                      type="button"
+                    >
+                      {isActionLoading ? <LoaderCircle className="reg-spin" size={15} /> : <Check size={15} />}
+                      Phê duyệt hồ sơ
+                    </button>
+                    <button
+                      className="reg-button reg-button--reject"
+                      disabled={isActionLoading}
+                      onClick={() => setShowRejectModal(true)}
+                      type="button"
+                    >
+                      <X size={15} /> Từ chối đơn
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Document Images */}
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-indigo-600" />
-                Giấy Tờ Tùy Thân ({DOC_TYPE_LABELS[normalizeDocType(selected.documentType)] || 'Giấy tờ'})
-              </h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    Mặt trước
-                  </p>
-                  <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800">
-                    {selected.frontDocUrl ? (
-                      <img
-                        src={selected.frontDocUrl}
-                        alt="Mặt trước"
-                        className="w-full h-44 object-cover hover:scale-105 transition-transform cursor-zoom-in"
-                      />
-                    ) : (
-                      <div className="w-full h-44 flex items-center justify-center text-slate-400 text-xs">
-                        Không có
-                      </div>
-                    )}
+            {/* Layout 2 Cột: Thông tin + Giấy tờ */}
+            <div className="reg-detail-layout">
+              {/* Cột trái: Thông tin cá nhân */}
+              <div className="reg-detail-info-block">
+                <h3 className="reg-detail-section-title">
+                  <User size={15} /> Thông Tin Đăng Ký
+                </h3>
+                <div className="reg-info-list">
+                  <div className="reg-info-item">
+                    <User size={15} />
+                    <div>
+                      <p>Họ và tên</p>
+                      <strong>{selected.fullName}</strong>
+                    </div>
+                  </div>
+                  <div className="reg-info-item">
+                    <Mail size={15} />
+                    <div>
+                      <p>Địa chỉ Email</p>
+                      <strong>{selected.email}</strong>
+                    </div>
+                  </div>
+                  <div className="reg-info-item">
+                    <Phone size={15} />
+                    <div>
+                      <p>Số điện thoại</p>
+                      <strong>{selected.phone || 'Chưa cập nhật'}</strong>
+                    </div>
+                  </div>
+                  <div className="reg-info-item">
+                    <Calendar size={15} />
+                    <div>
+                      <p>Ngày sinh</p>
+                      <strong>
+                        {selected.dateOfBirth ? new Date(selected.dateOfBirth).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}
+                      </strong>
+                    </div>
+                  </div>
+                  <div className="reg-info-item">
+                    <MapPin size={15} />
+                    <div>
+                      <p>Địa chỉ liên hệ</p>
+                      <strong>{selected.address || 'Chưa cập nhật'}</strong>
+                    </div>
+                  </div>
+                  <div className="reg-info-item">
+                    <FileText size={15} />
+                    <div>
+                      <p>Loại giấy tờ tùy thân</p>
+                      <strong>{DOC_TYPE_LABELS[normalizeDocType(selected.documentType)] || 'Giấy tờ tùy thân'}</strong>
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    Mặt sau
-                  </p>
-                  <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800">
-                    {selected.backDocUrl ? (
-                      <img
-                        src={selected.backDocUrl}
-                        alt="Mặt sau"
-                        className="w-full h-44 object-cover hover:scale-105 transition-transform cursor-zoom-in"
-                      />
-                    ) : (
-                      <div className="w-full h-44 flex items-center justify-center text-slate-400 text-xs">
-                        Không có
-                      </div>
-                    )}
+              </div>
+
+              {/* Cột phải: Hình ảnh giấy tờ đối chiếu */}
+              <div className="reg-docs-review">
+                <h3 className="reg-detail-section-title">
+                  <FileText size={15} /> Giấy Tờ Xác Minh Danh Tính (Bấm vào ảnh để phóng to)
+                </h3>
+                <div className="reg-docs-triple">
+                  {/* Slot 1: Mặt trước */}
+                  <div className="reg-doc-frame-box">
+                    <p className="reg-doc-frame-label">MẶT TRƯỚC GIẤY TỜ</p>
+                    <div className="reg-doc-preview">
+                      {selected.frontDocUrl ? (
+                        <>
+                          <img
+                            src={selected.frontDocUrl}
+                            alt="Mặt trước"
+                            onClick={() =>
+                              setLightboxImg({ src: selected.frontDocUrl!, caption: 'Mặt trước giấy tờ tùy thân' })
+                            }
+                          />
+                          <div className="reg-doc-preview-overlay">
+                            <ZoomIn size={22} />
+                            <span>Phóng to</span>
+                          </div>
+                        </>
+                      ) : (
+                        <span className="reg-doc-empty-note">Không có ảnh</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    Ảnh Chân Dung / Selfie
-                  </p>
-                  <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800">
-                    {selected.selfieUrl ? (
-                      <img
-                        src={selected.selfieUrl}
-                        alt="Selfie"
-                        className="w-full h-44 object-cover hover:scale-105 transition-transform cursor-zoom-in"
-                      />
-                    ) : (
-                      <div className="w-full h-44 flex items-center justify-center text-slate-400 text-xs">
-                        Không có
-                      </div>
-                    )}
+
+                  {/* Slot 2: Mặt sau */}
+                  <div className="reg-doc-frame-box">
+                    <p className="reg-doc-frame-label">MẶT SAU GIẤY TỜ</p>
+                    <div className="reg-doc-preview">
+                      {selected.backDocUrl ? (
+                        <>
+                          <img
+                            src={selected.backDocUrl}
+                            alt="Mặt sau"
+                            onClick={() =>
+                              setLightboxImg({ src: selected.backDocUrl!, caption: 'Mặt sau giấy tờ tùy thân' })
+                            }
+                          />
+                          <div className="reg-doc-preview-overlay">
+                            <ZoomIn size={22} />
+                            <span>Phóng to</span>
+                          </div>
+                        </>
+                      ) : (
+                        <span className="reg-doc-empty-note">Không có ảnh</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Slot 3: Selfie */}
+                  <div className="reg-doc-frame-box">
+                    <p className="reg-doc-frame-label">ẢNH CHÂN DUNG / SELFIE</p>
+                    <div className="reg-doc-preview">
+                      {selected.selfieUrl ? (
+                        <>
+                          <img
+                            src={selected.selfieUrl}
+                            alt="Chân dung selfie"
+                            onClick={() =>
+                              setLightboxImg({ src: selected.selfieUrl!, caption: 'Ảnh chụp chân dung đối chiếu' })
+                            }
+                          />
+                          <div className="reg-doc-preview-overlay">
+                            <ZoomIn size={22} />
+                            <span>Phóng to</span>
+                          </div>
+                        </>
+                      ) : (
+                        <span className="reg-doc-empty-note">Không có ảnh</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          </article>
+        </div>
+      )}
 
-      {/* Reject Modal */}
-      {showRejectModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl w-[440px] p-6 space-y-4 shadow-2xl animate-in zoom-in-95 border border-slate-200 dark:border-slate-800">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-              Từ Chối Đơn Đăng Ký
-            </h3>
-            <p className="text-xs text-slate-500">
-              Vui lòng nhập lý do từ chối. Trạng thái sẽ được cập nhật trực tiếp vào cơ sở dữ liệu.
-            </p>
-            <textarea
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Ví dụ: Ảnh giấy tờ bị mờ, vui lòng tải lên ảnh chụp rõ nét hơn..."
-              rows={3}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-white"
-            />
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setShowRejectModal(false)}
-                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleReject}
-                disabled={!rejectReason.trim() || isActionLoading}
-                className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 disabled:opacity-50 flex items-center gap-1.5 shadow-md shadow-rose-600/20"
-              >
-                {isActionLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Xác nhận Từ Chối
-              </button>
-            </div>
+      {/* ─── Lightbox Modal ─── */}
+      {lightboxImg && (
+        <div className="reg-lightbox" onClick={() => setLightboxImg(null)}>
+          <div className="reg-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="reg-lightbox-close"
+              aria-label="Đóng xem ảnh"
+              onClick={() => setLightboxImg(null)}
+              type="button"
+            >
+              <X size={20} />
+            </button>
+            <img src={lightboxImg.src} alt={lightboxImg.caption} />
+            <div className="reg-lightbox-caption">{lightboxImg.caption}</div>
           </div>
         </div>
       )}
-    </div>
+
+      {/* ─── Import Dialog ─── */}
+      {showImportDialog && (
+        <div
+          className="reg-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !importBusy) setShowImportDialog(false);
+          }}
+        >
+          <section aria-labelledby="reg-import-title" aria-modal="true" className="reg-dialog reg-dialog--import" role="dialog">
+            <header>
+              <div>
+                <span className="reg-dialog-icon">
+                  <FileSpreadsheet size={19} />
+                </span>
+                <div>
+                  <h2 id="reg-import-title">Nhập danh sách độc giả</h2>
+                  <p>Tải lên tệp CSV tối đa 2 MB, không quá 1.000 dòng.</p>
+                </div>
+              </div>
+              <button aria-label="Đóng" disabled={importBusy} onClick={() => setShowImportDialog(false)} type="button">
+                <X size={18} />
+              </button>
+            </header>
+            <button className="reg-template-link" onClick={downloadTemplate} type="button">
+              <Download size={15} /> Tải tệp CSV mẫu
+            </button>
+            <form onSubmit={handleImport}>
+              <label className="reg-file-picker">
+                <Upload size={22} />
+                <strong>{importFile?.name ?? 'Chọn tệp CSV để tải lên'}</strong>
+                <span>CSV · Tối đa 2 MB</span>
+                <input
+                  accept=".csv,text/csv"
+                  disabled={importBusy}
+                  onChange={(event) => {
+                    setImportFile(event.target.files?.[0] ?? null);
+                    setImportResult(null);
+                  }}
+                  type="file"
+                />
+              </label>
+              <p className="reg-field-hint">
+                Cột bắt buộc: fullName, email. Tùy chọn: studentId, phone, readerType (Student/Lecturer/External), address, dateOfBirth.
+              </p>
+              {importResult && (
+                <div className="reg-import-summary" role="status">
+                  <strong>
+                    Đã xử lý {importResult.totalRows} dòng: {importResult.successRows} tạo thành công, {importResult.failedRows} thất bại.
+                  </strong>
+                  {importResult.notificationFailureCount > 0 && (
+                    <span>{importResult.notificationFailureCount} người dùng chưa nhận được email tạo mật khẩu.</span>
+                  )}
+                  {importResult.results
+                    .filter((item) => !item.success || !item.passwordSetupEmailSent)
+                    .map((item) => (
+                      <span className="reg-import-issue" key={`${item.row}-${item.email}`}>
+                        Dòng {item.row} · {item.email}: {item.message || 'Không gửi được email đặt mật khẩu.'}
+                      </span>
+                    ))}
+                </div>
+              )}
+              <footer>
+                <button
+                  className="reg-button reg-button--secondary"
+                  disabled={importBusy}
+                  onClick={() => setShowImportDialog(false)}
+                  type="button"
+                >
+                  Đóng
+                </button>
+                <button className="reg-button reg-button--primary" disabled={!importFile || importBusy} type="submit">
+                  {importBusy ? <LoaderCircle className="reg-spin" size={16} /> : <Upload size={15} />} Nhập danh sách
+                </button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {/* ─── Reject Dialog ─── */}
+      {showRejectModal && (
+        <div
+          className="reg-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowRejectModal(false);
+          }}
+        >
+          <section aria-labelledby="reg-reject-title" aria-modal="true" className="reg-dialog" role="dialog">
+            <header>
+              <div>
+                <span className="reg-dialog-icon reg-dialog-icon--red">
+                  <X size={19} />
+                </span>
+                <div>
+                  <h2 id="reg-reject-title">Từ chối đơn đăng ký</h2>
+                  <p>Trạng thái và lý do từ chối sẽ được lưu vào cơ sở dữ liệu.</p>
+                </div>
+              </div>
+              <button aria-label="Đóng" onClick={() => setShowRejectModal(false)} type="button">
+                <X size={18} />
+              </button>
+            </header>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleReject();
+              }}
+            >
+              <label>
+                Lý do từ chối
+                <textarea
+                  name="reason"
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Ví dụ: Ảnh giấy tờ bị mờ, vui lòng chụp lại rõ nét cả 2 mặt..."
+                  rows={3}
+                  required
+                />
+              </label>
+              <footer>
+                <button className="reg-button reg-button--secondary" onClick={() => setShowRejectModal(false)} type="button">
+                  Hủy
+                </button>
+                <button className="reg-button reg-button--reject" disabled={!rejectReason.trim() || isActionLoading} type="submit">
+                  {isActionLoading && <LoaderCircle className="reg-spin" size={16} />} Xác nhận từ chối
+                </button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {/* ─── Toast ─── */}
+      {toast && (
+        <div className={`reg-toast reg-toast--${toast.tone}`} role="status">
+          {toast.tone === 'success' ? <Check size={16} /> : <AlertCircle size={16} />}
+          {toast.message}
+        </div>
+      )}
+    </section>
   );
 };
 

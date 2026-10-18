@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -19,6 +20,7 @@ public class HealthController : ControllerBase
     }
 
     [HttpGet("/db-check")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> DbCheck([FromServices] IConfiguration config)
     {
         var connStr = config.GetConnectionString("DefaultConnection");
@@ -76,6 +78,7 @@ public class HealthController : ControllerBase
     }
 
     [HttpPost("/db-seed")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> DbSeed([FromServices] IConfiguration config)
     {
         var connStr = config.GetConnectionString("DefaultConnection");
@@ -299,6 +302,7 @@ public class HealthController : ControllerBase
     }
 
     [HttpGet("/fix-db-enums")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> FixDbEnums([FromServices] IConfiguration config)
     {
         var connStr = config.GetConnectionString("DefaultConnection");
@@ -394,4 +398,3 @@ public class HealthController : ControllerBase
         }
     }
 }
-

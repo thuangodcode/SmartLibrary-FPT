@@ -1,0 +1,672 @@
+/* ==========================================================================
+   SmartLibrary FPT - Readers Management Page (Librarian Portal)
+   Design System 100% unified with AdminUsersPage
+   ========================================================================== */
+
+.lib-readers-page {
+  display: grid;
+  gap: 18px;
+  color: #263247;
+}
+
+/* ─── Page Heading ─── */
+.lib-readers-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.lib-readers-eyebrow {
+  margin: 0 0 7px;
+  color: #e8783e;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lib-readers-heading h1 {
+  margin: 0;
+  color: #192235;
+  font-size: clamp(24px, 2.6vw, 30px);
+  font-weight: 750;
+  letter-spacing: -0.04em;
+}
+
+.lib-readers-description {
+  margin: 7px 0 0;
+  color: #8790a0;
+  font-size: 13px;
+}
+
+.lib-readers-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ─── Buttons ─── */
+.lib-readers-button {
+  min-height: 37px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+  white-space: nowrap;
+}
+
+.lib-readers-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.lib-readers-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.lib-readers-button--primary {
+  color: #fff;
+  background: #d95f27;
+  box-shadow: 0 4px 10px rgba(217, 95, 39, 0.15);
+}
+
+.lib-readers-button--primary:hover:not(:disabled) {
+  background: #c9511b;
+}
+
+.lib-readers-button--secondary {
+  border-color: #e5e8ee;
+  color: #536074;
+  background: #fff;
+}
+
+.lib-readers-button--secondary:hover:not(:disabled) {
+  border-color: #cbd1db;
+  background: #fafbfc;
+}
+
+/* ─── Metric Cards ─── */
+.lib-readers-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.lib-readers-metric {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 77px;
+  padding: 14px 16px;
+  border: 1px solid #eceef3;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(37, 48, 72, 0.03);
+}
+
+.lib-readers-metric-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 10px;
+}
+
+.lib-readers-tone-orange {
+  color: #e8783e;
+  background: #fff1e8;
+}
+
+.lib-readers-tone-green {
+  color: #39a982;
+  background: #e8f8f2;
+}
+
+.lib-readers-tone-blue {
+  color: #5c79dc;
+  background: #eef1ff;
+}
+
+.lib-readers-tone-purple {
+  color: #8b69d4;
+  background: #f3efff;
+}
+
+.lib-readers-metric p {
+  overflow: hidden;
+  margin: 0 0 4px;
+  color: #7f8999;
+  font-size: 11px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lib-readers-metric strong {
+  color: #1b2638;
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+
+/* ─── Main Table Panel ─── */
+.lib-readers-table-panel {
+  min-width: 0;
+  border: 1px solid #e9ecf3;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(37, 48, 72, 0.03);
+  overflow: hidden;
+}
+
+/* Type Tabs */
+.lib-readers-tabs {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  overflow-x: auto;
+  padding: 0 18px;
+  border-bottom: 1px solid #edf0f4;
+  white-space: nowrap;
+}
+
+.lib-readers-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #828b9b;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.lib-readers-tabs button.is-active {
+  border-bottom-color: #e36d34;
+  color: #cb5a25;
+  font-weight: 700;
+}
+
+.lib-readers-tabs button span {
+  padding: 2px 7px;
+  border-radius: 10px;
+  color: #798394;
+  background: #f0f2f6;
+  font-size: 10px;
+}
+
+.lib-readers-tabs button.is-active span {
+  color: #cb5a25;
+  background: #ffebe1;
+}
+
+/* Table Toolbar Heading */
+.lib-readers-table-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px 14px;
+  flex-wrap: wrap;
+}
+
+.lib-readers-table-heading h2 {
+  margin: 0;
+  color: #263247;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.lib-readers-table-heading p {
+  margin: 4px 0 0;
+  color: #969eac;
+  font-size: 11px;
+}
+
+.lib-readers-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lib-readers-search {
+  width: 270px;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid #e6e9ef;
+  border-radius: 8px;
+  color: #919aaa;
+  background: #f8fafc;
+  transition: all 0.15s ease;
+}
+
+.lib-readers-search:focus-within {
+  background: #fff;
+  border-color: #df895f;
+  box-shadow: 0 0 0 3px rgba(224, 112, 58, 0.1);
+  color: #df895f;
+}
+
+.lib-readers-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: #384459;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+}
+
+.lib-readers-search input::placeholder {
+  color: #a5acb8;
+}
+
+.lib-readers-filters select {
+  height: 35px;
+  padding: 0 10px;
+  border: 1px solid #e6e9ef;
+  border-radius: 8px;
+  outline: 0;
+  color: #687386;
+  background: #fff;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.lib-readers-filters select:focus {
+  border-color: #df895f;
+}
+
+/* ─── Table Structure ─── */
+.lib-readers-table-scroll {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.lib-readers-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.lib-readers-table thead {
+  background: #f8f9fb;
+}
+
+.lib-readers-table th {
+  height: 38px;
+  color: #8892a1;
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 14px;
+}
+
+.lib-readers-table td {
+  height: 48px;
+  border-top: 1px solid #f0f2f5;
+  color: #647083;
+  font-size: 11px;
+  padding: 0 14px;
+}
+
+.lib-readers-table th:first-child,
+.lib-readers-table td:first-child {
+  padding-left: 18px;
+}
+
+.lib-readers-table th:last-child,
+.lib-readers-table td:last-child {
+  padding-right: 18px;
+  text-align: right;
+}
+
+.lib-readers-table tbody tr {
+  transition: background 0.14s ease;
+}
+
+.lib-readers-table tbody tr:hover {
+  background: #fafbfc;
+}
+
+.lib-readers-id {
+  color: #44536a !important;
+  font-weight: 650;
+  font-family: monospace;
+}
+
+.lib-readers-user-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lib-readers-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f1f4f9;
+  color: #4d5c75;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.lib-readers-names strong {
+  display: block;
+  font-size: 12px;
+  color: #2b384c;
+  font-weight: 650;
+}
+
+.lib-readers-names span {
+  display: block;
+  font-size: 10px;
+  color: #8b95a5;
+  margin-top: 1px;
+}
+
+.lib-readers-type-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* ─── Status Badges with Dot ─── */
+.lib-readers-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.lib-readers-status::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.lib-readers-status--active {
+  color: #278c66;
+  background: #e8f7f0;
+}
+
+.lib-readers-status--pending {
+  color: #b47813;
+  background: #fff6df;
+}
+
+.lib-readers-status--suspended {
+  color: #b84c4a;
+  background: #fff0ee;
+}
+
+/* Action Icon Button */
+.lib-readers-icon-button {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #64748b;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.lib-readers-icon-button:hover {
+  background: #d95f27;
+  color: #fff;
+  border-color: #d95f27;
+}
+
+/* ─── Pagination ─── */
+.lib-readers-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-top: 1px solid #edf0f4;
+  color: #8792a2;
+  font-size: 11px;
+}
+
+.lib-readers-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─── State Indicator (Empty/Loading) ─── */
+.lib-readers-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 50px 20px;
+  color: #8f98a8;
+  font-size: 12px;
+}
+
+.lib-readers-spin {
+  animation: lib-readers-spin-kf 1s linear infinite;
+}
+
+@keyframes lib-readers-spin-kf {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Detail Modal (Matching Admin User Detail Dialog) ─── */
+.lib-readers-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  animation: lib-readers-fade 0.15s ease;
+}
+
+@keyframes lib-readers-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lib-readers-dialog {
+  width: 100%;
+  max-width: 620px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
+  border: 1px solid #e9ecf3;
+  overflow: hidden;
+  animation: lib-readers-slide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes lib-readers-slide {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.lib-readers-dialog header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px 18px;
+  border-bottom: 1px solid #f0f2f7;
+}
+
+.lib-readers-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.lib-readers-dialog-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #fff1e8;
+  color: #d95f27;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  font-weight: 750;
+  border: 2px solid #fed7aa;
+  flex-shrink: 0;
+}
+
+.lib-readers-dialog-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 750;
+  color: #192235;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lib-readers-dialog-head p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #8790a0;
+}
+
+.lib-readers-dialog-close {
+  border: none;
+  background: transparent;
+  color: #929caa;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.12s ease;
+}
+
+.lib-readers-dialog-close:hover {
+  background: #f1f4f8;
+  color: #192235;
+}
+
+.lib-readers-dialog-body {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.lib-readers-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.lib-readers-info-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #edf0f5;
+  border-radius: 10px;
+}
+
+.lib-readers-info-card svg {
+  color: #8790a0;
+  flex-shrink: 0;
+}
+
+.lib-readers-info-card p {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8790a0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lib-readers-info-card strong {
+  display: block;
+  font-size: 12px;
+  color: #192235;
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.lib-readers-dialog footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid #f0f2f7;
+  background: #fcfdfe;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 960px) {
+  .lib-readers-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .lib-readers-metrics {
+    grid-template-columns: 1fr;
+  }
+  .lib-readers-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .lib-readers-info-grid {
+    grid-template-columns: 1fr;
+  }
+}

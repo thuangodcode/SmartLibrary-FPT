@@ -51,7 +51,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Đăng nhập hệ thống (Email + Mật khẩu)
+    /// Đăng nhập hệ thống (Email, tên đăng nhập hoặc mã sinh viên + mật khẩu)
     /// </summary>
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginCommand command)
@@ -60,6 +60,9 @@ public class AuthController : ControllerBase
 
         if (!result.IsSuccess)
         {
+            if (result.ErrorCode == "AUTH_SERVICE_UNAVAILABLE")
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse<object>.Fail(result.ErrorMessage ?? "Dịch vụ xác thực tạm thời không khả dụng."));
+
             return Unauthorized(ApiResponse<object>.Fail(result.ErrorMessage ?? "Đăng nhập thất bại."));
         }
 
@@ -82,6 +85,8 @@ public class AuthController : ControllerBase
         {
             userProfile = await _identityProvider.GetUserProfileWithPermissionsAsync(result.UserId);
         }
+        if (userProfile is null)
+            return Unauthorized(ApiResponse<object>.Fail("Tài khoản không hoạt động hoặc chưa được cấp quyền truy cập."));
 
         var responseData = new
         {
@@ -92,6 +97,21 @@ public class AuthController : ControllerBase
         };
 
         return Ok(ApiResponse<object>.Ok(responseData));
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<IActionResult> GetCurrentUser()
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized(ApiResponse<object>.Fail("Phiên đăng nhập không hợp lệ."));
+
+        var userProfile = await _identityProvider.GetUserProfileWithPermissionsAsync(userId);
+        if (userProfile is null)
+            return Unauthorized(ApiResponse<object>.Fail("Tài khoản không hoạt động hoặc chưa được cấp quyền truy cập."));
+
+        return Ok(ApiResponse<object>.Ok(new { user = userProfile }));
     }
 
     /// <summary>
@@ -183,9 +203,6 @@ public class AuthController : ControllerBase
         var cleanEmail = request.Email.Trim().ToLowerInvariant();
         var otp = System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
 
-        _memoryCache.Set($"reg_otp:{cleanEmail}", otp, TimeSpan.FromMinutes(10));
-        _logger.LogInformation(">>> SmartLibrary OTP for {Email}: [{Otp}] <<<", cleanEmail, otp);
-
         try
         {
             await _emailService.SendEmailAsync(
@@ -196,14 +213,19 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not send OTP email via provider");
+            _logger.LogError(ex, "Could not send registration OTP email to {Email}", cleanEmail);
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                ApiResponse<object>.Fail("Không thể gửi email xác thực lúc này. Vui lòng thử lại sau hoặc liên hệ quản trị viên."));
         }
+
+        _memoryCache.Set($"reg_otp:{cleanEmail}", otp, TimeSpan.FromMinutes(10));
+        _memoryCache.Remove($"reg_verified:{cleanEmail}");
 
         return Ok(ApiResponse<object>.Ok(new
         {
             message = "Mã xác thực đã được gửi đến email của bạn.",
-            email = cleanEmail,
-            otp = otp
+            email = cleanEmail
         }));
     }
 
@@ -250,7 +272,7 @@ public class AuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Email))
             return BadRequest(ApiResponse<object>.Fail("Vui lòng nhập địa chỉ email."));
 
-        if (string.IsNullOrWhiteSpace(request.Password))
+        if (string.IsNullOrEmpty(request.Password))
             return BadRequest(ApiResponse<object>.Fail("Vui lòng nhập mật khẩu."));
 
         if (string.IsNullOrWhiteSpace(request.FullName))
