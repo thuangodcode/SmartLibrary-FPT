@@ -324,14 +324,44 @@ public class RegistrationService : IRegistrationService
                 }
             }
 
-            // Upsert auth.users with encrypted password
+            // Upsert auth.users with encrypted password & GoTrue compatibility
             var authUserSql = @"
-                INSERT INTO auth.users (id, instance_id, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role, aud)
-                VALUES (@id, '00000000-0000-0000-0000-000000000000', @email, crypt(@password, gen_salt('bf')), NOW(), '{""provider"":""email"",""providers"":[""email""]}'::jsonb, json_build_object('full_name', @fullName)::jsonb, NOW(), NOW(), 'authenticated', 'authenticated')
+                INSERT INTO auth.users (
+                    id, instance_id, email, encrypted_password, email_confirmed_at,
+                    raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role, aud,
+                    confirmation_token, recovery_token, email_change_token_new, email_change,
+                    phone_change, phone_change_token, email_change_token_current, reauthentication_token
+                )
+                VALUES (
+                    @id, '00000000-0000-0000-0000-000000000000', @email, crypt(@password, gen_salt('bf')), NOW(),
+                    '{""provider"":""email"",""providers"":[""email""]}'::jsonb, json_build_object('full_name', @fullName, 'email_verified', true)::jsonb,
+                    NOW(), NOW(), 'authenticated', 'authenticated',
+                    '', '', '', '', '', '', '', ''
+                )
                 ON CONFLICT (id) DO UPDATE SET 
                     email = EXCLUDED.email,
                     encrypted_password = crypt(@password, gen_salt('bf')),
+                    confirmation_token = COALESCE(auth.users.confirmation_token, ''),
+                    recovery_token = COALESCE(auth.users.recovery_token, ''),
+                    email_change_token_new = COALESCE(auth.users.email_change_token_new, ''),
+                    email_change = COALESCE(auth.users.email_change, ''),
+                    phone_change = COALESCE(auth.users.phone_change, ''),
+                    phone_change_token = COALESCE(auth.users.phone_change_token, ''),
+                    email_change_token_current = COALESCE(auth.users.email_change_token_current, ''),
+                    reauthentication_token = COALESCE(auth.users.reauthentication_token, ''),
                     updated_at = NOW();
+
+                INSERT INTO auth.identities (id, user_id, provider_id, identity_data, provider, created_at, updated_at)
+                VALUES (
+                    gen_random_uuid(),
+                    @id,
+                    @id::text,
+                    jsonb_build_object('sub', @id::text, 'email', @email, 'email_verified', true, 'phone_verified', false),
+                    'email',
+                    NOW(),
+                    NOW()
+                )
+                ON CONFLICT (provider, provider_id) DO NOTHING;
             ";
             await using (var aCmd = new NpgsqlCommand(authUserSql, conn, tx))
             {
