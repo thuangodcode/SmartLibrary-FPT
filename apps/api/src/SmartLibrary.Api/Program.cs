@@ -83,6 +83,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/api/health-check");
+app.MapGet("/", () => Results.Redirect("/swagger"));
 
 app.Run();
 
