@@ -9,7 +9,7 @@ namespace SmartLibrary.Infrastructure.Services;
 public class StorageService : IStorageService
 {
     private readonly ILogger<StorageService> _logger;
-    private readonly Cloudinary _cloudinary;
+    private readonly Cloudinary? _cloudinary;
 
     public StorageService(ILogger<StorageService> logger, IConfiguration configuration)
     {
@@ -19,12 +19,24 @@ public class StorageService : IStorageService
         var apiKey = configuration["Cloudinary:ApiKey"];
         var apiSecret = configuration["Cloudinary:ApiSecret"];
         
-        var account = new Account(cloudName, apiKey, apiSecret);
-        _cloudinary = new Cloudinary(account);
+        if (!string.IsNullOrWhiteSpace(cloudName) && !string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(apiSecret))
+        {
+            var account = new Account(cloudName, apiKey, apiSecret);
+            _cloudinary = new Cloudinary(account);
+        }
+        else
+        {
+            _logger.LogWarning("Cloudinary credentials are not configured or incomplete. File storage operations will be disabled.");
+        }
     }
 
     public async Task<string> UploadFileAsync(Stream fileStream, string fileName, string bucket, CancellationToken ct = default)
     {
+        if (_cloudinary == null)
+        {
+            throw new InvalidOperationException("Cloudinary is not configured. Please provide Cloudinary credentials in configuration.");
+        }
+
         _logger.LogInformation("Uploading file {FileName} to Cloudinary folder {Bucket}", fileName, bucket);
         
         var uploadParams = new ImageUploadParams()
@@ -48,6 +60,8 @@ public class StorageService : IStorageService
 
     public async Task DeleteFileAsync(string filePath, string bucket, CancellationToken ct = default)
     {
+        if (_cloudinary == null) return;
+
         _logger.LogInformation("Deleting file {FilePath} from Cloudinary", filePath);
         
         var deletionParams = new DeletionParams(filePath)
@@ -60,12 +74,15 @@ public class StorageService : IStorageService
 
     public string GetPublicUrl(string filePath, string bucket)
     {
+        if (_cloudinary == null) return filePath;
         // This should not be used for authenticated files, but kept for interface compatibility
         return _cloudinary.Api.UrlImgUp.BuildUrl(filePath);
     }
 
     public Task<string> CreatePresignedUrlAsync(string filePath, string bucket, int expiresInSeconds = 60, CancellationToken ct = default)
     {
+        if (_cloudinary == null) return Task.FromResult(filePath);
+
         _logger.LogInformation("Creating authenticated URL for {FilePath}", filePath);
         
         var url = _cloudinary.Api.UrlImgUp
