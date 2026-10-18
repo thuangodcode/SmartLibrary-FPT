@@ -202,21 +202,12 @@ public class AuthController : ControllerBase
 
         var cleanEmail = request.Email.Trim().ToLowerInvariant();
         var otp = System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
-        var emailSent = false;
 
-        try
-        {
-            await _emailService.SendEmailAsync(
-                cleanEmail,
-                "SmartLibrary - Mã xác thực Email đăng ký tài khoản",
-                $"Mã xác thực OTP của bạn là: {otp}. Mã có hiệu lực trong vòng 10 phút. Tuyệt đối không chia sẻ mã này cho bất kỳ ai."
-            );
-            emailSent = true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Could not send registration OTP email to {Email}. Email service might not be configured. Providing fallback OTP in response.", cleanEmail);
-        }
+        var emailSent = await _emailService.SendEmailAsync(
+            cleanEmail,
+            "SmartLibrary - Mã xác thực Email đăng ký tài khoản",
+            $"Mã xác thực OTP của bạn là: {otp}. Mã có hiệu lực trong vòng 10 phút. Tuyệt đối không chia sẻ mã này cho bất kỳ ai."
+        );
 
         _memoryCache.Set($"reg_otp:{cleanEmail}", otp, TimeSpan.FromMinutes(10));
         _memoryCache.Remove($"reg_verified:{cleanEmail}");
@@ -225,7 +216,7 @@ public class AuthController : ControllerBase
         {
             message = emailSent
                 ? "Mã xác thực đã được gửi đến email của bạn."
-                : "Hệ thống email đang trong chế độ thử nghiệm. Mã OTP xác thực được cung cấp để bạn tiếp tục hoàn tất đăng ký.",
+                : "Hệ thống chưa cấu hình SMTP để gửi mail thật. Vui lòng dùng mã OTP hiển thị trên màn hình để tiếp tục.",
             email = cleanEmail,
             otp
         }));
