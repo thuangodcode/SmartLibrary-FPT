@@ -12,10 +12,12 @@ import {
   GraduationCap,
   Languages,
   LibraryBig,
+  LogOut,
   MapPin,
   Menu,
   Palette,
   Search,
+  ShieldCheck,
   Sparkles,
   TrendingUp,
   Users,
@@ -28,6 +30,7 @@ import bookCoverTwo from '../../../assets/figma/home-book-2.png';
 import bookCoverThree from '../../../assets/figma/home-book-3.png';
 import bookCoverFour from '../../../assets/figma/home-book-4.png';
 import libraryPhoto from '../../../assets/figma/home-library.png';
+import { useAuthStore } from '../../auth/store/useAuthStore';
 import './HomePage.css';
 
 const categories = [
@@ -121,6 +124,10 @@ export const HomePage = () => {
   const [activeCategory, setActiveCategory] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const logout = useAuthStore((s) => s.logout);
+
   const visibleBooks = useMemo(() => {
     const query = appliedSearch.trim().toLocaleLowerCase('vi');
     return featuredBooks.filter((book) => {
@@ -174,12 +181,57 @@ export const HomePage = () => {
             <a href="#categories" onClick={() => setIsMenuOpen(false)}>Thể loại</a>
             <a href="#featured-books" onClick={() => setIsMenuOpen(false)}>Sách nổi bật</a>
             <a href="#library" onClick={() => setIsMenuOpen(false)}>Thư viện</a>
-            <div className="public-nav-auth">
-              <Link to="/login" onClick={() => setIsMenuOpen(false)}>Đăng nhập</Link>
-              <Link to="/register" className="public-nav-register" onClick={() => setIsMenuOpen(false)}>
-                Đăng ký
-              </Link>
-            </div>
+
+            {isAuthenticated && user ? (
+              <div className="public-nav-user">
+                {user.role === 'Admin' && (
+                  <Link to="/admin" className="public-portal-btn admin-portal" onClick={() => setIsMenuOpen(false)}>
+                    <ShieldCheck size={14} />
+                    <span>Quản trị</span>
+                  </Link>
+                )}
+                {user.role === 'Librarian' && (
+                  <Link to="/librarian" className="public-portal-btn librarian-portal" onClick={() => setIsMenuOpen(false)}>
+                    <BookOpen size={14} />
+                    <span>Thủ thư</span>
+                  </Link>
+                )}
+                <div className="public-user-chip">
+                  <div className="public-user-avatar">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt={user.fullName} />
+                    ) : (
+                      <span>{user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}</span>
+                    )}
+                  </div>
+                  <div className="public-user-info">
+                    <span className="public-user-name">{user.fullName || user.email}</span>
+                    <span className="public-user-role">
+                      {user.role === 'Admin' ? 'Admin' : user.role === 'Librarian' ? 'Thủ thư' : 'Độc giả'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="public-logout-btn"
+                  onClick={() => {
+                    logout();
+                    setIsMenuOpen(false);
+                  }}
+                  title="Đăng xuất"
+                >
+                  <LogOut size={14} />
+                  <span>Đăng xuất</span>
+                </button>
+              </div>
+            ) : (
+              <div className="public-nav-auth">
+                <Link to="/login" onClick={() => setIsMenuOpen(false)}>Đăng nhập</Link>
+                <Link to="/register" className="public-nav-register" onClick={() => setIsMenuOpen(false)}>
+                  Đăng ký
+                </Link>
+              </div>
+            )}
           </nav>
         </div>
       </header>
@@ -407,15 +459,50 @@ export const HomePage = () => {
         <section className="public-cta">
           <div className="public-container public-cta-inner">
             <div>
-              <span className="public-eyebrow">BẮT ĐẦU HÀNH TRÌNH HỌC TẬP</span>
-              <h2>Sẵn sàng nâng tầm trải nghiệm học tập?</h2>
-              <p>Đăng nhập để lưu sách yêu thích và khám phá thêm tài liệu dành riêng cho bạn.</p>
+              <span className="public-eyebrow">
+                {isAuthenticated ? 'SMARTLIBRARY · FPT UNIVERSITY' : 'BẮT ĐẦU HÀNH TRÌNH HỌC TẬP'}
+              </span>
+              <h2>
+                {isAuthenticated ? `Chào mừng trở lại, ${user?.fullName || 'Độc giả'}!` : 'Sẵn sàng nâng tầm trải nghiệm học tập?'}
+              </h2>
+              <p>
+                {isAuthenticated
+                  ? 'Khám phá hơn 13.500+ đầu sách học thuật, tài liệu chuyên sâu và bắt đầu mượn sách thuận tiện tại thư viện.'
+                  : 'Đăng nhập để lưu sách yêu thích và khám phá thêm tài liệu dành riêng cho bạn.'}
+              </p>
             </div>
             <div className="public-cta-actions">
-              <Link to="/login" className="public-button public-button-dark">Đăng nhập</Link>
-              <Link to="/register" className="public-button public-button-orange">
-                Tạo tài khoản <ArrowRight size={16} />
-              </Link>
+              {isAuthenticated ? (
+                <>
+                  {user?.role === 'Admin' ? (
+                    <Link to="/admin" className="public-button public-button-orange">
+                      Vào trang Quản trị <ArrowRight size={16} />
+                    </Link>
+                  ) : user?.role === 'Librarian' ? (
+                    <Link to="/librarian" className="public-button public-button-orange">
+                      Bàn làm việc Thủ thư <ArrowRight size={16} />
+                    </Link>
+                  ) : (
+                    <a href="#featured-books" className="public-button public-button-orange">
+                      Khám phá sách nổi bật <ArrowRight size={16} />
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    className="public-button public-button-dark"
+                    onClick={() => logout()}
+                  >
+                    Đăng xuất
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link to="/login" className="public-button public-button-dark">Đăng nhập</Link>
+                  <Link to="/register" className="public-button public-button-orange">
+                    Tạo tài khoản <ArrowRight size={16} />
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </section>
@@ -438,8 +525,24 @@ export const HomePage = () => {
           </div>
           <div>
             <h3>Tài khoản</h3>
-            <Link to="/login">Đăng nhập</Link>
-            <Link to="/register">Đăng ký bạn đọc</Link>
+            {isAuthenticated ? (
+              <>
+                {user?.role === 'Admin' && <Link to="/admin">Trang Quản trị</Link>}
+                {user?.role === 'Librarian' && <Link to="/librarian">Cổng Thủ thư</Link>}
+                <button
+                  type="button"
+                  className="public-footer-logout-link"
+                  onClick={() => logout()}
+                >
+                  Đăng xuất ({user?.fullName || 'Tài khoản'})
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/login">Đăng nhập</Link>
+                <Link to="/register">Đăng ký bạn đọc</Link>
+              </>
+            )}
             <a href="mailto:library@fpt.edu.vn">Liên hệ hỗ trợ</a>
           </div>
           <div className="public-footer-location">

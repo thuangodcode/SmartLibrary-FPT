@@ -15,9 +15,19 @@ export const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const setAuth = useAuthStore((state) => state.setAuth);
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect');
+
+  React.useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === 'Admin') navigate('/admin');
+      else if (user.role === 'Librarian') navigate('/librarian');
+      else navigate('/');
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const {
     register,
