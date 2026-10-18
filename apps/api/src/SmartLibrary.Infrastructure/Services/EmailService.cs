@@ -1,21 +1,59 @@
 using SmartLibrary.Application.Interfaces;
+using System.Net;
+using System.Net.Mail;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 
 namespace SmartLibrary.Infrastructure.Services;
 
 public class EmailService : IEmailService
 {
     private readonly ILogger<EmailService> _logger;
+    private readonly IConfiguration _configuration;
 
-    public EmailService(ILogger<EmailService> logger)
+    public EmailService(ILogger<EmailService> logger, IConfiguration configuration)
     {
         _logger = logger;
+        _configuration = configuration;
     }
 
-    public Task SendEmailAsync(string to, string subject, string body, CancellationToken ct = default)
+    public async Task SendEmailAsync(string to, string subject, string body, CancellationToken ct = default)
     {
-        _logger.LogInformation("Sending email to {To}: {Subject}", to, subject);
-        // TODO: Implement actual email sending (SMTP, SendGrid, etc.)
-        return Task.CompletedTask;
+        var host = _configuration["Smtp:Host"];
+        var username = _configuration["Smtp:Username"];
+        var password = _configuration["Smtp:Password"];
+        var fromAddress = _configuration["Smtp:FromAddress"];
+        var fromName = _configuration["Smtp:FromName"] ?? "SmartLibrary";
+        var port = _configuration.GetValue("Smtp:Port", 587);
+        var enableSsl = _configuration.GetValue("Smtp:EnableSsl", true);
+
+        if (string.IsNullOrWhiteSpace(host) ||
+            string.IsNullOrWhiteSpace(username) ||
+            string.IsNullOrWhiteSpace(password) ||
+            string.IsNullOrWhiteSpace(fromAddress))
+        {
+            throw new InvalidOperationException("SMTP email delivery is not configured.");
+        }
+
+        using var message = new MailMessage
+        {
+            From = new MailAddress(fromAddress, fromName),
+            Subject = subject,
+            Body = body,
+            SubjectEncoding = System.Text.Encoding.UTF8,
+            BodyEncoding = System.Text.Encoding.UTF8,
+            IsBodyHtml = false
+        };
+        message.To.Add(new MailAddress(to));
+
+        using var client = new SmtpClient(host, port)
+        {
+            EnableSsl = enableSsl,
+            UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(username, password)
+        };
+
+        await client.SendMailAsync(message, ct);
+        _logger.LogInformation("Email delivered to {To}: {Subject}", to, subject);
     }
 }

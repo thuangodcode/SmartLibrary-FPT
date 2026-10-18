@@ -6,8 +6,10 @@ import { AuthLayout } from '../components/AuthLayout';
 import { ToastNotification } from '../../../components/ui/ToastNotification';
 import { registerSchema, type RegisterInput } from '../schemas/authSchemas';
 import { DocumentUploader } from '../components/DocumentUploader';
+import { parseApiResponse } from '../../../lib/api';
+import { API_BASE_URL } from '../../../config';
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL}`;
+// API_BASE_URL is provided by the shared app config, with a localhost fallback.
 
 export const RegisterPage: React.FC = () => {
   const [step, setStep] = useState(1);
@@ -57,10 +59,10 @@ export const RegisterPage: React.FC = () => {
         body: JSON.stringify({ email: data.email, fullName: data.fullName }),
       });
 
-      const resJson = await response.json();
+      const resJson = await parseApiResponse<{ success?: boolean; error?: string; data?: { otp?: string } }>(response);
 
-      if (!response.ok || !resJson.success) {
-        throw new Error(resJson.error || 'Không thể gửi mã xác nhận đến email này.');
+      if (!response.ok || !resJson?.success) {
+        throw new Error(resJson?.error || 'Không thể gửi mã xác nhận đến email này.');
       }
 
       setSavedInfo(data);
@@ -70,14 +72,14 @@ export const RegisterPage: React.FC = () => {
       setResendCountdown(60);
       setStep(2); // Go to Email Verification
       setToast({
-        id: Date.now().toString(),
+        id: 'toast-otp-success',
         type: 'success',
         title: 'Đã gửi mã OTP',
         message: 'Mã xác thực gồm 6 chữ số đã được gửi tới email của bạn.',
       });
     } catch (err: unknown) {
       setToast({
-        id: Date.now().toString(),
+        id: 'toast-otp-error',
         type: 'error',
         title: 'Lỗi',
         message: err instanceof Error ? err.message : 'Không thể gửi mã xác minh',
@@ -130,9 +132,9 @@ export const RegisterPage: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: savedInfo.email, fullName: savedInfo.fullName }),
       });
-      const resJson = await response.json();
-      if (!response.ok || !resJson.success) {
-        throw new Error(resJson.error || 'Gửi lại mã OTP thất bại.');
+      const resJson = await parseApiResponse<{ success?: boolean; error?: string; data?: { otp?: string } }>(response);
+      if (!response.ok || !resJson?.success) {
+        throw new Error(resJson?.error || 'Gửi lại mã OTP thất bại.');
       }
       if (resJson.data?.otp) {
         setDevOtpHint(resJson.data.otp);
@@ -188,10 +190,10 @@ export const RegisterPage: React.FC = () => {
         body: JSON.stringify({ email: savedInfo.email, otp: fullOtp }),
       });
 
-      const resJson = await response.json();
+      const resJson = await parseApiResponse<{ success?: boolean; error?: string }>(response);
 
-      if (!response.ok || !resJson.success) {
-        throw new Error(resJson.error || 'Mã xác thực OTP không chính xác hoặc đã hết hạn.');
+      if (!response.ok || !resJson?.success) {
+        throw new Error(resJson?.error || 'Mã xác thực OTP không chính xác hoặc đã hết hạn.');
       }
 
       setToast({
@@ -269,10 +271,10 @@ export const RegisterPage: React.FC = () => {
         body: formData,
       });
 
-      const resJson = await response.json();
+      const resJson = await parseApiResponse<{ success?: boolean; error?: string }>(response);
 
-      if (!response.ok || !resJson.success) {
-        throw new Error(resJson.error || 'Nộp hồ sơ thất bại. Vui lòng kiểm tra lại ảnh hoặc kết nối mạng.');
+      if (!response.ok || !resJson?.success) {
+        throw new Error(resJson?.error || 'Nộp hồ sơ thất bại. Vui lòng kiểm tra lại ảnh hoặc kết nối mạng.');
       }
 
       setToast({
@@ -297,8 +299,9 @@ export const RegisterPage: React.FC = () => {
 
   return (
     <AuthLayout
-      title="Đăng Ký Độc Giả Ngoài"
-      subtitle="Vui lòng hoàn thành 4 bước để sử dụng dịch vụ thư viện."
+      variant="design"
+      title="Đăng ký tài khoản"
+      subtitle="Bắt đầu hành trình tri thức cùng SmartLibrary."
     >
       {/* Stepper Header */}
       <div className="flex items-center justify-between mb-8 relative">
@@ -337,7 +340,7 @@ export const RegisterPage: React.FC = () => {
 
       {/* STEP 1: Personal Information */}
       {step === 1 && (
-        <form onSubmit={handleSubmit(onSubmitInfo)} className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-500">
+        <form onSubmit={handleSubmit(onSubmitInfo)} className="auth-register-form animate-in fade-in slide-in-from-right-4 duration-500">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Họ và tên</label>
@@ -416,7 +419,7 @@ export const RegisterPage: React.FC = () => {
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="password"
-                  placeholder="Tối thiểu 8 ký tự..."
+                  placeholder="Nhập mật khẩu tùy ý..."
                   {...register('password')}
                   className="w-full pl-9 pr-3 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs focus:border-indigo-600 focus:outline-none"
                 />
@@ -507,7 +510,7 @@ export const RegisterPage: React.FC = () => {
           )}
 
           {/* 6 Digit Inputs */}
-          <div className="flex justify-center gap-2" onPaste={handleOtpPaste}>
+          <div className="auth-otp flex justify-center gap-2" onPaste={handleOtpPaste}>
             {[0, 1, 2, 3, 4, 5].map((index) => (
               <input
                 key={index}

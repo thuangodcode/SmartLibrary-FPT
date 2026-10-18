@@ -7,6 +7,7 @@ namespace SmartLibrary.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/[controller]")]
+[Authorize(Policy = "LibrarianOnly")]
 public class RegistrationsController : ControllerBase
 {
     private readonly IRegistrationService _registrationService;
@@ -17,7 +18,6 @@ public class RegistrationsController : ControllerBase
     }
 
     [HttpGet]
-    // [Authorize(Policy = "RequireLibrarianOrAdmin")]
     public async Task<IActionResult> GetRegistrations([FromQuery] string? status, [FromQuery] string? q, [FromQuery] DateTime? from, [FromQuery] DateTime? to, [FromQuery] int page = 1)
     {
         var result = await _registrationService.GetPendingRegistrationsAsync(status, q, from, to, page, 20);
@@ -42,7 +42,9 @@ public class RegistrationsController : ControllerBase
     [HttpPost("{id:guid}/approve")]
     public async Task<IActionResult> ApproveRegistration(Guid id, [FromBody] ApproveRequest request)
     {
-        var reviewerId = GetCurrentUserId();
+        if (!TryGetCurrentUserId(out var reviewerId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản người duyệt."));
+
         await _registrationService.ApproveRegistrationAsync(id, reviewerId, request.MembershipExpiresAt, request.Note);
         return Ok(ApiResponse<object>.Ok(true, new { message = "Approved successfully." }));
     }
@@ -50,7 +52,9 @@ public class RegistrationsController : ControllerBase
     [HttpPost("{id:guid}/reject")]
     public async Task<IActionResult> RejectRegistration(Guid id, [FromBody] RejectRequest request)
     {
-        var reviewerId = GetCurrentUserId();
+        if (!TryGetCurrentUserId(out var reviewerId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản người duyệt."));
+
         await _registrationService.RejectRegistrationAsync(id, reviewerId, request.Reason);
         return Ok(ApiResponse<object>.Ok(true, new { message = "Rejected successfully." }));
     }
@@ -58,20 +62,18 @@ public class RegistrationsController : ControllerBase
     [HttpPost("{id:guid}/request-more-info")]
     public async Task<IActionResult> RequestMoreInfo(Guid id, [FromBody] RejectRequest request)
     {
-        var reviewerId = GetCurrentUserId();
+        if (!TryGetCurrentUserId(out var reviewerId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản người duyệt."));
+
         await _registrationService.RequestMoreInfoAsync(id, reviewerId, request.Reason);
         return Ok(ApiResponse<object>.Ok(true, new { message = "Requested more info." }));
     }
 
-    private Guid GetCurrentUserId()
+    private bool TryGetCurrentUserId(out Guid userId)
     {
         var val = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                ?? User.FindFirst("sub")?.Value;
-        if (Guid.TryParse(val, out var id) && id != Guid.Empty)
-            return id;
-
-        // Default librarian reviewer ID if token is missing/dev
-        return Guid.Parse("e464f184-a8eb-4b04-b5a8-88ea49946354");
+        return Guid.TryParse(val, out userId) && userId != Guid.Empty;
     }
 }
 

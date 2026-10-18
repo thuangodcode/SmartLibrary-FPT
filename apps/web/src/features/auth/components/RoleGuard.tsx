@@ -23,6 +23,12 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles, children }) 
   }
 
   if (!allowedRoles.includes(user.role)) {
+    if (user.role === 'Admin') {
+      return <Navigate to="/admin" replace />;
+    }
+    if (user.role === 'Librarian') {
+      return <Navigate to="/librarian" replace />;
+    }
     return <Navigate to="/403" replace />;
   }
 

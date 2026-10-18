@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './features/home/pages/HomePage';
 import LoginPage from './features/auth/pages/LoginPage';
 import RegisterPage from './features/auth/pages/RegisterPage';
@@ -12,6 +12,10 @@ import { LibrarianLayout } from './features/librarian/components/LibrarianLayout
 import LibrarianDashboard from './features/librarian/pages/LibrarianDashboard';
 import RegistrationApprovalPage from './features/librarian/pages/RegistrationApprovalPage';
 import ReadersManagementPage from './features/librarian/pages/ReadersManagementPage';
+import { AdminLayout } from './features/admin/components/AdminLayout';
+import AdminOverviewPage from './features/admin/pages/AdminOverviewPage';
+import AdminSectionPage from './features/admin/pages/AdminSectionPage';
+import AdminUsersPage from './features/admin/pages/AdminUsersPage';
 import { useAuthStore } from './features/auth/store/useAuthStore';
 
 function App() {
@@ -34,7 +38,7 @@ function App() {
 
       {/* Librarian Routes */}
       <Route path="/librarian" element={
-        <RoleGuard allowedRoles={['Librarian', 'Admin']}>
+        <RoleGuard allowedRoles={['Librarian']}>
           <LibrarianLayout />
         </RoleGuard>
       }>
@@ -43,17 +47,20 @@ function App() {
         <Route path="readers" element={<ReadersManagementPage />} />
       </Route>
 
-      {/* Admin Routes (placeholder) */}
+      {/* Admin Routes */}
       <Route path="/admin" element={
         <RoleGuard allowedRoles={['Admin']}>
-          <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Admin Dashboard</h1>
-              <p className="text-sm text-slate-500 mt-2">Coming soon...</p>
-            </div>
-          </div>
+          <AdminLayout />
         </RoleGuard>
-      } />
+      }>
+        <Route index element={<AdminOverviewPage />} />
+        <Route path="users" element={<AdminUsersPage />} />
+        <Route path="books" element={<AdminSectionPage title="Quản lý sách" />} />
+        <Route path="policies" element={<AdminSectionPage title="Chính sách thư viện" />} />
+        <Route path="ai-settings" element={<AdminSectionPage title="Cấu hình AI" />} />
+        <Route path="reports" element={<AdminSectionPage title="Thống kê & báo cáo" />} />
+        <Route path="*" element={<Navigate to="/admin" replace />} />
+      </Route>
     </Routes>
   );
 }

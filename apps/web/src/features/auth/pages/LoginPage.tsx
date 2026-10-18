@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, ShieldCheck } from 'lucide-react';
 import { AuthLayout } from '../components/AuthLayout';
 import { loginSchema, type LoginInput } from '../schemas/authSchemas';
 import { useAuthStore } from '../store/useAuthStore';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { parseApiResponse } from '../../../lib/api';
+import { API_BASE_URL } from '../../../config';
 
 export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -30,7 +32,7 @@ export const LoginPage: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -39,37 +41,45 @@ export const LoginPage: React.FC = () => {
         }),
       });
 
-      const resData = await response.json();
-      if (!response.ok || !resData.success) {
-        setErrorMessage(resData.error || 'Email hoặc mật khẩu không đúng. Vui lòng thử lại.');
+      const resData = await parseApiResponse<{ success?: boolean; error?: string; data?: { user?: { id?: string; email?: string; fullName?: string; avatarUrl?: string | null; role?: string; status?: string; permissions?: string[] }; accessToken?: string } }>(response);
+      if (!response.ok || !resData?.success) {
+        setErrorMessage(resData?.error || 'Email hoặc mật khẩu không đúng. Vui lòng thử lại.');
         return;
       }
 
-      const user = resData.data.user;
-      const role = user?.role || 'Reader';
+      const user = resData.data?.user;
+      const role = user?.role;
+      const accessToken = resData.data?.accessToken;
+      if (
+        !user?.id ||
+        !accessToken ||
+        user.status !== 'Active' ||
+        (role !== 'Admin' && role !== 'Librarian' && role !== 'Reader')
+      ) {
+        setErrorMessage('Tài khoản chưa được xác thực hoặc chưa được cấp quyền hợp lệ.');
+        return;
+      }
 
       setAuth(
         {
           id: user?.id || '',
           email: user?.email || data.email,
           fullName: user?.fullName || 'Người dùng',
-          avatarUrl: user?.avatarUrl || null,
-          role: role,
+          avatarUrl: user?.avatarUrl ?? undefined,
+          role,
           status: user?.status || 'Active',
         },
-        resData.data.accessToken,
+        accessToken,
         user?.permissions || []
       );
 
       // Role-based redirect
-      if (redirect) {
-        navigate(redirect);
-      } else if (role === 'Admin') {
-        navigate('/admin');
+      if (role === 'Admin') {
+        navigate(redirect?.startsWith('/admin') ? redirect : '/admin');
       } else if (role === 'Librarian') {
-        navigate('/librarian');
+        navigate(redirect?.startsWith('/librarian') ? redirect : '/librarian');
       } else {
-        navigate('/');
+        navigate(redirect && !redirect.startsWith('/admin') && !redirect.startsWith('/librarian') ? redirect : '/');
       }
     } catch {
       setErrorMessage('Không thể kết nối với Backend API. Vui lòng kiểm tra lại dịch vụ Backend.');
@@ -80,105 +90,100 @@ export const LoginPage: React.FC = () => {
 
   return (
     <AuthLayout
-      title="Đăng Nhập SmartLibrary"
-      subtitle="Nhập email và mật khẩu của bạn để truy cập thư viện số"
+      variant="design"
+      title="Đăng nhập"
+      subtitle="Chào mừng trở lại. Những cuốn sách hay đang chờ bạn."
     >
       {errorMessage && (
-        <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs font-semibold">
-          ⚠️ {errorMessage}
+        <div className="auth-error" role="alert">
+          {errorMessage}
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Email Input */}
-        <div>
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-            Địa chỉ Email
-          </label>
-          <div className="relative">
-            <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="email"
-              {...register('email')}
-              placeholder="vinhnt@fpt.edu.vn"
-              className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-600 transition-colors"
-            />
-          </div>
+      <form onSubmit={handleSubmit(onSubmit)} className="auth-form">
+        <div className="auth-field">
+          <label htmlFor="login-email" className="auth-label">Email, tên đăng nhập hoặc mã sinh viên</label>
+          <input
+            id="login-email"
+            type="text"
+            autoComplete="username"
+            {...register('email')}
+            placeholder="adminfpt hoặc email của bạn"
+            className="auth-input"
+          />
           {errors.email && (
-            <p className="text-[11px] text-rose-500 mt-1 font-medium">{errors.email.message}</p>
+            <p className="text-xs text-rose-600">{errors.email.message}</p>
           )}
         </div>
 
-        {/* Password Input */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-              Mật khẩu
-            </label>
-            <a
-              href="/forgot-password"
-              className="text-[11px] font-semibold text-indigo-600 hover:underline"
-            >
+        <div className="auth-field">
+          <div className="flex items-center justify-between">
+            <label htmlFor="login-password" className="auth-label">Mật khẩu</label>
+            <Link to="/forgot-password" className="text-xs font-semibold">
               Quên mật khẩu?
-            </a>
+            </Link>
           </div>
-          <div className="relative">
-            <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <div className="auth-password-field">
             <input
+              id="login-password"
               type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
               {...register('password')}
               placeholder="••••••••"
-              className="w-full pl-10 pr-10 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-600 transition-colors"
+              className="auth-input"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              className="auth-password-toggle"
+              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
             >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
             </button>
           </div>
           {errors.password && (
-            <p className="text-[11px] text-rose-500 mt-1 font-medium">{errors.password.message}</p>
+            <p className="text-xs text-rose-600">{errors.password.message}</p>
           )}
         </div>
 
-        {/* Remember me checkbox */}
-        <div className="flex items-center gap-2">
+        <label className="flex items-center gap-2 text-xs text-slate-600">
           <input
             type="checkbox"
             id="rememberMe"
             {...register('rememberMe')}
-            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+            className="auth-checkbox h-4 w-4 rounded"
           />
-          <label htmlFor="rememberMe" className="text-xs text-slate-600 dark:text-slate-400">
-            Ghi nhớ đăng nhập
-          </label>
-        </div>
+          Ghi nhớ đăng nhập
+        </label>
 
-        {/* Submit Button */}
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full py-3.5 rounded-2xl bg-slate-900 dark:bg-indigo-600 text-white font-semibold text-xs sm:text-sm shadow-xl hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          className="auth-primary-button"
         >
           {isLoading ? (
             <span>Đang đăng nhập...</span>
           ) : (
             <>
-              <span>Đăng Nhập</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight size={16} />
+              <span>Đăng nhập</span>
             </>
           )}
         </button>
       </form>
 
-      <div className="text-center pt-2">
-        <p className="text-xs text-slate-500">
+      <div className="auth-security-note">
+        <ShieldCheck size={17} />
+        <div>
+          <strong>Đăng nhập an toàn</strong>
+          <p>Không chia sẻ mật khẩu. Chỉ ghi nhớ đăng nhập trên thiết bị cá nhân.</p>
+        </div>
+      </div>
+
+      <div className="pt-5 text-xs">
+        <p className="text-slate-500">
           Chưa có tài khoản?{' '}
-          <a href="/register" className="font-bold text-indigo-600 hover:underline">
-            Đăng ký ngay
-          </a>
+          <Link to="/register" className="font-semibold">Đăng ký tài khoản →</Link>
         </p>
       </div>
     </AuthLayout>

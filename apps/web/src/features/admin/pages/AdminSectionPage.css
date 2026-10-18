@@ -1,0 +1,70 @@
+.admin-section-page {
+  min-height: 100%;
+}
+
+.admin-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 25px;
+}
+
+.admin-section-eyebrow {
+  color: #e07845;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .12em;
+}
+
+.admin-section-heading h1 {
+  margin: 7px 0 5px;
+  color: #252c3b;
+  font-size: clamp(22px, 2vw, 28px);
+  font-weight: 750;
+  letter-spacing: -.035em;
+}
+
+.admin-section-heading p {
+  margin: 0;
+  color: #858d9d;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.admin-section-empty {
+  min-height: 310px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  border: 1px solid #eceef4;
+  border-radius: 15px;
+  background: #fff;
+  text-align: center;
+}
+
+.admin-section-empty-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 13px;
+  border-radius: 14px;
+  color: #df7643;
+  background: #fff2e9;
+}
+
+.admin-section-empty h2 {
+  margin: 0;
+  color: #30394b;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.admin-section-empty p {
+  margin: 7px 0 0;
+  color: #8b93a2;
+  font-size: 12px;
+  line-height: 1.6;
+}

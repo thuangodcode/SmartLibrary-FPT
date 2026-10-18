@@ -4,10 +4,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Mail, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { AuthLayout } from '../components/AuthLayout';
 import { forgotPasswordSchema, type ForgotPasswordInput } from '../schemas/authSchemas';
+import { API_BASE_URL } from '../../../config';
+import { parseApiResponse } from '../../../lib/api';
 
 export const ForgotPasswordPage: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   const {
     register,
@@ -17,11 +20,22 @@ export const ForgotPasswordPage: React.FC = () => {
     resolver: zodResolver(forgotPasswordSchema),
   });
 
-  const onSubmit = async () => {
+  const onSubmit = async ({ email }: ForgotPasswordInput) => {
     setIsLoading(true);
+    setRequestError(null);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const result = await parseApiResponse<{ success?: boolean; error?: string }>(response);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || 'Không thể gửi yêu cầu khôi phục mật khẩu.');
+      }
       setIsSubmitted(true);
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : 'Không thể gửi yêu cầu khôi phục mật khẩu.');
     } finally {
       setIsLoading(false);
     }
@@ -66,6 +80,7 @@ export const ForgotPasswordPage: React.FC = () => {
               <p className="text-[11px] text-rose-500 mt-1 font-medium">{errors.email.message}</p>
             )}
           </div>
+          {requestError && <p className="text-[11px] text-rose-500 font-medium" role="alert">{requestError}</p>}
 
           <button
             type="submit"

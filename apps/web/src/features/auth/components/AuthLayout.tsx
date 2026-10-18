@@ -1,14 +1,59 @@
 import React from 'react';
-import { BookOpen, Sparkles, ShieldCheck, CheckCircle } from 'lucide-react';
+import { BookOpen, CheckCircle, ShieldCheck, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { AnnouncementBar } from '../../../components/layout/AnnouncementBar';
+import libraryImage from '../../../assets/figma/auth-campus-library.jpeg';
+import libraryLogo from '../../../assets/figma/auth-logo-fpt.png';
+import './AuthLayout.css';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
   title: string;
   subtitle: string;
+  variant?: 'classic' | 'design';
 }
 
-export const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle }) => {
+export const AuthLayout: React.FC<AuthLayoutProps> = ({
+  children,
+  title,
+  subtitle,
+  variant = 'classic',
+}) => {
+  if (variant === 'design') {
+    return (
+      <div className="figma-auth-page">
+        <main className="figma-auth-panel">
+          <nav className="figma-auth-nav" aria-label="Điều hướng xác thực">
+            <Link to="/" className="figma-auth-logo" aria-label="SmartLibrary - Trang chủ">
+              <img className="figma-auth-logo-image" src={libraryLogo} alt="FPT SmartLibrary" />
+            </Link>
+            <a href="mailto:library@fpt.edu.vn" className="figma-auth-support">Cần hỗ trợ?</a>
+          </nav>
+
+          <section className="figma-auth-content" aria-labelledby="auth-title">
+            <div className="figma-auth-intro">
+              <p className="figma-auth-eyebrow">CỔNG ĐỘC GIẢ SMARTLIBRARY</p>
+              <h1 id="auth-title">{title}</h1>
+              <p className="figma-auth-subtitle">{subtitle}</p>
+            </div>
+            {children}
+            <p className="figma-auth-legal">
+              Bằng cách tiếp tục, bạn đồng ý với Điều khoản sử dụng và Chính sách quyền riêng tư.
+            </p>
+          </section>
+        </main>
+
+        <aside className="figma-auth-visual">
+          <img
+            className="figma-auth-visual-image"
+            src={libraryImage}
+            alt="Tòa nhà thư viện Đại học FPT trong khuôn viên học tập"
+          />
+        </aside>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#FAFAF8] dark:bg-[#0B0F17] flex flex-col justify-between">
       <AnnouncementBar />

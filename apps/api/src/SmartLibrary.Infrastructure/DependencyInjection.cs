@@ -34,6 +34,8 @@ public static class DependencyInjection
         services.AddScoped<IAiEmbeddingService, AiEmbeddingService>();
         services.AddScoped<IAiRecommendationService, AiRecommendationService>();
         services.AddScoped<IEmailService, EmailService>();
+        services.AddHttpClient();
+        services.AddScoped<IAdminUserManagementService, AdminUserManagementService>();
         services.AddScoped<IStorageService, StorageService>();
         services.AddScoped<IReportExportService, ReportExportService>();
 

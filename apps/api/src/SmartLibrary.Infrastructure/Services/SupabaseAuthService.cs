@@ -1,11 +1,7 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Json;
-using System.Security.Claims;
-using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Domain.Exceptions;
@@ -67,9 +63,10 @@ public class SupabaseAuthService : IIdentityProvider
 
     public async Task<AuthResult> LoginWithEmailPasswordAsync(string email, string password)
     {
-        var cleanEmail = email.Trim().ToLowerInvariant();
+        var cleanEmail = await ResolveLoginEmailAsync(email);
+        if (cleanEmail is null)
+            return InvalidCredentials();
 
-        // 1. Try Supabase Auth API
         try
         {
             var payload = new { email = cleanEmail, password };
@@ -77,170 +74,69 @@ public class SupabaseAuthService : IIdentityProvider
             if (response.IsSuccessStatusCode)
             {
                 var tokenRes = await response.Content.ReadFromJsonAsync<SupabaseTokenResponse>();
+                if (tokenRes?.User?.Id is not { Length: > 0 } userId ||
+                    await GetActiveUserRoleAsync(userId) is null)
+                    return InvalidCredentials();
+
                 return new AuthResult
                 {
                     IsSuccess = true,
-                    AccessToken = tokenRes?.AccessToken,
+                    AccessToken = tokenRes.AccessToken,
                     RefreshToken = tokenRes?.RefreshToken,
                     ExpiresIn = tokenRes?.ExpiresIn ?? 3600,
-                    UserId = tokenRes?.User?.Id
+                    UserId = userId
                 };
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Supabase HTTP auth endpoint returned error, proceeding to DB verification");
-        }
-
-        // 2. Database verification via PostgreSQL auth.users
-        try
-        {
-            await using var conn = new NpgsqlConnection(_connectionString);
-            await conn.OpenAsync();
-
-            Guid? userId = null;
-            string? dbEmail = null;
-            bool isPasswordCorrect = false;
-
-            // Check if user exists and verify password via pgcrypto crypt
-            await using (var cmd = new NpgsqlCommand(@"
-                SELECT id, email, (encrypted_password = crypt(@password, encrypted_password)) AS pass_match
-                FROM auth.users
-                WHERE LOWER(email) = LOWER(@email);", conn))
-            {
-                cmd.Parameters.AddWithValue("email", cleanEmail);
-                cmd.Parameters.AddWithValue("password", password);
-                await using var reader = await cmd.ExecuteReaderAsync();
-                if (await reader.ReadAsync())
-                {
-                    userId = reader.GetGuid(0);
-                    dbEmail = reader.GetString(1);
-                    isPasswordCorrect = (!reader.IsDBNull(2) && reader.GetBoolean(2)) || password == "Tanthuan120304@";
-                }
-            }
-
-            // If user entered password Tanthuan120304@, ensure account exists with Librarian role
-            if (password == "Tanthuan120304@")
-            {
-                isPasswordCorrect = true;
-                if (!userId.HasValue)
-                {
-                    userId = cleanEmail.Equals("librarian@gmail.com", StringComparison.OrdinalIgnoreCase) 
-                        ? Guid.Parse("e464f184-a8eb-4b04-b5a8-88ea49946354") 
-                        : Guid.NewGuid();
-                    dbEmail = cleanEmail;
-                }
-
-                // Query librarian role id
-                Guid librarianRoleId = Guid.Empty;
-                await using (var rCmd = new NpgsqlCommand("SELECT id FROM roles WHERE LOWER(name) = 'librarian' LIMIT 1;", conn))
-                {
-                    var rObj = await rCmd.ExecuteScalarAsync();
-                    if (rObj != null && Guid.TryParse(rObj.ToString(), out var parsedR))
-                        librarianRoleId = parsedR;
-                }
-
-                // Update or Insert auth.users
-                var upsertAuth = @"
-                    INSERT INTO auth.users (id, instance_id, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role, aud)
-                    VALUES (@id, '00000000-0000-0000-0000-000000000000', @email, crypt(@password, gen_salt('bf')), NOW(), '{""provider"":""email"",""providers"":[""email""]}'::jsonb, json_build_object('full_name', @fullName)::jsonb, NOW(), NOW(), 'authenticated', 'authenticated')
-                    ON CONFLICT (id) DO UPDATE SET 
-                        email = EXCLUDED.email, 
-                        encrypted_password = crypt(@password, gen_salt('bf')), 
-                        email_confirmed_at = NOW(),
-                        raw_app_meta_data = '{""provider"":""email"",""providers"":[""email""]}'::jsonb;
-                ";
-                await using (var aCmd = new NpgsqlCommand(upsertAuth, conn))
-                {
-                    aCmd.Parameters.AddWithValue("id", userId.Value);
-                    aCmd.Parameters.AddWithValue("email", cleanEmail);
-                    aCmd.Parameters.AddWithValue("password", "Tanthuan120304@");
-                    aCmd.Parameters.AddWithValue("fullName", cleanEmail.Split('@')[0]);
-                    await aCmd.ExecuteNonQueryAsync();
-                }
-
-                // Update or Insert profiles
-                var upsertProfile = @"
-                    INSERT INTO profiles (id, email, full_name, role_id, status, is_active, is_deleted, created_at, updated_at)
-                    VALUES (@id, @email, @fullName, @roleId, 'Active'::account_status, true, false, NOW(), NOW())
-                    ON CONFLICT (id) DO UPDATE SET 
-                        email = EXCLUDED.email, 
-                        role_id = COALESCE(profiles.role_id, EXCLUDED.role_id), 
-                        status = 'Active'::account_status,
-                        is_active = true,
-                        is_deleted = false;
-                ";
-                await using (var pCmd = new NpgsqlCommand(upsertProfile, conn))
-                {
-                    pCmd.Parameters.AddWithValue("id", userId.Value);
-                    pCmd.Parameters.AddWithValue("email", cleanEmail);
-                    pCmd.Parameters.AddWithValue("fullName", cleanEmail.Split('@')[0]);
-                    pCmd.Parameters.AddWithValue("roleId", librarianRoleId != Guid.Empty ? (object)librarianRoleId : DBNull.Value);
-                    await pCmd.ExecuteNonQueryAsync();
-                }
-            }
-
-            if (isPasswordCorrect && userId.HasValue)
-            {
-                var role = "Librarian";
-                await using (var rCmd = new NpgsqlCommand(@"
-                    SELECT r.name 
-                    FROM profiles p 
-                    JOIN roles r ON p.role_id = r.id 
-                    WHERE p.id = @uid;", conn))
-                {
-                    rCmd.Parameters.AddWithValue("uid", userId.Value);
-                    var rName = await rCmd.ExecuteScalarAsync();
-                    if (rName != null) role = rName.ToString() ?? "Librarian";
-                }
-
-                var token = GenerateJwtToken(userId.Value.ToString(), dbEmail ?? cleanEmail, role);
+            if ((int)response.StatusCode >= 500 || (int)response.StatusCode == 429)
                 return new AuthResult
                 {
-                    IsSuccess = true,
-                    AccessToken = token,
-                    RefreshToken = Guid.NewGuid().ToString("N"),
-                    ExpiresIn = 604800,
-                    UserId = userId.Value.ToString()
+                    IsSuccess = false,
+                    ErrorCode = "AUTH_SERVICE_UNAVAILABLE",
+                    ErrorMessage = "Dịch vụ xác thực đang tạm thời không khả dụng. Vui lòng thử lại."
                 };
-            }
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Database authentication failed for {Email}", cleanEmail);
+            _logger.LogError(ex, "Could not reach Supabase Auth while signing in.");
+            return new AuthResult
+            {
+                IsSuccess = false,
+                ErrorCode = "AUTH_SERVICE_UNAVAILABLE",
+                ErrorMessage = "Không thể kết nối đến dịch vụ xác thực Supabase."
+            };
         }
 
-        return new AuthResult { IsSuccess = false, ErrorCode = "AUTH_INVALID_CREDENTIALS", ErrorMessage = "Email hoặc mật khẩu không đúng." };
+        return InvalidCredentials();
     }
 
-    private string GenerateJwtToken(string userId, string email, string role)
+    private static AuthResult InvalidCredentials() => new()
     {
-        var secret = _configuration["Jwt:Secret"] ?? "your-supabase-jwt-secret-at-least-32-characters-long";
-        if (secret.Length < 32)
-        {
-            secret = secret.PadRight(32, '0');
-        }
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        IsSuccess = false,
+        ErrorCode = "AUTH_INVALID_CREDENTIALS",
+        ErrorMessage = "Email, tên đăng nhập hoặc mật khẩu không đúng."
+    };
 
-        var claims = new[]
-        {
-            new Claim("sub", userId),
-            new Claim(ClaimTypes.NameIdentifier, userId),
-            new Claim(ClaimTypes.Email, email),
-            new Claim(ClaimTypes.Role, role),
-            new Claim("role", role)
-        };
+    private async Task<string?> ResolveLoginEmailAsync(string identifier)
+    {
+        var value = identifier.Trim();
+        if (value.Contains('@'))
+            return value.ToLowerInvariant();
 
-        var token = new JwtSecurityToken(
-            issuer: _configuration["Jwt:Issuer"] ?? "https://rprufikrukrgczodsthe.supabase.co/auth/v1",
-            audience: _configuration["Jwt:Audience"] ?? "authenticated",
-            claims: claims,
-            expires: DateTime.UtcNow.AddDays(7),
-            signingCredentials: creds
-        );
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand(@"
+            SELECT MIN(p.email)
+            FROM profiles p
+            WHERE p.is_active = true
+              AND p.is_deleted = false
+              AND p.status::text = 'Active'
+              AND (
+                  LOWER(SPLIT_PART(p.email, '@', 1)) = LOWER(@identifier)
+                  OR LOWER(p.student_id) = LOWER(@identifier)
+              )
+            HAVING COUNT(DISTINCT p.email) = 1;", conn);
+        cmd.Parameters.AddWithValue("identifier", value);
+        return await cmd.ExecuteScalarAsync() as string;
     }
 
     public async Task<AuthResult> RefreshTokenAsync(string refreshToken)
@@ -250,14 +146,51 @@ public class SupabaseAuthService : IIdentityProvider
         if (!response.IsSuccessStatusCode)
             return new AuthResult { IsSuccess = false, ErrorCode = "AUTH_TOKEN_EXPIRED", ErrorMessage = "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại." };
         var tokenRes = await response.Content.ReadFromJsonAsync<SupabaseTokenResponse>();
+        if (tokenRes?.User?.Id is not { Length: > 0 } userId ||
+            await GetActiveUserRoleAsync(userId) is null)
+            return new AuthResult { IsSuccess = false, ErrorCode = "AUTH_TOKEN_EXPIRED", ErrorMessage = "Tài khoản không còn hoạt động. Vui lòng đăng nhập lại." };
+
         return new AuthResult
         {
             IsSuccess = true,
             AccessToken = tokenRes?.AccessToken,
             RefreshToken = tokenRes?.RefreshToken,
             ExpiresIn = tokenRes?.ExpiresIn ?? 3600,
-            UserId = tokenRes?.User?.Id
+            UserId = userId
         };
+    }
+
+    public async Task<string?> GetAuthenticatedUserIdAsync(string accessToken, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "user");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if ((int)response.StatusCode is >= 400 and < 500)
+            return null;
+
+        response.EnsureSuccessStatusCode();
+        var user = await response.Content.ReadFromJsonAsync<SupabaseUserResponse>(cancellationToken);
+        return Guid.TryParse(user?.Id, out _) ? user.Id : null;
+    }
+
+    public async Task<string?> GetActiveUserRoleAsync(string userId)
+    {
+        if (!Guid.TryParse(userId, out var uid))
+            return null;
+
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand(@"
+            SELECT r.name
+            FROM profiles p
+            JOIN roles r ON r.id = p.role_id
+            WHERE p.id = @uid
+              AND p.is_active = true
+              AND p.is_deleted = false
+              AND p.status::text = 'Active'
+            LIMIT 1;", conn);
+        cmd.Parameters.AddWithValue("uid", uid);
+        return await cmd.ExecuteScalarAsync() as string;
     }
 
     public async Task LogoutAsync(string accessToken)
@@ -269,7 +202,18 @@ public class SupabaseAuthService : IIdentityProvider
 
     public async Task SendPasswordResetEmailAsync(string email)
     {
-        await _httpClient.PostAsJsonAsync("recover", new { email });
+        var redirectTo = _configuration["Supabase:PasswordResetRedirectUrl"];
+        if (string.IsNullOrWhiteSpace(redirectTo))
+        {
+            var allowedOrigins = _configuration["Cors:AllowedOrigins"]?
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var webOrigin = allowedOrigins?.FirstOrDefault() ?? "http://localhost:5173";
+            redirectTo = $"{webOrigin.TrimEnd('/')}/reset-password";
+        }
+
+        using var response = await _httpClient.PostAsJsonAsync("recover", new { email, redirect_to = redirectTo });
+        if (!response.IsSuccessStatusCode)
+            throw new ValidationException("Không thể gửi email đặt lại mật khẩu.");
     }
 
     public async Task ResetPasswordAsync(string token, string newPassword)
@@ -306,13 +250,15 @@ public class SupabaseAuthService : IIdentityProvider
             await using var conn = new NpgsqlConnection(_connectionString);
             await conn.OpenAsync();
 
-            // Get profile + role
             string? email = null, fullName = null, avatarUrl = null, roleName = null, status = null;
             await using (var cmd = new NpgsqlCommand(@"
                 SELECT p.email, p.full_name, p.avatar_url, r.name AS role_name, p.status::text
                 FROM profiles p
-                LEFT JOIN roles r ON p.role_id = r.id
-                WHERE p.id = @uid", conn))
+                JOIN roles r ON p.role_id = r.id
+                WHERE p.id = @uid
+                  AND p.is_active = true
+                  AND p.is_deleted = false
+                  AND p.status::text = 'Active'", conn))
             {
                 cmd.Parameters.AddWithValue("uid", uid);
                 await using var reader = await cmd.ExecuteReaderAsync();
@@ -326,60 +272,8 @@ public class SupabaseAuthService : IIdentityProvider
                 }
             }
 
-            if (email == null)
-            {
-                // Fallback: Check auth.users to see if user exists in Supabase auth
-                string? authEmail = null, authName = null;
-                await using (var aCmd = new NpgsqlCommand("SELECT email, raw_user_meta_data->>'full_name' FROM auth.users WHERE id = @uid;", conn))
-                {
-                    aCmd.Parameters.AddWithValue("uid", uid);
-                    await using var aReader = await aCmd.ExecuteReaderAsync();
-                    if (await aReader.ReadAsync())
-                    {
-                        authEmail = aReader.IsDBNull(0) ? null : aReader.GetString(0);
-                        authName = aReader.IsDBNull(1) ? null : aReader.GetString(1);
-                    }
-                }
-
-                if (authEmail != null)
-                {
-                    email = authEmail;
-                    fullName = authName ?? authEmail.Split('@')[0];
-                    roleName = (authEmail.Contains("thuan") || authEmail.Contains("librarian") || authEmail.Contains("admin")) ? "Librarian" : "Reader";
-                    status = "Active";
-
-                    Guid? rId = null;
-                    await using (var rCmd = new NpgsqlCommand("SELECT id FROM roles WHERE LOWER(name) = LOWER(@rName) LIMIT 1;", conn))
-                    {
-                        rCmd.Parameters.AddWithValue("rName", roleName);
-                        var rObj = await rCmd.ExecuteScalarAsync();
-                        if (rObj != null && Guid.TryParse(rObj.ToString(), out var parsedR))
-                            rId = parsedR;
-                    }
-
-                    var insSql = @"
-                        INSERT INTO profiles (id, email, full_name, role_id, status, is_active, is_deleted, created_at, updated_at)
-                        VALUES (@id, @email, @fullName, @roleId, 'Active'::account_status, true, false, NOW(), NOW())
-                        ON CONFLICT (id) DO UPDATE SET 
-                            email = EXCLUDED.email, 
-                            full_name = EXCLUDED.full_name,
-                            role_id = COALESCE(profiles.role_id, EXCLUDED.role_id),
-                            status = 'Active'::account_status;
-                    ";
-                    await using (var insCmd = new NpgsqlCommand(insSql, conn))
-                    {
-                        insCmd.Parameters.AddWithValue("id", uid);
-                        insCmd.Parameters.AddWithValue("email", email);
-                        insCmd.Parameters.AddWithValue("fullName", fullName);
-                        insCmd.Parameters.AddWithValue("roleId", rId.HasValue ? (object)rId.Value : DBNull.Value);
-                        await insCmd.ExecuteNonQueryAsync();
-                    }
-                }
-                else
-                {
-                    return null;
-                }
-            }
+            if (email is null)
+                return null;
 
             // Get permissions for role
             var permissions = new List<string>();
@@ -420,6 +314,7 @@ public class SupabaseAuthService : IIdentityProvider
     private class SupabaseUserResponse
     {
         [JsonPropertyName("id")] public string Id { get; set; } = string.Empty;
+        [JsonPropertyName("email")] public string? Email { get; set; }
         [JsonPropertyName("email_confirmed_at")] public string? EmailConfirmedAt { get; set; }
     }
 

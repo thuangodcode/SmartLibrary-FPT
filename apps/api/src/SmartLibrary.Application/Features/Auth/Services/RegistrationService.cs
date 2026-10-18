@@ -29,8 +29,6 @@ public class RegistrationService : IRegistrationService
     {
         var q = _unitOfWork.Repository<RegistrationRequest>()
             .Query()
-            .Include(r => r.User)
-            .Include(r => r.Documents)
             .AsNoTracking();
 
         if (!string.IsNullOrEmpty(status) && !status.Equals("All", StringComparison.OrdinalIgnoreCase))
@@ -171,12 +169,15 @@ public class RegistrationService : IRegistrationService
         {
             return;
         }
-        {
+        if (req.Status != RegistrationRequestStatus.Submitted)
+            throw new Exception("Đơn đăng ký không ở trạng thái chờ duyệt.");
+
+        if (reviewerId != Guid.Empty && await _unitOfWork.Repository<UserProfile>().Query().AnyAsync(u => u.Id == reviewerId))
             req.ReviewedById = reviewerId;
-        }
         req.ReviewedAt = DateTime.UtcNow;
         req.RejectReason = reason;
 
+        req.Status = RegistrationRequestStatus.Rejected;
         req.User.Status = AccountStatus.Rejected;
 
         await _unitOfWork.SaveChangesAsync();

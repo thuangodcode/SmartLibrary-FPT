@@ -13,6 +13,8 @@ public interface IIdentityProvider
     Task ChangePasswordAsync(string userId, string currentPassword, string newPassword);
     Task ResendVerificationEmailAsync(string email);
     Task<object?> GetUserProfileWithPermissionsAsync(string userId);
+    Task<string?> GetAuthenticatedUserIdAsync(string accessToken, CancellationToken cancellationToken = default);
+    Task<string?> GetActiveUserRoleAsync(string userId);
 }
 
 public class AuthResult
