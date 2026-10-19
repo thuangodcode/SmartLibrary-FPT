@@ -84,3 +84,5 @@ TestResults/
 
 # ── AI Agents & Local configs ──
 .agents/
+.cursor/
+.codacy/

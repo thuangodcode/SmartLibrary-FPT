@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using SmartLibrary.Application.Common;
-using SmartLibrary.Infrastructure.Persistence;
+using SmartLibrary.Application.Features.Categories;
+using SmartLibrary.Application.Features.Categories.DTOs;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -9,27 +9,17 @@ namespace SmartLibrary.Api.Controllers;
 [Route("api/v1/[controller]")]
 public class CategoriesController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly CategoryService _categoryService;
 
-    public CategoriesController(AppDbContext context)
+    public CategoriesController(CategoryService categoryService)
     {
-        _context = context;
+        _categoryService = categoryService;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct = default)
     {
-        var categories = await _context.Categories
-            .AsNoTracking()
-            .Select(c => new
-            {
-                c.Id,
-                c.Name,
-                c.Description,
-                BookCount = c.Books.Count
-            })
-            .ToListAsync(ct);
-
-        return Ok(ApiResponse<object>.Ok(categories));
+        var categories = await _categoryService.GetAllAsync(ct);
+        return Ok(ApiResponse<IReadOnlyList<CategoryDto>>.Ok(categories));
     }
 }

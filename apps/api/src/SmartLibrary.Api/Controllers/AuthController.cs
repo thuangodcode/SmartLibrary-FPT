@@ -1,12 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Auth.Commands;
 using SmartLibrary.Application.Interfaces;
-using SmartLibrary.Domain.Enums;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -15,22 +13,16 @@ namespace SmartLibrary.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IIdentityProvider _identityProvider;
-    private readonly IEmailService _emailService;
-    private readonly IMemoryCache _memoryCache;
-    private readonly IRegistrationService _registrationService;
+    private readonly IAuthOtpService _authOtpService;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IIdentityProvider identityProvider,
-        IEmailService emailService,
-        IMemoryCache memoryCache,
-        IRegistrationService registrationService,
+        IAuthOtpService authOtpService,
         ILogger<AuthController> logger)
     {
         _identityProvider = identityProvider;
-        _emailService = emailService;
-        _memoryCache = memoryCache;
-        _registrationService = registrationService;
+        _authOtpService = authOtpService;
         _logger = logger;
     }
 
@@ -79,7 +71,6 @@ public class AuthController : ControllerBase
             Response.Cookies.Append("refreshToken", result.RefreshToken, cookieOptions);
         }
 
-        // Fetch user profile with role and permissions from DB
         object? userProfile = null;
         if (!string.IsNullOrEmpty(result.UserId))
         {
@@ -195,30 +186,17 @@ public class AuthController : ControllerBase
     /// Gửi mã xác thực OTP qua email
     /// </summary>
     [HttpPost("send-otp")]
-    public async Task<IActionResult> SendOtp([FromBody] SendOtpRequest request)
+    public async Task<IActionResult> SendOtp([FromBody] SendOtpRequest request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.Email))
-            return BadRequest(ApiResponse<object>.Fail("Vui lòng cung cấp email hợp lệ."));
-
-        var cleanEmail = request.Email.Trim().ToLowerInvariant();
-        var otp = System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
-
-        var emailSent = await _emailService.SendEmailAsync(
-            cleanEmail,
-            "SmartLibrary - Mã xác thực Email đăng ký tài khoản",
-            $"Mã xác thực OTP của bạn là: {otp}. Mã có hiệu lực trong vòng 10 phút. Tuyệt đối không chia sẻ mã này cho bất kỳ ai."
-        );
-
-        _memoryCache.Set($"reg_otp:{cleanEmail}", otp, TimeSpan.FromMinutes(10));
-        _memoryCache.Remove($"reg_verified:{cleanEmail}");
+        var result = await _authOtpService.SendOtpAsync(request.Email, ct);
+        if (!result.IsSuccess)
+            return BadRequest(ApiResponse<object>.Fail(result.Error!));
 
         return Ok(ApiResponse<object>.Ok(new
         {
-            message = emailSent
-                ? "Mã xác thực đã được gửi đến email của bạn."
-                : "Hệ thống chưa cấu hình SMTP để gửi mail thật. Vui lòng dùng mã OTP hiển thị trên màn hình để tiếp tục.",
-            email = cleanEmail,
-            otp
+            message = result.Data!.Message,
+            email = result.Data.Email,
+            otp = result.Data.Otp
         }));
     }
 
@@ -228,20 +206,14 @@ public class AuthController : ControllerBase
     [HttpPost("verify-otp")]
     public IActionResult VerifyOtp([FromBody] VerifyOtpRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Otp))
-            return BadRequest(ApiResponse<object>.Fail("Vui lòng cung cấp email và mã OTP."));
+        var result = _authOtpService.VerifyOtp(request.Email, request.Otp);
+        if (!result.IsSuccess)
+            return BadRequest(ApiResponse<object>.Fail(result.Error!));
 
-        var cleanEmail = request.Email.Trim().ToLowerInvariant();
-        if (!_memoryCache.TryGetValue($"reg_otp:{cleanEmail}", out string? cachedOtp) || cachedOtp != request.Otp.Trim())
-        {
-            return BadRequest(ApiResponse<object>.Fail("Mã xác thực OTP không chính xác hoặc đã hết hạn."));
-        }
-
-        _memoryCache.Set($"reg_verified:{cleanEmail}", true, TimeSpan.FromMinutes(30));
-        return Ok(ApiResponse<object>.Ok(new { verified = true, message = "Xác minh email thành công!" }));
+        return Ok(ApiResponse<object>.Ok(new { verified = result.Data!.Verified, message = result.Data.Message }));
     }
 
-    public class RegisterReaderForm : SmartLibrary.Application.Interfaces.RegisterExternalReaderRequest
+    public class RegisterReaderForm : RegisterExternalReaderRequest
     {
         public IFormFile? Front { get; set; }
         public IFormFile? Back { get; set; }
@@ -254,49 +226,18 @@ public class AuthController : ControllerBase
     /// </summary>
     [HttpPost("register-reader")]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> RegisterReader([FromForm] RegisterReaderForm form)
+    public async Task<IActionResult> RegisterReader([FromForm] RegisterReaderForm form, CancellationToken ct)
     {
-        var request = (SmartLibrary.Application.Interfaces.RegisterExternalReaderRequest)form;
-        var front = form.Front;
-        var back = form.Back;
-        var selfie = form.Selfie;
-        var otp = form.Otp;
-
-        if (string.IsNullOrWhiteSpace(request.Email))
-            return BadRequest(ApiResponse<object>.Fail("Vui lòng nhập địa chỉ email."));
-
-        if (string.IsNullOrEmpty(request.Password))
-            return BadRequest(ApiResponse<object>.Fail("Vui lòng nhập mật khẩu."));
-
-        if (string.IsNullOrWhiteSpace(request.FullName))
-            return BadRequest(ApiResponse<object>.Fail("Vui lòng nhập họ và tên."));
-
-        if (front == null || front.Length == 0)
-            return BadRequest(ApiResponse<object>.Fail("Vui lòng tải lên ảnh mặt trước giấy tờ."));
-
-        var cleanEmail = request.Email.Trim().ToLowerInvariant();
-        var isVerified = _memoryCache.TryGetValue($"reg_verified:{cleanEmail}", out bool v) && v;
-        if (!isVerified && !string.IsNullOrWhiteSpace(otp))
-        {
-            if (_memoryCache.TryGetValue($"reg_otp:{cleanEmail}", out string? cached) && cached == otp.Trim())
-            {
-                isVerified = true;
-            }
-        }
-
-        if (!isVerified)
-        {
-            return BadRequest(ApiResponse<object>.Fail("Email chưa được xác thực bằng mã OTP. Vui lòng quay lại bước xác minh email."));
-        }
-
         try
         {
-            var reqId = await _registrationService.RegisterExternalReaderAsync(request, front, back, selfie);
-            _memoryCache.Remove($"reg_otp:{cleanEmail}");
-            _memoryCache.Remove($"reg_verified:{cleanEmail}");
+            var result = await _authOtpService.RegisterExternalReaderAsync(
+                form, form.Front, form.Back, form.Selfie, form.Otp, ct);
+
+            if (!result.IsSuccess)
+                return BadRequest(ApiResponse<object>.Fail(result.Error!));
 
             return Ok(ApiResponse<object>.Ok(
-                new { registrationId = reqId },
+                new { registrationId = result.Data!.RegistrationId },
                 new { message = "Đăng ký tài khoản và nộp hồ sơ thành công! Vui lòng chờ Thủ thư phê duyệt." }
             ));
         }

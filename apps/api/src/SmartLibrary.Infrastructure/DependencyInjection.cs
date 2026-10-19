@@ -2,6 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SmartLibrary.Application.Features.Books;
+using SmartLibrary.Application.Features.Categories;
+using SmartLibrary.Application.Features.Statistics;
+using SmartLibrary.Application.Features.Policies;
+using SmartLibrary.Application.Features.Users;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Infrastructure.Persistence;
 using SmartLibrary.Infrastructure.Persistence.Repositories;
@@ -29,6 +33,10 @@ public static class DependencyInjection
         services.AddHttpClient<IIdentityProvider, SupabaseAuthService>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IBookRepository, BookRepository>();
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<IDashboardRepository, DashboardRepository>();
+        services.AddScoped<IReaderRepository, ReaderRepository>();
+        services.AddScoped<IPolicyRuleRepository, PolicyRuleRepository>();
 
         // Services
         services.AddScoped<IAiEmbeddingService, AiEmbeddingService>();

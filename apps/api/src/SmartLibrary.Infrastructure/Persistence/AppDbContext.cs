@@ -30,6 +30,10 @@ public class AppDbContext : DbContext
     public DbSet<RegistrationRequest> RegistrationRequests => Set<RegistrationRequest>();
     public DbSet<IdentityDocument> IdentityDocuments => Set<IdentityDocument>();
     public DbSet<UserImportBatch> UserImportBatches => Set<UserImportBatch>();
+    public DbSet<PolicyRule> PolicyRules => Set<PolicyRule>();
+    public DbSet<PolicyRuleParameter> PolicyRuleParameters => Set<PolicyRuleParameter>();
+    public DbSet<PolicyRuleTarget> PolicyRuleTargets => Set<PolicyRuleTarget>();
+    public DbSet<PolicyRuleHistory> PolicyRuleHistories => Set<PolicyRuleHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -109,6 +113,33 @@ public class AppDbContext : DbContext
                 v => v.ToString().ToLower(),
                 v => Enum.Parse<BookCondition>(v, true)
             );
+        });
+
+        modelBuilder.Entity<PolicyRule>(entity =>
+        {
+            entity.ToTable("policy_rules");
+            entity.Property(p => p.PolicyType).HasConversion<string>();
+            entity.Property(p => p.Status).HasConversion<string>();
+            entity.HasOne(p => p.CreatedByUser).WithMany().HasForeignKey(p => p.CreatedBy);
+            entity.HasOne(p => p.UpdatedByUser).WithMany().HasForeignKey(p => p.UpdatedBy);
+            entity.HasMany(p => p.Parameters).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId);
+            entity.HasMany(p => p.Targets).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId);
+            entity.HasMany(p => p.Histories).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId);
+        });
+
+        modelBuilder.Entity<PolicyRuleParameter>(entity =>
+        {
+            entity.ToTable("policy_rule_parameters");
+        });
+
+        modelBuilder.Entity<PolicyRuleTarget>(entity =>
+        {
+            entity.ToTable("policy_rule_targets");
+        });
+
+        modelBuilder.Entity<PolicyRuleHistory>(entity =>
+        {
+            entity.ToTable("policy_rule_histories");
         });
 
         // Global query filter for soft delete
