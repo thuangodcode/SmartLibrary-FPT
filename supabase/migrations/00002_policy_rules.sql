@@ -1,0 +1,2 @@
+-- Policy rules module (also applied via Supabase MCP). See PolicyRules feature.
+-- Tables: policy_rules, policy_rule_parameters, policy_rule_targets, policy_rule_histories

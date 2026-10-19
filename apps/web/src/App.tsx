@@ -16,6 +16,7 @@ import { AdminLayout } from './features/admin/components/AdminLayout';
 import AdminOverviewPage from './features/admin/pages/AdminOverviewPage';
 import AdminSectionPage from './features/admin/pages/AdminSectionPage';
 import AdminUsersPage from './features/admin/pages/AdminUsersPage';
+import AdminPoliciesPage from './features/admin/pages/AdminPoliciesPage';
 import { useAuthStore } from './features/auth/store/useAuthStore';
 
 function App() {
@@ -56,7 +57,7 @@ function App() {
         <Route index element={<AdminOverviewPage />} />
         <Route path="users" element={<AdminUsersPage />} />
         <Route path="books" element={<AdminSectionPage title="Quản lý sách" />} />
-        <Route path="policies" element={<AdminSectionPage title="Chính sách thư viện" />} />
+        <Route path="policies" element={<AdminPoliciesPage />} />
         <Route path="ai-settings" element={<AdminSectionPage title="Cấu hình AI" />} />
         <Route path="reports" element={<AdminSectionPage title="Thống kê & báo cáo" />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />

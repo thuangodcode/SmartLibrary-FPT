@@ -6,19 +6,38 @@
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* —— Desktop rail: collapsed by default, expands on hover / touch toggle —— */
 .admin-sidebar {
-  width: 256px;
-  flex: 0 0 256px;
+  --admin-rail-collapsed: 72px;
+  --admin-rail-expanded: 240px;
+  --admin-rail-duration: 260ms;
+
+  width: var(--admin-rail-collapsed);
+  flex: 0 0 var(--admin-rail-collapsed);
   display: flex;
   flex-direction: column;
-  padding: 24px 16px 16px;
+  padding: 20px 12px 14px;
   background: #fff;
   border-right: 1px solid #e9ecf3;
+  overflow: hidden;
+  transition:
+    width var(--admin-rail-duration) ease,
+    flex-basis var(--admin-rail-duration) ease,
+    padding var(--admin-rail-duration) ease;
+  z-index: 12;
+}
+
+.admin-sidebar--expanded {
+  width: var(--admin-rail-expanded);
+  flex: 0 0 var(--admin-rail-expanded);
+  padding: 24px 14px 16px;
 }
 
 .admin-brand-row {
   display: flex;
   align-items: center;
+  min-height: 52px;
+  flex-shrink: 0;
 }
 
 .admin-brand {
@@ -28,15 +47,36 @@
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 0 8px;
+  padding: 0;
   color: inherit;
   text-decoration: none;
+  overflow: hidden;
+}
+
+.admin-sidebar--collapsed .admin-brand {
+  justify-content: center;
 }
 
 .admin-brand-logo {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
+  flex-shrink: 0;
+}
+
+.admin-brand-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  max-width: 0;
+  transition: opacity 180ms ease, max-width var(--admin-rail-duration) ease;
+}
+
+.admin-sidebar--expanded .admin-brand-text {
+  opacity: 1;
+  max-width: 160px;
+  transition-delay: 40ms;
 }
 
 .admin-brand strong,
@@ -61,22 +101,83 @@
   display: none;
   margin-left: auto;
   color: #7a8496;
+  flex-shrink: 0;
+}
+
+.admin-rail-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  margin: 10px 0 0;
+  border: 1px solid #eef0f5;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #677187;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.admin-sidebar--collapsed .admin-rail-toggle {
+  padding: 0;
+}
+
+.admin-sidebar--expanded .admin-rail-toggle {
+  justify-content: flex-start;
+  padding: 0 12px;
+}
+
+.admin-rail-toggle-label {
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 0;
+  max-width: 0;
+  transition: opacity 180ms ease, max-width var(--admin-rail-duration) ease;
+}
+
+.admin-sidebar--expanded .admin-rail-toggle-label {
+  opacity: 1;
+  max-width: 120px;
 }
 
 .admin-nav-caption {
-  margin: 39px 10px 11px;
+  margin: 28px 10px 11px;
   color: #a0a7b5;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .12em;
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 0;
+  max-height: 0;
+  margin-top: 18px;
+  margin-bottom: 0;
+  transition:
+    opacity 160ms ease,
+    max-height var(--admin-rail-duration) ease,
+    margin var(--admin-rail-duration) ease;
+}
+
+.admin-sidebar--expanded .admin-nav-caption {
+  opacity: 1;
+  max-height: 24px;
+  margin: 32px 10px 11px;
+  transition-delay: 40ms;
 }
 
 .admin-navigation {
   display: grid;
   gap: 6px;
+  margin-top: 10px;
 }
 
 .admin-nav-link {
+  position: relative;
   min-height: 46px;
   display: flex;
   align-items: center;
@@ -87,7 +188,33 @@
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
+  overflow: hidden;
+  white-space: nowrap;
   transition: background-color .16s ease, color .16s ease;
+}
+
+.admin-sidebar--collapsed .admin-nav-link {
+  justify-content: center;
+  padding: 0;
+  gap: 0;
+}
+
+.admin-nav-icon {
+  flex-shrink: 0;
+}
+
+.admin-nav-label {
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  max-width: 0;
+  transition: opacity 180ms ease, max-width var(--admin-rail-duration) ease;
+}
+
+.admin-sidebar--expanded .admin-nav-label {
+  opacity: 1;
+  max-width: 180px;
+  transition-delay: 50ms;
 }
 
 .admin-nav-link:hover {
@@ -100,16 +227,56 @@
   background: #fff1e8;
 }
 
+/* Tooltip when rail is collapsed */
+.admin-sidebar--collapsed .admin-nav-link[data-tooltip]::after,
+.admin-sidebar--collapsed .admin-logout-button[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 7px 11px;
+  border-radius: 8px;
+  background: #1f2937;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 8px 20px rgb(15 23 42 / 18%);
+  transition: opacity .15s ease;
+  z-index: 40;
+}
+
+.admin-sidebar--collapsed .admin-nav-link:hover::after,
+.admin-sidebar--collapsed .admin-logout-button:hover::after {
+  opacity: 1;
+}
+
 .admin-sidebar-bottom {
   margin-top: auto;
+  padding-top: 12px;
 }
 
 .admin-sidebar-help {
-  margin: 0 1px 17px;
-  padding: 15px 13px;
+  margin: 0 1px 14px;
+  padding: 14px 12px;
   border: 1px solid #f0e7e2;
   border-radius: 12px;
   background: #fffbf8;
+  overflow: hidden;
+  transition: padding var(--admin-rail-duration) ease, margin var(--admin-rail-duration) ease;
+}
+
+.admin-sidebar--collapsed .admin-sidebar-help {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 0;
+  margin: 0 0 12px;
+  border: 0;
+  background: transparent;
 }
 
 .admin-help-icon {
@@ -121,6 +288,24 @@
   color: #e86b24;
   background: #fff0e5;
   border-radius: 9px;
+  flex-shrink: 0;
+}
+
+.admin-sidebar--collapsed .admin-help-icon {
+  margin-bottom: 0;
+}
+
+.admin-help-copy {
+  overflow: hidden;
+  opacity: 0;
+  max-height: 0;
+  transition: opacity 160ms ease, max-height var(--admin-rail-duration) ease;
+}
+
+.admin-sidebar--expanded .admin-help-copy {
+  opacity: 1;
+  max-height: 80px;
+  transition-delay: 40ms;
 }
 
 .admin-sidebar-help strong {
@@ -135,6 +320,7 @@
 }
 
 .admin-logout-button {
+  position: relative;
   width: 100%;
   display: flex;
   align-items: center;
@@ -145,6 +331,16 @@
   font-size: 12px;
   font-weight: 600;
   text-align: left;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.admin-sidebar--collapsed .admin-logout-button {
+  justify-content: center;
+  padding: 12px 0;
+  gap: 0;
 }
 
 .admin-logout-button:hover {
@@ -154,6 +350,7 @@
 .admin-main {
   min-width: 0;
   flex: 1;
+  transition: none;
 }
 
 .admin-topbar {
@@ -263,23 +460,89 @@
 }
 
 .admin-content {
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 31px 34px 40px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 24px 28px 28px;
+  box-sizing: border-box;
 }
 
+/* —— Mobile / narrow: full drawer (existing behavior) —— */
 @media (max-width: 900px) {
   .admin-sidebar {
     position: fixed;
     z-index: 20;
     inset: 0 auto 0 0;
     width: 270px;
+    flex: none;
     transform: translateX(-100%);
     transition: transform .2s ease;
+    padding: 24px 16px 16px;
+    overflow: auto;
+  }
+
+  .admin-sidebar--collapsed,
+  .admin-sidebar--expanded {
+    width: 270px;
+    flex: none;
+    padding: 24px 16px 16px;
   }
 
   .admin-sidebar-open {
     transform: translateX(0);
+  }
+
+  /* Always show labels in mobile drawer */
+  .admin-brand-text,
+  .admin-nav-caption,
+  .admin-nav-label,
+  .admin-help-copy,
+  .admin-rail-toggle-label {
+    opacity: 1;
+    max-width: none;
+    max-height: none;
+  }
+
+  .admin-nav-caption {
+    margin: 39px 10px 11px;
+  }
+
+  .admin-sidebar--collapsed .admin-brand,
+  .admin-sidebar--collapsed .admin-nav-link,
+  .admin-sidebar--collapsed .admin-logout-button {
+    justify-content: flex-start;
+  }
+
+  .admin-sidebar--collapsed .admin-nav-link,
+  .admin-sidebar--expanded .admin-nav-link {
+    padding: 0 13px;
+    gap: 12px;
+  }
+
+  .admin-sidebar--collapsed .admin-logout-button {
+    padding: 12px 13px;
+    gap: 11px;
+  }
+
+  .admin-sidebar--collapsed .admin-sidebar-help {
+    display: block;
+    margin: 0 1px 17px;
+    padding: 15px 13px;
+    border: 1px solid #f0e7e2;
+    background: #fffbf8;
+  }
+
+  .admin-sidebar--collapsed .admin-help-icon {
+    margin-bottom: 12px;
+  }
+
+  .admin-sidebar--collapsed .admin-nav-link[data-tooltip]::after,
+  .admin-sidebar--collapsed .admin-logout-button[data-tooltip]::after {
+    display: none;
+  }
+
+  .admin-rail-toggle {
+    display: none;
   }
 
   .admin-sidebar-close {
@@ -333,5 +596,17 @@
 
   .admin-content {
     padding: 21px 15px 30px;
+  }
+}
+
+/* Prefer-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .admin-sidebar,
+  .admin-brand-text,
+  .admin-nav-caption,
+  .admin-nav-label,
+  .admin-help-copy,
+  .admin-rail-toggle-label {
+    transition: none;
   }
 }

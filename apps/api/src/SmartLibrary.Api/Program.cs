@@ -6,6 +6,31 @@ using SmartLibrary.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using SmartLibrary.Infrastructure.Persistence;
 
+// Load .env before configuration binds (repo root or API project folder)
+static void LoadDotEnv()
+{
+    var candidates = new[]
+    {
+        Path.Combine(Directory.GetCurrentDirectory(), ".env"),
+        Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "../../../.env")),
+        Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "../../../../.env")),
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../.env")),
+        Path.Combine(AppContext.BaseDirectory, ".env"),
+    };
+
+    foreach (var path in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+    {
+        if (!File.Exists(path)) continue;
+        DotNetEnv.Env.Load(path);
+        Console.WriteLine($"[config] Loaded .env from {path}");
+        return;
+    }
+
+    Console.WriteLine("[config] No .env file found. Using appsettings / process environment only.");
+}
+
+LoadDotEnv();
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ── Serilog ──

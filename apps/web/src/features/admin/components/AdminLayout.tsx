@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Bell,
   BookOpen,
   Bot,
   ChartNoAxesCombined,
   ChevronDown,
+  ChevronRight,
   LayoutDashboard,
   LogOut,
   Menu,
+  PanelLeft,
   ShieldCheck,
   UsersRound,
   X,
@@ -26,8 +28,13 @@ const navigation = [
   { label: 'Thống kê & báo cáo', to: '/admin/reports', icon: ChartNoAxesCombined, end: false },
 ];
 
+const EXPAND_DELAY_MS = 140;
+
 export const AdminLayout: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [railExpanded, setRailExpanded] = useState(false);
+  const [hoverCapable, setHoverCapable] = useState(true);
+  const expandTimerRef = useRef<number | null>(null);
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const location = useLocation();
@@ -36,26 +43,72 @@ export const AdminLayout: React.FC = () => {
     item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
   )?.label ?? 'Tổng quan';
 
+  useEffect(() => {
+    const mq = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const sync = () => setHoverCapable(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => () => {
+    if (expandTimerRef.current !== null) window.clearTimeout(expandTimerRef.current);
+  }, []);
+
+  const clearExpandTimer = () => {
+    if (expandTimerRef.current !== null) {
+      window.clearTimeout(expandTimerRef.current);
+      expandTimerRef.current = null;
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  const collapsed = !railExpanded;
+  const showTooltips = collapsed && !mobileOpen;
+
+  const sidebarClassName = [
+    'admin-sidebar',
+    mobileOpen ? 'admin-sidebar-open' : '',
+    railExpanded ? 'admin-sidebar--expanded' : 'admin-sidebar--collapsed',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <div className="admin-shell">
-      {sidebarOpen && (
+      {mobileOpen && (
         <button
+          type="button"
           className="admin-mobile-scrim"
           aria-label="Đóng menu"
-          onClick={() => setSidebarOpen(false)}
+          onClick={() => setMobileOpen(false)}
         />
       )}
 
-      <aside className={`admin-sidebar${sidebarOpen ? ' admin-sidebar-open' : ''}`}>
+      <aside
+        className={sidebarClassName}
+        onMouseEnter={() => {
+          if (!hoverCapable) return;
+          clearExpandTimer();
+          expandTimerRef.current = window.setTimeout(() => {
+            setRailExpanded(true);
+            expandTimerRef.current = null;
+          }, EXPAND_DELAY_MS);
+        }}
+        onMouseLeave={() => {
+          if (!hoverCapable) return;
+          clearExpandTimer();
+          setRailExpanded(false);
+        }}
+      >
         <div className="admin-brand-row">
-          <Link to="/admin" className="admin-brand">
+          <Link to="/admin" className="admin-brand" title="SmartLibrary">
             <img src={smartLibraryLogo} alt="" className="admin-brand-logo" />
-            <span>
+            <span className="admin-brand-text">
               <strong>SmartLibrary</strong>
               <small>QUẢN TRỊ HỆ THỐNG</small>
             </span>
@@ -64,11 +117,24 @@ export const AdminLayout: React.FC = () => {
             type="button"
             className="admin-sidebar-close"
             aria-label="Đóng menu"
-            onClick={() => setSidebarOpen(false)}
+            onClick={() => setMobileOpen(false)}
           >
             <X size={18} />
           </button>
         </div>
+
+        {!hoverCapable && (
+          <button
+            type="button"
+            className="admin-rail-toggle"
+            aria-label={railExpanded ? 'Thu gọn menu' : 'Mở rộng menu'}
+            aria-expanded={railExpanded}
+            onClick={() => setRailExpanded((v) => !v)}
+          >
+            {railExpanded ? <PanelLeft size={18} /> : <ChevronRight size={18} />}
+            <span className="admin-rail-toggle-label">{railExpanded ? 'Thu gọn' : 'Mở rộng'}</span>
+          </button>
+        )}
 
         <div className="admin-nav-caption">MENU CHÍNH</div>
         <nav className="admin-navigation" aria-label="Điều hướng quản trị">
@@ -77,11 +143,13 @@ export const AdminLayout: React.FC = () => {
               key={to}
               to={to}
               end={end}
-              onClick={() => setSidebarOpen(false)}
+              title={showTooltips ? label : undefined}
+              data-tooltip={label}
+              onClick={() => setMobileOpen(false)}
               className={({ isActive }) => `admin-nav-link${isActive ? ' admin-nav-link-active' : ''}`}
             >
-              <Icon size={19} strokeWidth={1.9} />
-              <span>{label}</span>
+              <Icon size={20} strokeWidth={1.9} className="admin-nav-icon" />
+              <span className="admin-nav-label">{label}</span>
             </NavLink>
           ))}
         </nav>
@@ -89,12 +157,20 @@ export const AdminLayout: React.FC = () => {
         <div className="admin-sidebar-bottom">
           <div className="admin-sidebar-help">
             <span className="admin-help-icon"><BookOpen size={18} /></span>
-            <strong>SmartLibrary</strong>
-            <p>Quản lý thư viện trong một không gian thống nhất.</p>
+            <div className="admin-help-copy">
+              <strong>SmartLibrary</strong>
+              <p>Quản lý thư viện trong một không gian thống nhất.</p>
+            </div>
           </div>
-          <button type="button" className="admin-logout-button" onClick={handleLogout}>
-            <LogOut size={17} />
-            <span>Đăng xuất</span>
+          <button
+            type="button"
+            className="admin-logout-button"
+            onClick={handleLogout}
+            title={showTooltips ? 'Đăng xuất' : undefined}
+            data-tooltip="Đăng xuất"
+          >
+            <LogOut size={18} className="admin-nav-icon" />
+            <span className="admin-nav-label">Đăng xuất</span>
           </button>
         </div>
       </aside>
@@ -105,7 +181,7 @@ export const AdminLayout: React.FC = () => {
             type="button"
             className="admin-menu-button"
             aria-label="Mở menu"
-            onClick={() => setSidebarOpen(true)}
+            onClick={() => setMobileOpen(true)}
           >
             <Menu size={21} />
           </button>
