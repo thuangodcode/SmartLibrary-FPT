@@ -254,11 +254,15 @@ const AdminPoliciesPage: React.FC = () => {
   }, [authHeaders]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadList();
   }, [loadList]);
 
   useEffect(() => {
-    if (selectedId) void loadDetail(selectedId);
+    if (selectedId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void loadDetail(selectedId);
+    }
   }, [selectedId, loadDetail]);
 
   const openCreate = () => {
