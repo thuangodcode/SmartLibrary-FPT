@@ -26,14 +26,17 @@ public class DashboardRepository : IDashboardRepository
 
     public async Task<LibrarianDashboardStatsDto> GetLibrarianStatsAsync(CancellationToken ct = default)
     {
+        // Column aliases must follow the snake_case naming convention configured in
+        // DependencyInjection (UseSnakeCaseNamingConvention) because EF Core wraps this
+        // raw SQL in an outer SELECT that references the properties by their store names.
         var statsRow = await _context.Database.SqlQueryRaw<LibrarianStatsRow>(@"
             SELECT 
-                (SELECT COUNT(*)::int FROM registration_requests WHERE status::text IN ('Submitted', '0')) AS ""PendingRegistrations"",
-                (SELECT COUNT(*)::int FROM profiles WHERE is_deleted = false) AS ""TotalReaders"",
-                (SELECT COUNT(*)::int FROM books WHERE is_deleted = false) AS ""TotalBooks"",
-                COALESCE((SELECT SUM(available_copies)::int FROM books WHERE is_deleted = false), 0) AS ""AvailableCopies"",
-                (SELECT COUNT(*)::int FROM borrow_records WHERE status::text IN ('borrowed', 'Borrowed', '2') AND is_deleted = false) AS ""BorrowedCount"",
-                (SELECT COUNT(*)::int FROM borrow_records WHERE status::text IN ('overdue', 'Overdue', '4') AND is_deleted = false) AS ""OverdueCount""
+                (SELECT COUNT(*)::int FROM registration_requests WHERE status::text IN ('Submitted', '0')) AS pending_registrations,
+                (SELECT COUNT(*)::int FROM profiles WHERE is_deleted = false) AS total_readers,
+                (SELECT COUNT(*)::int FROM books WHERE is_deleted = false) AS total_books,
+                COALESCE((SELECT SUM(available_copies)::int FROM books WHERE is_deleted = false), 0) AS available_copies,
+                (SELECT COUNT(*)::int FROM borrow_records WHERE status::text IN ('borrowed', 'Borrowed', '2') AND is_deleted = false) AS borrowed_count,
+                (SELECT COUNT(*)::int FROM borrow_records WHERE status::text IN ('overdue', 'Overdue', '4') AND is_deleted = false) AS overdue_count
         ").FirstOrDefaultAsync(ct);
 
         return new LibrarianDashboardStatsDto

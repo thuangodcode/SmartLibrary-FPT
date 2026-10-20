@@ -29,6 +29,13 @@ public sealed class AdminReportsController(ReportService reports) : ControllerBa
     public async Task<ActionResult<ApiResponse<IReadOnlyList<TemplateDto>>>> Templates(CancellationToken ct)
         => Ok(ApiResponse<IReadOnlyList<TemplateDto>>.Ok(await reports.TemplatesAsync(ct)));
 
+    [HttpGet("templates/{id:guid}")]
+    public async Task<ActionResult<ApiResponse<TemplateDto>>> TemplateDetail(Guid id, CancellationToken ct)
+    {
+        var template = await reports.TemplateDetailAsync(id, ct);
+        return template is null ? NotFound(ApiResponse<object>.Fail("Không tìm thấy mẫu báo cáo.")) : Ok(ApiResponse<TemplateDto>.Ok(template));
+    }
+
     [HttpPost("templates")]
     public async Task<ActionResult<ApiResponse<TemplateDto>>> CreateTemplate(CreateTemplateRequest request, CancellationToken ct)
         => Ok(ApiResponse<TemplateDto>.Ok(await reports.SaveTemplateAsync(null, new TemplateWriteRequest(request.Name, request.ReportType, request.Description, request.Configuration, request.IsEnabled), UserId, ct)));

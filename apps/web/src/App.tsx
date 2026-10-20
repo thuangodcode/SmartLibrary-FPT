@@ -12,6 +12,8 @@ import { LibrarianLayout } from './features/librarian/components/LibrarianLayout
 import LibrarianDashboard from './features/librarian/pages/LibrarianDashboard';
 import RegistrationApprovalPage from './features/librarian/pages/RegistrationApprovalPage';
 import ReadersManagementPage from './features/librarian/pages/ReadersManagementPage';
+import LibrarianReportsPage from './features/librarian/pages/LibrarianReportsPage';
+import LibrarianReportDetailPage from './features/librarian/pages/LibrarianReportDetailPage';
 import { AdminLayout } from './features/admin/components/AdminLayout';
 import AdminOverviewPage from './features/admin/pages/AdminOverviewPage';
 import AdminSectionPage from './features/admin/pages/AdminSectionPage';
@@ -20,6 +22,7 @@ import AdminPoliciesPage from './features/admin/pages/AdminPoliciesPage';
 import AdminReportsPage from './features/admin/pages/AdminReportsPage';
 import AdminReportDetailPage from './features/admin/pages/AdminReportDetailPage';
 import AdminReportTemplatesPage from './features/admin/pages/AdminReportTemplatesPage';
+import AdminReportTemplateDetailPage from './features/admin/pages/AdminReportTemplateDetailPage';
 import { useAuthStore } from './features/auth/store/useAuthStore';
 
 function App() {
@@ -49,6 +52,8 @@ function App() {
         <Route index element={<LibrarianDashboard />} />
         <Route path="registrations" element={<RegistrationApprovalPage />} />
         <Route path="readers" element={<ReadersManagementPage />} />
+        <Route path="reports" element={<LibrarianReportsPage />} />
+        <Route path="reports/:id" element={<LibrarianReportDetailPage />} />
       </Route>
 
       {/* Admin Routes */}
@@ -64,6 +69,7 @@ function App() {
         <Route path="ai-settings" element={<AdminSectionPage title="Cấu hình AI" />} />
         <Route path="reports" element={<AdminReportsPage />} />
         <Route path="reports/templates" element={<AdminReportTemplatesPage />} />
+        <Route path="reports/templates/:templateId" element={<AdminReportTemplateDetailPage />} />
         <Route path="reports/:id" element={<AdminReportDetailPage />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Route>

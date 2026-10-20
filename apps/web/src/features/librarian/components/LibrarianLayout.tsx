@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Bell,
   BookOpen,
+  ChartNoAxesCombined,
   ChevronDown,
   FileCheck,
   LayoutDashboard,
@@ -23,6 +24,7 @@ const navigation = [
   { label: 'Duyệt tài khoản', to: '/librarian/registrations', icon: FileCheck, end: false, hasBadge: true },
   { label: 'Quản lý sách', to: '/librarian/books', icon: BookOpen, end: false },
   { label: 'Quản lý độc giả', to: '/librarian/readers', icon: Users, end: false },
+  { label: 'Quản lý báo cáo', to: '/librarian/reports', icon: ChartNoAxesCombined, end: false },
   { label: 'Cài đặt', to: '/librarian/settings', icon: Settings, end: false },
 ];
 

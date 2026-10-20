@@ -6,6 +6,7 @@ import {
   ChartNoAxesCombined,
   ChevronDown,
   ChevronRight,
+  FileSliders,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -23,10 +24,10 @@ import './AdminLayout.css';
 const navigation = [
   { label: 'Tổng quan', to: '/admin', icon: LayoutDashboard, end: true },
   { label: 'Quản lý người dùng', to: '/admin/users', icon: UsersRound, end: false },
-  { label: 'Quản lý sách', to: '/admin/books', icon: BookOpen, end: false },
-  { label: 'Chính sách thư viện', to: '/admin/policies', icon: ShieldCheck, end: false },
-  { label: 'Cấu hình AI', to: '/admin/ai-settings', icon: Bot, end: false },
+  { label: 'Quy định thư viện', to: '/admin/policies', icon: ShieldCheck, end: false },
+  { label: 'Quản lý mẫu báo cáo', to: '/admin/reports/templates', icon: FileSliders, end: true },
   { label: 'Thống kê & báo cáo', to: '/admin/reports', icon: ChartNoAxesCombined, end: false },
+  { label: 'Cấu hình AI', to: '/admin/ai-settings', icon: Bot, end: false },
 ];
 
 const EXPAND_DELAY_MS = 140;
@@ -41,9 +42,19 @@ export const AdminLayout: React.FC = () => {
   const { showToast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
-  const currentPage = navigation.find((item) =>
-    item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
-  )?.label ?? 'Tổng quan';
+
+  const isItemActive = (to: string, end?: boolean) => {
+    if (to === '/admin/reports') {
+      return (
+        location.pathname === '/admin/reports' ||
+        (location.pathname.startsWith('/admin/reports/') &&
+          !location.pathname.startsWith('/admin/reports/templates'))
+      );
+    }
+    return end ? location.pathname === to : location.pathname.startsWith(to);
+  };
+
+  const currentPage = navigation.find((item) => isItemActive(item.to, item.end))?.label ?? 'Tổng quan';
 
   useEffect(() => {
     const mq = window.matchMedia('(hover: hover) and (pointer: fine)');
@@ -141,20 +152,23 @@ export const AdminLayout: React.FC = () => {
 
         <div className="admin-nav-caption">MENU CHÍNH</div>
         <nav className="admin-navigation" aria-label="Điều hướng quản trị">
-          {navigation.map(({ label, to, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              title={showTooltips ? label : undefined}
-              data-tooltip={label}
-              onClick={() => setMobileOpen(false)}
-              className={({ isActive }) => `admin-nav-link${isActive ? ' admin-nav-link-active' : ''}`}
-            >
-              <Icon size={20} strokeWidth={1.9} className="admin-nav-icon" />
-              <span className="admin-nav-label">{label}</span>
-            </NavLink>
-          ))}
+          {navigation.map(({ label, to, icon: Icon, end }) => {
+            const active = isItemActive(to, end);
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                title={showTooltips ? label : undefined}
+                data-tooltip={label}
+                onClick={() => setMobileOpen(false)}
+                className={`admin-nav-link${active ? ' admin-nav-link-active' : ''}`}
+              >
+                <Icon size={20} strokeWidth={1.9} className="admin-nav-icon" />
+                <span className="admin-nav-label">{label}</span>
+              </NavLink>
+            );
+          })}
         </nav>
 
         <div className="admin-sidebar-bottom">

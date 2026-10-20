@@ -17,6 +17,7 @@ public sealed class ReportService(IReportRepository repository)
             items = items.Where(x => x.Name.Contains(query.Search) || x.Code.Contains(query.Search));
         if (!string.IsNullOrWhiteSpace(query.Status)) items = items.Where(x => x.Status == query.Status);
         if (!string.IsNullOrWhiteSpace(query.Format)) items = items.Where(x => x.Format == query.Format);
+        if (query.SubmittedBy.HasValue) items = items.Where(x => x.SubmittedBy == query.SubmittedBy.Value);
         if (DateTime.TryParse(query.Month, out var month))
         {
             var start = new DateTime(month.Year, month.Month, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -34,7 +35,7 @@ public sealed class ReportService(IReportRepository repository)
             _ => items.OrderByDescending(x => x.CreatedAt)
         };
         var rows = await ordered.Skip((page - 1) * pageSize).Take(pageSize)
-            .Select(x => new ReportListItemDto(x.Id, x.Code, x.Name, x.Submitter.FullName, x.CreatedAt, x.Format, x.Status, x.IsViewed, x.IsApproved)).ToListAsync(ct);
+            .Select(x => new ReportListItemDto(x.Id, x.Code, x.Name, x.Submitter.FullName, x.CreatedAt, x.Format, x.Status, x.IsViewed, x.IsApproved, x.PeriodStart, x.PeriodEnd)).ToListAsync(ct);
         return new ReportListDto(rows, count, page, pageSize, (int)Math.Ceiling(count / (double)pageSize));
     }
 
@@ -46,14 +47,43 @@ public sealed class ReportService(IReportRepository repository)
             report.Template.Name, report.CreatedAt, report.PeriodStart, report.PeriodEnd, report.Format, report.Status,
             report.IsViewed, report.IsApproved, report.Snapshot,
             report.Reviews.OrderBy(x => x.CreatedAt).Select(x => new ReportReviewDto(x.Action, x.Comment, x.Reviewer.FullName, x.CreatedAt)).ToList(),
-            ReadRows(report.Snapshot));
+            ReadRows(report.Snapshot),
+            report.TemplateId, report.Template.ReportType, report.Template.Description, report.Template.Configuration);
+    }
+
+    private static JsonDocument ParseConfiguration(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return JsonDocument.Parse("{}");
+        var doc = JsonDocument.Parse(raw);
+        if (doc.RootElement.ValueKind == JsonValueKind.String)
+        {
+            var inner = doc.RootElement.GetString();
+            if (!string.IsNullOrWhiteSpace(inner) && (inner.TrimStart().StartsWith('{') || inner.TrimStart().StartsWith('[')))
+            {
+                try
+                {
+                    var unwrapped = JsonDocument.Parse(inner);
+                    doc.Dispose();
+                    return unwrapped;
+                }
+                catch { }
+            }
+        }
+        return doc;
     }
 
     private static IReadOnlyList<ReportRowDto> ReadRows(string snapshot)
     {
-        using var document = JsonDocument.Parse(snapshot);
-        if (!document.RootElement.TryGetProperty("rows", out var rows) || rows.ValueKind != JsonValueKind.Array) return [];
-        return JsonSerializer.Deserialize<List<ReportRowDto>>(rows.GetRawText(), JsonOptions) ?? [];
+        try
+        {
+            using var document = ParseConfiguration(snapshot);
+            if (document.RootElement.ValueKind != JsonValueKind.Object || !document.RootElement.TryGetProperty("rows", out var rows) || rows.ValueKind != JsonValueKind.Array) return [];
+            return JsonSerializer.Deserialize<List<ReportRowDto>>(rows.GetRawText(), JsonOptions) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
     }
 
     public async Task<ReportSummaryDto> SummaryAsync(DateTime? from, DateTime? to, CancellationToken ct)
@@ -100,20 +130,38 @@ public sealed class ReportService(IReportRepository repository)
         if (!await repository.Users.AnyAsync(x => x.Id == userId && x.IsActive, ct)) throw new ArgumentException("Tài khoản gửi báo cáo không hợp lệ hoặc đã bị khóa.");
         var template = await repository.Templates.FirstOrDefaultAsync(x => x.Id == request.TemplateId && x.IsEnabled && !x.IsDeleted, ct)
             ?? throw new KeyNotFoundException("Không tìm thấy mẫu báo cáo đang bật.");
-        using var templateConfiguration = JsonDocument.Parse(template.Configuration);
-        if (!templateConfiguration.RootElement.TryGetProperty("formats", out var formats) || formats.ValueKind != JsonValueKind.Array || !formats.EnumerateArray().Any(x => string.Equals(x.GetString(), request.Format, StringComparison.OrdinalIgnoreCase)))
+        using var templateConfiguration = ParseConfiguration(template.Configuration);
+        var formatAllowed = true;
+        if (templateConfiguration.RootElement.ValueKind == JsonValueKind.Object
+            && templateConfiguration.RootElement.TryGetProperty("formats", out var formats)
+            && formats.ValueKind == JsonValueKind.Array)
+        {
+            formatAllowed = formats.EnumerateArray().Any(x => string.Equals(x.GetString(), request.Format, StringComparison.OrdinalIgnoreCase));
+        }
+        if (!formatAllowed)
             throw new ArgumentException("Định dạng gửi báo cáo chưa được bật trong mẫu.");
         if (request.Format == "PDF") throw new ArgumentException("API xuất PDF chưa được triển khai. Hãy chọn CSV trong mẫu báo cáo.");
         var reportPeriodEnd = periodEndExclusive.AddDays(-1);
+        if (request.CustomRows is { Count: > 0 } submittedRows)
+        {
+            var validation = ReportImportValidator.Validate(template.Id, template.Configuration, submittedRows);
+            if (!validation.IsReady)
+            {
+                var preview = string.Join(" ", validation.Issues.Take(5).Select(x => x.Row > 0 ? $"Dòng {x.Row}: {x.Message}" : x.Message));
+                throw new ArgumentException($"Dữ liệu báo cáo chưa đạt chuẩn mẫu. {preview}");
+            }
+        }
         var stats = await SummaryAsync(request.PeriodStart, reportPeriodEnd, ct);
         var categories = await BorrowByCategoryAsync(request.PeriodStart, reportPeriodEnd, ct);
-        var rows = await repository.BorrowRecords.AsNoTracking()
-            .Where(x => x.BorrowDate >= request.PeriodStart.Date && x.BorrowDate < periodEndExclusive)
-            .SelectMany(x => x.BookCopy.Book.Categories.DefaultIfEmpty(), (record, category) => new { Record = record, Category = category == null ? "Chưa phân loại" : category.Name })
-            .GroupBy(x => new { Day = x.Record.BorrowDate!.Value.Date, x.Category })
-            .Select(group => new ReportRowDto(group.Key.Day, group.Key.Category, group.Count(), group.Count(x => x.Record.ReturnDate != null),
-                group.Count(x => x.Record.ReturnDate == null && x.Record.DueDate < DateTime.UtcNow), group.Count(x => x.Record.ReturnDate != null), null))
-            .OrderBy(x => x.Date).ThenBy(x => x.Category).ToListAsync(ct);
+        var rows = request.CustomRows is { Count: > 0 } customRows
+            ? customRows
+            : (IReadOnlyList<ReportRowDto>)await repository.BorrowRecords.AsNoTracking()
+                .Where(x => x.BorrowDate >= request.PeriodStart.Date && x.BorrowDate < periodEndExclusive)
+                .SelectMany(x => x.BookCopy.Book.Categories.DefaultIfEmpty(), (record, category) => new { Record = record, Category = category == null ? "Chưa phân loại" : category.Name })
+                .GroupBy(x => new { Day = x.Record.BorrowDate!.Value.Date, x.Category })
+                .Select(group => new ReportRowDto(group.Key.Day, group.Key.Category, group.Count(), group.Count(x => x.Record.ReturnDate != null),
+                    group.Count(x => x.Record.ReturnDate == null && x.Record.DueDate < DateTime.UtcNow), group.Count(x => x.Record.ReturnDate != null), null))
+                .OrderBy(x => x.Date).ThenBy(x => x.Category).ToListAsync(ct);
         var report = new LibraryReport
         {
             Code = $"RPT-{DateTime.UtcNow:yyMMddHHmmss}-{Random.Shared.Next(100, 999)}", Name = request.Name?.Trim() is { Length: > 0 } name ? name : template.Name,
@@ -135,6 +183,8 @@ public sealed class ReportService(IReportRepository repository)
             throw new UnauthorizedAccessException("Chỉ quản trị viên đang hoạt động mới được duyệt báo cáo.");
         var report = await repository.FindReportForUpdateAsync(id, ct);
         if (report is null || report.IsDeleted) throw new KeyNotFoundException("Không tìm thấy báo cáo.");
+        if (!string.IsNullOrWhiteSpace(request.Name)) report.Name = request.Name.Trim();
+        if (!string.IsNullOrWhiteSpace(request.Status)) report.Status = request.Status.Trim();
         if (request.IsViewed.HasValue && request.IsViewed.Value != report.IsViewed) report.IsViewed = request.IsViewed.Value;
         if (request.IsApproved.HasValue && request.IsApproved.Value != report.IsApproved) report.IsApproved = request.IsApproved.Value;
         if (request.IsApproved == true || request.IsViewed == true) { report.ReviewedBy = userId; report.ReviewedAt = DateTime.UtcNow; }
@@ -164,6 +214,18 @@ public sealed class ReportService(IReportRepository repository)
     public async Task<IReadOnlyList<TemplateDto>> TemplatesAsync(CancellationToken ct) => await repository.Templates.AsNoTracking().Where(x => !x.IsDeleted)
         .OrderByDescending(x => x.CreatedAt).Select(x => new TemplateDto(x.Id, x.Name, x.ReportType, x.Description, x.Configuration, x.IsEnabled, x.CreatedAt)).ToListAsync(ct);
 
+    public async Task<TemplateDto?> TemplateDetailAsync(Guid id, CancellationToken ct) =>
+        await repository.Templates.AsNoTracking().Where(x => x.Id == id && !x.IsDeleted)
+            .Select(x => new TemplateDto(x.Id, x.Name, x.ReportType, x.Description, x.Configuration, x.IsEnabled, x.CreatedAt))
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<ValidateReportRowsResult> ValidateRowsAsync(ValidateReportRowsRequest request, CancellationToken ct)
+    {
+        var template = await repository.Templates.AsNoTracking().FirstOrDefaultAsync(x => x.Id == request.TemplateId && x.IsEnabled && !x.IsDeleted, ct)
+            ?? throw new KeyNotFoundException("Không tìm thấy mẫu báo cáo đang bật.");
+        return ReportImportValidator.Validate(template.Id, template.Configuration, request.Rows);
+    }
+
     public Task<TemplateDto> SaveTemplateAsync(CreateTemplateRequest request, Guid userId, CancellationToken ct)
         => SaveTemplateAsync(null, new TemplateWriteRequest(request.Name, request.ReportType, request.Description, request.Configuration, request.IsEnabled), userId, ct);
 
@@ -183,7 +245,7 @@ public sealed class ReportService(IReportRepository repository)
     public async Task<IReadOnlyList<ReportDetailDto>> FindReportDetailsAsync(Guid[] ids, CancellationToken ct)
     {
         var reports = await repository.FindReportDetailsAsync(ids, ct);
-        return reports.Where(x => !x.IsDeleted).Select(x => new ReportDetailDto(x.Id, x.Code, x.Name, x.Submitter.FullName, x.Template.Name, x.CreatedAt, x.PeriodStart, x.PeriodEnd, x.Format, x.Status, x.IsViewed, x.IsApproved, x.Snapshot, [], ReadRows(x.Snapshot))).ToList();
+        return reports.Where(x => !x.IsDeleted).Select(x => new ReportDetailDto(x.Id, x.Code, x.Name, x.Submitter.FullName, x.Template.Name, x.CreatedAt, x.PeriodStart, x.PeriodEnd, x.Format, x.Status, x.IsViewed, x.IsApproved, x.Snapshot, [], ReadRows(x.Snapshot), x.TemplateId, x.Template.ReportType, x.Template.Description, x.Template.Configuration)).ToList();
     }
     public Task SaveChangesAsync(CancellationToken ct) => repository.SaveChangesAsync(ct);
 
