@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Mail, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Mail, ArrowRight, CheckCircle2, RotateCcw, ArrowLeft, Loader2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../components/AuthLayout';
 import { forgotPasswordSchema, type ForgotPasswordInput } from '../schemas/authSchemas';
 import { API_BASE_URL } from '../../../config';
@@ -9,8 +10,11 @@ import { parseApiResponse } from '../../../lib/api';
 
 export const ForgotPasswordPage: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [requestError, setRequestError] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const navigate = useNavigate();
 
   const {
     register,
@@ -20,9 +24,17 @@ export const ForgotPasswordPage: React.FC = () => {
     resolver: zodResolver(forgotPasswordSchema),
   });
 
-  const onSubmit = async ({ email }: ForgotPasswordInput) => {
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (resendCountdown > 0) {
+      timer = setTimeout(() => setResendCountdown((prev) => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [resendCountdown]);
+
+  const sendResetEmail = async (email: string) => {
     setIsLoading(true);
-    setRequestError(null);
+    setErrorMessage(null);
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/forgot-password`, {
         method: 'POST',
@@ -33,74 +45,136 @@ export const ForgotPasswordPage: React.FC = () => {
       if (!response.ok || !result?.success) {
         throw new Error(result?.error || 'Không thể gửi yêu cầu khôi phục mật khẩu.');
       }
+      setSubmittedEmail(email);
       setIsSubmitted(true);
+      setResendCountdown(60);
     } catch (error) {
-      setRequestError(error instanceof Error ? error.message : 'Không thể gửi yêu cầu khôi phục mật khẩu.');
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể gửi yêu cầu khôi phục mật khẩu.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const onSubmit = async ({ email }: ForgotPasswordInput) => {
+    await sendResetEmail(email);
+  };
+
+  const handleResend = async () => {
+    if (!submittedEmail || resendCountdown > 0 || isLoading) return;
+    await sendResetEmail(submittedEmail);
+  };
+
   return (
     <AuthLayout
-      title="Quên Mật Khẩu?"
-      subtitle="Nhập email của bạn để nhận liên kết khôi phục mật khẩu bảo mật"
+      variant="design"
+      title="Quên Mật Khẩu"
+      subtitle="Nhập email tài khoản của bạn để nhận liên kết và mã xác thực đặt lại mật khẩu an toàn."
     >
+      {errorMessage && (
+        <div className="auth-error mb-4" role="alert">
+          {errorMessage}
+        </div>
+      )}
+
       {isSubmitted ? (
-        <div className="text-center py-6 space-y-4">
-          <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-7 h-7" />
+        <div className="space-y-6 pt-2">
+          <div className="p-5 rounded-2xl bg-orange-50/70 border border-orange-100 flex items-start gap-3.5">
+            <CheckCircle2 className="w-6 h-6 text-[#df6226] shrink-0 mt-0.5" />
+            <div className="text-xs text-slate-700 leading-relaxed space-y-1">
+              <p className="font-semibold text-slate-900 text-sm">Đã gửi yêu cầu thành công!</p>
+              <p>
+                Hướng dẫn đặt lại mật khẩu và mã OTP xác thực đã được gửi đến:
+              </p>
+              <p className="font-bold text-[#df6226] text-sm break-all">{submittedEmail}</p>
+              <p className="text-[11px] text-slate-500 pt-1">
+                Vui lòng kiểm tra hộp thư đến hoặc mục <strong>Thư rác / Spam</strong>.
+              </p>
+            </div>
           </div>
-          <h3 className="font-bold text-sm text-slate-900 dark:text-white">Đã gửi yêu cầu khôi phục</h3>
-          <p className="text-xs text-slate-600 dark:text-slate-300">
-            Nếu email của bạn tồn tại trên hệ thống, một hướng dẫn đặt lại mật khẩu đã được gửi đến hộp thư.
-          </p>
-          <div className="pt-4">
-            <a href="/login" className="text-xs font-bold text-indigo-600 hover:underline">
-              &larr; Quay lại Đăng nhập
-            </a>
+
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => navigate(`/reset-password?email=${encodeURIComponent(submittedEmail)}`)}
+              className="auth-submit w-full flex items-center justify-center gap-2"
+            >
+              <span>Nhập Mã OTP Đặt Lại Mật Khẩu</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center justify-between text-xs px-1 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsSubmitted(false)}
+                className="text-slate-500 hover:text-slate-800 flex items-center gap-1 font-medium transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Đổi email khác
+              </button>
+
+              <button
+                type="button"
+                disabled={resendCountdown > 0 || isLoading}
+                onClick={handleResend}
+                className="text-[#df6226] font-semibold hover:underline disabled:text-slate-400 disabled:no-underline flex items-center gap-1 transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                {resendCountdown > 0 ? `Gửi lại sau (${resendCountdown}s)` : 'Gửi lại email'}
+              </button>
+            </div>
+          </div>
+
+          <div className="auth-footer-prompt text-center pt-3 border-t border-slate-100">
+            <Link to="/login" className="auth-footer-link inline-flex items-center gap-1.5 font-semibold text-xs">
+              <ArrowLeft className="w-3.5 h-3.5" /> Quay lại trang Đăng nhập
+            </Link>
           </div>
         </div>
       ) : (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Địa chỉ Email đăng ký
+        <form onSubmit={handleSubmit(onSubmit)} className="auth-form">
+          <div className="auth-field">
+            <label htmlFor="forgot-email" className="auth-label">
+              Địa chỉ Email đăng ký tài khoản
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
+                id="forgot-email"
                 type="email"
+                autoComplete="email"
                 {...register('email')}
-                placeholder="vinhnt@fpt.edu.vn"
-                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs sm:text-sm focus:outline-none focus:border-indigo-600"
+                placeholder="example@fpt.edu.vn hoặc example@gmail.com"
+                className="auth-input pl-10"
               />
+              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
             {errors.email && (
-              <p className="text-[11px] text-rose-500 mt-1 font-medium">{errors.email.message}</p>
+              <p className="text-xs text-rose-600 mt-1">{errors.email.message}</p>
             )}
           </div>
-          {requestError && <p className="text-[11px] text-rose-500 font-medium" role="alert">{requestError}</p>}
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3.5 rounded-2xl bg-slate-900 dark:bg-indigo-600 text-white font-semibold text-xs sm:text-sm shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+            className="auth-submit w-full flex items-center justify-center gap-2"
           >
             {isLoading ? (
-              <span>Đang gửi yêu cầu...</span>
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Đang gửi email...</span>
+              </>
             ) : (
               <>
-                <span>Gửi Liên Kết Khôi Phục</span>
+                <span>Gửi Yêu Cầu Khôi Phục</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
 
-          <div className="text-center pt-2">
-            <a href="/login" className="text-xs font-bold text-slate-600 dark:text-slate-400 hover:underline">
-              &larr; Quay lại Đăng nhập
-            </a>
+          <div className="auth-footer-prompt text-center pt-2">
+            <span className="text-slate-500 text-xs">Nhớ lại mật khẩu? </span>
+            <Link to="/login" className="auth-footer-link font-semibold text-xs">
+              Đăng nhập ngay
+            </Link>
           </div>
         </form>
       )}

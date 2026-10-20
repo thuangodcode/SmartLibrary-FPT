@@ -42,6 +42,8 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z
   .object({
+    email: z.string().email('Định dạng email không hợp lệ.').optional().or(z.literal('')),
+    otp: z.string().optional().or(z.literal('')),
     password: z
       .string()
       .min(8, 'Mật khẩu tối thiểu 8 ký tự.')

@@ -188,20 +188,32 @@ public class AuthController : ControllerBase
     /// Gửi email quên mật khẩu
     /// </summary>
     [HttpPost("forgot-password")]
-    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken ct)
     {
-        await _identityProvider.SendPasswordResetEmailAsync(request.Email);
-        return Ok(ApiResponse<object>.Ok(true, new { message = "Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi." }));
+        var origin = Request.Headers["Origin"].ToString();
+        if (string.IsNullOrWhiteSpace(origin))
+            origin = Request.Headers["Referer"].ToString();
+
+        var result = await _authOtpService.SendPasswordResetOtpAsync(request.Email, origin, ct);
+        if (!result.IsSuccess)
+            return BadRequest(ApiResponse<object>.Fail(result.Error!));
+
+        return Ok(ApiResponse<object>.Ok(true, new { message = "Nếu email tồn tại trong hệ thống, hướng dẫn và mã xác thực đặt lại mật khẩu đã được gửi đến hộp thư của bạn." }));
     }
 
     /// <summary>
-    /// Đặt lại mật khẩu mới bằng token
+    /// Đặt lại mật khẩu mới bằng token hoặc mã OTP
     /// </summary>
     [HttpPost("reset-password")]
-    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken ct)
     {
-        await _identityProvider.ResetPasswordAsync(request.Token, request.NewPassword);
-        return Ok(ApiResponse<object>.Ok(true, new { message = "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại." }));
+        var result = await _authOtpService.ResetPasswordWithOtpOrTokenAsync(
+            request.Email, request.Token, request.Otp, request.NewPassword, ct);
+
+        if (!result.IsSuccess)
+            return BadRequest(ApiResponse<object>.Fail(result.Error!));
+
+        return Ok(ApiResponse<object>.Ok(true, new { message = "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại bằng mật khẩu mới." }));
     }
 
     /// <summary>
@@ -217,8 +229,7 @@ public class AuthController : ControllerBase
         return Ok(ApiResponse<object>.Ok(new
         {
             message = result.Data!.Message,
-            email = result.Data.Email,
-            otp = result.Data.Otp
+            email = result.Data.Email
         }));
     }
 
@@ -272,7 +283,7 @@ public class AuthController : ControllerBase
 
     public record RefreshRequest(string? RefreshToken);
     public record ForgotPasswordRequest(string Email);
-    public record ResetPasswordRequest(string Token, string NewPassword);
+    public record ResetPasswordRequest(string? Email, string? Token, string? Otp, string NewPassword);
     public record SendOtpRequest(string Email, string? FullName);
     public record VerifyOtpRequest(string Email, string Otp);
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Mail, Lock, User as UserIcon, ArrowRight, Check, Phone, MapPin, Calendar, UploadCloud, FileText, Loader2, Sparkles, RotateCcw } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, ArrowRight, Check, Phone, MapPin, Calendar, UploadCloud, FileText, Loader2, RotateCcw } from 'lucide-react';
 import { AuthLayout } from '../components/AuthLayout';
 import { ToastNotification } from '../../../components/ui/ToastNotification';
 import { registerSchema, type RegisterInput } from '../schemas/authSchemas';
@@ -21,7 +21,6 @@ export const RegisterPage: React.FC = () => {
 
   // Step 2: OTP State
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
-  const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
   const [resendCountdown, setResendCountdown] = useState<number>(0);
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -66,9 +65,6 @@ export const RegisterPage: React.FC = () => {
       }
 
       setSavedInfo(data);
-      if (resJson.data?.otp) {
-        setDevOtpHint(resJson.data.otp);
-      }
       setResendCountdown(60);
       setStep(2); // Go to Email Verification
       setToast({
@@ -132,12 +128,9 @@ export const RegisterPage: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: savedInfo.email, fullName: savedInfo.fullName }),
       });
-      const resJson = await parseApiResponse<{ success?: boolean; error?: string; data?: { otp?: string } }>(response);
+      const resJson = await parseApiResponse<{ success?: boolean; error?: string }>(response);
       if (!response.ok || !resJson?.success) {
         throw new Error(resJson?.error || 'Gửi lại mã OTP thất bại.');
-      }
-      if (resJson.data?.otp) {
-        setDevOtpHint(resJson.data.otp);
       }
       setResendCountdown(60);
       setToast({
@@ -489,25 +482,11 @@ export const RegisterPage: React.FC = () => {
             </p>
           </div>
 
-          {/* Development OTP quick-fill helper */}
-          {devOtpHint && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between">
-              <span className="flex items-center gap-1.5 font-medium">
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                Mã xác thực: <strong className="font-mono text-sm tracking-widest">{devOtpHint}</strong>
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setOtpDigits(devOtpHint.split(''));
-                  otpInputRefs.current[5]?.focus();
-                }}
-                className="text-[11px] font-bold px-2.5 py-1 bg-amber-200 dark:bg-amber-800/80 hover:bg-amber-300 rounded-lg transition-colors"
-              >
-                Tự động điền
-              </button>
-            </div>
-          )}
+          <div className="p-3.5 bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl text-xs text-slate-600 dark:text-slate-300">
+            <p>
+              Vui lòng kiểm tra hộp thư đến (hoặc thư mục <strong>Thư rác/Spam</strong>) của địa chỉ email trên để nhận mã OTP gồm 6 chữ số.
+            </p>
+          </div>
 
           {/* 6 Digit Inputs */}
           <div className="auth-otp flex justify-center gap-2" onPaste={handleOtpPaste}>
