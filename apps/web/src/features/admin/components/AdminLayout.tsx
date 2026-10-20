@@ -25,7 +25,6 @@ import './AdminLayout.css';
 const navigation = [
   { label: 'Tổng quan', to: '/admin', icon: LayoutDashboard, end: true },
   { label: 'Quản lý người dùng', to: '/admin/users', icon: UsersRound, end: false },
-  { label: 'Quản lý sách', to: '/admin/books', icon: BookOpen, end: false },
   { label: 'Quản lý chính sách', to: '/admin/policies', icon: FileText, end: false },
   { label: 'Quản lý quy định', to: '/admin/regulations', icon: ShieldCheck, end: false },
   { label: 'Quản lý mẫu báo cáo', to: '/admin/reports/templates', icon: FileSliders, end: true },
