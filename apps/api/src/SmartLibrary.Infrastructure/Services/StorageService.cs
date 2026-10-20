@@ -26,7 +26,7 @@ public class StorageService : IStorageService
         }
         else
         {
-            _logger.LogWarning("Cloudinary credentials are not configured or incomplete. File storage operations will be disabled.");
+            _logger.LogWarning("Cloudinary credentials are not configured or incomplete. File uploads will fail.");
         }
     }
 
@@ -34,8 +34,8 @@ public class StorageService : IStorageService
     {
         if (_cloudinary == null)
         {
-            _logger.LogWarning("Cloudinary is not configured. Falling back to default document path for {FileName}.", fileName);
-            return $"https://res.cloudinary.com/dvoexcswb/image/upload/v1/identity-documents/{fileName}";
+            _logger.LogError("Cannot upload {FileName}: Cloudinary credentials are not configured.", fileName);
+            throw new InvalidOperationException("Cloudinary chưa được cấu hình. Vui lòng liên hệ quản trị viên.");
         }
 
         _logger.LogInformation("Uploading file {FileName} to Cloudinary folder {Bucket}", fileName, bucket);
@@ -53,10 +53,17 @@ public class StorageService : IStorageService
         if (uploadResult.Error != null)
         {
             _logger.LogError("Cloudinary upload failed: {Error}", uploadResult.Error.Message);
-            throw new Exception($"Cloudinary upload failed: {uploadResult.Error.Message}");
+            throw new InvalidOperationException($"Cloudinary upload failed: {uploadResult.Error.Message}");
         }
 
-        return uploadResult.SecureUrl?.ToString() ?? uploadResult.Url?.ToString() ?? uploadResult.PublicId;
+        var uploadedUrl = uploadResult.SecureUrl?.ToString() ?? uploadResult.Url?.ToString();
+        if (string.IsNullOrWhiteSpace(uploadedUrl))
+        {
+            _logger.LogError("Cloudinary did not return a URL for uploaded file {FileName}.", fileName);
+            throw new InvalidOperationException("Cloudinary tải ảnh lên nhưng không trả về đường dẫn ảnh.");
+        }
+
+        return uploadedUrl;
     }
 
     public async Task DeleteFileAsync(string filePath, string bucket, CancellationToken ct = default)

@@ -121,6 +121,8 @@ supabase db reset   # Apply migrations + seed data
 > Các tài khoản/khóa từng xuất hiện trong file cấu hình hoặc ảnh chụp cần được đổi/thu hồi tại nhà cung cấp; xóa khỏi file hiện tại không thu hồi các khóa đó hay xóa chúng khỏi lịch sử Git.
 >
 > **Nếu GitGuardian báo SMTP credentials đã bị đẩy lên GitHub:** thu hồi ngay Google App Password cũ tại Google Account → Security → App passwords, tạo mật khẩu ứng dụng mới, cập nhật `Smtp__Password` (và `Smtp__Username`/`Smtp__FromAddress` nếu cần) trong Render, rồi redeploy. Chỉ đánh dấu cảnh báo GitGuardian là đã xử lý sau khi khóa cũ bị thu hồi. Đổi mật khẩu/khóa không xóa bí mật khỏi lịch sử commit; việc xóa khỏi lịch sử Git cần phối hợp với cộng tác viên, làm sạch mọi nhánh/tag và force-push theo hướng dẫn GitHub Secret Scanning. Không viết lại lịch sử repo dùng chung khi chưa thống nhất với nhóm.
+>
+> Trên Render, cấu hình đủ `Cloudinary__CloudName`, `Cloudinary__ApiKey`, `Cloudinary__ApiSecret` từ Cloudinary Dashboard rồi redeploy API. Nếu thiếu cấu hình, API sẽ từ chối upload thay vì lưu một URL ảnh giả. Các hồ sơ đã lưu URL giả trước khi sửa cần tải ảnh lên lại; deploy mới không thể khôi phục các file chưa từng được upload.
 
 Tài khoản Supabase Auth cũng cần hồ sơ trong `public.profiles` với trạng thái `Active`, cờ `is_active = true`, chưa bị xóa và có role. Tài khoản thiếu hồ sơ được backfill bởi migration nhưng giữ trạng thái chờ kích hoạt; quản trị viên vẫn cần phê duyệt/kích hoạt theo quy trình.
 

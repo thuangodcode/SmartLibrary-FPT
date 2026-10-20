@@ -128,6 +128,7 @@ export const RegistrationApprovalPage: React.FC = () => {
 
   // Lightbox for document inspection
   const [lightboxImg, setLightboxImg] = useState<{ src: string; caption: string } | null>(null);
+  const [failedImageUrls, setFailedImageUrls] = useState<Set<string>>(() => new Set());
 
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
 
@@ -298,6 +299,9 @@ export const RegistrationApprovalPage: React.FC = () => {
   }, [registrations, filter, search]);
 
   const selected = registrations.find((r) => r.id === selectedId);
+  const markImageFailed = (url: string) => {
+    setFailedImageUrls((previous) => new Set(previous).add(url));
+  };
 
   // Metrics
   const stats = useMemo(() => {
@@ -674,11 +678,12 @@ export const RegistrationApprovalPage: React.FC = () => {
                   <div className="reg-doc-frame-box">
                     <p className="reg-doc-frame-label">MẶT TRƯỚC GIẤY TỜ</p>
                     <div className="reg-doc-preview">
-                      {selected.frontDocUrl ? (
+                      {selected.frontDocUrl && !failedImageUrls.has(selected.frontDocUrl) ? (
                         <>
                           <img
                             src={selected.frontDocUrl}
                             alt="Mặt trước"
+                            onError={() => markImageFailed(selected.frontDocUrl!)}
                             onClick={() =>
                               setLightboxImg({ src: selected.frontDocUrl!, caption: 'Mặt trước giấy tờ tùy thân' })
                             }
@@ -688,6 +693,8 @@ export const RegistrationApprovalPage: React.FC = () => {
                             <span>Phóng to</span>
                           </div>
                         </>
+                      ) : selected.frontDocUrl ? (
+                        <span className="reg-doc-empty-note">Ảnh không tải được. Kiểm tra lại cấu hình Cloudinary hoặc đường dẫn ảnh.</span>
                       ) : (
                         <span className="reg-doc-empty-note">Không có ảnh</span>
                       )}
@@ -698,11 +705,12 @@ export const RegistrationApprovalPage: React.FC = () => {
                   <div className="reg-doc-frame-box">
                     <p className="reg-doc-frame-label">MẶT SAU GIẤY TỜ</p>
                     <div className="reg-doc-preview">
-                      {selected.backDocUrl ? (
+                      {selected.backDocUrl && !failedImageUrls.has(selected.backDocUrl) ? (
                         <>
                           <img
                             src={selected.backDocUrl}
                             alt="Mặt sau"
+                            onError={() => markImageFailed(selected.backDocUrl!)}
                             onClick={() =>
                               setLightboxImg({ src: selected.backDocUrl!, caption: 'Mặt sau giấy tờ tùy thân' })
                             }
@@ -712,6 +720,8 @@ export const RegistrationApprovalPage: React.FC = () => {
                             <span>Phóng to</span>
                           </div>
                         </>
+                      ) : selected.backDocUrl ? (
+                        <span className="reg-doc-empty-note">Ảnh không tải được. Kiểm tra lại cấu hình Cloudinary hoặc đường dẫn ảnh.</span>
                       ) : (
                         <span className="reg-doc-empty-note">Không có ảnh</span>
                       )}
@@ -722,11 +732,12 @@ export const RegistrationApprovalPage: React.FC = () => {
                   <div className="reg-doc-frame-box">
                     <p className="reg-doc-frame-label">ẢNH CHÂN DUNG / SELFIE</p>
                     <div className="reg-doc-preview">
-                      {selected.selfieUrl ? (
+                      {selected.selfieUrl && !failedImageUrls.has(selected.selfieUrl) ? (
                         <>
                           <img
                             src={selected.selfieUrl}
                             alt="Chân dung selfie"
+                            onError={() => markImageFailed(selected.selfieUrl!)}
                             onClick={() =>
                               setLightboxImg({ src: selected.selfieUrl!, caption: 'Ảnh chụp chân dung đối chiếu' })
                             }
@@ -736,6 +747,8 @@ export const RegistrationApprovalPage: React.FC = () => {
                             <span>Phóng to</span>
                           </div>
                         </>
+                      ) : selected.selfieUrl ? (
+                        <span className="reg-doc-empty-note">Ảnh không tải được. Kiểm tra lại cấu hình Cloudinary hoặc đường dẫn ảnh.</span>
                       ) : (
                         <span className="reg-doc-empty-note">Không có ảnh</span>
                       )}
