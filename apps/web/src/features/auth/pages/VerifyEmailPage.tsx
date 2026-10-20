@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Mail, CheckCircle2, ArrowRight, RefreshCw } from 'lucide-react';
 import { AuthLayout } from '../components/AuthLayout';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useToast } from '../../../components/ui/useToast';
 
 export const VerifyEmailPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const email = searchParams.get('email') || 'bạn';
   const token = searchParams.get('token');
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
@@ -30,12 +32,18 @@ export const VerifyEmailPage: React.FC = () => {
 
   useEffect(() => {
     if (token) {
-      setTimeout(() => {
+      const timeout = window.setTimeout(() => {
         setIsVerifyingToken(false);
         setVerificationSuccess(true);
+        showToast({
+          type: 'success',
+          title: 'Xác minh email thành công',
+          message: 'Bạn có thể tiếp tục sử dụng tài khoản SmartLibrary.',
+        });
       }, 1000);
+      return () => window.clearTimeout(timeout);
     }
-  }, [token]);
+  }, [showToast, token]);
 
   const handleResend = () => {
     setCanResend(false);

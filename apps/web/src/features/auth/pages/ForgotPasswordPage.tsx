@@ -7,14 +7,15 @@ import { AuthLayout } from '../components/AuthLayout';
 import { forgotPasswordSchema, type ForgotPasswordInput } from '../schemas/authSchemas';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
+import { useToast } from '../../../components/ui/useToast';
 
 export const ForgotPasswordPage: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [resendCountdown, setResendCountdown] = useState(0);
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const {
     register,
@@ -34,7 +35,6 @@ export const ForgotPasswordPage: React.FC = () => {
 
   const sendResetEmail = async (email: string) => {
     setIsLoading(true);
-    setErrorMessage(null);
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/forgot-password`, {
         method: 'POST',
@@ -48,8 +48,17 @@ export const ForgotPasswordPage: React.FC = () => {
       setSubmittedEmail(email);
       setIsSubmitted(true);
       setResendCountdown(60);
+      showToast({
+        type: 'success',
+        title: 'Đã gửi hướng dẫn',
+        message: 'Hãy kiểm tra hộp thư đến hoặc mục Thư rác (Spam).',
+      });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể gửi yêu cầu khôi phục mật khẩu.');
+      showToast({
+        type: 'error',
+        title: 'Không thể gửi yêu cầu',
+        message: error instanceof Error ? error.message : 'Không thể gửi yêu cầu khôi phục mật khẩu.',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -70,12 +79,6 @@ export const ForgotPasswordPage: React.FC = () => {
       title="Khôi phục mật khẩu"
       subtitle="Nhập email đã đăng ký. Chúng tôi sẽ gửi hướng dẫn để bạn tạo mật khẩu mới."
     >
-      {errorMessage && (
-        <div className="auth-error password-recovery-error" role="alert">
-          {errorMessage}
-        </div>
-      )}
-
       {isSubmitted ? (
         <div className="password-recovery-success">
           <div className="password-recovery-success-card">

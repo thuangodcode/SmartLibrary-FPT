@@ -14,6 +14,7 @@ import {
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import smartLibraryLogo from '../../../assets/figma/auth-logo-fpt.png';
 import { useAuthStore } from '../../auth/store/useAuthStore';
+import { useToast } from '../../../components/ui/useToast';
 import { API_BASE_URL } from '../../../config';
 import './LibrarianLayout.css';
 
@@ -30,6 +31,7 @@ export const LibrarianLayout: React.FC = () => {
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const { showToast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
   const currentPage = navigation.find((item) =>
@@ -62,6 +64,7 @@ export const LibrarianLayout: React.FC = () => {
 
   const handleLogout = () => {
     logout();
+    showToast({ type: 'success', title: 'Đăng xuất thành công', message: 'Bạn đã đăng xuất khỏi SmartLibrary.' });
     navigate('/login');
   };
 

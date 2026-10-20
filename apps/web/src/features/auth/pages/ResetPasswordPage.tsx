@@ -7,6 +7,7 @@ import { AuthLayout } from '../components/AuthLayout';
 import { resetPasswordSchema, type ResetPasswordInput } from '../schemas/authSchemas';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
+import { useToast } from '../../../components/ui/useToast';
 
 export const ResetPasswordPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -22,8 +23,8 @@ export const ResetPasswordPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const { showToast } = useToast();
 
   const {
     register,
@@ -50,11 +51,13 @@ export const ResetPasswordPage: React.FC = () => {
   }, [emailFromUrl, setValue]);
 
   const onSubmit = async (data: ResetPasswordInput) => {
-    setErrorMessage(null);
-
     const emailToSend = data.email || emailValue;
     if (!activeToken && (!emailToSend || !data.otp)) {
-      setErrorMessage('Vui lòng nhập đầy đủ địa chỉ Email và Mã xác thực OTP đã nhận.');
+      showToast({
+        type: 'warning',
+        title: 'Thiếu thông tin',
+        message: 'Vui lòng nhập đầy đủ email và mã xác thực đã nhận.',
+      });
       return;
     }
 
@@ -77,11 +80,20 @@ export const ResetPasswordPage: React.FC = () => {
       }
 
       setIsSuccess(true);
+      showToast({
+        type: 'success',
+        title: 'Đặt lại mật khẩu thành công',
+        message: 'Bạn có thể đăng nhập bằng mật khẩu mới.',
+      });
       setTimeout(() => {
         navigate('/login?resetSuccess=true');
-      }, 3000);
+      }, 1600);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể cập nhật mật khẩu.');
+      showToast({
+        type: 'error',
+        title: 'Không thể cập nhật mật khẩu',
+        message: error instanceof Error ? error.message : 'Không thể cập nhật mật khẩu.',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -97,12 +109,6 @@ export const ResetPasswordPage: React.FC = () => {
           : 'Nhập email, mã xác thực OTP nhận từ thư và thiết lập mật khẩu mới.'
       }
     >
-      {errorMessage && (
-        <div className="auth-error mb-4" role="alert">
-          {errorMessage}
-        </div>
-      )}
-
       {isSuccess ? (
         <div className="password-reset-success">
           <div className="password-reset-success-icon">
@@ -111,7 +117,7 @@ export const ResetPasswordPage: React.FC = () => {
           <div className="password-reset-success-copy">
             <h3>Đặt lại mật khẩu thành công</h3>
             <p>
-              Mật khẩu mới của bạn đã được cập nhật an toàn. Đang chuyển hướng bạn đến trang đăng nhập trong giây lát...
+              Mật khẩu mới đã được cập nhật. Đang chuyển bạn đến trang đăng nhập...
             </p>
           </div>
           <button

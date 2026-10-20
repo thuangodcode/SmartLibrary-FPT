@@ -31,6 +31,7 @@ import bookCoverThree from '../../../assets/figma/home-book-3.png';
 import bookCoverFour from '../../../assets/figma/home-book-4.png';
 import libraryPhoto from '../../../assets/figma/home-library.png';
 import { useAuthStore } from '../../auth/store/useAuthStore';
+import { useToast } from '../../../components/ui/useToast';
 import './HomePage.css';
 
 const categories = [
@@ -127,6 +128,12 @@ export const HomePage = () => {
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const logout = useAuthStore((s) => s.logout);
+  const { showToast } = useToast();
+
+  const handleLogout = () => {
+    logout();
+    showToast({ type: 'success', title: 'Đăng xuất thành công', message: 'Bạn đã đăng xuất khỏi SmartLibrary.' });
+  };
 
   const visibleBooks = useMemo(() => {
     const query = appliedSearch.trim().toLocaleLowerCase('vi');
@@ -215,7 +222,7 @@ export const HomePage = () => {
                   type="button"
                   className="public-logout-btn"
                   onClick={() => {
-                    logout();
+                    handleLogout();
                     setIsMenuOpen(false);
                   }}
                   title="Đăng xuất"
@@ -490,7 +497,7 @@ export const HomePage = () => {
                   <button
                     type="button"
                     className="public-button public-button-dark"
-                    onClick={() => logout()}
+                    onClick={handleLogout}
                   >
                     Đăng xuất
                   </button>
@@ -532,7 +539,7 @@ export const HomePage = () => {
                 <button
                   type="button"
                   className="public-footer-logout-link"
-                  onClick={() => logout()}
+                  onClick={handleLogout}
                 >
                   Đăng xuất ({user?.fullName || 'Tài khoản'})
                 </button>

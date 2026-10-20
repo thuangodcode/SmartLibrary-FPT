@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Sparkles, Sun, Moon, Bell, Menu, X, ChevronDown, BookOpen, LogOut, User as UserIcon, Settings } from 'lucide-react';
 import { useAuthStore } from '../../features/auth/store/useAuthStore';
+import { useToast } from '../ui/useToast';
 
 interface CategoryNav {
   id: string;
@@ -18,6 +19,7 @@ export const Header: React.FC = () => {
   const [categories, setCategories] = useState<CategoryNav[]>([]);
 
   const { user, isAuthenticated, logout } = useAuthStore();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -66,6 +68,7 @@ export const Header: React.FC = () => {
       });
     } catch { /* ignore */ }
     logout();
+    showToast({ type: 'success', title: 'Đăng xuất thành công', message: 'Bạn đã đăng xuất khỏi SmartLibrary.' });
     navigate('/login');
   };
 
