@@ -34,6 +34,9 @@ public class AppDbContext : DbContext
     public DbSet<PolicyRuleParameter> PolicyRuleParameters => Set<PolicyRuleParameter>();
     public DbSet<PolicyRuleTarget> PolicyRuleTargets => Set<PolicyRuleTarget>();
     public DbSet<PolicyRuleHistory> PolicyRuleHistories => Set<PolicyRuleHistory>();
+    public DbSet<ReportTemplate> ReportTemplates => Set<ReportTemplate>();
+    public DbSet<LibraryReport> LibraryReports => Set<LibraryReport>();
+    public DbSet<ReportReview> ReportReviews => Set<ReportReview>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -140,6 +143,37 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<PolicyRuleHistory>(entity =>
         {
             entity.ToTable("policy_rule_histories");
+        });
+
+        modelBuilder.Entity<ReportTemplate>(entity =>
+        {
+            entity.ToTable("report_templates");
+            entity.Property(x => x.Configuration).HasColumnType("jsonb");
+            entity.HasIndex(x => x.IsEnabled);
+        });
+
+        modelBuilder.Entity<LibraryReport>(entity =>
+        {
+            entity.ToTable("reports");
+            entity.Property(x => x.Snapshot).HasColumnType("jsonb");
+            entity.HasIndex(x => new { x.Status, x.CreatedAt });
+            entity.HasIndex(x => x.TemplateId);
+            entity.HasIndex(x => x.SubmittedBy);
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasOne(x => x.Template).WithMany(x => x.Reports).HasForeignKey(x => x.TemplateId);
+            entity.HasOne(x => x.Submitter).WithMany().HasForeignKey(x => x.SubmittedBy);
+        });
+
+        modelBuilder.Entity<ReportReview>(entity =>
+        {
+            entity.ToTable("report_reviews");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
+            entity.Property(x => x.IsDeleted).HasDefaultValue(false);
+            entity.HasIndex(x => new { x.ReportId, x.CreatedAt });
+            entity.HasOne(x => x.Report).WithMany(x => x.Reviews).HasForeignKey(x => x.ReportId);
+            entity.HasOne(x => x.Reviewer).WithMany().HasForeignKey(x => x.ReviewerId);
         });
 
         // Global query filter for soft delete

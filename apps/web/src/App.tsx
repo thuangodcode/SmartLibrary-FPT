@@ -17,6 +17,9 @@ import AdminOverviewPage from './features/admin/pages/AdminOverviewPage';
 import AdminSectionPage from './features/admin/pages/AdminSectionPage';
 import AdminUsersPage from './features/admin/pages/AdminUsersPage';
 import AdminPoliciesPage from './features/admin/pages/AdminPoliciesPage';
+import AdminReportsPage from './features/admin/pages/AdminReportsPage';
+import AdminReportDetailPage from './features/admin/pages/AdminReportDetailPage';
+import AdminReportTemplatesPage from './features/admin/pages/AdminReportTemplatesPage';
 import { useAuthStore } from './features/auth/store/useAuthStore';
 
 function App() {
@@ -59,7 +62,9 @@ function App() {
         <Route path="books" element={<AdminSectionPage title="Quản lý sách" />} />
         <Route path="policies" element={<AdminPoliciesPage />} />
         <Route path="ai-settings" element={<AdminSectionPage title="Cấu hình AI" />} />
-        <Route path="reports" element={<AdminSectionPage title="Thống kê & báo cáo" />} />
+        <Route path="reports" element={<AdminReportsPage />} />
+        <Route path="reports/templates" element={<AdminReportTemplatesPage />} />
+        <Route path="reports/:id" element={<AdminReportDetailPage />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Route>
     </Routes>

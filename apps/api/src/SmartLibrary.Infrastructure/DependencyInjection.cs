@@ -5,6 +5,7 @@ using SmartLibrary.Application.Features.Books;
 using SmartLibrary.Application.Features.Categories;
 using SmartLibrary.Application.Features.Statistics;
 using SmartLibrary.Application.Features.Policies;
+using SmartLibrary.Application.Features.Reports;
 using SmartLibrary.Application.Features.Users;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Infrastructure.Persistence;
@@ -37,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IDashboardRepository, DashboardRepository>();
         services.AddScoped<IReaderRepository, ReaderRepository>();
         services.AddScoped<IPolicyRuleRepository, PolicyRuleRepository>();
+        services.AddScoped<IReportRepository, ReportRepository>();
 
         // Services
         services.AddScoped<IAiEmbeddingService, AiEmbeddingService>();
