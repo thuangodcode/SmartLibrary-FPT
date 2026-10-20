@@ -29,6 +29,7 @@ public sealed class PolicyRuleHistoryDto
 public sealed class PolicyRuleListItemDto
 {
     public Guid Id { get; init; }
+    public string Code { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
     public PolicyRuleType PolicyType { get; init; }
@@ -36,11 +37,15 @@ public sealed class PolicyRuleListItemDto
     public int Priority { get; init; }
     public bool OverridesGeneral { get; init; }
     public DateTime CreatedAt { get; init; }
+    public DateTime UpdatedAt { get; init; }
+    public string? UpdatedByName { get; init; }
+    public IReadOnlyList<PolicyRuleParameterDto> Parameters { get; init; } = Array.Empty<PolicyRuleParameterDto>();
 }
 
 public sealed class PolicyRuleDetailDto
 {
     public Guid Id { get; init; }
+    public string Code { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
     public PolicyRuleType PolicyType { get; init; }
@@ -77,6 +82,7 @@ public sealed class PolicyRuleListResultDto
 
 public sealed class UpsertPolicyRuleRequest
 {
+    public string? Code { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string PolicyType { get; set; } = string.Empty;

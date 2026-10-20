@@ -17,6 +17,11 @@ import AdminOverviewPage from './features/admin/pages/AdminOverviewPage';
 import AdminSectionPage from './features/admin/pages/AdminSectionPage';
 import AdminUsersPage from './features/admin/pages/AdminUsersPage';
 import AdminPoliciesPage from './features/admin/pages/AdminPoliciesPage';
+import AdminPolicyDetailPage from './features/admin/pages/AdminPolicyDetailPage';
+import AdminPolicyFormPage from './features/admin/pages/AdminPolicyFormPage';
+import AdminRegulationsPage from './features/admin/pages/AdminRegulationsPage';
+import AdminRegulationDetailPage from './features/admin/pages/AdminRegulationDetailPage';
+import AdminRegulationFormPage from './features/admin/pages/AdminRegulationFormPage';
 import { useAuthStore } from './features/auth/store/useAuthStore';
 
 function App() {
@@ -58,6 +63,13 @@ function App() {
         <Route path="users" element={<AdminUsersPage />} />
         <Route path="books" element={<AdminSectionPage title="Quản lý sách" />} />
         <Route path="policies" element={<AdminPoliciesPage />} />
+        <Route path="policies/create" element={<AdminPolicyFormPage mode="create" />} />
+        <Route path="policies/:policyCode/edit" element={<AdminPolicyFormPage mode="edit" />} />
+        <Route path="policies/:policyCode" element={<AdminPolicyDetailPage />} />
+        <Route path="regulations" element={<AdminRegulationsPage />} />
+        <Route path="regulations/create" element={<AdminRegulationFormPage mode="create" />} />
+        <Route path="regulations/:regulationId/edit" element={<AdminRegulationFormPage mode="edit" />} />
+        <Route path="regulations/:regulationId" element={<AdminRegulationDetailPage />} />
         <Route path="ai-settings" element={<AdminSectionPage title="Cấu hình AI" />} />
         <Route path="reports" element={<AdminSectionPage title="Thống kê & báo cáo" />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />

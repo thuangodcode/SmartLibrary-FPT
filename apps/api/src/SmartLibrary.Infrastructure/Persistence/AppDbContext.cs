@@ -118,13 +118,18 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<PolicyRule>(entity =>
         {
             entity.ToTable("policy_rules");
+            entity.Property(p => p.Code).HasColumnName("code").HasMaxLength(20).IsRequired();
+            entity.HasIndex(p => p.Code).IsUnique();
             entity.Property(p => p.PolicyType).HasConversion<string>();
             entity.Property(p => p.Status).HasConversion<string>();
-            entity.HasOne(p => p.CreatedByUser).WithMany().HasForeignKey(p => p.CreatedBy);
-            entity.HasOne(p => p.UpdatedByUser).WithMany().HasForeignKey(p => p.UpdatedBy);
-            entity.HasMany(p => p.Parameters).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId);
-            entity.HasMany(p => p.Targets).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId);
-            entity.HasMany(p => p.Histories).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId);
+            entity.HasOne(p => p.CreatedByUser).WithMany().HasForeignKey(p => p.CreatedBy).IsRequired(false);
+            entity.HasOne(p => p.UpdatedByUser).WithMany().HasForeignKey(p => p.UpdatedBy).IsRequired(false);
+            entity.HasMany(p => p.Parameters).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId)
+                .IsRequired(false).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(p => p.Targets).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId)
+                .IsRequired(false).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(p => p.Histories).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId)
+                .IsRequired(false).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<PolicyRuleParameter>(entity =>

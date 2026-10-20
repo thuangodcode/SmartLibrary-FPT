@@ -5,6 +5,8 @@ namespace SmartLibrary.Domain.Entities;
 
 public class PolicyRule : AuditableEntity, ISoftDeletable
 {
+    /// <summary>Public unique code used in URLs (e.g. CS06). Primary key remains Id.</summary>
+    public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public PolicyRuleType PolicyType { get; set; }

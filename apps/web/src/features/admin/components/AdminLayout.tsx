@@ -6,6 +6,7 @@ import {
   ChartNoAxesCombined,
   ChevronDown,
   ChevronRight,
+  FileText,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -14,7 +15,7 @@ import {
   UsersRound,
   X,
 } from 'lucide-react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import smartLibraryLogo from '../../../assets/figma/auth-logo-fpt.png';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import './AdminLayout.css';
@@ -23,7 +24,8 @@ const navigation = [
   { label: 'Tổng quan', to: '/admin', icon: LayoutDashboard, end: true },
   { label: 'Quản lý người dùng', to: '/admin/users', icon: UsersRound, end: false },
   { label: 'Quản lý sách', to: '/admin/books', icon: BookOpen, end: false },
-  { label: 'Chính sách thư viện', to: '/admin/policies', icon: ShieldCheck, end: false },
+  { label: 'Quản lý chính sách', to: '/admin/policies', icon: FileText, end: false },
+  { label: 'Quản lý quy định', to: '/admin/regulations', icon: ShieldCheck, end: false },
   { label: 'Cấu hình AI', to: '/admin/ai-settings', icon: Bot, end: false },
   { label: 'Thống kê & báo cáo', to: '/admin/reports', icon: ChartNoAxesCombined, end: false },
 ];
@@ -37,11 +39,7 @@ export const AdminLayout: React.FC = () => {
   const expandTimerRef = useRef<number | null>(null);
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
-  const location = useLocation();
   const navigate = useNavigate();
-  const currentPage = navigation.find((item) =>
-    item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
-  )?.label ?? 'Tổng quan';
 
   useEffect(() => {
     const mq = window.matchMedia('(hover: hover) and (pointer: fine)');
@@ -185,11 +183,6 @@ export const AdminLayout: React.FC = () => {
           >
             <Menu size={21} />
           </button>
-          <div className="admin-breadcrumb">
-            <span>Quản trị</span>
-            <span className="admin-breadcrumb-separator">/</span>
-            <strong>{currentPage}</strong>
-          </div>
           <div className="admin-topbar-actions">
             <button type="button" className="admin-icon-button" aria-label="Thông báo">
               <Bell size={19} />

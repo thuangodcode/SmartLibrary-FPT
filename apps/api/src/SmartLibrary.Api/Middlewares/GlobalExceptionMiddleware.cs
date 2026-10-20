@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Domain.Exceptions;
 
@@ -35,19 +36,23 @@ public class GlobalExceptionMiddleware
 
     private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        var (statusCode, errorCode) = exception switch
+        var (statusCode, errorCode, message) = exception switch
         {
-            NotFoundException => (HttpStatusCode.NotFound, Errors.NotFound),
-            DomainException => (HttpStatusCode.BadRequest, Errors.ValidationFailed),
-            UnauthorizedAccessException => (HttpStatusCode.Unauthorized, Errors.Unauthorized),
-            _ => (HttpStatusCode.InternalServerError, Errors.InternalError)
+            NotFoundException => (HttpStatusCode.NotFound, Errors.NotFound, exception.Message),
+            DomainException => (HttpStatusCode.BadRequest, Errors.ValidationFailed, exception.Message),
+            UnauthorizedAccessException => (HttpStatusCode.Unauthorized, Errors.Unauthorized, exception.Message),
+            DbUpdateConcurrencyException => (
+                HttpStatusCode.Conflict,
+                Errors.InternalError,
+                "Không lưu được quy định vì dữ liệu đã thay đổi. Tải lại trang rồi thử lại."),
+            _ => (HttpStatusCode.InternalServerError, Errors.InternalError, exception.Message)
         };
 
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)statusCode;
 
         var response = ApiResponse<object>.Fail(
-            string.IsNullOrEmpty(exception.Message) ? errorCode : exception.Message
+            string.IsNullOrEmpty(message) ? errorCode : message
         );
 
         var json = JsonSerializer.Serialize(response, new JsonSerializerOptions

@@ -20,12 +20,22 @@ public class PolicyRuleService
         _unitOfWork = unitOfWork;
     }
 
+    public Task<PolicyRuleListResultDto> GetPagedAsync(
+        string? search,
+        string? type,
+        string? status,
+        int page,
+        int pageSize,
+        CancellationToken ct = default)
+        => GetPagedAsync(search, type, status, page, pageSize, null, ct);
+
     public async Task<PolicyRuleListResultDto> GetPagedAsync(
         string? search,
         string? type,
         string? status,
         int page,
         int pageSize,
+        IReadOnlyCollection<PolicyRuleType>? allowedTypes,
         CancellationToken ct = default)
     {
         PolicyRuleType? parsedType = null;
@@ -45,8 +55,9 @@ public class PolicyRuleService
         var safePage = page < 1 ? 1 : page;
         var safePageSize = pageSize < 1 ? 10 : Math.Min(pageSize, 50);
 
-        var (items, total) = await _repository.GetPagedAsync(search, parsedType, parsedStatus, safePage, safePageSize, ct);
-        var categories = await _repository.GetCategoryCountsAsync(ct);
+        var (items, total) = await _repository.GetPagedAsync(
+            search, parsedType, parsedStatus, safePage, safePageSize, allowedTypes, ct);
+        var categories = await _repository.GetCategoryCountsAsync(allowedTypes, ct);
 
         return new PolicyRuleListResultDto
         {
@@ -63,7 +74,16 @@ public class PolicyRuleService
     {
         var entity = await _repository.GetByIdWithDetailsAsync(id, ct);
         if (entity is null)
-            return Result<PolicyRuleDetailDto>.Failure("Không tìm thấy chính sách.");
+            return Result<PolicyRuleDetailDto>.Failure("Không tìm thấy quy định.");
+
+        return Result<PolicyRuleDetailDto>.Success(MapDetail(entity));
+    }
+
+    public async Task<Result<PolicyRuleDetailDto>> GetByKeyAsync(string key, CancellationToken ct = default)
+    {
+        var entity = await _repository.GetByKeyWithDetailsAsync(key, ct);
+        if (entity is null)
+            return Result<PolicyRuleDetailDto>.Failure("Không tìm thấy quy định.");
 
         return Result<PolicyRuleDetailDto>.Success(MapDetail(entity));
     }
@@ -77,14 +97,20 @@ public class PolicyRuleService
         if (validationError is not null)
             return Result<PolicyRuleDetailDto>.Failure(validationError);
 
+        var policyType = Enum.Parse<PolicyRuleType>(request.PolicyType, true);
+        var code = await ResolveCodeAsync(request.Code, policyType, excludeId: null, ct);
+        if (!code.IsSuccess)
+            return Result<PolicyRuleDetailDto>.Failure(code.Error!);
+
         var entity = new PolicyRule
         {
+            Code = code.Data!,
             Name = request.Name.Trim(),
             Description = request.Description?.Trim(),
-            PolicyType = Enum.Parse<PolicyRuleType>(request.PolicyType, true),
+            PolicyType = policyType,
             Status = Enum.Parse<PolicyRuleStatus>(request.Status, true),
             Priority = request.Priority,
-            OverridesGeneral = request.OverridesGeneral || request.PolicyType.Equals(nameof(PolicyRuleType.CategoryOverride), StringComparison.OrdinalIgnoreCase),
+            OverridesGeneral = request.OverridesGeneral || policyType == PolicyRuleType.CategoryOverride,
             EffectiveFrom = request.EffectiveFrom,
             EffectiveTo = request.EffectiveTo,
             CreatedBy = actorId,
@@ -100,7 +126,7 @@ public class PolicyRuleService
             PolicyRuleId = entity.Id,
             ChangedBy = actorId,
             ChangedByName = actorName,
-            ChangeSummary = "Tạo chính sách mới",
+            ChangeSummary = "Tạo quy định mới",
             AfterJson = SerializeSnapshot(entity)
         }, ct);
 
@@ -111,7 +137,7 @@ public class PolicyRuleService
     }
 
     public async Task<Result<PolicyRuleDetailDto>> UpdateAsync(
-        Guid id,
+        string key,
         UpsertPolicyRuleRequest request,
         Guid actorId,
         CancellationToken ct = default)
@@ -120,47 +146,88 @@ public class PolicyRuleService
         if (validationError is not null)
             return Result<PolicyRuleDetailDto>.Failure(validationError);
 
-        var entity = await _repository.GetByIdWithDetailsAsync(id, ct);
-        if (entity is null)
-            return Result<PolicyRuleDetailDto>.Failure("Không tìm thấy chính sách.");
+        var id = await _repository.FindIdByKeyAsync(key, ct);
+        if (id is null)
+            return Result<PolicyRuleDetailDto>.Failure("Không tìm thấy quy định.");
 
-        var before = SerializeSnapshot(entity);
+        var existing = await _repository.GetByIdWithDetailsAsync(id.Value, ct);
+        if (existing is null)
+            return Result<PolicyRuleDetailDto>.Failure("Không tìm thấy quy định.");
 
-        entity.Name = request.Name.Trim();
-        entity.Description = request.Description?.Trim();
-        entity.PolicyType = Enum.Parse<PolicyRuleType>(request.PolicyType, true);
-        entity.Status = Enum.Parse<PolicyRuleStatus>(request.Status, true);
-        entity.Priority = request.Priority;
-        entity.OverridesGeneral = request.OverridesGeneral || entity.PolicyType == PolicyRuleType.CategoryOverride;
-        entity.EffectiveFrom = request.EffectiveFrom;
-        entity.EffectiveTo = request.EffectiveTo;
-        entity.UpdatedBy = actorId;
+        var before = SerializeSnapshot(existing);
+        var policyType = Enum.Parse<PolicyRuleType>(request.PolicyType, true);
+        var status = Enum.Parse<PolicyRuleStatus>(request.Status, true);
+        var overridesGeneral = request.OverridesGeneral || policyType == PolicyRuleType.CategoryOverride;
 
-        entity.Parameters.Clear();
-        entity.Targets.Clear();
-        ApplyChildren(entity, request);
+        var parameters = request.Parameters
+            .Where(x => !string.IsNullOrWhiteSpace(x.Key))
+            .GroupBy(x => x.Key.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.Last())
+            .Select(p => new PolicyRuleParameter
+            {
+                Id = Guid.NewGuid(),
+                PolicyRuleId = id.Value,
+                ParamKey = p.Key.Trim(),
+                ParamValue = p.Value?.Trim() ?? string.Empty,
+                DisplayLabel = p.Label?.Trim()
+            }).ToList();
+        var targets = request.Targets
+            .Where(x => !string.IsNullOrWhiteSpace(x.TargetType))
+            .Select(t => new PolicyRuleTarget
+            {
+                Id = Guid.NewGuid(),
+                PolicyRuleId = id.Value,
+                TargetType = t.TargetType.Trim(),
+                TargetValue = string.IsNullOrWhiteSpace(t.TargetValue) ? "*" : t.TargetValue.Trim(),
+                TargetLabel = t.TargetLabel?.Trim()
+            }).ToList();
 
-        await _repository.UpdateAsync(entity, ct);
+        var actorName = await _repository.GetUserDisplayNameAsync(actorId, ct);
+        Guid? updatedBy = actorName is null ? null : actorId;
 
-        var actorName = await _repository.GetUserDisplayNameAsync(actorId, ct) ?? "Admin";
+        var affected = await _repository.UpdateScalarsAsync(
+            id.Value,
+            request.Name.Trim(),
+            request.Description?.Trim(),
+            policyType,
+            status,
+            request.Priority,
+            overridesGeneral,
+            request.EffectiveFrom,
+            request.EffectiveTo,
+            updatedBy,
+            existing.IsDeleted,
+            ct);
+        if (affected == 0)
+            return Result<PolicyRuleDetailDto>.Failure("Không lưu được quy định. Tải lại trang rồi thử lại.");
+
+        await _repository.ReplaceChildrenAsync(id.Value, parameters, targets, ct);
+
         await _repository.AddHistoryAsync(new PolicyRuleHistory
         {
-            PolicyRuleId = entity.Id,
-            ChangedBy = actorId,
-            ChangedByName = actorName,
-            ChangeSummary = "Cập nhật chính sách",
+            PolicyRuleId = id.Value,
+            ChangedBy = updatedBy,
+            ChangedByName = actorName ?? "Admin",
+            ChangeSummary = "Cập nhật quy định",
             BeforeJson = before,
-            AfterJson = SerializeSnapshot(entity)
+            AfterJson = JsonSerializer.Serialize(new
+            {
+                existing.Code,
+                Name = request.Name.Trim(),
+                Description = request.Description?.Trim(),
+                PolicyType = policyType.ToString(),
+                Status = status.ToString()
+            }, JsonOptions)
         }, ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
 
-        var updated = await _repository.GetByIdWithDetailsAsync(entity.Id, ct);
+        var updated = await _repository.GetByIdWithDetailsAsync(id.Value, ct);
         return Result<PolicyRuleDetailDto>.Success(MapDetail(updated!));
     }
 
     public async Task<Result<PolicyRuleDetailDto>> UpdateStatusAsync(
-        Guid id,
+        string key,
         UpdatePolicyStatusRequest request,
         Guid actorId,
         CancellationToken ct = default)
@@ -168,26 +235,38 @@ public class PolicyRuleService
         if (!Enum.TryParse<PolicyRuleStatus>(request.Status, true, out var newStatus))
             return Result<PolicyRuleDetailDto>.Failure("Trạng thái không hợp lệ.");
 
-        var entity = await _repository.GetByIdWithDetailsAsync(id, ct);
+        var entity = await _repository.GetByKeyWithDetailsAsync(key, ct);
         if (entity is null)
-            return Result<PolicyRuleDetailDto>.Failure("Không tìm thấy chính sách.");
+            return Result<PolicyRuleDetailDto>.Failure("Không tìm thấy quy định.");
 
         var before = SerializeSnapshot(entity);
         var oldStatus = entity.Status;
-        entity.Status = newStatus;
-        entity.UpdatedBy = actorId;
+        var actorName = await _repository.GetUserDisplayNameAsync(actorId, ct);
+        Guid? updatedBy = actorName is null ? null : actorId;
+        var affected = await _repository.UpdateScalarsAsync(
+            entity.Id,
+            entity.Name,
+            entity.Description,
+            entity.PolicyType,
+            newStatus,
+            entity.Priority,
+            entity.OverridesGeneral,
+            entity.EffectiveFrom,
+            entity.EffectiveTo,
+            updatedBy,
+            entity.IsDeleted,
+            ct);
+        if (affected == 0)
+            return Result<PolicyRuleDetailDto>.Failure("Không đổi được trạng thái. Tải lại trang rồi thử lại.");
 
-        await _repository.UpdateAsync(entity, ct);
-
-        var actorName = await _repository.GetUserDisplayNameAsync(actorId, ct) ?? "Admin";
         await _repository.AddHistoryAsync(new PolicyRuleHistory
         {
             PolicyRuleId = entity.Id,
-            ChangedBy = actorId,
-            ChangedByName = actorName,
+            ChangedBy = updatedBy,
+            ChangedByName = actorName ?? "Admin",
             ChangeSummary = $"Đổi trạng thái: {oldStatus} → {newStatus}",
             BeforeJson = before,
-            AfterJson = SerializeSnapshot(entity)
+            AfterJson = JsonSerializer.Serialize(new { entity.Code, Status = newStatus.ToString() }, JsonOptions)
         }, ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
@@ -196,12 +275,70 @@ public class PolicyRuleService
         return Result<PolicyRuleDetailDto>.Success(MapDetail(updated!));
     }
 
+    public async Task<Result<bool>> DeleteAsync(string key, Guid actorId, CancellationToken ct = default)
+    {
+        var entity = await _repository.GetByKeyWithDetailsAsync(key, ct);
+        if (entity is null)
+            return Result<bool>.Failure("Không tìm thấy quy định.");
+
+        var before = SerializeSnapshot(entity);
+        var actorName = await _repository.GetUserDisplayNameAsync(actorId, ct);
+        Guid? updatedBy = actorName is null ? null : actorId;
+        var affected = await _repository.UpdateScalarsAsync(
+            entity.Id,
+            entity.Name,
+            entity.Description,
+            entity.PolicyType,
+            entity.Status,
+            entity.Priority,
+            entity.OverridesGeneral,
+            entity.EffectiveFrom,
+            entity.EffectiveTo,
+            updatedBy,
+            true,
+            ct);
+        if (affected == 0)
+            return Result<bool>.Failure("Không xóa được quy định. Tải lại trang rồi thử lại.");
+
+        await _repository.AddHistoryAsync(new PolicyRuleHistory
+        {
+            PolicyRuleId = entity.Id,
+            ChangedBy = updatedBy,
+            ChangedByName = actorName ?? "Admin",
+            ChangeSummary = "Xóa quy định",
+            BeforeJson = before
+        }, ct);
+
+        await _unitOfWork.SaveChangesAsync(ct);
+        return Result<bool>.Success(true);
+    }
+
+    private async Task<Result<string>> ResolveCodeAsync(
+        string? requestedCode,
+        PolicyRuleType policyType,
+        Guid? excludeId,
+        CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedCode))
+        {
+            var code = requestedCode.Trim().ToUpperInvariant();
+            if (code.Length > 20 || !code.All(ch => char.IsLetterOrDigit(ch)))
+                return Result<string>.Failure("Mã quy định chỉ gồm chữ và số, tối đa 20 ký tự.");
+            if (await _repository.CodeExistsAsync(code, excludeId, ct))
+                return Result<string>.Failure("Mã quy định đã tồn tại.");
+            return Result<string>.Success(code);
+        }
+
+        var prefix = PolicyRuleKinds.IsRegulation(policyType) ? "QD" : "CS";
+        return Result<string>.Success(await _repository.AllocateNextCodeAsync(prefix, ct));
+    }
+
     private static string? ValidateRequest(UpsertPolicyRuleRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
-            return "Vui lòng nhập tên chính sách.";
+            return "Vui lòng nhập tên quy định.";
         if (!Enum.TryParse<PolicyRuleType>(request.PolicyType, true, out _))
-            return "Loại chính sách không hợp lệ.";
+            return "Loại quy định không hợp lệ.";
         if (!Enum.TryParse<PolicyRuleStatus>(request.Status, true, out _))
             return "Trạng thái không hợp lệ.";
         if (request.EffectiveFrom.HasValue && request.EffectiveTo.HasValue
@@ -236,6 +373,7 @@ public class PolicyRuleService
     private static string SerializeSnapshot(PolicyRule entity) =>
         JsonSerializer.Serialize(new
         {
+            entity.Code,
             entity.Name,
             entity.Description,
             PolicyType = entity.PolicyType.ToString(),
@@ -249,6 +387,7 @@ public class PolicyRuleService
     private static PolicyRuleDetailDto MapDetail(PolicyRule entity) => new()
     {
         Id = entity.Id,
+        Code = entity.Code,
         Name = entity.Name,
         Description = entity.Description,
         PolicyType = entity.PolicyType,
