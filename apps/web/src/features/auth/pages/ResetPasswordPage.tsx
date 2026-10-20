@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowRight, Eye, EyeOff, CheckCircle2, ArrowLeft, Loader2, KeyRound, Mail } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -18,7 +18,6 @@ export const ResetPasswordPage: React.FC = () => {
   const hashToken = new URLSearchParams(window.location.hash.slice(1)).get('access_token');
   const activeToken = tokenFromUrl || hashToken || '';
 
-  const [emailValue, setEmailValue] = useState(emailFromUrl);
   const [otpCode, setOtpCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -29,7 +28,7 @@ export const ResetPasswordPage: React.FC = () => {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<ResetPasswordInput>({
@@ -42,23 +41,13 @@ export const ResetPasswordPage: React.FC = () => {
     },
   });
 
-  const watchPassword = watch('password', '');
+  const emailValue = useWatch({ control, name: 'email', defaultValue: emailFromUrl }) || '';
 
   useEffect(() => {
     if (emailFromUrl) {
       setValue('email', emailFromUrl);
-      setEmailValue(emailFromUrl);
     }
   }, [emailFromUrl, setValue]);
-
-  // Real-time password criteria
-  const passwordCriteria = [
-    { label: 'Tối thiểu 8 ký tự', met: watchPassword.length >= 8 },
-    { label: 'Chữ in hoa (A-Z)', met: /[A-Z]/.test(watchPassword) },
-    { label: 'Chữ thường (a-z)', met: /[a-z]/.test(watchPassword) },
-    { label: 'Chữ số (0-9)', met: /[0-9]/.test(watchPassword) },
-    { label: 'Ký tự đặc biệt (!@#$%...)', met: /[^a-zA-Z0-9]/.test(watchPassword) },
-  ];
 
   const onSubmit = async (data: ResetPasswordInput) => {
     setErrorMessage(null);
@@ -115,32 +104,32 @@ export const ResetPasswordPage: React.FC = () => {
       )}
 
       {isSuccess ? (
-        <div className="space-y-6 pt-4 text-center">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-9 h-9" />
+        <div className="password-reset-success">
+          <div className="password-reset-success-icon">
+            <CheckCircle2 aria-hidden="true" />
           </div>
-          <div>
-            <h3 className="font-bold text-lg text-slate-900">Đặt Lại Mật Khẩu Thành Công!</h3>
-            <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+          <div className="password-reset-success-copy">
+            <h3>Đặt lại mật khẩu thành công</h3>
+            <p>
               Mật khẩu mới của bạn đã được cập nhật an toàn. Đang chuyển hướng bạn đến trang đăng nhập trong giây lát...
             </p>
           </div>
           <button
             type="button"
             onClick={() => navigate('/login')}
-            className="auth-submit w-full flex items-center justify-center gap-2"
+            className="auth-submit password-reset-submit"
           >
             <span>Đăng Nhập Ngay</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       ) : (
-        <form onSubmit={handleSubmit(onSubmit)} className="auth-form">
+        <form onSubmit={handleSubmit(onSubmit)} className="auth-form password-recovery-form">
           {/* Email field if not provided by token link */}
           {!activeToken && (
-            <div className="auth-field">
+            <div className="auth-field password-recovery-field">
               <label htmlFor="reset-email" className="auth-label">
-                Địa chỉ Email
+                Email tài khoản
               </label>
               <div className="relative">
                 <input
@@ -150,11 +139,11 @@ export const ResetPasswordPage: React.FC = () => {
                   {...register('email')}
                   value={emailValue}
                   onChange={(e) => {
-                    setEmailValue(e.target.value);
                     setValue('email', e.target.value);
                   }}
-                  placeholder="example@fpt.edu.vn"
-                  className="auth-input pl-10"
+                  placeholder="name@example.com"
+                  className="auth-input password-recovery-input pl-10"
+                  aria-invalid={Boolean(errors.email)}
                 />
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -166,9 +155,9 @@ export const ResetPasswordPage: React.FC = () => {
 
           {/* OTP field if not using token link */}
           {!activeToken && (
-            <div className="auth-field">
+            <div className="auth-field password-recovery-field">
               <label htmlFor="reset-otp" className="auth-label">
-                Mã xác thực OTP (6 chữ số trong email)
+                Mã xác thực
               </label>
               <div className="relative">
                 <input
@@ -183,11 +172,15 @@ export const ResetPasswordPage: React.FC = () => {
                     setOtpCode(val);
                     setValue('otp', val);
                   }}
-                  placeholder="Ví dụ: 123456"
-                  className="auth-input pl-10 font-mono tracking-widest text-base"
+                  placeholder="Nhập mã 6 chữ số trong email"
+                  className="auth-input password-recovery-input pl-10 font-mono tracking-widest text-base"
+                  aria-describedby="reset-otp-help"
                 />
                 <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
+              <p id="reset-otp-help" className="password-recovery-help">
+                Mã xác thực gồm 6 chữ số, được gửi đến email của bạn.
+              </p>
               {errors.otp && (
                 <p className="text-xs text-rose-600 mt-1">{errors.otp.message}</p>
               )}
@@ -195,7 +188,7 @@ export const ResetPasswordPage: React.FC = () => {
           )}
 
           {/* New Password */}
-          <div className="auth-field">
+          <div className="auth-field password-recovery-field">
             <label htmlFor="reset-password" className="auth-label">
               Mật khẩu mới
             </label>
@@ -205,8 +198,10 @@ export const ResetPasswordPage: React.FC = () => {
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="new-password"
                 {...register('password')}
-                placeholder="Nhập mật khẩu mới an toàn..."
-                className="auth-input"
+                placeholder="Nhập mật khẩu bạn muốn sử dụng"
+                className="auth-input password-recovery-input"
+                aria-invalid={Boolean(errors.password)}
+                aria-describedby="reset-password-help"
               />
               <button
                 type="button"
@@ -221,29 +216,15 @@ export const ResetPasswordPage: React.FC = () => {
               <p className="text-xs text-rose-600 mt-1">{errors.password.message}</p>
             )}
 
-            {/* Password Criteria Checklist */}
-            <div className="grid grid-cols-2 gap-1.5 pt-2">
-              {passwordCriteria.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-1.5 text-[11px]">
-                  <span
-                    className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold ${
-                      item.met ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'
-                    }`}
-                  >
-                    {item.met ? '✓' : '•'}
-                  </span>
-                  <span className={item.met ? 'text-emerald-700 font-medium' : 'text-slate-500'}>
-                    {item.label}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <p id="reset-password-help" className="password-recovery-help">
+              Mật khẩu có thể là bất kỳ nội dung nào bạn muốn. Không bắt buộc chữ hoa, chữ số hay ký tự đặc biệt.
+            </p>
           </div>
 
           {/* Confirm Password */}
-          <div className="auth-field">
+          <div className="auth-field password-recovery-field">
             <label htmlFor="reset-confirm-password" className="auth-label">
-              Xác nhận mật khẩu mới
+              Nhập lại mật khẩu mới
             </label>
             <div className="auth-password-field">
               <input
@@ -251,8 +232,9 @@ export const ResetPasswordPage: React.FC = () => {
                 type={showConfirmPassword ? 'text' : 'password'}
                 autoComplete="new-password"
                 {...register('confirmPassword')}
-                placeholder="Nhập lại mật khẩu mới..."
-                className="auth-input"
+                placeholder="Nhập lại đúng mật khẩu phía trên"
+                className="auth-input password-recovery-input"
+                aria-invalid={Boolean(errors.confirmPassword)}
               />
               <button
                 type="button"
@@ -271,7 +253,7 @@ export const ResetPasswordPage: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="auth-submit w-full flex items-center justify-center gap-2"
+            className="auth-submit password-reset-submit"
           >
             {isLoading ? (
               <>
@@ -286,7 +268,7 @@ export const ResetPasswordPage: React.FC = () => {
             )}
           </button>
 
-          <div className="auth-footer-prompt text-center pt-2">
+          <div className="auth-footer-prompt password-recovery-footer">
             <Link to="/login" className="auth-footer-link inline-flex items-center gap-1.5 font-semibold text-xs">
               <ArrowLeft className="w-3.5 h-3.5" /> Quay lại Đăng nhập
             </Link>

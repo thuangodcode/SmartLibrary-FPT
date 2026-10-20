@@ -67,56 +67,56 @@ export const ForgotPasswordPage: React.FC = () => {
   return (
     <AuthLayout
       variant="design"
-      title="Quên Mật Khẩu"
-      subtitle="Nhập email tài khoản của bạn để nhận liên kết và mã xác thực đặt lại mật khẩu an toàn."
+      title="Khôi phục mật khẩu"
+      subtitle="Nhập email đã đăng ký. Chúng tôi sẽ gửi hướng dẫn để bạn tạo mật khẩu mới."
     >
       {errorMessage && (
-        <div className="auth-error mb-4" role="alert">
+        <div className="auth-error password-recovery-error" role="alert">
           {errorMessage}
         </div>
       )}
 
       {isSubmitted ? (
-        <div className="space-y-6 pt-2">
-          <div className="p-5 rounded-2xl bg-orange-50/70 border border-orange-100 flex items-start gap-3.5">
-            <CheckCircle2 className="w-6 h-6 text-[#df6226] shrink-0 mt-0.5" />
-            <div className="text-xs text-slate-700 leading-relaxed space-y-1">
-              <p className="font-semibold text-slate-900 text-sm">Đã gửi yêu cầu thành công!</p>
-              <p>
-                Hướng dẫn đặt lại mật khẩu và mã OTP xác thực đã được gửi đến:
-              </p>
-              <p className="font-bold text-[#df6226] text-sm break-all">{submittedEmail}</p>
-              <p className="text-[11px] text-slate-500 pt-1">
-                Vui lòng kiểm tra hộp thư đến hoặc mục <strong>Thư rác / Spam</strong>.
+        <div className="password-recovery-success">
+          <div className="password-recovery-success-card">
+            <div className="password-recovery-success-icon">
+              <CheckCircle2 aria-hidden="true" />
+            </div>
+            <div className="password-recovery-success-copy">
+              <h2>Kiểm tra hộp thư của bạn</h2>
+              <p>Hướng dẫn đặt lại mật khẩu và mã xác thực đã được gửi đến:</p>
+              <strong>{submittedEmail}</strong>
+              <p className="password-recovery-help">
+                Nếu chưa thấy email, hãy kiểm tra mục Thư rác (Spam).
               </p>
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="password-recovery-actions">
             <button
               type="button"
               onClick={() => navigate(`/reset-password?email=${encodeURIComponent(submittedEmail)}`)}
-              className="auth-submit w-full flex items-center justify-center gap-2"
+              className="auth-submit password-reset-submit"
             >
-              <span>Nhập Mã OTP Đặt Lại Mật Khẩu</span>
+              <span>Nhập mã xác thực</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
-            <div className="flex items-center justify-between text-xs px-1 pt-1">
+            <div className="password-recovery-secondary-actions">
               <button
                 type="button"
                 onClick={() => setIsSubmitted(false)}
-                className="text-slate-500 hover:text-slate-800 flex items-center gap-1 font-medium transition-colors"
+                className="password-recovery-text-button"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                Đổi email khác
+                Dùng email khác
               </button>
 
               <button
                 type="button"
                 disabled={resendCountdown > 0 || isLoading}
                 onClick={handleResend}
-                className="text-[#df6226] font-semibold hover:underline disabled:text-slate-400 disabled:no-underline flex items-center gap-1 transition-colors"
+                className="password-recovery-text-button password-recovery-resend"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 {resendCountdown > 0 ? `Gửi lại sau (${resendCountdown}s)` : 'Gửi lại email'}
@@ -124,17 +124,17 @@ export const ForgotPasswordPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="auth-footer-prompt text-center pt-3 border-t border-slate-100">
+          <div className="auth-footer-prompt password-recovery-footer">
             <Link to="/login" className="auth-footer-link inline-flex items-center gap-1.5 font-semibold text-xs">
-              <ArrowLeft className="w-3.5 h-3.5" /> Quay lại trang Đăng nhập
+              <ArrowLeft className="w-3.5 h-3.5" /> Quay lại đăng nhập
             </Link>
           </div>
         </div>
       ) : (
-        <form onSubmit={handleSubmit(onSubmit)} className="auth-form">
-          <div className="auth-field">
+        <form onSubmit={handleSubmit(onSubmit)} className="auth-form password-recovery-form">
+          <div className="auth-field password-recovery-field">
             <label htmlFor="forgot-email" className="auth-label">
-              Địa chỉ Email đăng ký tài khoản
+              Email tài khoản
             </label>
             <div className="relative">
               <input
@@ -142,8 +142,9 @@ export const ForgotPasswordPage: React.FC = () => {
                 type="email"
                 autoComplete="email"
                 {...register('email')}
-                placeholder="example@fpt.edu.vn hoặc example@gmail.com"
-                className="auth-input pl-10"
+                placeholder="name@example.com"
+                className="auth-input password-recovery-input pl-10"
+                aria-invalid={Boolean(errors.email)}
               />
               <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -155,7 +156,7 @@ export const ForgotPasswordPage: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="auth-submit w-full flex items-center justify-center gap-2"
+            className="auth-submit password-reset-submit"
           >
             {isLoading ? (
               <>
@@ -164,14 +165,14 @@ export const ForgotPasswordPage: React.FC = () => {
               </>
             ) : (
               <>
-                <span>Gửi Yêu Cầu Khôi Phục</span>
+                <span>Gửi hướng dẫn khôi phục</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
 
-          <div className="auth-footer-prompt text-center pt-2">
-            <span className="text-slate-500 text-xs">Nhớ lại mật khẩu? </span>
+          <div className="auth-footer-prompt password-recovery-footer">
+            <span className="text-slate-500 text-xs">Bạn đã nhớ mật khẩu? </span>
             <Link to="/login" className="auth-footer-link font-semibold text-xs">
               Đăng nhập ngay
             </Link>

@@ -274,8 +274,8 @@ public class AuthOtpService : IAuthOtpService
         string newPassword,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 8)
-            return Result<bool>.Failure("Mật khẩu mới phải có tối thiểu 8 ký tự.");
+        if (string.IsNullOrEmpty(newPassword))
+            return Result<bool>.Failure("Vui lòng nhập mật khẩu mới.");
 
         Guid? targetUserId = null;
         string? targetEmail = null;
