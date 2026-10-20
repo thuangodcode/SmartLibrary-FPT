@@ -77,6 +77,7 @@ export function useHomeData() {
 
       const books: Book[] = rawBooks.map((b, idx) => ({
         id: b.id,
+        categoryId: b.categoryNames?.[0] || 'c1',
         title: b.title,
         author: b.authorNames?.length ? b.authorNames.join(', ') : 'Nhiều tác giả',
         category: b.categoryNames?.[0] || 'Công nghệ thông tin',
@@ -128,4 +129,3 @@ export function useHomeData() {
     staleTime: 1000 * 60 * 5, // Cache 5 phút
   });
 }
-
