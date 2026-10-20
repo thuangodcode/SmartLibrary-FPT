@@ -2,7 +2,7 @@
   position: fixed;
   z-index: 2147483647;
   right: max(20px, env(safe-area-inset-right));
-  bottom: max(20px, env(safe-area-inset-bottom));
+  top: max(20px, env(safe-area-inset-top));
   display: flex;
   width: min(390px, calc(100vw - 32px));
   flex-direction: column;
@@ -139,7 +139,7 @@
 @media (max-width: 600px) {
   .toast-viewport {
     right: 12px;
-    bottom: max(12px, env(safe-area-inset-bottom));
+    top: max(12px, env(safe-area-inset-top));
     width: calc(100vw - 24px);
   }
 }
