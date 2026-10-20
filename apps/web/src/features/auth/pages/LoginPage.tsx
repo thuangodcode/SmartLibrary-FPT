@@ -51,9 +51,14 @@ export const LoginPage: React.FC = () => {
         }),
       });
 
-      const resData = await parseApiResponse<{ success?: boolean; error?: string; data?: { user?: { id?: string; email?: string; fullName?: string; avatarUrl?: string | null; role?: string; status?: string; permissions?: string[] }; accessToken?: string } }>(response);
+      const resData = await parseApiResponse<{ success?: boolean; error?: string; meta?: { code?: string }; data?: { user?: { id?: string; email?: string; fullName?: string; avatarUrl?: string | null; role?: string; status?: string; permissions?: string[] }; accessToken?: string } }>(response);
       if (!response.ok || !resData?.success) {
-        setErrorMessage(resData?.error || 'Email hoặc mật khẩu không đúng. Vui lòng thử lại.');
+        const fallbackMessage = response.status === 503
+          ? 'Dịch vụ đăng nhập đang tạm thời không khả dụng. Vui lòng thử lại sau.'
+          : response.status === 429
+            ? 'Bạn đã thử đăng nhập quá nhiều lần. Vui lòng chờ rồi thử lại.'
+            : 'Email hoặc mật khẩu không đúng. Vui lòng thử lại.';
+        setErrorMessage(resData?.error || fallbackMessage);
         return;
       }
 

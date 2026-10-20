@@ -23,11 +23,12 @@ public class SupabaseAuthService : IIdentityProvider
         _configuration = configuration;
         _logger = logger;
         _supabaseUrl = configuration["Supabase:Url"] ?? "https://placeholder.supabase.co";
-        _anonKey = configuration["Supabase:AnonKey"] ?? "placeholder_key";
+        _anonKey = configuration["Supabase:AnonKey"] ?? string.Empty;
         _connectionString = configuration.GetConnectionString("DefaultConnection") ?? "";
 
         _httpClient.BaseAddress = new Uri($"{_supabaseUrl.TrimEnd('/')}/auth/v1/");
-        _httpClient.DefaultRequestHeaders.Add("apikey", _anonKey);
+        if (!string.IsNullOrWhiteSpace(_anonKey))
+            _httpClient.DefaultRequestHeaders.Add("apikey", _anonKey);
     }
 
     public async Task<(string UserId, bool EmailConfirmed)> RegisterUserAsync(string email, string password, string fullName, string? studentId)
@@ -63,20 +64,34 @@ public class SupabaseAuthService : IIdentityProvider
 
     public async Task<AuthResult> LoginWithEmailPasswordAsync(string email, string password)
     {
-        var cleanEmail = await ResolveLoginEmailAsync(email);
-        if (cleanEmail is null)
-            return InvalidCredentials();
+        if (string.IsNullOrWhiteSpace(_anonKey) || string.IsNullOrWhiteSpace(_connectionString))
+        {
+            _logger.LogError("Login is unavailable because Supabase or database credentials are not configured.");
+            return new AuthResult
+            {
+                IsSuccess = false,
+                ErrorCode = "AUTH_SERVICE_UNAVAILABLE",
+                ErrorMessage = "Dịch vụ đăng nhập chưa được cấu hình đầy đủ. Vui lòng liên hệ quản trị viên."
+            };
+        }
 
         try
         {
+            var cleanEmail = await ResolveLoginEmailAsync(email);
+            if (cleanEmail is null)
+                return InvalidCredentials();
+
             var payload = new { email = cleanEmail, password };
             var response = await _httpClient.PostAsJsonAsync("token?grant_type=password", payload);
             if (response.IsSuccessStatusCode)
             {
                 var tokenRes = await response.Content.ReadFromJsonAsync<SupabaseTokenResponse>();
-                if (tokenRes?.User?.Id is not { Length: > 0 } userId ||
-                    await GetActiveUserRoleAsync(userId) is null)
+                if (tokenRes?.User?.Id is not { Length: > 0 } userId)
                     return InvalidCredentials();
+
+                var accountResult = await CheckLoginEligibilityAsync(userId);
+                if (accountResult is not null)
+                    return accountResult;
 
                 return new AuthResult
                 {
@@ -87,13 +102,26 @@ public class SupabaseAuthService : IIdentityProvider
                     UserId = userId
                 };
             }
-            if ((int)response.StatusCode >= 500 || (int)response.StatusCode == 429)
+            if ((int)response.StatusCode >= 500)
+            {
+                _logger.LogError("Supabase Auth returned HTTP {StatusCode} during sign-in.", (int)response.StatusCode);
                 return new AuthResult
                 {
                     IsSuccess = false,
                     ErrorCode = "AUTH_SERVICE_UNAVAILABLE",
                     ErrorMessage = "Dịch vụ xác thực đang tạm thời không khả dụng. Vui lòng thử lại."
                 };
+            }
+            if ((int)response.StatusCode == 429)
+            {
+                _logger.LogWarning("Supabase Auth rate-limited a sign-in request.");
+                return new AuthResult
+                {
+                    IsSuccess = false,
+                    ErrorCode = "AUTH_RATE_LIMITED",
+                    ErrorMessage = "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng chờ rồi thử lại."
+                };
+            }
         }
         catch (HttpRequestException ex)
         {
@@ -105,8 +133,92 @@ public class SupabaseAuthService : IIdentityProvider
                 ErrorMessage = "Không thể kết nối đến dịch vụ xác thực Supabase."
             };
         }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogError(ex, "Supabase Auth request timed out while signing in.");
+            return new AuthResult
+            {
+                IsSuccess = false,
+                ErrorCode = "AUTH_SERVICE_UNAVAILABLE",
+                ErrorMessage = "Dịch vụ xác thực phản hồi quá thời gian chờ. Vui lòng thử lại."
+            };
+        }
+        catch (NpgsqlException ex)
+        {
+            _logger.LogError(ex, "Could not check the application profile while signing in.");
+            return new AuthResult
+            {
+                IsSuccess = false,
+                ErrorCode = "AUTH_PROFILE_SERVICE_UNAVAILABLE",
+                ErrorMessage = "Không thể kiểm tra hồ sơ tài khoản lúc này. Vui lòng thử lại."
+            };
+        }
 
         return InvalidCredentials();
+    }
+
+    private async Task<AuthResult?> CheckLoginEligibilityAsync(string userId)
+    {
+        if (!Guid.TryParse(userId, out var uid))
+            return InvalidCredentials();
+
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand(@"
+            SELECT p.status::text, p.is_active, p.is_deleted, r.name
+            FROM profiles p
+            LEFT JOIN roles r ON r.id = p.role_id
+            WHERE p.id = @uid
+            LIMIT 1;", conn);
+        cmd.Parameters.AddWithValue("uid", uid);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            return new AuthResult
+            {
+                IsSuccess = false,
+                ErrorCode = "AUTH_PROFILE_MISSING",
+                ErrorMessage = "Tài khoản xác thực đã tồn tại nhưng chưa có hồ sơ thư viện. Vui lòng liên hệ quản trị viên."
+            };
+        }
+
+        var status = reader.IsDBNull(0) ? null : reader.GetString(0);
+        var isActive = !reader.IsDBNull(1) && reader.GetBoolean(1);
+        var isDeleted = !reader.IsDBNull(2) && reader.GetBoolean(2);
+        var role = reader.IsDBNull(3) ? null : reader.GetString(3);
+
+        if (!isActive || isDeleted || string.Equals(status, "Suspended", StringComparison.OrdinalIgnoreCase))
+        {
+            return new AuthResult
+            {
+                IsSuccess = false,
+                ErrorCode = "AUTH_ACCOUNT_SUSPENDED",
+                ErrorMessage = "Tài khoản đã bị tạm ngưng hoặc vô hiệu hóa. Vui lòng liên hệ quản trị viên."
+            };
+        }
+
+        if (!string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase))
+        {
+            return new AuthResult
+            {
+                IsSuccess = false,
+                ErrorCode = "AUTH_ACCOUNT_NOT_ACTIVE",
+                ErrorMessage = "Tài khoản chưa được kích hoạt. Vui lòng xác minh thông tin hoặc liên hệ quản trị viên."
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(role))
+        {
+            return new AuthResult
+            {
+                IsSuccess = false,
+                ErrorCode = "AUTH_ROLE_MISSING",
+                ErrorMessage = "Tài khoản chưa được cấp vai trò truy cập. Vui lòng liên hệ quản trị viên."
+            };
+        }
+
+        return null;
     }
 
     private static AuthResult InvalidCredentials() => new()

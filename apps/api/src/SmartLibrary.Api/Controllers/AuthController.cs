@@ -53,9 +53,15 @@ public class AuthController : ControllerBase
         if (!result.IsSuccess)
         {
             if (result.ErrorCode == "AUTH_SERVICE_UNAVAILABLE")
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse<object>.Fail(result.ErrorMessage ?? "Dịch vụ xác thực tạm thời không khả dụng."));
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, AuthFailure(result));
+            if (result.ErrorCode == "AUTH_PROFILE_SERVICE_UNAVAILABLE")
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, AuthFailure(result));
+            if (result.ErrorCode == "AUTH_RATE_LIMITED")
+                return StatusCode(StatusCodes.Status429TooManyRequests, AuthFailure(result));
+            if (result.ErrorCode is "AUTH_PROFILE_MISSING" or "AUTH_ACCOUNT_NOT_ACTIVE" or "AUTH_ACCOUNT_SUSPENDED" or "AUTH_ROLE_MISSING")
+                return StatusCode(StatusCodes.Status403Forbidden, AuthFailure(result));
 
-            return Unauthorized(ApiResponse<object>.Fail(result.ErrorMessage ?? "Đăng nhập thất bại."));
+            return Unauthorized(AuthFailure(result));
         }
 
         var isMobile = Request.Headers["X-Client-Type"] == "mobile";
@@ -77,7 +83,15 @@ public class AuthController : ControllerBase
             userProfile = await _identityProvider.GetUserProfileWithPermissionsAsync(result.UserId);
         }
         if (userProfile is null)
-            return Unauthorized(ApiResponse<object>.Fail("Tài khoản không hoạt động hoặc chưa được cấp quyền truy cập."));
+        {
+            _logger.LogError("Authentication succeeded for user {UserId}, but the application profile could not be loaded.", result.UserId);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new ApiResponse<object>
+            {
+                Success = false,
+                Error = "Đã xác thực được tài khoản nhưng tạm thời không đọc được hồ sơ thư viện. Vui lòng thử lại.",
+                Meta = new { code = "AUTH_PROFILE_SERVICE_UNAVAILABLE" }
+            });
+        }
 
         var responseData = new
         {
@@ -89,6 +103,14 @@ public class AuthController : ControllerBase
 
         return Ok(ApiResponse<object>.Ok(responseData));
     }
+
+    private static ApiResponse<object> AuthFailure(AuthResult result) =>
+        new()
+        {
+            Success = false,
+            Error = result.ErrorMessage ?? "Đăng nhập thất bại.",
+            Meta = new { code = result.ErrorCode }
+        };
 
     [Authorize]
     [HttpGet("me")]

@@ -107,9 +107,20 @@ supabase db reset   # Apply migrations + seed data
 | `ConnectionStrings__DefaultConnection` | PostgreSQL connection string | API |
 | `Jwt__Secret` | JWT signing secret (Supabase) | API |
 | `Supabase__Url` | Supabase URL | API |
+| `Supabase__AnonKey` | Supabase anon key | API |
 | `Supabase__ServiceRoleKey` | Supabase service role key | API |
+| `Resend__ApiKey` | Resend email API key | API |
+| `Smtp__Username`, `Smtp__Password` | SMTP account credentials | API |
+| `Smtp__FromAddress` | Sender email address | API |
+| `Cloudinary__CloudName`, `Cloudinary__ApiKey`, `Cloudinary__ApiSecret` | Cloudinary credentials | API |
 
 > ⚠️ **Không commit file `.env`!** Chỉ commit `.env.example`.
+> Backend đọc biến môi trường hoặc .NET User Secrets trong môi trường Development. Ví dụ:
+> `dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<connection-string>" --project apps/api/src/SmartLibrary.Api`
+> và cấu hình các key còn lại theo cùng cách, ví dụ `dotnet user-secrets set "Supabase:ServiceRoleKey" "<key>" --project apps/api/src/SmartLibrary.Api`.
+> Các tài khoản/khóa từng xuất hiện trong file cấu hình hoặc ảnh chụp cần được đổi/thu hồi tại nhà cung cấp; xóa khỏi file hiện tại không thu hồi các khóa đó hay xóa chúng khỏi lịch sử Git.
+
+Tài khoản Supabase Auth cũng cần hồ sơ trong `public.profiles` với trạng thái `Active`, cờ `is_active = true`, chưa bị xóa và có role. Tài khoản thiếu hồ sơ được backfill bởi migration nhưng giữ trạng thái chờ kích hoạt; quản trị viên vẫn cần phê duyệt/kích hoạt theo quy trình.
 
 ## 👥 Vai trò người dùng
 
