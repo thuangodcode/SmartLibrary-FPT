@@ -1,568 +1,129 @@
-import { useMemo, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import {
-  ArrowRight,
-  Atom,
-  BookOpen,
-  BrainCircuit,
-  Check,
-  ChevronRight,
-  Clock3,
-  Code2,
-  GraduationCap,
-  Languages,
-  LibraryBig,
-  LogOut,
-  MapPin,
-  Menu,
-  Palette,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  TrendingUp,
-  Users,
-  Wifi,
-  X,
-} from 'lucide-react';
+import { useMemo, useRef, useState, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowDown, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Clock3, LogOut, MapPin, Menu, Search, ShieldCheck, X } from 'lucide-react';
 import smartLibraryLogo from '../../../assets/figma/smartlibrary-logo.png';
+import campusPhoto from '../../../assets/figma/HCM-Campus.jpg';
+import libraryPhoto from '../../../assets/figma/home-library.png';
 import bookCoverOne from '../../../assets/figma/home-book-1.png';
 import bookCoverTwo from '../../../assets/figma/home-book-2.png';
 import bookCoverThree from '../../../assets/figma/home-book-3.png';
 import bookCoverFour from '../../../assets/figma/home-book-4.png';
-import libraryPhoto from '../../../assets/figma/home-library.png';
+import cantHurtMeCover from "../../../assets/figma/Can'tHurtMe.jpg";
+import powerLawsCover from '../../../assets/figma/48PowerOfLaws.webp';
+import meditationsCover from '../../../assets/figma/MeditationMarcusAurelius.webp';
+import pragmaticProgrammerCover from '../../../assets/figma/ThePragmaticProgrammer.jpg';
+import republicCover from '../../../assets/figma/TheRepublicPlato.webp';
 import { useAuthStore } from '../../auth/store/useAuthStore';
-import { useToast } from '../../../components/ui/useToast';
+import { MOCK_BOOKS, MOCK_CATEGORIES, MOCK_FAQS, MOCK_NEWS, MOCK_SERVICES } from '../mock';
 import './HomePage.css';
 
-const categories = [
-  {
-    name: 'Công nghệ thông tin',
-    description: 'Lập trình, hệ thống, phần mềm và bảo mật.',
-    count: '3.450',
-    Icon: Code2,
-  },
-  {
-    name: 'Kinh tế & Quản trị',
-    description: 'Kinh doanh, marketing, tài chính và khởi nghiệp.',
-    count: '2.150',
-    Icon: TrendingUp,
-  },
-  {
-    name: 'Khoa học dữ liệu & AI',
-    description: 'Big Data, Machine Learning và thống kê ứng dụng.',
-    count: '1.890',
-    Icon: BrainCircuit,
-  },
-  {
-    name: 'Ngoại ngữ & Nhật - Anh',
-    description: 'Giáo trình JLPT, IELTS và tiếng Anh chuyên ngành.',
-    count: '1.450',
-    Icon: Languages,
-  },
-  {
-    name: 'Khoa học & Kỹ thuật',
-    description: 'Tài liệu khoa học, kỹ thuật và nghiên cứu chuyên sâu.',
-    count: '1.200',
-    Icon: Atom,
-  },
-  {
-    name: 'Kỹ năng mềm & Thiết kế',
-    description: 'UI/UX, giao tiếp, lãnh đạo và làm việc nhóm.',
-    count: '980',
-    Icon: Palette,
-  },
-];
-
-const featuredBooks = [
-  {
-    title: 'Deep Learning with Python',
-    author: 'François Chollet',
-    code: 'CS-402',
-    category: 'Khoa học dữ liệu & AI',
-    location: 'Tầng 2 · Kệ A3',
-    availability: 'Còn 5 bản sẵn sàng',
-    cover: bookCoverOne,
-  },
-  {
-    title: 'Clean Architecture',
-    author: 'Robert C. Martin',
-    code: 'SE-301',
-    category: 'Công nghệ thông tin',
-    location: 'Tầng 2 · Kệ B1',
-    availability: 'Còn 3 bản sẵn sàng',
-    cover: bookCoverTwo,
-  },
-  {
-    title: 'Designing Data-Intensive Applications',
-    author: 'Martin Kleppmann',
-    code: 'CS-315',
-    category: 'Công nghệ thông tin',
-    location: 'Tầng 3 · Kệ C2',
-    availability: 'Còn 2 bản sẵn sàng',
-    cover: bookCoverThree,
-  },
-  {
-    title: 'Modern Microeconomics',
-    author: 'N. Gregory Mankiw',
-    code: 'EC-204',
-    category: 'Kinh tế & Quản trị',
-    location: 'Tầng 1 · Kệ D4',
-    availability: 'Còn 6 bản sẵn sàng',
-    cover: bookCoverFour,
-  },
-];
-
-const popularSearches = [
-  'Công nghệ thông tin',
-  'Khoa học dữ liệu & AI',
-  'Kinh tế & Quản trị',
-  'Ngoại ngữ & Nhật - Anh',
-];
+const bookCovers = [bookCoverOne, bookCoverTwo, bookCoverThree, bookCoverFour];
+const specialBookCovers: Record<string, string> = {
+  b11: cantHurtMeCover,
+  b12: powerLawsCover,
+  b13: meditationsCover,
+  b14: pragmaticProgrammerCover,
+  b15: republicCover,
+};
+const quickSearches = ['React', 'Trí tuệ nhân tạo', 'Kỹ năng mềm'];
 
 export const HomePage = () => {
+  const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const categoryRailRef = useRef<HTMLDivElement>(null);
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const logout = useAuthStore((state) => state.logout);
 
-  const user = useAuthStore((s) => s.user);
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const logout = useAuthStore((s) => s.logout);
-  const { showToast } = useToast();
-
-  const handleLogout = () => {
-    logout();
-    showToast({ type: 'success', title: 'Đăng xuất thành công', message: 'Bạn đã đăng xuất khỏi SmartLibrary.' });
-  };
-
+  const totalBooks = useMemo(() => MOCK_CATEGORIES.reduce((total, category) => total + category.bookCount, 0), []);
   const visibleBooks = useMemo(() => {
     const query = appliedSearch.trim().toLocaleLowerCase('vi');
-    return featuredBooks.filter((book) => {
-      const matchesSearch =
-        !query ||
-        `${book.title} ${book.author} ${book.code} ${book.category}`
-          .toLocaleLowerCase('vi')
-          .includes(query);
-      const matchesCategory =
-        !activeCategory ||
-        book.category.toLocaleLowerCase('vi') === activeCategory.toLocaleLowerCase('vi');
-      return matchesSearch && matchesCategory;
+    return MOCK_BOOKS.filter((book) => {
+      const searchable = [book.title, book.author, book.category, book.isbn, book.description, book.publisher].join(' ').toLocaleLowerCase('vi');
+      return (!query || searchable.includes(query)) && (!activeCategory || book.categoryId === activeCategory);
     });
   }, [activeCategory, appliedSearch]);
 
-  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setActiveCategory('');
-    setAppliedSearch(searchInput);
-    document.getElementById('featured-books')?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const chooseSearch = (value: string) => {
-    setSearchInput(value);
-    setActiveCategory('');
-    setAppliedSearch(value);
-    document.getElementById('featured-books')?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToBooks = () => window.setTimeout(() => document.getElementById('books')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 20);
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setActiveCategory(''); setAppliedSearch(searchInput); scrollToBooks(); };
+  const applyQuickSearch = (value: string) => { setSearchInput(value); setAppliedSearch(value); setActiveCategory(''); scrollToBooks(); };
+  const selectCategory = (categoryId: string) => { setActiveCategory((current) => current === categoryId ? '' : categoryId); setAppliedSearch(''); setSearchInput(''); scrollToBooks(); };
+  const scrollCategoryRail = (direction: -1 | 1) => categoryRailRef.current?.scrollBy({ left: direction * 340, behavior: 'smooth' });
+  const clearFilters = () => { setSearchInput(''); setAppliedSearch(''); setActiveCategory(''); };
+  const closeMenu = () => setIsMenuOpen(false);
+  const cta = isAuthenticated && user
+    ? user.role === 'Admin' ? { label: 'Mở trang quản trị', to: '/admin' }
+      : user.role === 'Librarian' ? { label: 'Mở bàn thủ thư', to: '/librarian' }
+        : { label: 'Khám phá tủ sách', to: '#books' }
+    : { label: 'Bắt đầu với SmartLibrary', to: '/register' };
 
   return (
-    <div className="public-home">
-      <header className="public-header">
-        <div className="public-header-inner">
-          <Link to="/" className="public-brand" aria-label="SmartLibrary - Trang chủ">
-            <img src={smartLibraryLogo} alt="SmartLibrary" />
-            <span>FPT UNIVERSITY HCMC</span>
-          </Link>
-
-          <button
-            type="button"
-            className="public-menu-toggle"
-            onClick={() => setIsMenuOpen((open) => !open)}
-            aria-label={isMenuOpen ? 'Đóng menu' : 'Mở menu'}
-            aria-expanded={isMenuOpen}
-          >
-            {isMenuOpen ? <X size={21} /> : <Menu size={21} />}
-          </button>
-
-          <nav className={`public-nav${isMenuOpen ? ' is-open' : ''}`} aria-label="Điều hướng chính">
-            <a href="#top" onClick={() => setIsMenuOpen(false)}>Trang chủ</a>
-            <a href="#categories" onClick={() => setIsMenuOpen(false)}>Thể loại</a>
-            <a href="#featured-books" onClick={() => setIsMenuOpen(false)}>Sách nổi bật</a>
-            <a href="#library" onClick={() => setIsMenuOpen(false)}>Thư viện</a>
-
-            {isAuthenticated && user ? (
-              <div className="public-nav-user">
-                {user.role === 'Admin' && (
-                  <Link to="/admin" className="public-portal-btn admin-portal" onClick={() => setIsMenuOpen(false)}>
-                    <ShieldCheck size={14} />
-                    <span>Quản trị</span>
-                  </Link>
-                )}
-                {user.role === 'Librarian' && (
-                  <Link to="/librarian" className="public-portal-btn librarian-portal" onClick={() => setIsMenuOpen(false)}>
-                    <BookOpen size={14} />
-                    <span>Thủ thư</span>
-                  </Link>
-                )}
-                <div className="public-user-chip">
-                  <div className="public-user-avatar">
-                    {user.avatarUrl ? (
-                      <img src={user.avatarUrl} alt={user.fullName} />
-                    ) : (
-                      <span>{user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}</span>
-                    )}
-                  </div>
-                  <div className="public-user-info">
-                    <span className="public-user-name">{user.fullName || user.email}</span>
-                    <span className="public-user-role">
-                      {user.role === 'Admin' ? 'Admin' : user.role === 'Librarian' ? 'Thủ thư' : 'Độc giả'}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="public-logout-btn"
-                  onClick={() => {
-                    handleLogout();
-                    setIsMenuOpen(false);
-                  }}
-                  title="Đăng xuất"
-                >
-                  <LogOut size={14} />
-                  <span>Đăng xuất</span>
-                </button>
-              </div>
-            ) : (
-              <div className="public-nav-auth">
-                <Link to="/login" onClick={() => setIsMenuOpen(false)}>Đăng nhập</Link>
-                <Link to="/register" className="public-nav-register" onClick={() => setIsMenuOpen(false)}>
-                  Đăng ký
-                </Link>
-              </div>
-            )}
+    <div className="annual-home">
+      <header className="annual-header">
+        <div className="annual-frame annual-header-inner">
+          <Link to="/" className="annual-brand" aria-label="SmartLibrary - Trang chủ"><img src={smartLibraryLogo} alt="SmartLibrary" /><span>FPT UNIVERSITY HCMC</span></Link>
+          <button type="button" className="annual-menu-toggle" aria-expanded={isMenuOpen} aria-label={isMenuOpen ? 'Đóng menu' : 'Mở menu'} onClick={() => setIsMenuOpen((open) => !open)}>{isMenuOpen ? <X /> : <Menu />}</button>
+          <nav className={`annual-nav${isMenuOpen ? ' is-open' : ''}`} aria-label="Điều hướng chính">
+            <a href="#categories" onClick={closeMenu}>Danh mục</a><a href="#books" onClick={closeMenu}>Tủ sách</a><a href="#services" onClick={closeMenu}>Dịch vụ</a><a href="#library" onClick={closeMenu}>Thư viện</a>
+            {isAuthenticated && user ? <div className="annual-account">
+              {user.role === 'Admin' && <Link to="/admin" onClick={closeMenu}><ShieldCheck size={16} /> Quản trị</Link>}
+              {user.role === 'Librarian' && <Link to="/librarian" onClick={closeMenu}><BookOpen size={16} /> Thủ thư</Link>}
+              <span className="annual-user-name">{user.fullName || user.email}</span>
+              <button type="button" onClick={() => { logout(); closeMenu(); }}><LogOut size={16} /> Đăng xuất</button>
+            </div> : <div className="annual-auth"><Link to="/login" onClick={closeMenu}>Đăng nhập</Link><Link to="/register" className="annual-action" onClick={closeMenu}>Đăng ký</Link></div>}
           </nav>
         </div>
       </header>
 
       <main>
-        <section className="public-hero" id="top">
-          <div className="public-hero-grid" aria-hidden="true" />
-          <div className="public-container public-hero-content">
-            <div className="public-badge">
-              <Sparkles size={14} />
-              <span>SMARTLIBRARY · FPT UNIVERSITY HCMC</span>
+        <section className="annual-hero" id="top">
+          <div className="annual-frame annual-hero-copy">
+            <div className="annual-hero-side"><p>Thư viện học thuật dành cho cộng đồng FPT University tại TP. Hồ Chí Minh.</p><a href="#categories" className="annual-inline-link">Bắt đầu khám phá <ArrowDown size={18} /></a></div>
+            <h1 aria-label="Tri thức, theo cách của bạn"><span>Tri thức,</span><span>theo cách của bạn.</span></h1>
+          </div>
+          <div className="annual-hero-media">
+            <img src={campusPhoto} alt="Khuôn viên xanh của FPT University TP. Hồ Chí Minh" />
+            <div className="annual-frame annual-search-dock">
+              <form className="annual-search" onSubmit={submitSearch} role="search"><Search size={22} aria-hidden="true" /><label className="sr-only" htmlFor="annual-book-search">Tìm sách</label><input id="annual-book-search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Tên sách, tác giả, ISBN hoặc điều bạn muốn học" /><button type="submit">Tìm trong thư viện</button></form>
+              <div className="annual-search-suggestions" aria-label="Gợi ý tìm kiếm"><span>Thử tìm:</span>{quickSearches.map((term) => <button type="button" key={term} onClick={() => applyQuickSearch(term)}>{term}</button>)}</div>
             </div>
-            <h1>Khám phá tri thức, theo cách của bạn.</h1>
-            <p className="public-hero-copy">
-              Tìm kiếm sách và khám phá những gợi ý phù hợp với hành trình học tập và nghiên cứu
-              của bạn tại Đại học FPT TP.HCM.
-            </p>
-            <form className="public-search" onSubmit={submitSearch} role="search">
-              <Search size={19} aria-hidden="true" />
-              <input
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Nhập tên sách, tác giả hoặc chủ đề học thuật..."
-                aria-label="Tìm sách, tác giả hoặc chủ đề"
-              />
-              <button type="submit">Tìm kiếm</button>
-            </form>
-            <div className="public-popular-searches" aria-label="Tìm kiếm phổ biến">
-              <span>Tìm kiếm phổ biến:</span>
-              {popularSearches.map((term) => (
-                <button key={term} type="button" onClick={() => chooseSearch(term)}>
-                  {term}
-                </button>
-              ))}
-            </div>
-            <div className="public-metrics">
-              <div>
-                <BookOpen size={18} />
-                <strong>13.500+</strong>
-                <span>Tài liệu học thuật</span>
-              </div>
-              <div>
-                <Check size={18} />
-                <strong>98,6%</strong>
-                <span>Tài liệu luôn sẵn sàng</span>
-              </div>
-              <div>
-                <GraduationCap size={20} />
-                <strong>100%</strong>
-                <span>Chuẩn FPT University</span>
-              </div>
-            </div>
+            <div className="annual-hero-stat"><strong>{totalBooks.toLocaleString('vi-VN')}+</strong><span>đầu sách đang chờ được mở</span></div>
           </div>
         </section>
 
-        <section className="public-section public-categories" id="categories">
-          <div className="public-container">
-            <div className="public-section-heading">
-              <div>
-                <span className="public-eyebrow">PHÂN HỆ HỌC THUẬT</span>
-                <h2>Danh mục nổi bật</h2>
-                <p>Khám phá tài liệu đa ngành chuẩn quốc tế theo khung chương trình FPT University.</p>
-              </div>
-              <a href="#featured-books" className="public-text-link">
-                Xem tất cả danh mục <ArrowRight size={15} />
-              </a>
-            </div>
-            <div className="public-category-grid">
-              {categories.map(({ name, description, count, Icon }) => (
-                <button
-                  key={name}
-                  type="button"
-                  className={`public-category-card${activeCategory === name ? ' is-active' : ''}`}
-                  onClick={() => {
-                    setActiveCategory(activeCategory === name ? '' : name);
-                    setAppliedSearch('');
-                    setSearchInput('');
-                    document.getElementById('featured-books')?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                >
-                  <span className="public-icon-box"><Icon size={22} strokeWidth={1.7} /></span>
-                  <strong>{name}</strong>
-                  <span className="public-category-description">{description}</span>
-                  <span className="public-category-meta">
-                    <span>{count} cuốn</span>
-                    <ChevronRight size={15} />
-                  </span>
-                </button>
-              ))}
-            </div>
+        <section className="annual-section annual-categories" id="categories">
+          <div className="annual-frame annual-directory-layout">
+            <div className="annual-directory-intro"><h2>Bạn muốn bắt đầu từ đâu?</h2><p>Tám lối vào cho tám kiểu tò mò. Chọn một lĩnh vực để mở đúng ngăn sách bạn cần.</p><div className="annual-directory-art" aria-label="Tuyển tập sách từ nhiều lĩnh vực"><div className="annual-art-field"><span>Đọc rộng hơn ngành học của bạn.</span></div><img className="annual-art-book art-book-one" src={meditationsCover} alt="Bìa sách Meditations" /><img className="annual-art-book art-book-two" src={pragmaticProgrammerCover} alt="Bìa sách The Pragmatic Programmer" /><img className="annual-art-book art-book-three" src={republicCover} alt="Bìa sách The Republic" /></div></div>
+            <div className="annual-directory">{MOCK_CATEGORIES.map((category) => <button type="button" key={category.id} className={activeCategory === category.id ? 'is-active' : ''} onClick={() => selectCategory(category.id)}><span className="annual-directory-name">{category.name}</span><span className="annual-directory-description">{category.description}</span><span className="annual-directory-count">{category.bookCount.toLocaleString('vi-VN')} cuốn</span><ArrowRight aria-hidden="true" /></button>)}</div>
           </div>
         </section>
 
-        <section className="public-section public-featured" id="featured-books">
-          <div className="public-container">
-            <div className="public-section-heading public-featured-heading">
-              <div>
-                <span className="public-eyebrow">TỦ SÁCH ĐƯỢC QUAN TÂM</span>
-                <h2>Sách được quan tâm nhiều nhất</h2>
-                <p>Tuyển chọn tài liệu nổi bật từ cộng đồng học thuật FPT University.</p>
-              </div>
-              <div className="public-book-filters" aria-label="Lọc sách">
-                <button
-                  type="button"
-                  className={!activeCategory ? 'is-active' : ''}
-                  onClick={() => setActiveCategory('')}
-                >
-                  Tất cả
-                </button>
-                <button type="button" onClick={() => chooseSearch('data')}>Data</button>
-                <button type="button" onClick={() => chooseSearch('learning')}>AI &amp; Dữ liệu</button>
-              </div>
-            </div>
-            {(appliedSearch || activeCategory) && (
-              <div className="public-results-note">
-                {visibleBooks.length} kết quả
-                {appliedSearch && <> cho “{appliedSearch}”</>}
-                {activeCategory && <> trong “{activeCategory}”</>}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAppliedSearch('');
-                    setSearchInput('');
-                    setActiveCategory('');
-                  }}
-                >
-                  Xóa bộ lọc
-                </button>
-              </div>
-            )}
-            {visibleBooks.length > 0 ? (
-              <div className="public-book-grid">
-                {visibleBooks.map((book, index) => (
-                  <article className="public-book-card" key={book.code}>
-                    <div className="public-book-cover">
-                      <img src={book.cover} alt={`Bìa sách ${book.title}`} />
-                      {index === 0 && <span className="public-book-badge">Nổi bật</span>}
-                      <span className="public-book-code">{book.code}</span>
-                    </div>
-                    <div className="public-book-info">
-                      <h3>{book.title}</h3>
-                      <p>{book.author}</p>
-                      <div className="public-book-availability">
-                        <span><i />{book.availability}</span>
-                        <small>{book.location}</small>
-                      </div>
-                      <Link to="/login" className="public-book-action">
-                        Xem chi tiết <ArrowRight size={15} />
-                      </Link>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="public-empty-results">
-                Không tìm thấy sách phù hợp. Hãy thử tên sách, tác giả hoặc chủ đề khác.
-              </div>
-            )}
+        <section className="annual-section annual-books" id="books">
+          <div className="annual-frame">
+            <div className="annual-section-head annual-books-head"><h2>Đang được đọc tại FPT.</h2><div className="annual-book-filter-shell"><button type="button" className="annual-rail-arrow" onClick={() => scrollCategoryRail(-1)} aria-label="Xem danh mục phía trước"><ChevronLeft /></button><div className="annual-book-controls" ref={categoryRailRef}><button type="button" className={!activeCategory ? 'is-active' : ''} onClick={clearFilters}>Tất cả</button>{MOCK_CATEGORIES.map((category) => <button type="button" key={category.id} className={activeCategory === category.id ? 'is-active' : ''} onClick={(event) => { selectCategory(category.id); event.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); }}>{category.name}</button>)}</div><button type="button" className="annual-rail-arrow" onClick={() => scrollCategoryRail(1)} aria-label="Xem thêm danh mục"><ChevronRight /></button></div></div>
+            {(appliedSearch || activeCategory) && <div className="annual-result-note"><span>{visibleBooks.length} kết quả {appliedSearch ? `cho “${appliedSearch}”` : `trong “${MOCK_CATEGORIES.find((category) => category.id === activeCategory)?.name || activeCategory}”`}</span><button type="button" onClick={clearFilters}>Xóa bộ lọc</button></div>}
+            {visibleBooks.length ? <div className="annual-book-stage">{visibleBooks.map((book, index) => <article className="annual-book" key={book.id}><div className="annual-book-image"><img src={specialBookCovers[book.id] || bookCovers[index % bookCovers.length]} alt={`Bìa sách ${book.title}`} /></div><div className="annual-book-copy"><span>{book.category}</span><h3>{book.title}</h3><p>{book.author}</p><div className="annual-book-meta"><span>{book.availableCopies > 0 ? `${book.availableCopies} bản có sẵn` : 'Đang chờ trả'}</span><span>{book.publishYear}</span></div></div></article>)}</div> : <div className="annual-empty"><h3>Danh mục này chưa có sách.</h3><p>Kho mock hiện chưa có tài liệu phù hợp. Bạn có thể chọn một danh mục khác hoặc xem toàn bộ tủ sách.</p><button type="button" onClick={clearFilters}>Xem toàn bộ sách</button></div>}
           </div>
         </section>
 
-        <section className="public-ai-section">
-          <div className="public-container public-ai-layout">
-            <div className="public-ai-intro">
-              <span className="public-eyebrow">TRỢ LÝ HỌC THUẬT</span>
-              <h2>Tìm sách phù hợp với bạn cùng AI.</h2>
-              <p>
-                Mô tả điều bạn muốn học. SmartLibrary giúp bạn khám phá tài liệu liên quan,
-                kể cả khi bạn chưa biết chính xác tên sách.
-              </p>
-              <Link to="/login" className="public-button public-button-orange">
-                Khám phá cùng AI <ArrowRight size={16} />
-              </Link>
-            </div>
-            <div className="public-ai-cards">
-              <article>
-                <span><Search size={19} /></span>
-                <h3>Tìm kiếm theo ý tưởng</h3>
-                <p>Diễn đạt nhu cầu bằng ngôn ngữ tự nhiên và nhận gợi ý có liên quan.</p>
-              </article>
-              <article>
-                <span><Sparkles size={19} /></span>
-                <h3>Gợi ý cá nhân hóa</h3>
-                <p>Khám phá tài liệu phù hợp với chuyên ngành và mục tiêu học tập của bạn.</p>
-              </article>
-              <article>
-                <span><LibraryBig size={19} /></span>
-                <h3>Nguồn học thuật tin cậy</h3>
-                <p>Tập trung vào giáo trình, sách chuyên ngành và tài nguyên của thư viện.</p>
-              </article>
-            </div>
-          </div>
+        <section className="annual-section annual-services" id="services"><div className="annual-frame"><div className="annual-services-head"><h2>Các dịch vụ dành cho bạn.</h2><p>Mọi thao tác thường ngày với thư viện được gom lại trong một lối đi ngắn, rõ ràng và dễ sử dụng.</p></div><div className="annual-service-mosaic"><div className="annual-service-note"><strong>Mượn. Gia hạn. Theo dõi.</strong><span>Ba việc cần thiết, ngay tại một nơi.</span></div>{MOCK_SERVICES.map((service, index) => <button type="button" key={service.id} className={`annual-service service-${index + 1}`} onClick={() => navigate(service.route)}><span>{service.badge || 'Dành cho bạn'}</span><strong>{service.title}</strong><p>{service.description}</p><ArrowRight aria-hidden="true" /></button>)}</div></div></section>
+
+        <section className="annual-section annual-library" id="library">
+          <div className="annual-library-image"><img src={libraryPhoto} alt="Không gian học tập trong thư viện FPT University" /><span>SmartLibrary · FPT University HCMC</span></div>
+          <div className="annual-library-field"><div><h2>Một nơi để đọc, làm việc và ở lại với ý tưởng.</h2><p>Không gian học tập mở cho những giờ tự học, nghiên cứu và làm đồ án cùng nhau.</p></div><dl><div><dt><Clock3 size={20} /> Thứ Hai – Thứ Sáu</dt><dd>07:00 – 19:00</dd></div><div><dt><Clock3 size={20} /> Thứ Bảy</dt><dd>07:00 – 17:00</dd></div><div><dt><Clock3 size={20} /> Chủ Nhật</dt><dd>Không phục vụ</dd></div><div><dt><MapPin size={20} /> Địa điểm</dt><dd>Tòa Alpha, Khu Công nghệ cao, TP. Thủ Đức</dd></div></dl><p className="annual-facilities">Wi-Fi 6 miễn phí · Máy tính tra cứu · Không gian đọc · Khu tự học</p></div>
         </section>
 
-        <section className="public-section public-library" id="library">
-          <div className="public-container public-library-layout">
-            <div className="public-library-copy">
-              <span className="public-eyebrow">KHÔNG GIAN HỌC TẬP &amp; NGHIÊN CỨU HIỆN ĐẠI</span>
-              <h2>Tiếp cận tri thức, ở bất kỳ đâu.</h2>
-              <p>
-                SmartLibrary kết nối nguồn tài liệu số với không gian học tập tại FPT University,
-                để việc tìm kiếm, đọc và nghiên cứu luôn liền mạch.
-              </p>
-              <div className="public-library-stats">
-                <div><strong>24/7</strong><span>Truy cập thư viện số</span></div>
-                <div><strong>1.200+</strong><span>Chỗ ngồi học tập</span></div>
-                <div><strong>100%</strong><span>Kết nối Wi-Fi</span></div>
-              </div>
-              <div className="public-library-facilities">
-                <span><Clock3 size={16} /> Mở cửa mỗi ngày</span>
-                <span><MapPin size={16} /> FPT University HCMC</span>
-                <span><Wifi size={16} /> Wi-Fi miễn phí</span>
-              </div>
-            </div>
-            <div className="public-library-visual">
-              <img src={libraryPhoto} alt="Không gian học tập tại thư viện SmartLibrary" />
-              <div className="public-library-caption">
-                <Users size={17} />
-                <span>Không gian học tập dành cho cộng đồng FPT</span>
-              </div>
-            </div>
-          </div>
-        </section>
+        <section className="annual-section annual-news"><div className="annual-frame"><div className="annual-section-head annual-news-head"><div><h2>Từ bàn quản lý thư viện.</h2></div><p>Thông báo mới, sách mới và những thay đổi có ích cho một học kỳ bận rộn.</p></div><div className="annual-news-layout"><article className="annual-news-lead"><div className="annual-news-meta"><span>{MOCK_NEWS[0].category}</span><time>{MOCK_NEWS[0].date}</time></div><h3>{MOCK_NEWS[0].title}</h3><p>{MOCK_NEWS[0].summary}</p><button type="button">Đọc trong {MOCK_NEWS[0].readTime} <ArrowRight size={18} /></button></article><div className="annual-news-list">{MOCK_NEWS.slice(1).map((item) => <article key={item.id}><div className="annual-news-meta"><span>{item.category}</span><time>{item.date}</time></div><h3>{item.title}</h3><p>{item.summary}</p><span>{item.readTime}</span></article>)}</div></div></div></section>
 
-        <section className="public-cta">
-          <div className="public-container public-cta-inner">
-            <div>
-              <span className="public-eyebrow">
-                {isAuthenticated ? 'SMARTLIBRARY · FPT UNIVERSITY' : 'BẮT ĐẦU HÀNH TRÌNH HỌC TẬP'}
-              </span>
-              <h2>
-                {isAuthenticated ? `Chào mừng trở lại, ${user?.fullName || 'Độc giả'}!` : 'Sẵn sàng nâng tầm trải nghiệm học tập?'}
-              </h2>
-              <p>
-                {isAuthenticated
-                  ? 'Khám phá hơn 13.500+ đầu sách học thuật, tài liệu chuyên sâu và bắt đầu mượn sách thuận tiện tại thư viện.'
-                  : 'Đăng nhập để lưu sách yêu thích và khám phá thêm tài liệu dành riêng cho bạn.'}
-              </p>
-            </div>
-            <div className="public-cta-actions">
-              {isAuthenticated ? (
-                <>
-                  {user?.role === 'Admin' ? (
-                    <Link to="/admin" className="public-button public-button-orange">
-                      Vào trang Quản trị <ArrowRight size={16} />
-                    </Link>
-                  ) : user?.role === 'Librarian' ? (
-                    <Link to="/librarian" className="public-button public-button-orange">
-                      Bàn làm việc Thủ thư <ArrowRight size={16} />
-                    </Link>
-                  ) : (
-                    <a href="#featured-books" className="public-button public-button-orange">
-                      Khám phá sách nổi bật <ArrowRight size={16} />
-                    </a>
-                  )}
-                  <button
-                    type="button"
-                    className="public-button public-button-dark"
-                    onClick={handleLogout}
-                  >
-                    Đăng xuất
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link to="/login" className="public-button public-button-dark">Đăng nhập</Link>
-                  <Link to="/register" className="public-button public-button-orange">
-                    Tạo tài khoản <ArrowRight size={16} />
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-        </section>
+        <section className="annual-section annual-faq"><div className="annual-frame annual-faq-layout"><div className="annual-faq-intro"><h2>Những điều cần biết.</h2><p>Câu trả lời ngắn cho những việc sinh viên thường hỏi nhất tại quầy.</p><div className="annual-faq-stamp"><strong>14 ngày</strong><span>thời hạn mượn tiêu chuẩn</span></div></div><div className="annual-faq-copy">{MOCK_FAQS.map((item) => <p key={item.id}><strong>{item.question}</strong> {item.answer}</p>)}</div></div></section>
+
+        <section className="annual-cta"><div className="annual-cta-photo"><img src={campusPhoto} alt="Khoảng xanh tại FPT University TP. Hồ Chí Minh" /></div><div className="annual-frame annual-cta-inner"><h2>Mở sách.<br />Mở một lối đi.</h2><div><p>{isAuthenticated ? `Chào ${user?.fullName || 'bạn'}, tủ sách vẫn đang mở.` : 'Tạo tài khoản để giữ sách, gia hạn và nhận gợi ý phù hợp với ngành học.'}</p>{cta.to.startsWith('#') ? <a href={cta.to} className="annual-cta-button">{cta.label} <ArrowRight /></a> : <Link to={cta.to} className="annual-cta-button">{cta.label} <ArrowRight /></Link>}</div></div></section>
       </main>
 
-      <footer className="public-footer">
-        <div className="public-container public-footer-grid">
-          <div className="public-footer-brand">
-            <Link to="/" className="public-brand">
-              <img src={smartLibraryLogo} alt="SmartLibrary" />
-              <span>FPT UNIVERSITY HCMC</span>
-            </Link>
-            <p>Không gian tri thức số kết nối cộng đồng học thuật FPT University.</p>
-          </div>
-          <div>
-            <h3>Khám phá</h3>
-            <a href="#categories">Danh mục nổi bật</a>
-            <a href="#featured-books">Sách được quan tâm</a>
-            <a href="#library">Không gian thư viện</a>
-          </div>
-          <div>
-            <h3>Tài khoản</h3>
-            {isAuthenticated ? (
-              <>
-                {user?.role === 'Admin' && <Link to="/admin">Trang Quản trị</Link>}
-                {user?.role === 'Librarian' && <Link to="/librarian">Cổng Thủ thư</Link>}
-                <button
-                  type="button"
-                  className="public-footer-logout-link"
-                  onClick={handleLogout}
-                >
-                  Đăng xuất ({user?.fullName || 'Tài khoản'})
-                </button>
-              </>
-            ) : (
-              <>
-                <Link to="/login">Đăng nhập</Link>
-                <Link to="/register">Đăng ký bạn đọc</Link>
-              </>
-            )}
-            <a href="mailto:library@fpt.edu.vn">Liên hệ hỗ trợ</a>
-          </div>
-          <div className="public-footer-location">
-            <h3>Thư viện FPT</h3>
-            <p><MapPin size={15} /> Khu Công nghệ cao, TP. Thủ Đức, TP.HCM</p>
-            <p><Clock3 size={15} /> Thứ 2 – Thứ 7 · 07:30 – 21:00</p>
-          </div>
-        </div>
-        <div className="public-container public-footer-bottom">
-          <span>© 2026 SmartLibrary · FPT University HCMC</span>
-          <span>Tri thức mở ra tương lai.</span>
-        </div>
-      </footer>
+      <footer className="annual-footer"><div className="annual-frame annual-footer-top"><Link to="/" className="annual-footer-logo"><img src={smartLibraryLogo} alt="SmartLibrary" /></Link><p>Một thư viện sống cùng nhịp học tập của sinh viên FPT.</p></div><div className="annual-frame annual-footer-grid"><div><strong>Ghé thư viện</strong><p>Tòa Alpha, Khu Công nghệ cao<br />TP. Thủ Đức, TP. Hồ Chí Minh</p></div><div><strong>Khám phá</strong><a href="#categories">Danh mục</a><a href="#books">Tủ sách</a><a href="#services">Dịch vụ</a></div><div><strong>Thời gian</strong><p>Thứ Hai – Thứ Sáu<br />07:00 – 19:00</p><p>Thứ Bảy<br />07:00 – 17:00</p><p>Chủ Nhật · Không phục vụ</p></div><div><strong>Tài khoản</strong>{isAuthenticated ? <button type="button" onClick={logout}>Đăng xuất</button> : <><Link to="/login">Đăng nhập</Link><Link to="/register">Đăng ký</Link></>}</div></div><div className="annual-frame annual-footer-mark">SmartLibrary</div><div className="annual-frame annual-footer-legal">© 2026 FPT University HCMC · Tri thức dành cho cộng đồng.</div></footer>
     </div>
   );
 };
