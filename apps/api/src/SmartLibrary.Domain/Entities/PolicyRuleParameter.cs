@@ -9,5 +9,5 @@ public class PolicyRuleParameter : BaseEntity
     public string ParamValue { get; set; } = string.Empty;
     public string? DisplayLabel { get; set; }
 
-    public PolicyRule PolicyRule { get; set; } = null!;
+    public PolicyRule? PolicyRule { get; set; }
 }

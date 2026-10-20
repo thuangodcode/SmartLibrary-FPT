@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileSliders,
+  FileText,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -24,7 +25,9 @@ import './AdminLayout.css';
 const navigation = [
   { label: 'Tổng quan', to: '/admin', icon: LayoutDashboard, end: true },
   { label: 'Quản lý người dùng', to: '/admin/users', icon: UsersRound, end: false },
-  { label: 'Quy định thư viện', to: '/admin/policies', icon: ShieldCheck, end: false },
+  { label: 'Quản lý sách', to: '/admin/books', icon: BookOpen, end: false },
+  { label: 'Quản lý chính sách', to: '/admin/policies', icon: FileText, end: false },
+  { label: 'Quản lý quy định', to: '/admin/regulations', icon: ShieldCheck, end: false },
   { label: 'Quản lý mẫu báo cáo', to: '/admin/reports/templates', icon: FileSliders, end: true },
   { label: 'Thống kê & báo cáo', to: '/admin/reports', icon: ChartNoAxesCombined, end: false },
   { label: 'Cấu hình AI', to: '/admin/ai-settings', icon: Bot, end: false },
@@ -53,8 +56,6 @@ export const AdminLayout: React.FC = () => {
     }
     return end ? location.pathname === to : location.pathname.startsWith(to);
   };
-
-  const currentPage = navigation.find((item) => isItemActive(item.to, item.end))?.label ?? 'Tổng quan';
 
   useEffect(() => {
     const mq = window.matchMedia('(hover: hover) and (pointer: fine)');
@@ -202,11 +203,6 @@ export const AdminLayout: React.FC = () => {
           >
             <Menu size={21} />
           </button>
-          <div className="admin-breadcrumb">
-            <span>Quản trị</span>
-            <span className="admin-breadcrumb-separator">/</span>
-            <strong>{currentPage}</strong>
-          </div>
           <div className="admin-topbar-actions">
             <button type="button" className="admin-icon-button" aria-label="Thông báo">
               <Bell size={19} />

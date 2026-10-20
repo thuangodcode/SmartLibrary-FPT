@@ -366,27 +366,10 @@
   height: 76px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 0 34px;
   border-bottom: 1px solid #e9ecf3;
   background: #fff;
-}
-
-.admin-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #9aa1af;
-  font-size: 12px;
-}
-
-.admin-breadcrumb strong {
-  color: #30394b;
-  font-weight: 650;
-}
-
-.admin-breadcrumb-separator {
-  color: #c1c6d0;
 }
 
 .admin-topbar-actions,
