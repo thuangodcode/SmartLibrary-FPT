@@ -11,12 +11,14 @@ import {
   Settings,
   Users,
   X,
+  Check,
 } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import smartLibraryLogo from '../../../assets/figma/auth-logo-fpt.png';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { API_BASE_URL } from '../../../config';
+import { parseApiResponse } from '../../../lib/api';
 import './LibrarianLayout.css';
 
 const navigation = [
@@ -28,10 +30,29 @@ const navigation = [
   { label: 'Cài đặt', to: '/librarian/settings', icon: Settings, end: false },
 ];
 
+interface ApiEnvelope<T> {
+  success?: boolean;
+  data?: T;
+  error?: string;
+}
+
+interface ReportDecisionNotice {
+  id: string;
+  name: string;
+  templateName: string;
+  reportId: string | null;
+  lastReportStatus: string | null;
+  lastReviewComment: string | null;
+}
+
 export const LibrarianLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number | null>(null);
+  const [decisionNotices, setDecisionNotices] = useState<ReportDecisionNotice[]>([]);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [dismissedNoticeIds, setDismissedNoticeIds] = useState<string[]>([]);
   const user = useAuthStore((state) => state.user);
+  const accessToken = useAuthStore((state) => state.accessToken);
   const logout = useAuthStore((state) => state.logout);
   const { showToast } = useToast();
   const location = useLocation();
@@ -63,6 +84,61 @@ export const LibrarianLayout: React.FC = () => {
     };
     fetchPending();
   }, [location.pathname, pendingCount]);
+
+  React.useEffect(() => {
+    const storageKey = `smartlibrary:report-decisions:${user?.email ?? 'librarian'}`;
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        const parsed: unknown = saved ? JSON.parse(saved) : [];
+        setDismissedNoticeIds(Array.isArray(parsed) && parsed.every((value): value is string => typeof value === 'string') ? parsed : []);
+      } catch {
+        setDismissedNoticeIds([]);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [user?.email]);
+
+  React.useEffect(() => {
+    if (!accessToken) return undefined;
+    let cancelled = false;
+    const fetchDecisions = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/librarian/reports/requests`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const result = await parseApiResponse<ApiEnvelope<ReportDecisionNotice[]>>(response);
+        if (!response.ok || !result?.success || !result.data) {
+          throw new Error(result?.error || 'Không thể tải thông báo báo cáo.');
+        }
+        if (!cancelled) {
+          setDecisionNotices(result.data.filter((item) =>
+            item.lastReportStatus === 'Approved' || item.lastReportStatus === 'Rejected',
+          ));
+          setNotificationError(null);
+        }
+      } catch (caught) {
+        if (!cancelled) setNotificationError(caught instanceof Error ? caught.message : 'Không thể tải thông báo báo cáo.');
+      }
+    };
+    void fetchDecisions();
+    const timer = window.setInterval(() => void fetchDecisions(), 30000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [accessToken]);
+
+  const dismissDecision = (noticeId: string) => {
+    const next = [...new Set([...dismissedNoticeIds, noticeId])];
+    setDismissedNoticeIds(next);
+    try {
+      localStorage.setItem(`smartlibrary:report-decisions:${user?.email ?? 'librarian'}`, JSON.stringify(next));
+    } catch {
+      setNotificationError('Không thể lưu trạng thái đã xem của thông báo trên thiết bị này.');
+    }
+  };
+  const unreadDecisionCount = decisionNotices.filter((notice) => !dismissedNoticeIds.includes(notice.id)).length;
 
   const handleLogout = () => {
     logout();
@@ -147,10 +223,34 @@ export const LibrarianLayout: React.FC = () => {
             <strong>{currentPage}</strong>
           </div>
           <div className="lib-topbar-actions">
-            <button type="button" className="lib-icon-button" aria-label="Thông báo">
-              <Bell size={19} />
-              <span className="lib-notification-dot" />
-            </button>
+            <details className="lib-notification-menu">
+              <summary className="lib-icon-button" aria-label={`Thông báo${unreadDecisionCount ? `, ${unreadDecisionCount} thông báo chưa xem` : ''}`}>
+                <Bell size={19} />
+                {unreadDecisionCount > 0 && <span className="lib-notification-count">{unreadDecisionCount > 9 ? '9+' : unreadDecisionCount}</span>}
+              </summary>
+              <section className="lib-notification-popover" aria-label="Thông báo báo cáo">
+                <header><strong>Thông báo báo cáo</strong><span>{unreadDecisionCount} chưa xem</span></header>
+                {notificationError && <p className="lib-notification-error">{notificationError}</p>}
+                {decisionNotices.length ? decisionNotices.slice(0, 8).map((notice) => (
+                  <article className={dismissedNoticeIds.includes(notice.id) ? 'is-read' : ''} key={notice.id}>
+                    <div className={`lib-notification-mark ${notice.lastReportStatus === 'Approved' ? 'is-approved' : 'is-rejected'}`}>
+                      {notice.lastReportStatus === 'Approved' ? <Check size={15}/> : <X size={15}/>}
+                    </div>
+                    <div className="lib-notification-copy">
+                      <strong>{notice.lastReportStatus === 'Approved' ? 'Báo cáo đã được duyệt' : 'Admin yêu cầu chỉnh sửa'}</strong>
+                      <span>{notice.name || notice.templateName}</span>
+                      {notice.lastReportStatus === 'Rejected' && notice.lastReviewComment && <p>{notice.lastReviewComment}</p>}
+                      {notice.reportId && <Link to={`/librarian/reports/${notice.reportId}`}>Xem báo cáo</Link>}
+                    </div>
+                    {!dismissedNoticeIds.includes(notice.id) && (
+                      <button type="button" onClick={() => dismissDecision(notice.id)} aria-label="Đánh dấu đã xem"><Check size={15}/></button>
+                    )}
+                  </article>
+                )) : !notificationError ? (
+                  <p className="lib-notification-empty">Chưa có thông báo duyệt báo cáo.</p>
+                ) : null}
+              </section>
+            </details>
             <span className="lib-topbar-divider" />
             <div className="lib-profile">
               <div className="lib-avatar">{user?.fullName?.trim().charAt(0).toUpperCase() || 'T'}</div>

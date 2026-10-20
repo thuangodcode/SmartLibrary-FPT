@@ -58,6 +58,7 @@ function App() {
         <Route path="registrations" element={<RegistrationApprovalPage />} />
         <Route path="readers" element={<ReadersManagementPage />} />
         <Route path="reports" element={<LibrarianReportsPage />} />
+        <Route path="reports/new" element={<LibrarianReportsPage />} />
         <Route path="reports/:id" element={<LibrarianReportDetailPage />} />
       </Route>
 

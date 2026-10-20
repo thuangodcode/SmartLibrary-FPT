@@ -9,10 +9,8 @@ public static class ReportImportValidator
 
     private static readonly Dictionary<string, string[]> MetricHeaderAliases = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["Borrowed"] = ["Mượn", "Borrowed", "borrowed", "So muon"],
-        ["Returned"] = ["Trả", "Tra", "Returned", "returned", "So tra"],
-        ["Overdue"] = ["Quá hạn", "Qua han", "Overdue", "overdue"],
-        ["ReturnedCount"] = ["Đã trả", "Da tra", "ReturnedCount", "returnedCount", "Returned Count"],
+        ["Borrowed"] = ["Lượt mượn", "Mượn", "Borrowed", "borrowed", "So muon"],
+        ["Returned"] = ["Lượt trả", "Trả", "Tra", "Returned", "returned", "So tra"],
     };
 
     private static readonly string[][] DateHeaders = [["Ngày", "Ngay", "Date", "date"]];
@@ -21,7 +19,7 @@ public static class ReportImportValidator
 
     public static TemplateImportSchema ParseSchema(string? configurationJson)
     {
-        var metrics = new List<string> { "Borrowed", "Returned", "Overdue", "ReturnedCount" };
+        var metrics = new List<string> { "Borrowed", "Returned" };
         try
         {
             if (!string.IsNullOrWhiteSpace(configurationJson))
@@ -48,8 +46,9 @@ public static class ReportImportValidator
             // keep defaults
         }
 
+        metrics = metrics.Where(metric => metric is "Borrowed" or "Returned").Distinct().ToList();
         if (metrics.Count == 0)
-            metrics = ["Borrowed", "Returned", "Overdue", "ReturnedCount"];
+            metrics = ["Borrowed", "Returned"];
 
         var columns = new List<ExpectedColumnDto>
         {
@@ -138,7 +137,12 @@ public static class ReportImportValidator
     {
         if (root.TryGetProperty("metrics", out var metrics) && metrics.ValueKind == JsonValueKind.Array)
         {
-            var parsed = metrics.EnumerateArray().Select(x => x.GetString()).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToList();
+            var parsed = metrics.EnumerateArray()
+                .Where(x => x.ValueKind == JsonValueKind.String)
+                .Select(x => x.GetString())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Cast<string>()
+                .ToList();
             if (parsed.Count > 0) return parsed;
         }
         return defaults;
@@ -148,17 +152,13 @@ public static class ReportImportValidator
     {
         "Borrowed" => row.Borrowed,
         "Returned" => row.Returned,
-        "Overdue" => row.Overdue,
-        "ReturnedCount" => row.ReturnedCount,
         _ => 0,
     };
 
     private static string MetricLabel(string metric) => metric switch
     {
-        "Borrowed" => "Mượn",
-        "Returned" => "Trả",
-        "Overdue" => "Quá hạn",
-        "ReturnedCount" => "Đã trả",
+        "Borrowed" => "Lượt mượn",
+        "Returned" => "Lượt trả",
         _ => metric,
     };
 

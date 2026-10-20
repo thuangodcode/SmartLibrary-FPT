@@ -5,6 +5,7 @@ import {
   ArrowDownToLine,
   CalendarDays,
   CheckCircle2,
+  ClipboardList,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -24,7 +25,7 @@ import {
   UploadCloud,
   X,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import {
@@ -71,6 +72,7 @@ interface ReportItem {
   status: string;
   isViewed: boolean;
   isApproved: boolean;
+  isRejected?: boolean;
 }
 
 interface ReportList {
@@ -79,6 +81,23 @@ interface ReportList {
   page: number;
   pageSize: number;
   totalPages: number;
+}
+
+interface ReportRequest {
+  id: string;
+  librarianId: string;
+  librarianName: string;
+  templateId: string;
+  templateName: string;
+  reportType: string;
+  periodStart: string;
+  periodEnd: string;
+  name: string;
+  status: string;
+  createdAt: string;
+  reportId?: string | null;
+  lastReportStatus?: string | null;
+  lastReviewComment?: string | null;
 }
 
 type CreateMode = 'auto' | 'manual' | 'import';
@@ -106,12 +125,24 @@ const formatDateTime = (val: string) => {
   }
 };
 
+const toDateInput = (value: string, exclusiveEnd = false) => {
+  const date = new Date(value);
+  if (exclusiveEnd) date.setDate(date.getDate() - 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
 export const LibrarianReportsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestId = new URLSearchParams(location.search).get('requestId');
   const token = useAuthStore((state) => state.accessToken);
+  const createModalOpen = location.pathname.endsWith('/reports/new');
 
   // Data states
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [requests, setRequests] = useState<ReportRequest[]>([]);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestLoading, setRequestLoading] = useState(true);
   const [reports, setReports] = useState<ReportList | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -122,8 +153,6 @@ export const LibrarianReportsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
 
-  // Modals
-  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createMode, setCreateMode] = useState<CreateMode>('auto');
   const [manualRows, setManualRows] = useState<ManualReportRow[]>([emptyManualRow()]);
   const [importIssues, setImportIssues] = useState<ImportIssue[]>([]);
@@ -153,16 +182,40 @@ export const LibrarianReportsPage: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await parseApiResponse<ApiEnvelope<Template[]>>(res);
-      if (res.ok && data?.success && data.data) {
-        setTemplates(data.data);
-        if (data.data.length > 0 && !selectedTemplateId) {
-          setSelectedTemplateId(data.data[0].id);
-        }
+      if (!res.ok || !data?.success || !data.data) {
+        throw new Error(data?.error || `Không tải được mẫu báo cáo (HTTP ${res.status}).`);
       }
-    } catch {
-      // silently ignore or set message
+      setTemplates(data.data);
+      if (data.data.length > 0 && !selectedTemplateId) {
+        setSelectedTemplateId(data.data[0].id);
+      }
+    } catch (caught) {
+      setToastMessage(caught instanceof Error ? caught.message : 'Không tải được danh sách mẫu báo cáo.');
     }
   }, [token, selectedTemplateId]);
+
+  const loadRequests = useCallback(async () => {
+    if (!token) {
+      setRequestLoading(false);
+      return;
+    }
+    setRequestLoading(true);
+    setRequestError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/librarian/reports/requests`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await parseApiResponse<ApiEnvelope<ReportRequest[]>>(response);
+      if (!response.ok || !result?.success || !result.data) {
+        throw new Error(result?.error || 'Không tải được yêu cầu báo cáo.');
+      }
+      setRequests(result.data);
+    } catch (caught) {
+      setRequestError(caught instanceof Error ? caught.message : 'Không tải được yêu cầu báo cáo.');
+    } finally {
+      setRequestLoading(false);
+    }
+  }, [token]);
 
   // Load Reports
   const loadReports = useCallback(async () => {
@@ -207,11 +260,32 @@ export const LibrarianReportsPage: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [loadReports]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadRequests(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadRequests]);
+
   // Auto-generate name when template or date changes
   const activeTemplate = useMemo(
     () => templates.find((t) => t.id === selectedTemplateId),
     [templates, selectedTemplateId],
   );
+
+  const activeRequest = useMemo(
+    () => requests.find((request) => request.id === requestId),
+    [requests, requestId],
+  );
+
+  useEffect(() => {
+    if (!activeRequest) return;
+    const timer = window.setTimeout(() => {
+      setSelectedTemplateId(activeRequest.templateId);
+      setReportName(activeRequest.name || activeRequest.templateName);
+      setPeriodStart(toDateInput(activeRequest.periodStart));
+      setPeriodEnd(toDateInput(activeRequest.periodEnd, true));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeRequest]);
 
   const activeTemplateConfig = useMemo(
     () => parseTemplateConfiguration(activeTemplate?.configuration),
@@ -232,16 +306,21 @@ export const LibrarianReportsPage: React.FC = () => {
 
   const canSubmitManual = createMode !== 'manual' || isReadyToSubmit(manualValidationIssues);
   const canSubmitImport = createMode !== 'import' || importReady;
+  const requestedRequestUnavailable = Boolean(requestId && !requestLoading && (!activeRequest || activeRequest.status === 'Submitted'));
 
   useEffect(() => {
     if (activeTemplate) {
+      if (activeRequest?.templateId === activeTemplate.id) {
+        const timer = window.setTimeout(() => setReportName(activeRequest.name || activeRequest.templateName), 0);
+        return () => window.clearTimeout(timer);
+      }
       const now = new Date();
       const timer = window.setTimeout(() => {
         setReportName(`${activeTemplate.name} - T${now.getMonth() + 1}/${now.getFullYear()}`);
       }, 0);
       return () => window.clearTimeout(timer);
     }
-  }, [activeTemplate]);
+  }, [activeTemplate, activeRequest]);
 
   // KPI Calculations
   const stats = useMemo(() => {
@@ -263,48 +342,66 @@ export const LibrarianReportsPage: React.FC = () => {
 
   const openCreateModal = () => {
     resetCreateForm();
-    setCreateModalOpen(true);
+    navigate('/librarian/reports/new');
   };
 
   const syncServerValidation = async (rows: ManualReportRow[]) => {
     if (!token || !selectedTemplateId) return false;
     const apiRows = rows.map((r) => manualRowToApi(r, templateMetrics));
-    const res = await fetch(`${API_BASE_URL}/api/librarian/reports/validate`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ templateId: selectedTemplateId, rows: apiRows }),
-    });
-    const result = await parseApiResponse<
-      ApiEnvelope<{ isReady: boolean; issues: { row: number; field: string; message: string; severity: string }[] }>
-    >(res);
-    if (!res.ok || !result?.success || !result.data) {
-      setToastMessage(result?.error || 'Không kiểm tra được dữ liệu.');
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/librarian/reports/validate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templateId: selectedTemplateId, rows: apiRows }),
+      });
+      const result = await parseApiResponse<
+        ApiEnvelope<{ isReady: boolean; issues: { row: number; field: string; message: string; severity: string }[] }>
+      >(res);
+      if (!res.ok || !result?.success || !result.data) {
+        setImportReady(false);
+        setToastMessage(result?.error || `Không kiểm tra được dữ liệu (HTTP ${res.status}).`);
+        return false;
+      }
+      const issues: ImportIssue[] = (result.data.issues ?? []).map((x) => ({
+        row: x.row,
+        field: x.field,
+        message: x.message,
+        severity: x.severity === 'warning' ? 'warning' : 'error',
+      }));
+      setImportIssues(issues);
+      setImportReady(result.data.isReady);
+      return result.data.isReady;
+    } catch (caught) {
+      setImportReady(false);
+      setToastMessage(caught instanceof Error ? caught.message : 'Không kết nối được để kiểm tra dữ liệu.');
       return false;
     }
-    const issues: ImportIssue[] = (result.data.issues ?? []).map((x) => ({
-      row: x.row,
-      field: x.field,
-      message: x.message,
-      severity: x.severity === 'warning' ? 'warning' : 'error',
-    }));
-    setImportIssues(issues);
-    setImportReady(result.data.isReady);
-    return result.data.isReady;
   };
 
   const handleImportFile = async (file: File | null) => {
     if (!file) return;
     setImportFileName(file.name);
-    const text = await file.text();
-    const { rows, issues } = parseReportCsv(text, activeTemplateConfig);
-    setImportIssues(issues);
-    if (!isReadyToSubmit(issues)) {
-      setImportReady(false);
-      setManualRows([]);
+    setImportReady(false);
+    setImportIssues([]);
+    setManualRows([]);
+    if (!file.name.toLowerCase().endsWith('.csv') && file.type !== 'text/csv') {
+      setImportIssues([{ row: 0, field: 'file', message: 'Vui lòng chọn file có định dạng CSV.', severity: 'error' }]);
       return;
     }
-    setManualRows(rows);
-    await syncServerValidation(rows);
+    try {
+      const text = await file.text();
+      const { rows, issues } = parseReportCsv(text, activeTemplateConfig);
+      setImportIssues(issues);
+      if (!isReadyToSubmit(issues)) {
+        setManualRows([]);
+        return;
+      }
+      setManualRows(rows);
+      await syncServerValidation(rows);
+    } catch (caught) {
+      setImportReady(false);
+      setImportIssues([{ row: 0, field: 'file', message: caught instanceof Error ? `Không đọc được file CSV: ${caught.message}` : 'Không đọc được file CSV.', severity: 'error' }]);
+    }
   };
 
   const downloadSampleCsv = () => {
@@ -314,12 +411,16 @@ export const LibrarianReportsPage: React.FC = () => {
     a.href = url;
     a.download = `mau-bao-cao-${activeTemplate?.name ?? 'template'}.csv`;
     a.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const handleCreateReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !selectedTemplateId) return;
+    if (requestId && requestedRequestUnavailable) {
+      setToastMessage('Yêu cầu này không còn khả dụng hoặc không được giao cho tài khoản của bạn.');
+      return;
+    }
 
     if (!periodStart || !periodEnd) {
       setToastMessage('Vui lòng chọn ngày bắt đầu và kết thúc kỳ báo cáo.');
@@ -359,8 +460,9 @@ export const LibrarianReportsPage: React.FC = () => {
         name: reportName.trim() || undefined,
         format,
         periodStart: new Date(periodStart).toISOString(),
-        periodEnd: new Date(periodEnd).toISOString(),
+        periodEnd: new Date(new Date(periodEnd).getTime() + 24 * 60 * 60 * 1000).toISOString(),
         customRows,
+        ...(activeRequest ? { requestId: activeRequest.id } : {}),
       };
 
       const res = await fetch(`${API_BASE_URL}/api/librarian/reports`, {
@@ -378,9 +480,9 @@ export const LibrarianReportsPage: React.FC = () => {
       }
 
       setToastMessage('Đã gửi báo cáo thành công tới Quản trị viên (Admin)!');
-      setCreateModalOpen(false);
       resetCreateForm();
       await loadReports();
+      await loadRequests();
       navigate(`/librarian/reports/${result.data.id}`);
     } catch (err) {
       setToastMessage(err instanceof Error ? err.message : 'Lỗi khi gửi báo cáo.');
@@ -413,7 +515,7 @@ export const LibrarianReportsPage: React.FC = () => {
   };
 
   return (
-    <div className="lib-reports-page">
+    <div className={`lib-reports-page${createModalOpen ? ' lib-reports-page-create' : ''}`}>
       {/* ── Header ── */}
       <header className="lib-reports-header">
         <div>
@@ -477,6 +579,47 @@ export const LibrarianReportsPage: React.FC = () => {
             <p className="lib-kpi-note">Do Admin ban hành cấu hình</p>
           </div>
         </article>
+      </section>
+
+      <section className="lib-reports-panel lib-report-requests-panel">
+        <div className="lib-panel-header">
+          <div className="lib-panel-header-copy">
+            <span>YÊU CẦU TỪ ADMIN</span>
+            <h2>Báo cáo được giao cho bạn</h2>
+          </div>
+          <span className="lib-request-count"><ClipboardList size={15}/>{requests.filter((request) => request.status !== 'Submitted').length} yêu cầu cần nộp</span>
+        </div>
+        {requestError ? (
+          <div className="lib-data-notice lib-request-error" role="alert"><AlertCircle size={16}/><span>{requestError}</span><button type="button" onClick={() => void loadRequests()}>Thử lại</button></div>
+        ) : requestLoading ? (
+          <div className="lib-request-empty"><LoaderCircle size={22} className="lib-spin"/><span>Đang tải yêu cầu được giao…</span></div>
+        ) : requests.length ? (
+          <div className="lib-report-request-list">
+            {requests.map((request) => (
+              <article key={request.id}>
+                <div className="lib-request-copy">
+                  <strong>{request.name || request.templateName}</strong>
+                  <span>{request.reportType} · {request.templateName}</span>
+                </div>
+                <div className="lib-request-period">
+                  <strong>{formatDate(request.periodStart)} – {formatDate(new Date(new Date(request.periodEnd).getTime() - 86400000).toISOString())}</strong>
+                  <span>Kỳ báo cáo được yêu cầu</span>
+                </div>
+                {request.lastReviewComment && request.lastReportStatus === 'Rejected' && (
+                  <p className="lib-request-feedback"><strong>Admin yêu cầu chỉnh sửa:</strong> {request.lastReviewComment}</p>
+                )}
+                <span className={`lib-request-status ${request.status === 'Submitted' ? 'is-submitted' : ''}`}>
+                  {request.lastReportStatus === 'Approved' ? 'Đã duyệt' : request.status === 'Submitted' ? 'Đã nộp · chờ duyệt' : request.lastReportStatus === 'Rejected' ? 'Cần nộp lại' : 'Chờ nộp'}
+                </span>
+                {request.status === 'Submitted'
+                  ? request.reportId && <Link className="lib-request-action secondary" to={`/librarian/reports/${request.reportId}`}><Eye size={15}/> Xem báo cáo đã gửi</Link>
+                  : <button type="button" className="lib-request-action" onClick={() => navigate(`/librarian/reports/new?requestId=${request.id}`)}><Send size={15}/>{request.lastReportStatus === 'Rejected' ? 'Chỉnh sửa & nộp lại' : 'Lập báo cáo'}</button>}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="lib-request-empty"><ClipboardList size={22}/><strong>Chưa có yêu cầu mới từ Admin</strong><span>Các yêu cầu được giao cho bạn sẽ hiển thị tại đây.</span></div>
+        )}
       </section>
 
       {/* ── Main Panel: List of Reports ── */}
@@ -585,6 +728,10 @@ export const LibrarianReportsPage: React.FC = () => {
                         <span className="lib-status-badge approved">
                           <CheckCircle2 size={12} /> Đã duyệt
                         </span>
+                      ) : item.isRejected || item.status === 'Rejected' ? (
+                        <span className="lib-status-badge rejected">
+                          <AlertCircle size={12} /> Cần chỉnh sửa
+                        </span>
                       ) : item.isViewed ? (
                         <span className="lib-status-badge viewed">
                           <Eye size={12} /> Đã xem
@@ -662,10 +809,10 @@ export const LibrarianReportsPage: React.FC = () => {
         )}
       </section>
 
-      {/* ── Modal: Tạo & gửi báo cáo mới cho Admin ── */}
+      {/* ── Trang: Tạo & gửi báo cáo mới cho Admin ── */}
       {createModalOpen && (
-        <div className="lib-modal-backdrop" role="dialog" aria-modal="true">
-          <div className="lib-modal">
+        <main className="lib-create-page">
+          <div className="lib-create-page-card">
             <header className="lib-modal-header">
               <div>
                 <h2>Lập &amp; gửi báo cáo cho Admin</h2>
@@ -674,8 +821,8 @@ export const LibrarianReportsPage: React.FC = () => {
               <button
                 type="button"
                 className="lib-modal-close"
-                onClick={() => setCreateModalOpen(false)}
-                aria-label="Đóng"
+                onClick={() => navigate('/librarian/reports')}
+                aria-label="Quay lại danh sách báo cáo"
               >
                 <X size={18} />
               </button>
@@ -692,6 +839,7 @@ export const LibrarianReportsPage: React.FC = () => {
                     id="lib-template-select"
                     value={selectedTemplateId}
                     onChange={(e) => setSelectedTemplateId(e.target.value)}
+                    disabled={Boolean(activeRequest)}
                     required
                   >
                     {templates.map((t) => (
@@ -710,6 +858,33 @@ export const LibrarianReportsPage: React.FC = () => {
                     <span className="lib-template-columns">
                       Cột bắt buộc: {expectedColumns.join(' · ')}
                     </span>
+                    <button type="button" className="lib-sample-csv-button" onClick={downloadSampleCsv}>
+                      <ArrowDownToLine size={15}/> Tải file CSV mẫu (có dòng Tổng)
+                    </button>
+                  </div>
+                )}
+                {activeRequest && (
+                  <div className="lib-request-form-banner" role="status">
+                    <ClipboardList size={18}/>
+                    <div><strong>Đang thực hiện yêu cầu từ Admin</strong><span>{activeRequest.name || activeRequest.templateName} · kỳ {formatDate(activeRequest.periodStart)} – {formatDate(new Date(new Date(activeRequest.periodEnd).getTime() - 86400000).toISOString())}</span></div>
+                  </div>
+                )}
+                {activeRequest && !activeTemplate && (
+                  <div className="lib-data-notice lib-request-invalid" role="alert">
+                    <AlertCircle size={17}/><span>Mẫu “{activeRequest.templateName}” hiện không khả dụng. Vui lòng báo Admin bật lại mẫu trước khi nộp báo cáo.</span>
+                  </div>
+                )}
+                {requestId && requestLoading && (
+                  <div className="lib-request-form-banner" role="status"><LoaderCircle size={18} className="lib-spin"/><div><strong>Đang xác minh yêu cầu</strong><span>Đang tải yêu cầu được Admin giao cho bạn…</span></div></div>
+                )}
+                {requestId && requestError && (
+                  <div className="lib-data-notice lib-request-invalid" role="alert">
+                    <AlertCircle size={17}/><span>Không thể xác minh yêu cầu: {requestError}</span><button type="button" onClick={() => void loadRequests()}>Thử lại</button>
+                  </div>
+                )}
+                {requestId && requestedRequestUnavailable && !requestError && (
+                  <div className="lib-data-notice lib-request-invalid" role="alert">
+                    <AlertCircle size={17}/><span>Không tìm thấy yêu cầu đang chờ được giao cho tài khoản của bạn. Không thể nộp báo cáo theo yêu cầu này.</span>
                   </div>
                 )}
 
@@ -756,10 +931,8 @@ export const LibrarianReportsPage: React.FC = () => {
                           <tr>
                             <th>Ngày</th>
                             <th>Nhóm sách</th>
-                            {templateMetrics.includes('Borrowed') && <th>Mượn</th>}
-                            {templateMetrics.includes('Returned') && <th>Trả</th>}
-                            {templateMetrics.includes('Overdue') && <th>Quá hạn</th>}
-                            {templateMetrics.includes('ReturnedCount') && <th>Đã trả</th>}
+                            {templateMetrics.includes('Borrowed') && <th>Lượt mượn</th>}
+                            {templateMetrics.includes('Returned') && <th>Lượt trả</th>}
                             <th>Ghi chú</th>
                             <th />
                           </tr>
@@ -822,38 +995,6 @@ export const LibrarianReportsPage: React.FC = () => {
                                   />
                                 </td>
                               )}
-                              {templateMetrics.includes('Overdue') && (
-                                <td>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    value={row.overdue}
-                                    onChange={(e) =>
-                                      setManualRows((rows) =>
-                                        rows.map((r, i) =>
-                                          i === idx ? { ...r, overdue: Number(e.target.value) || 0 } : r,
-                                        ),
-                                      )
-                                    }
-                                  />
-                                </td>
-                              )}
-                              {templateMetrics.includes('ReturnedCount') && (
-                                <td>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    value={row.returnedCount}
-                                    onChange={(e) =>
-                                      setManualRows((rows) =>
-                                        rows.map((r, i) =>
-                                          i === idx ? { ...r, returnedCount: Number(e.target.value) || 0 } : r,
-                                        ),
-                                      )
-                                    }
-                                  />
-                                </td>
-                              )}
                               <td>
                                 <input
                                   type="text"
@@ -910,7 +1051,11 @@ export const LibrarianReportsPage: React.FC = () => {
                         <input
                           type="file"
                           accept=".csv,text/csv"
-                          onChange={(e) => void handleImportFile(e.target.files?.[0] ?? null)}
+                          onChange={(e) => {
+                            const file = e.currentTarget.files?.[0] ?? null;
+                            e.currentTarget.value = '';
+                            void handleImportFile(file);
+                          }}
                         />
                       </label>
                     </div>
@@ -1002,7 +1147,7 @@ export const LibrarianReportsPage: React.FC = () => {
                 <button
                   type="button"
                   className="lib-btn lib-btn-secondary"
-                  onClick={() => setCreateModalOpen(false)}
+                  onClick={() => navigate('/librarian/reports')}
                   disabled={submitting}
                 >
                   Hủy bỏ
@@ -1010,7 +1155,7 @@ export const LibrarianReportsPage: React.FC = () => {
                 <button
                   type="submit"
                   className="lib-btn lib-btn-primary"
-                  disabled={submitting || !selectedTemplateId || !canSubmitManual || !canSubmitImport}
+                  disabled={submitting || !selectedTemplateId || !canSubmitManual || !canSubmitImport || requestLoading || requestedRequestUnavailable}
                 >
                   {submitting ? (
                     <>
@@ -1026,12 +1171,13 @@ export const LibrarianReportsPage: React.FC = () => {
               </footer>
             </form>
           </div>
-        </div>
+        </main>
       )}
 
       {/* Toast Notification */}
       {toastMessage && (
         <div
+          className="lib-toast"
           role="status"
           style={{
             position: 'fixed',

@@ -1,20 +1,35 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowDownToLine, BookOpen, CalendarDays, ChartNoAxesCombined, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, Eye, FileSpreadsheet, Filter, LoaderCircle, Search, Trash2, UsersRound } from 'lucide-react';
+import { AlertCircle, ArrowDownToLine, BookOpen, CalendarDays, ChartNoAxesCombined, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardList, Eye, FileSpreadsheet, Filter, LoaderCircle, Plus, Search, Trash2, UsersRound, X } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import './AdminReportsPage.css';
+import './AdminReportsExperience.css';
 
 interface ApiEnvelope<T> { success?: boolean; data?: T; error?: string }
 interface Summary { from: string; to: string; borrowed: number; returned: number; returnedOnTimeRate: number; borrowedChangePercent: number; returnedChangePercent: number; fineRevenue: number; fineTransactions: number; fineChangePercent: number; libraryVisits: number | null; libraryVisitsAvailable: boolean }
 interface CategoryStat { category: string; count: number; percent: number }
-interface ReportItem { id: string; code: string; name: string; submitter: string; createdAt: string; format: string; status: string; isViewed: boolean; isApproved: boolean }
+interface ReportItem { id: string; code: string; name: string; submitter: string; createdAt: string; format: string; status: string; isViewed: boolean; isApproved: boolean; isRejected?: boolean }
 interface ReportList { items: ReportItem[]; totalCount: number; page: number; pageSize: number; totalPages: number }
+interface Librarian { id: string; fullName: string; status: string; isActive: boolean }
+interface LibrarianList { items: Librarian[] }
+interface ReportTemplate { id: string; name: string; reportType: string; isEnabled: boolean }
+interface ReportRequest { id: string; librarianId: string; librarianName: string; templateId: string; templateName: string; reportType: string; periodStart: string; periodEnd: string; name: string; status: string; createdAt: string; reportId?: string | null; lastReportStatus?: string | null; lastReviewComment?: string | null }
 
 const number = (value: number) => value.toLocaleString('vi-VN');
 const money = (value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value);
 const date = (value: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(value));
+const reportTypeLabel = (type: string) => ({ Activity: 'Hoạt động mượn trả', Finance: 'Tài chính', Collection: 'Kho sách', Periodic: 'Định kỳ' }[type] ?? type);
+const inputDate = (value: string) => {
+  const parsed = new Date(value);
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+};
+const requestedEndDate = (value: string) => {
+  const parsed = new Date(value);
+  parsed.setDate(parsed.getDate() - 1);
+  return inputDate(parsed.toISOString());
+};
 
 const AdminReportsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -30,6 +45,21 @@ const AdminReportsPage: React.FC = () => {
   const [confirmDelete, setConfirmDelete] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [requests, setRequests] = useState<ReportRequest[]>([]);
+  const [librarians, setLibrarians] = useState<Librarian[]>([]);
+  const [templates, setTemplates] = useState<ReportTemplate[]>([]);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestFormOpen, setRequestFormOpen] = useState(false);
+  const [requestBusy, setRequestBusy] = useState(false);
+  const [requestLibrarianId, setRequestLibrarianId] = useState('');
+  const [requestTemplateId, setRequestTemplateId] = useState('');
+  const [requestName, setRequestName] = useState('');
+  const [requestPeriodStart, setRequestPeriodStart] = useState(() => {
+    const value = new Date();
+    value.setDate(value.getDate() - 30);
+    return value.toISOString().slice(0, 10);
+  });
+  const [requestPeriodEnd, setRequestPeriodEnd] = useState(() => new Date().toISOString().slice(0, 10));
 
   const query = useMemo(() => new URLSearchParams(params), [params]);
   const activeTab = query.get('tab') ?? 'activity';
@@ -39,7 +69,12 @@ const AdminReportsPage: React.FC = () => {
     if (!token) { setError('Vui lòng đăng nhập Admin để xem báo cáo.'); setLoading(false); return; }
     setLoading(true); setError(null);
     const headers = { Authorization: `Bearer ${token}` };
-    const qs = new URLSearchParams({ page: String(page), pageSize: '8' });
+    const qs = new URLSearchParams({
+      page: String(page),
+      pageSize: '8',
+      sortBy: 'createdAt',
+      sortDirection: 'desc',
+    });
     for (const key of ['search', 'month', 'status', 'format']) { const value = query.get(key); if (value) qs.set(key, value); }
     try {
       const [summaryResponse, categoryResponse, reportsResponse] = await Promise.all([
@@ -69,6 +104,74 @@ const AdminReportsPage: React.FC = () => {
   useEffect(() => { const timer = window.setTimeout(() => { setParams((current) => { const next = new URLSearchParams(current); if (searchInput.trim()) next.set('search', searchInput.trim()); else next.delete('search'); next.delete('page'); return next; }); }, 350); return () => window.clearTimeout(timer); }, [searchInput, setParams]);
 
   const updateQuery = (key: string, value: string) => setParams((current) => { const next = new URLSearchParams(current); if (value) next.set(key, value); else next.delete(key); if (key !== 'page') next.delete('page'); return next; });
+
+  const loadAssignmentData = useCallback(async () => {
+    if (!token) return;
+    setRequestError(null);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const [requestsResponse, templatesResponse, librariansResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/admin/reports/requests`, { headers }),
+        fetch(`${API_BASE_URL}/api/admin/reports/templates`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/admin/users?role=Librarian&page=1&pageSize=100&status=Active`, { headers }),
+      ]);
+      const [requestResult, templateResult, librarianResult] = await Promise.all([
+        parseApiResponse<ApiEnvelope<ReportRequest[]>>(requestsResponse),
+        parseApiResponse<ApiEnvelope<ReportTemplate[]>>(templatesResponse),
+        parseApiResponse<ApiEnvelope<LibrarianList>>(librariansResponse),
+      ]);
+      if (!requestsResponse.ok || !requestResult?.success || !requestResult.data) throw new Error(requestResult?.error || 'Không tải được các yêu cầu báo cáo.');
+      if (!templatesResponse.ok || !templateResult?.success || !templateResult.data) throw new Error(templateResult?.error || 'Không tải được mẫu báo cáo.');
+      if (!librariansResponse.ok || !librarianResult?.success || !librarianResult.data) throw new Error(librarianResult?.error || 'Không tải được danh sách Thủ thư.');
+      setRequests(requestResult.data);
+      setTemplates(templateResult.data.filter((template) => template.isEnabled));
+      setLibrarians(librarianResult.data.items.filter((librarian) => librarian.isActive || librarian.status === 'Active'));
+    } catch (caught) {
+      setRequestError(caught instanceof Error ? caught.message : 'Không thể tải dữ liệu giao báo cáo.');
+    }
+  }, [token]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadAssignmentData(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadAssignmentData]);
+
+  const createReportRequest = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!token || !requestLibrarianId || !requestTemplateId) return;
+    if (requestPeriodEnd < requestPeriodStart) {
+      setToast('Ngày kết thúc không được trước ngày bắt đầu.');
+      return;
+    }
+    setRequestBusy(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/reports/requests`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          librarianId: requestLibrarianId,
+          templateId: requestTemplateId,
+          name: requestName.trim() || undefined,
+          periodStart: new Date(requestPeriodStart).toISOString(),
+          periodEnd: new Date(new Date(requestPeriodEnd).getTime() + 86400000).toISOString(),
+        }),
+      });
+      const result = await parseApiResponse<ApiEnvelope<ReportRequest>>(response);
+      if (!response.ok || !result?.success || !result.data) throw new Error(result?.error || 'Không thể giao yêu cầu báo cáo.');
+      setToast(`Đã giao yêu cầu cho ${result.data.librarianName}.`);
+      setRequestFormOpen(false);
+      setRequestName('');
+      setRequestLibrarianId('');
+      setRequestTemplateId('');
+      await loadAssignmentData();
+    } catch (caught) {
+      setToast(caught instanceof Error ? caught.message : 'Không thể giao yêu cầu báo cáo.');
+    } finally {
+      setRequestBusy(false);
+    }
+  };
+
+  const selectedRequestTemplate = templates.find((template) => template.id === requestTemplateId);
 
   const exportCsv = async (reportId?: string) => {
     try {
@@ -109,14 +212,38 @@ const AdminReportsPage: React.FC = () => {
   ] : [];
 
   return <div className="reports-page">
-    <div className="reports-heading"><div><p className="reports-eyebrow">QUẢN TRỊ HỆ THỐNG</p><h1>Thống kê &amp; báo cáo</h1><p>Xem báo cáo tổng hợp theo thời gian, bộ phận và đối tượng phục vụ.</p></div><div className="reports-actions"><button type="button" className="reports-button secondary" onClick={() => void exportCsv()}><FileSpreadsheet size={16}/> Xuất CSV</button><span className="reports-button secondary" title="PDF export is unavailable because no real PDF API exists">PDF · Chưa có dữ liệu</span></div></div>
+    <div className="reports-heading"><div><p className="reports-eyebrow">QUẢN TRỊ HỆ THỐNG</p><h1>Thống kê &amp; báo cáo</h1><p>Xem báo cáo tổng hợp theo thời gian, bộ phận và đối tượng phục vụ.</p></div><div className="reports-actions"><button type="button" className="reports-button primary" onClick={() => setRequestFormOpen((open) => !open)}><Plus size={16}/> Giao báo cáo cho Thủ thư</button><button type="button" className="reports-button secondary" onClick={() => void exportCsv()}><FileSpreadsheet size={16}/> Xuất CSV</button><span className="reports-button secondary" title="PDF export is unavailable because no real PDF API exists">PDF · Chưa có dữ liệu</span></div></div>
     {error && <div className="reports-error" role="alert"><AlertCircle size={18}/><span>{error}</span><button onClick={() => void load()} type="button">Thử lại</button></div>}
+    {requestFormOpen && <section className="reports-panel reports-assignment-form-panel">
+      <div className="reports-panel-title"><div><span>GIAO VIỆC CHO THỦ THƯ</span><h2>Tạo yêu cầu nộp báo cáo</h2></div><button className="reports-icon-button" type="button" onClick={() => setRequestFormOpen(false)} aria-label="Đóng biểu mẫu"><X size={18}/></button></div>
+      <p className="reports-assignment-help">Chọn một Thủ thư, mẫu/loại báo cáo và kỳ cần tổng hợp. Yêu cầu sẽ xuất hiện trong trang Quản lý báo cáo của Thủ thư được chỉ định.</p>
+      <form className="reports-assignment-form" onSubmit={(event) => void createReportRequest(event)}>
+        <label>Thủ thư được giao<select required value={requestLibrarianId} onChange={(event) => setRequestLibrarianId(event.target.value)}><option value="">Chọn Thủ thư</option>{librarians.map((librarian) => <option value={librarian.id} key={librarian.id}>{librarian.fullName}</option>)}</select></label>
+        <label>Mẫu / loại báo cáo<select required value={requestTemplateId} onChange={(event) => setRequestTemplateId(event.target.value)}><option value="">Chọn mẫu báo cáo</option>{templates.map((template) => <option value={template.id} key={template.id}>{template.name} · {reportTypeLabel(template.reportType)}</option>)}</select></label>
+        <label>Tên yêu cầu (không bắt buộc)<input value={requestName} onChange={(event) => setRequestName(event.target.value)} placeholder={selectedRequestTemplate?.name ?? 'Ví dụ: Báo cáo hoạt động tháng 10'}/></label>
+        <label>Từ ngày<input type="date" required value={requestPeriodStart} onChange={(event) => setRequestPeriodStart(event.target.value)}/></label>
+        <label>Đến ngày<input type="date" required value={requestPeriodEnd} onChange={(event) => setRequestPeriodEnd(event.target.value)}/></label>
+        <div className="reports-assignment-form-actions"><button type="button" className="reports-button secondary" onClick={() => setRequestFormOpen(false)} disabled={requestBusy}>Hủy</button><button type="submit" className="reports-button primary" disabled={requestBusy || !librarians.length || !templates.length}>{requestBusy ? <LoaderCircle className="reports-spin" size={16}/> : <Plus size={16}/>} Giao yêu cầu</button></div>
+      </form>
+      {(!librarians.length || !templates.length) && <p className="reports-assignment-empty-hint">{!librarians.length ? 'Không tìm thấy Thủ thư đang hoạt động để giao việc.' : 'Chưa có mẫu báo cáo đang bật để giao.'}</p>}
+    </section>}
+    <section className="reports-panel reports-assignment-panel">
+      <div className="reports-panel-title"><div><span>THEO DÕI GIAO VIỆC</span><h2>Yêu cầu báo cáo từ Admin</h2></div><span className="reports-assignment-count"><ClipboardList size={15}/>{requests.filter((request) => request.status !== 'Submitted').length} đang chờ</span></div>
+      {requestError ? <div className="reports-error" role="alert"><AlertCircle size={17}/><span>{requestError}</span><button type="button" onClick={() => void loadAssignmentData()}>Thử lại</button></div>
+        : requests.length ? <div className="reports-assignment-list">{requests.map((request) => <article key={request.id}>
+          <div className="reports-assignment-person"><strong>{request.librarianName}</strong><span>Thủ thư được chỉ định</span></div>
+          <div className="reports-assignment-summary"><strong>{request.name || request.templateName}</strong><span>{reportTypeLabel(request.reportType)} · {request.templateName}</span></div>
+          <div className="reports-assignment-period"><strong>{date(request.periodStart)} – {date(requestedEndDate(request.periodEnd))}</strong><span>Kỳ báo cáo</span></div>
+          <span className={`reports-assignment-status ${request.status === 'Submitted' ? 'is-submitted' : request.lastReportStatus === 'Rejected' ? 'is-rejected' : ''}`}>{request.lastReportStatus === 'Approved' ? 'Đã duyệt' : request.status === 'Submitted' ? 'Đã nộp · chờ duyệt' : request.lastReportStatus === 'Rejected' ? 'Cần Thủ thư nộp lại' : 'Chờ Thủ thư nộp'}</span>
+          {request.reportId ? <Link className="reports-assignment-link" to={`/admin/reports/${request.reportId}`}><Eye size={15}/> Xem báo cáo</Link> : <span className="reports-assignment-date">Giao {date(request.createdAt)}</span>}
+        </article>)}</div> : <div className="reports-assignment-empty"><ClipboardList size={22}/><strong>Chưa có yêu cầu báo cáo</strong><span>Dùng “Giao báo cáo cho Thủ thư” để chỉ định người phụ trách và loại báo cáo.</span></div>}
+    </section>
     <section className="reports-kpis" aria-label="Chỉ số tổng hợp">{loading && !summary ? Array.from({ length: 4 }, (_, i) => <div className="reports-card skeleton" key={i}/>) : cards.map(({ label, value, note, icon: Icon, tone }) => <article className="reports-card" key={label}><span className={`reports-icon ${tone}`}><Icon size={19}/></span><div className="reports-card-value">{value}</div><h2>{label}</h2><p>{note}</p></article>)}</section>
     <nav className="reports-tabs" aria-label="Nhóm báo cáo">{[['activity', 'Báo cáo hoạt động'], ['finance', 'Tài chính'], ['collection', 'Kho sách'], ['periodic', 'Báo cáo định kỳ']].map(([id, label]) => <button type="button" className={activeTab === id ? 'active' : ''} key={id} onClick={() => updateQuery('tab', id)}>{label}</button>)}</nav>
     {activeTab === 'activity' ? <section className="reports-panel category-panel"><div className="reports-panel-title"><div><span>HOẠT ĐỘNG THƯ VIỆN</span><h2>Mượn theo nhóm sách</h2></div><span className="live-badge"><i/> Dữ liệu trực tiếp</span></div>{loading && !summary ? <p className="reports-muted">Đang tải thống kê…</p> : categories.length ? <div className="category-list">{categories.map((item) => <div className="category-row" key={item.category}><div className="category-copy"><strong>{item.category}</strong><span>{number(item.count)} lượt mượn · {item.percent}%</span></div><div className="category-track"><div style={{ width: `${item.percent}%` }}/></div></div>)}</div> : <div className="reports-empty"><ChartNoAxesCombined size={20}/><span>Chưa có dữ liệu mượn theo nhóm sách trong kỳ.</span></div>}</section> : <section className="reports-panel reports-tab-empty"><ChartNoAxesCombined size={22}/><h2>{activeTab === 'finance' ? 'Tài chính' : activeTab === 'collection' ? 'Kho sách' : 'Báo cáo định kỳ'}</h2><p>Chưa có dữ liệu cho mục này.</p></section>}
     <section className="reports-panel report-list-panel"><div className="reports-panel-title"><div><span>GỬI TỪ THỦ THƯ</span><h2>Thư viện báo cáo</h2></div><Link to="/admin/reports/templates">Quản lý mẫu báo cáo <ChevronRight size={15}/></Link></div><div className="reports-filters"><label className="reports-search"><Search size={17}/><input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Tìm tên hoặc mã báo cáo" aria-label="Tìm báo cáo"/></label><label className="reports-select"><CalendarDays size={15}/><input type="month" value={query.get('month') ?? ''} onChange={(event) => updateQuery('month', event.target.value)} aria-label="Lọc theo tháng"/></label><label className="reports-select"><Filter size={15}/><select value={query.get('status') ?? ''} onChange={(event) => updateQuery('status', event.target.value)} aria-label="Lọc trạng thái"><option value="">Tất cả trạng thái</option><option value="Ready">Sẵn sàng</option><option value="Processing">Đang xử lý</option><option value="Error">Lỗi</option></select></label><label className="reports-select"><FileSpreadsheet size={15}/><select value={query.get('format') ?? ''} onChange={(event) => updateQuery('format', event.target.value)} aria-label="Lọc định dạng"><option value="">Mọi định dạng</option><option value="CSV">CSV</option><option value="PDF">PDF</option></select></label></div>
       {selected.length > 0 && <div className="reports-bulk"><span>Đã chọn {selected.length} báo cáo</span><div><button type="button" onClick={() => void exportSelected()}><ArrowDownToLine size={15}/> Tải CSV</button><button type="button" onClick={() => setConfirmDelete(selected)}><Trash2 size={15}/> Xóa đã chọn</button></div></div>}
-      <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th><input type="checkbox" aria-label="Chọn tất cả báo cáo" checked={!!reports?.items.length && selected.length === reports.items.length} onChange={(event) => setSelected(event.target.checked ? reports?.items.map((x) => x.id) ?? [] : [])}/></th><th>Báo cáo</th><th>Ngày gửi</th><th>Định dạng</th><th>Trạng thái</th><th>Hành động</th></tr></thead><tbody>{loading && !reports ? <tr><td colSpan={6} className="reports-table-empty"><LoaderCircle className="reports-spin" size={20}/> Đang tải báo cáo…</td></tr> : reports?.items.length ? reports.items.map((item) => <tr key={item.id} className="report-row-clickable" onClick={() => navigate(`/admin/reports/${item.id}`)}><td onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label={`Chọn báo cáo ${item.code}`} checked={selected.includes(item.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))}/></td><td><Link to={`/admin/reports/${item.id}`} className="report-title-link"><strong>{item.name}</strong></Link><small>{item.code} · {item.submitter}</small></td><td>{date(item.createdAt)}</td><td><span className="format-pill">{item.format}</span></td><td><span className={`status-pill ${item.status.toLowerCase()}`}>{item.status === 'Ready' ? 'Sẵn sàng' : item.status === 'Processing' ? 'Đang xử lý' : item.status}</span></td><td className="report-row-actions" onClick={(e) => e.stopPropagation()}><Link to={`/admin/reports/${item.id}`} aria-label={`Xem ${item.code}`} title="Xem chi tiết &amp; mẫu báo cáo"><Eye size={16}/></Link><button type="button" aria-label={`Tải ${item.code} dưới dạng CSV`} onClick={() => void exportCsv(item.id)}><ArrowDownToLine size={16}/></button><button type="button" aria-label={`Xóa ${item.code}`} onClick={() => setConfirmDelete([item.id])}><Trash2 size={16}/></button></td></tr>) : <tr><td colSpan={6} className="reports-table-empty">Chưa có báo cáo nào phù hợp với bộ lọc.</td></tr>}</tbody></table></div>
+      <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th><input type="checkbox" aria-label="Chọn tất cả báo cáo" checked={!!reports?.items.length && selected.length === reports.items.length} onChange={(event) => setSelected(event.target.checked ? reports?.items.map((x) => x.id) ?? [] : [])}/></th><th>Báo cáo</th><th>Ngày gửi</th><th>Định dạng</th><th>Trạng thái duyệt</th><th>Hành động</th></tr></thead><tbody>{loading && !reports ? <tr><td colSpan={6} className="reports-table-empty"><LoaderCircle className="reports-spin" size={20}/> Đang tải báo cáo…</td></tr> : reports?.items.length ? reports.items.map((item) => <tr key={item.id} className="report-row-clickable" onClick={() => navigate(`/admin/reports/${item.id}`)}><td onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label={`Chọn báo cáo ${item.code}`} checked={selected.includes(item.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))}/></td><td><Link to={`/admin/reports/${item.id}`} className="report-title-link"><strong>{item.name}</strong></Link><small>{item.code} · {item.submitter}</small></td><td>{date(item.createdAt)}</td><td><span className="format-pill">{item.format}</span></td><td><span className={`status-pill ${item.isApproved ? 'approved' : item.isRejected || item.status === 'Rejected' ? 'rejected' : 'unapproved'}`}>{item.isApproved ? 'Đã duyệt' : item.isRejected || item.status === 'Rejected' ? 'Yêu cầu chỉnh sửa' : 'Chưa duyệt'}</span><small>{item.isViewed ? 'Đã xem' : item.status === 'Ready' ? 'Chờ xem' : item.status}</small></td><td className="report-row-actions" onClick={(e) => e.stopPropagation()}><Link to={`/admin/reports/${item.id}`} aria-label={`Xem ${item.code}`} title="Xem chi tiết &amp; mẫu báo cáo"><Eye size={16}/></Link><button type="button" aria-label={`Tải ${item.code} dưới dạng CSV`} onClick={() => void exportCsv(item.id)}><ArrowDownToLine size={16}/></button><button type="button" aria-label={`Xóa ${item.code}`} onClick={() => setConfirmDelete([item.id])}><Trash2 size={16}/></button></td></tr>) : <tr><td colSpan={6} className="reports-table-empty">Chưa có báo cáo nào phù hợp với bộ lọc.</td></tr>}</tbody></table></div>
       <div className="reports-pagination"><span>Hiển thị {reports?.totalCount ? (page - 1) * (reports?.pageSize ?? 8) + 1 : 0}-{Math.min(page * (reports?.pageSize ?? 8), reports?.totalCount ?? 0)} trong {number(reports?.totalCount ?? 0)} báo cáo</span><div><button type="button" aria-label="Trang trước" disabled={page <= 1} onClick={() => updateQuery('page', String(page - 1))}><ChevronLeft size={16}/></button><span>Trang {page} / {reports?.totalPages ?? 1}</span><button type="button" aria-label="Trang sau" disabled={page >= (reports?.totalPages ?? 1)} onClick={() => updateQuery('page', String(page + 1))}><ChevronRight size={16}/></button></div></div>
     </section>
     <footer className="reports-footer"><span>SmartLibrary · Dữ liệu trực tiếp</span><span>Múi giờ UTC+07:00 · Cập nhật {summary ? date(new Date().toISOString()) : '—'}</span></footer>

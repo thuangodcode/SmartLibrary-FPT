@@ -13,13 +13,16 @@ public sealed class ReportRepository(AppDbContext db) : IReportRepository
     public IQueryable<UserProfile> Users => db.UserProfiles;
     public IQueryable<Notification> Notifications => db.Notifications;
     public IQueryable<ReportReview> Reviews => db.ReportReviews;
+    public IQueryable<ReportRequest> ReportRequests => db.ReportRequests;
     public void AddReport(LibraryReport report) => db.LibraryReports.Add(report);
+    public void AddReportRequest(ReportRequest request) => db.ReportRequests.Add(request);
     public void AddNotification(Notification notification) => db.Notifications.Add(notification);
     public void AddReview(ReportReview review) => db.ReportReviews.Add(review);
     public void AddTemplate(ReportTemplate template) => db.ReportTemplates.Add(template);
     public Task<ReportTemplate?> FindTemplateAsync(Guid id, CancellationToken ct) => db.ReportTemplates.FirstOrDefaultAsync(x => x.Id == id, ct);
     public Task<ReportTemplate?> FindTemplateForUpdateAsync(Guid id, CancellationToken ct) => db.ReportTemplates.FirstOrDefaultAsync(x => x.Id == id, ct);
     public Task<LibraryReport?> FindReportForUpdateAsync(Guid id, CancellationToken ct) => db.LibraryReports.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == id, ct);
+    public Task<ReportRequest?> FindReportRequestForUpdateAsync(Guid id, CancellationToken ct) => db.ReportRequests.FirstOrDefaultAsync(x => x.Id == id, ct);
     public Task<ReportTemplate?> FindTemplateByNameAsync(string name, CancellationToken ct) => db.ReportTemplates.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Name == name, ct);
     public Task<ReportTemplate?> FindOtherTemplateByNameAsync(string name, Guid id, CancellationToken ct) => db.ReportTemplates.FirstOrDefaultAsync(x => x.Name == name && x.Id != id, ct);
     public Task<ReportTemplate?> FindTemplateByIdIgnoreFiltersAsync(Guid id, CancellationToken ct) => db.ReportTemplates.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == id, ct);

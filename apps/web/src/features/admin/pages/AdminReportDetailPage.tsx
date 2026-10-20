@@ -12,6 +12,7 @@ import {
   LoaderCircle,
   MessageSquareText,
   Pencil,
+  RotateCcw,
   Save,
   Send,
   SlidersHorizontal,
@@ -22,10 +23,11 @@ import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import './AdminReportDetailPage.css';
+import './AdminReportsExperience.css';
 
 interface Envelope<T> { success?: boolean; data?: T; error?: string }
 interface Review { action: string; comment: string | null; reviewer: string; createdAt: string }
-interface ReportRow { date: string; category: string; borrowed: number; returned: number; overdue: number; returnedCount: number; notes: string | null }
+interface ReportRow { date: string; category: string; borrowed: number; returned: number; notes: string | null }
 interface Report {
   id: string;
   code: string;
@@ -39,6 +41,7 @@ interface Report {
   status: string;
   isViewed: boolean;
   isApproved: boolean;
+  isRejected?: boolean;
   rows: ReportRow[];
   reviews: Review[];
   templateId?: string;
@@ -56,10 +59,8 @@ const fmtDate = (value: string) => {
 };
 
 const metricLabels: Record<string, string> = {
-  Borrowed: 'Số lượt mượn',
-  Returned: 'Số lượt trả',
-  Overdue: 'Sách quá hạn',
-  ReturnedCount: 'Đã hoàn tất trả',
+  Borrowed: 'Lượt mượn',
+  Returned: 'Lượt trả',
 };
 
 const periodLabels: Record<string, string> = {
@@ -92,7 +93,7 @@ const AdminReportDetailPage: React.FC = () => {
   const [tmplDesc, setTmplDesc] = useState('');
   const [tmplPeriod, setTmplPeriod] = useState('Month');
   const [tmplGroupBy, setTmplGroupBy] = useState('Day');
-  const [tmplMetrics, setTmplMetrics] = useState<string[]>(['Borrowed', 'Returned', 'Overdue', 'ReturnedCount']);
+  const [tmplMetrics, setTmplMetrics] = useState<string[]>(['Borrowed', 'Returned']);
   const [tmplEnabled, setTmplEnabled] = useState(true);
 
   const total = useMemo(
@@ -101,11 +102,9 @@ const AdminReportDetailPage: React.FC = () => {
         (sum, row) => ({
           borrowed: sum.borrowed + row.borrowed,
           returned: sum.returned + row.returned,
-          overdue: sum.overdue + row.overdue,
-          returnedCount: sum.returnedCount + row.returnedCount,
         }),
-        { borrowed: 0, returned: 0, overdue: 0, returnedCount: 0 }
-      ) ?? { borrowed: 0, returned: 0, overdue: 0, returnedCount: 0 },
+        { borrowed: 0, returned: 0 }
+      ) ?? { borrowed: 0, returned: 0 },
     [report]
   );
 
@@ -119,6 +118,12 @@ const AdminReportDetailPage: React.FC = () => {
       return null;
     }
   }, [report]);
+  const templateMetrics = useMemo(() => {
+    const configured = (parsedTemplateConfig?.metrics ?? []).filter(
+      (metric) => metric === 'Borrowed' || metric === 'Returned',
+    );
+    return configured.length ? configured : ['Borrowed', 'Returned'];
+  }, [parsedTemplateConfig]);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -161,7 +166,7 @@ const AdminReportDetailPage: React.FC = () => {
     };
   }, [load]);
 
-  const update = async (payload: { isViewed?: boolean; isApproved?: boolean; comment?: string; name?: string; status?: string }) => {
+  const update = async (payload: { isViewed?: boolean; isApproved?: boolean; isRejected?: boolean; comment?: string; name?: string; status?: string }) => {
     if (!token || !id) return;
     setBusy(true);
     try {
@@ -193,7 +198,7 @@ const AdminReportDetailPage: React.FC = () => {
     if (parsedTemplateConfig) {
       setTmplPeriod(parsedTemplateConfig.period || 'Month');
       setTmplGroupBy(parsedTemplateConfig.groupBy || 'Day');
-      setTmplMetrics(parsedTemplateConfig.metrics || ['Borrowed', 'Returned', 'Overdue', 'ReturnedCount']);
+      setTmplMetrics(templateMetrics);
     }
     setEditTemplateModal(true);
   };
@@ -333,8 +338,8 @@ const AdminReportDetailPage: React.FC = () => {
               <div>
                 <span>TRẠNG THÁI DUYỆT</span>
                 <strong>
-                  <i className={`detail-status ${report.isApproved ? 'approved' : report.isViewed ? 'viewed' : ''}`} />
-                  {report.isApproved ? 'Đã duyệt' : report.isViewed ? 'Đã xem' : report.status === 'Ready' ? 'Sẵn sàng' : report.status}
+                  <i className={`detail-status ${report.isApproved ? 'approved' : report.isRejected || report.status === 'Rejected' ? 'rejected' : report.isViewed ? 'viewed' : ''}`} />
+                  {report.isApproved ? 'Đã duyệt' : report.isRejected || report.status === 'Rejected' ? 'Yêu cầu chỉnh sửa' : report.isViewed ? 'Đã xem' : report.status === 'Ready' ? 'Sẵn sàng' : report.status}
                 </strong>
               </div>
               <div>
@@ -400,7 +405,7 @@ const AdminReportDetailPage: React.FC = () => {
               <div className="template-metrics-row">
                 <span className="metrics-title">Chỉ số bắt buộc theo mẫu:</span>
                 <div className="metrics-tags">
-                  {(parsedTemplateConfig?.metrics ?? ['Borrowed', 'Returned', 'Overdue', 'ReturnedCount']).map((m) => (
+                  {templateMetrics.map((m) => (
                     <span key={m} className="metric-tag">
                       {metricLabels[m] || m}
                     </span>
@@ -425,10 +430,8 @@ const AdminReportDetailPage: React.FC = () => {
                       <tr>
                         <th>Ngày</th>
                         <th>Nhóm sách / Danh mục</th>
-                        <th>Số mượn</th>
-                        <th>Số trả</th>
-                        <th>Quá hạn</th>
-                        <th>Đã trả</th>
+                        <th>Lượt mượn</th>
+                        <th>Lượt trả</th>
                         <th>Ghi chú</th>
                       </tr>
                     </thead>
@@ -439,8 +442,6 @@ const AdminReportDetailPage: React.FC = () => {
                           <td><strong>{row.category}</strong></td>
                           <td>{row.borrowed.toLocaleString('vi-VN')}</td>
                           <td>{row.returned.toLocaleString('vi-VN')}</td>
-                          <td>{row.overdue.toLocaleString('vi-VN')}</td>
-                          <td>{row.returnedCount.toLocaleString('vi-VN')}</td>
                           <td>{row.notes || '—'}</td>
                         </tr>
                       ))}
@@ -450,8 +451,6 @@ const AdminReportDetailPage: React.FC = () => {
                         <th colSpan={2}>Tổng cộng toàn kỳ</th>
                         <th>{total.borrowed.toLocaleString('vi-VN')}</th>
                         <th>{total.returned.toLocaleString('vi-VN')}</th>
-                        <th>{total.overdue.toLocaleString('vi-VN')}</th>
-                        <th>{total.returnedCount.toLocaleString('vi-VN')}</th>
                         <th>—</th>
                       </tr>
                     </tfoot>
@@ -508,6 +507,18 @@ const AdminReportDetailPage: React.FC = () => {
                   <Send size={15} /> Gửi nhận xét
                 </button>
               </form>
+              {!report.isApproved && (
+                <div className="report-reject-action">
+                  <p>Để yêu cầu Thủ thư chỉnh sửa, hãy nhập lý do ở trên rồi gửi phản hồi từ chối.</p>
+                  <button
+                    type="button"
+                    disabled={busy || !comment.trim()}
+                    onClick={() => void update({ isRejected: true, comment: comment.trim() })}
+                  >
+                    <RotateCcw size={15} /> Từ chối và yêu cầu chỉnh sửa
+                  </button>
+                </div>
+              )}
               {report.reviews.length > 0 && (
                 <div className="report-review-list">
                   {report.reviews.map((review, index) => (
@@ -516,7 +527,7 @@ const AdminReportDetailPage: React.FC = () => {
                         <strong>{review.reviewer}</strong>
                         <span>
                           {fmtDate(review.createdAt)} ·{' '}
-                          {review.action === 'Approved' ? 'Đã duyệt' : review.action === 'Viewed' ? 'Đã xem' : 'Nhận xét'}
+                          {review.action === 'Approved' ? 'Đã duyệt' : review.action === 'Rejected' ? 'Yêu cầu chỉnh sửa' : review.action === 'Viewed' ? 'Đã xem' : 'Nhận xét'}
                         </span>
                       </div>
                       <p>{review.comment || (review.action === 'Approved' ? 'Đã duyệt báo cáo.' : 'Đã xem báo cáo.')}</p>
@@ -634,7 +645,7 @@ const AdminReportDetailPage: React.FC = () => {
                     Chỉ số bắt buộc theo dõi:
                   </span>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: 11 }}>
-                    {[['Borrowed', 'Số lượt mượn'], ['Returned', 'Số lượt trả'], ['Overdue', 'Sách quá hạn'], ['ReturnedCount', 'Đã hoàn tất trả']].map(([key, label]) => (
+                    {[['Borrowed', 'Lượt mượn'], ['Returned', 'Lượt trả']].map(([key, label]) => (
                       <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                         <input
                           type="checkbox"

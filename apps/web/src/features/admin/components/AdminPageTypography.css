@@ -1,0 +1,223 @@
+.admin-content {
+  --admin-page-title-font: var(--font-sans);
+  --admin-page-title-color: #172238;
+}
+
+.admin-content .admin-page-heading,
+.admin-content .admin-users-heading,
+.admin-content .reg-heading,
+.admin-content .pol-heading,
+.admin-content .admin-section-heading {
+  position: relative;
+  align-items: center;
+  min-height: 176px;
+  padding: 34px 38px;
+  overflow: hidden;
+  border: 1px solid #f2e5dc;
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse at 92% 8%, rgb(232 120 62 / 13%), transparent 33%),
+    linear-gradient(120deg, #fff 0%, #fffaf6 58%, #fff4eb 100%);
+  box-shadow: 0 14px 36px rgb(41 50 70 / 5%);
+}
+
+.admin-content .admin-page-heading::after,
+.admin-content .admin-users-heading::after,
+.admin-content .reg-heading::after,
+.admin-content .pol-heading::after,
+.admin-content .admin-section-heading::after {
+  position: absolute;
+  right: 11%;
+  bottom: -88px;
+  width: 205px;
+  height: 205px;
+  border: 1px solid rgb(232 120 62 / 13%);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+
+.admin-content .admin-page-heading h1,
+.admin-content .admin-users-heading h1,
+.admin-content .reg-heading h1,
+.admin-content .pol-heading h1,
+.admin-content .admin-section-heading h1,
+.admin-content .reg-form-head h1,
+.admin-content .pol-form-head h1,
+.admin-content .reg-detail-title h1,
+.admin-content .pol-detail-title h1 {
+  margin: 0;
+  color: var(--admin-page-title-color);
+  font-family: var(--admin-page-title-font);
+  font-size: clamp(32px, 3.2vw, 42px);
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+}
+
+.admin-content .admin-page-description,
+.admin-content .admin-users-description,
+.admin-content .reg-heading p,
+.admin-content .reg-form-head p,
+.admin-content .reg-detail-title p,
+.admin-content .pol-heading p,
+.admin-content .pol-form-head p,
+.admin-content .pol-detail-title p,
+.admin-content .admin-section-heading > div > p {
+  margin-top: 12px;
+  color: #667287;
+  font-family: var(--admin-page-title-font);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.admin-content .admin-eyebrow,
+.admin-content .admin-users-eyebrow,
+.admin-content .admin-section-eyebrow {
+  margin-bottom: 10px;
+  color: #e8783e;
+  font-family: var(--admin-page-title-font);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+}
+
+.admin-content .admin-page-heading > div,
+.admin-content .admin-users-heading > div:first-child,
+.admin-content .reg-heading-copy,
+.admin-content .pol-heading-copy,
+.admin-content .admin-section-heading > div {
+  position: relative;
+  z-index: 1;
+}
+
+.admin-content .admin-users-actions,
+.admin-content .reg-heading > button,
+.admin-content .pol-heading > button {
+  position: relative;
+  z-index: 1;
+}
+
+.admin-content .admin-users-heading {
+  gap: 20px;
+}
+
+.admin-content .admin-users-button {
+  min-height: 46px;
+  padding-inline: 16px;
+  border-radius: 12px;
+  font-family: var(--admin-page-title-font);
+  font-size: 14px;
+}
+
+.admin-content .reg-heading-icon,
+.admin-content .pol-heading-icon {
+  width: 58px;
+  height: 58px;
+}
+
+.admin-content .admin-section-heading {
+  margin-bottom: 0;
+}
+
+.admin-content .reg-form-head,
+.admin-content .pol-form-head {
+  align-items: center;
+  gap: 20px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.admin-content .reg-detail-title h1,
+.admin-content .pol-detail-title h1 {
+  font-size: clamp(30px, 3vw, 40px);
+  overflow-wrap: anywhere;
+}
+
+.admin-content .reg-detail-title > .reg-detail-meta,
+.admin-content .pol-detail-title > .pol-detail-meta {
+  margin-bottom: 12px;
+}
+
+.admin-content .admin-section-heading h1 {
+  margin-block: 0;
+}
+
+@media (max-width: 1100px) {
+  .admin-content .admin-page-heading,
+  .admin-content .admin-users-heading,
+  .admin-content .reg-heading,
+  .admin-content .pol-heading,
+  .admin-content .admin-section-heading {
+    padding: 28px;
+  }
+}
+
+@media (max-width: 860px) {
+  .admin-content .admin-page-heading,
+  .admin-content .admin-users-heading,
+  .admin-content .reg-heading,
+  .admin-content .pol-heading,
+  .admin-content .admin-section-heading,
+  .admin-content .reg-form-head,
+  .admin-content .pol-form-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-content .admin-page-heading,
+  .admin-content .admin-users-heading,
+  .admin-content .reg-heading,
+  .admin-content .pol-heading,
+  .admin-content .admin-section-heading {
+    min-height: auto;
+    padding: 24px 20px;
+    border-radius: 18px;
+  }
+
+  .admin-content .admin-page-heading h1,
+  .admin-content .admin-users-heading h1,
+  .admin-content .reg-heading h1,
+  .admin-content .pol-heading h1,
+  .admin-content .admin-section-heading h1,
+  .admin-content .reg-form-head h1,
+  .admin-content .pol-form-head h1,
+  .admin-content .reg-detail-title h1,
+  .admin-content .pol-detail-title h1 {
+    font-size: 30px;
+  }
+
+  .admin-content .admin-page-description,
+  .admin-content .admin-users-description,
+  .admin-content .reg-heading p,
+  .admin-content .reg-form-head p,
+  .admin-content .reg-detail-title p,
+  .admin-content .pol-heading p,
+  .admin-content .pol-form-head p,
+  .admin-content .pol-detail-title p,
+  .admin-content .admin-section-heading > div > p {
+    font-size: 14px;
+  }
+
+  .admin-content .admin-users-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .admin-content .admin-users-actions > button {
+    flex: 1;
+  }
+
+  .admin-content .reg-heading > button,
+  .admin-content .pol-heading > button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-content .reg-heading-copy,
+  .admin-content .pol-heading-copy {
+    align-items: flex-start;
+  }
+}

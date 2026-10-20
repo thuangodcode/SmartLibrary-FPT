@@ -21,6 +21,7 @@ import smartLibraryLogo from '../../../assets/figma/auth-logo-fpt.png';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import './AdminLayout.css';
+import './AdminPageTypography.css';
 
 const navigation = [
   { label: 'Tổng quan', to: '/admin', icon: LayoutDashboard, end: true },
@@ -203,9 +204,14 @@ export const AdminLayout: React.FC = () => {
             <Menu size={21} />
           </button>
           <div className="admin-topbar-actions">
-            <button type="button" className="admin-icon-button" aria-label="Thông báo">
+            <button
+              type="button"
+              className="admin-icon-button"
+              aria-label="Mở danh sách báo cáo"
+              title="Mở danh sách báo cáo"
+              onClick={() => navigate('/admin/reports')}
+            >
               <Bell size={19} />
-              <span className="admin-notification-dot" />
             </button>
             <span className="admin-topbar-divider" />
             <div className="admin-profile">

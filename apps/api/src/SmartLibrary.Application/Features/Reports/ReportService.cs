@@ -8,6 +8,107 @@ public sealed class ReportService(IReportRepository repository)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    private static string GetDisplayName(string? value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    public async Task<IReadOnlyList<ReportRequestDto>> ReportRequestsAsync(Guid userId, bool isAdmin, CancellationToken ct)
+    {
+        var requiredRole = isAdmin ? "Admin" : "Librarian";
+        if (!await repository.Users.AnyAsync(x => x.Id == userId && x.IsActive && x.Role.Name == requiredRole, ct))
+            throw new UnauthorizedAccessException("Tài khoản không hợp lệ hoặc đã bị khóa.");
+
+        var requests = repository.ReportRequests.AsNoTracking().IgnoreQueryFilters()
+            .Include(x => x.Librarian)
+            .Include(x => x.Template)
+            .Include(x => x.Reports).ThenInclude(x => x.Reviews)
+            .AsQueryable();
+        if (!isAdmin)
+            requests = requests.Where(x => x.LibrarianId == userId);
+
+        var results = await requests.OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
+        return results.Select(x =>
+        {
+            var lastReport = x.Reports.OrderByDescending(report => report.CreatedAt).FirstOrDefault();
+            var lastReviewComment = lastReport?.Reviews
+                .Where(review => !review.IsDeleted)
+                .OrderByDescending(review => review.CreatedAt)
+                .FirstOrDefault(review => !string.IsNullOrWhiteSpace(review.Comment))
+                ?.Comment;
+            return new ReportRequestDto(
+                x.Id,
+                x.LibrarianId,
+                GetDisplayName(x.Librarian.FullName, "Không xác định"),
+                x.TemplateId,
+                x.Template.Name,
+                x.Template.ReportType,
+                x.PeriodStart,
+                x.PeriodEnd,
+                x.Name,
+                x.Status,
+                x.CreatedAt,
+                x.ReportId,
+                lastReport?.Id,
+                lastReport is null ? null : lastReport.IsApproved ? "Approved" : lastReport.Status,
+                lastReviewComment);
+        }).ToList();
+    }
+
+    public async Task<ReportRequestDto> CreateReportRequestAsync(CreateReportRequestAssignment request, Guid adminId, CancellationToken ct)
+    {
+        if (request.PeriodStart == default || request.PeriodEnd == default || request.PeriodEnd.Date <= request.PeriodStart.Date)
+            throw new ArgumentException("Kỳ báo cáo không hợp lệ.");
+        if (request.Name is { Length: > 250 })
+            throw new ArgumentException("Tên yêu cầu không được vượt quá 250 ký tự.");
+        if (!await repository.Users.AnyAsync(x => x.Id == adminId && x.IsActive && x.Role.Name == "Admin", ct))
+            throw new UnauthorizedAccessException("Chỉ quản trị viên đang hoạt động mới được giao yêu cầu báo cáo.");
+
+        var librarian = await repository.Users.Include(x => x.Role)
+            .FirstOrDefaultAsync(x => x.Id == request.LibrarianId && x.IsActive && x.Role.Name == "Librarian", ct)
+            ?? throw new ArgumentException("Thủ thư không tồn tại, đã bị khóa hoặc không có vai trò thủ thư.");
+        var template = await repository.Templates.FirstOrDefaultAsync(
+            x => x.Id == request.TemplateId && x.IsEnabled && !x.IsDeleted, ct)
+            ?? throw new KeyNotFoundException("Không tìm thấy mẫu báo cáo đang bật.");
+
+        var reportRequest = new ReportRequest
+        {
+            LibrarianId = librarian.Id,
+            Librarian = librarian,
+            RequestedBy = adminId,
+            TemplateId = template.Id,
+            Template = template,
+            PeriodStart = request.PeriodStart.Date,
+            PeriodEnd = request.PeriodEnd.Date,
+            Name = string.IsNullOrWhiteSpace(request.Name) ? null : request.Name.Trim(),
+            Status = "Pending"
+        };
+        repository.AddReportRequest(reportRequest);
+        repository.AddNotification(new Notification
+        {
+            UserId = librarian.Id,
+            Title = "Yêu cầu báo cáo mới",
+            Message = $"Quản trị viên đã giao yêu cầu báo cáo “{template.Name}”.",
+            Type = "report",
+            Metadata = JsonSerializer.Serialize(new { requestId = reportRequest.Id, status = reportRequest.Status })
+        });
+        await repository.SaveChangesAsync(ct);
+
+        return new ReportRequestDto(
+            reportRequest.Id,
+            librarian.Id,
+            GetDisplayName(librarian.FullName, "Không xác định"),
+            template.Id,
+            template.Name,
+            template.ReportType,
+            reportRequest.PeriodStart,
+            reportRequest.PeriodEnd,
+            reportRequest.Name,
+            reportRequest.Status,
+            reportRequest.CreatedAt,
+            reportRequest.ReportId,
+            null,
+            null,
+            null);
+    }
+
     public async Task<ReportListDto> ListAsync(ReportQuery query, CancellationToken ct)
     {
         var page = Math.Max(1, query.Page);
@@ -18,6 +119,7 @@ public sealed class ReportService(IReportRepository repository)
         if (!string.IsNullOrWhiteSpace(query.Status)) items = items.Where(x => x.Status == query.Status);
         if (!string.IsNullOrWhiteSpace(query.Format)) items = items.Where(x => x.Format == query.Format);
         if (query.SubmittedBy.HasValue) items = items.Where(x => x.SubmittedBy == query.SubmittedBy.Value);
+        if (query.IsApproved.HasValue) items = items.Where(x => x.IsApproved == query.IsApproved.Value);
         if (DateTime.TryParse(query.Month, out var month))
         {
             var start = new DateTime(month.Year, month.Month, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -35,20 +137,43 @@ public sealed class ReportService(IReportRepository repository)
             _ => items.OrderByDescending(x => x.CreatedAt)
         };
         var rows = await ordered.Skip((page - 1) * pageSize).Take(pageSize)
-            .Select(x => new ReportListItemDto(x.Id, x.Code, x.Name, x.Submitter.FullName, x.CreatedAt, x.Format, x.Status, x.IsViewed, x.IsApproved, x.PeriodStart, x.PeriodEnd)).ToListAsync(ct);
+            .Select(x => new ReportListItemDto(
+                x.Id,
+                x.Code,
+                x.Name,
+                x.Submitter != null ? (x.Submitter.FullName ?? "Không xác định") : "Không xác định",
+                x.CreatedAt,
+                x.Format,
+                x.Status,
+                x.IsViewed,
+                x.IsApproved,
+                x.PeriodStart,
+                x.PeriodEnd,
+                x.Status == "Rejected")).ToListAsync(ct);
         return new ReportListDto(rows, count, page, pageSize, (int)Math.Ceiling(count / (double)pageSize));
     }
 
-    public async Task<ReportDetailDto?> DetailAsync(Guid id, CancellationToken ct)
+    public async Task<ReportDetailDto?> DetailAsync(Guid id, CancellationToken ct, Guid? submittedBy = null)
     {
-        var report = await repository.Reports.AsNoTracking().Include(x => x.Submitter).Include(x => x.Template)
-            .Include(x => x.Reviews.Where(review => !review.IsDeleted)).ThenInclude(x => x.Reviewer).FirstOrDefaultAsync(x => x.Id == id, ct);
-        return report is null || report.IsDeleted ? null : new ReportDetailDto(report.Id, report.Code, report.Name, report.Submitter.FullName,
-            report.Template.Name, report.CreatedAt, report.PeriodStart, report.PeriodEnd, report.Format, report.Status,
+        var query = repository.Reports.Where(x => x.Id == id);
+        if (submittedBy.HasValue) query = query.Where(x => x.SubmittedBy == submittedBy.Value);
+        var report = await query.AsNoTracking().Include(x => x.Submitter).Include(x => x.Template)
+            .Include(x => x.Reviews.Where(review => !review.IsDeleted)).ThenInclude(x => x.Reviewer).FirstOrDefaultAsync(ct);
+        if (report is null || report.IsDeleted) return null;
+
+        var submitterName = GetDisplayName(report.Submitter?.FullName, "Không xác định");
+        var templateName = GetDisplayName(report.Template?.Name, "Mẫu báo cáo đã bị xóa");
+        var reviews = report.Reviews.OrderBy(x => x.CreatedAt)
+            .Select(x => new ReportReviewDto(x.Action, x.Comment, GetDisplayName(x.Reviewer?.FullName, "Không xác định"), x.CreatedAt))
+            .ToList();
+
+        return new ReportDetailDto(report.Id, report.Code, report.Name, submitterName,
+            templateName, report.CreatedAt, report.PeriodStart, report.PeriodEnd, report.Format, report.Status,
             report.IsViewed, report.IsApproved, report.Snapshot,
-            report.Reviews.OrderBy(x => x.CreatedAt).Select(x => new ReportReviewDto(x.Action, x.Comment, x.Reviewer.FullName, x.CreatedAt)).ToList(),
+            reviews,
             ReadRows(report.Snapshot),
-            report.TemplateId, report.Template.ReportType, report.Template.Description, report.Template.Configuration);
+            report.TemplateId, report.Template?.ReportType, report.Template?.Description, report.Template?.Configuration,
+            string.Equals(report.Status, "Rejected", StringComparison.OrdinalIgnoreCase));
     }
 
     private static JsonDocument ParseConfiguration(string? raw)
@@ -128,6 +253,22 @@ public sealed class ReportService(IReportRepository repository)
         if (periodEndExclusive <= request.PeriodStart.Date) throw new ArgumentException("Ngày kết thúc phải sau ngày bắt đầu.");
         if (request.Format is not ("CSV" or "PDF")) throw new ArgumentException("Định dạng chỉ hỗ trợ CSV hoặc PDF.");
         if (!await repository.Users.AnyAsync(x => x.Id == userId && x.IsActive, ct)) throw new ArgumentException("Tài khoản gửi báo cáo không hợp lệ hoặc đã bị khóa.");
+        ReportRequest? reportRequest = null;
+        if (request.RequestId.HasValue)
+        {
+            reportRequest = await repository.FindReportRequestForUpdateAsync(request.RequestId.Value, ct)
+                ?? throw new KeyNotFoundException("Không tìm thấy yêu cầu báo cáo.");
+            if (reportRequest.LibrarianId != userId)
+                throw new UnauthorizedAccessException("Yêu cầu báo cáo không được giao cho tài khoản này.");
+            if (!await repository.Users.AnyAsync(x => x.Id == userId && x.IsActive && x.Role.Name == "Librarian", ct))
+                throw new UnauthorizedAccessException("Chỉ thủ thư đang hoạt động mới được gửi báo cáo cho yêu cầu.");
+            if (reportRequest.Status != "Pending")
+                throw new InvalidOperationException("Yêu cầu này không còn ở trạng thái chờ gửi.");
+            if (reportRequest.TemplateId != request.TemplateId
+                || reportRequest.PeriodStart.Date != request.PeriodStart.Date
+                || reportRequest.PeriodEnd.Date != request.PeriodEnd.Date)
+                throw new ArgumentException("Mẫu và kỳ báo cáo phải khớp với yêu cầu được giao.");
+        }
         var template = await repository.Templates.FirstOrDefaultAsync(x => x.Id == request.TemplateId && x.IsEnabled && !x.IsDeleted, ct)
             ?? throw new KeyNotFoundException("Không tìm thấy mẫu báo cáo đang bật.");
         using var templateConfiguration = ParseConfiguration(template.Configuration);
@@ -153,26 +294,55 @@ public sealed class ReportService(IReportRepository repository)
         }
         var stats = await SummaryAsync(request.PeriodStart, reportPeriodEnd, ct);
         var categories = await BorrowByCategoryAsync(request.PeriodStart, reportPeriodEnd, ct);
-        var rows = request.CustomRows is { Count: > 0 } customRows
-            ? customRows
-            : (IReadOnlyList<ReportRowDto>)await repository.BorrowRecords.AsNoTracking()
-                .Where(x => x.BorrowDate >= request.PeriodStart.Date && x.BorrowDate < periodEndExclusive)
-                .SelectMany(x => x.BookCopy.Book.Categories.DefaultIfEmpty(), (record, category) => new { Record = record, Category = category == null ? "Chưa phân loại" : category.Name })
+        IReadOnlyList<ReportRowDto> rows;
+        if (request.CustomRows is { Count: > 0 } customRows)
+        {
+            rows = customRows;
+        }
+        else
+        {
+            var periodRecords = repository.BorrowRecords.AsNoTracking()
+                .Where(x => x.BorrowDate >= request.PeriodStart.Date && x.BorrowDate < periodEndExclusive);
+            var categorizedRows = await periodRecords
+                .Where(x => x.BookCopy.Book.Categories.Any())
+                .SelectMany(x => x.BookCopy.Book.Categories.Select(category => new { Record = x, Category = category.Name }))
                 .GroupBy(x => new { Day = x.Record.BorrowDate!.Value.Date, x.Category })
-                .Select(group => new ReportRowDto(group.Key.Day, group.Key.Category, group.Count(), group.Count(x => x.Record.ReturnDate != null),
-                    group.Count(x => x.Record.ReturnDate == null && x.Record.DueDate < DateTime.UtcNow), group.Count(x => x.Record.ReturnDate != null), null))
-                .OrderBy(x => x.Date).ThenBy(x => x.Category).ToListAsync(ct);
+                .Select(group => new ReportRowDto(group.Key.Day, group.Key.Category, group.Count(),
+                    group.Count(x => x.Record.ReturnDate != null),
+                    group.Count(x => x.Record.ReturnDate == null && x.Record.DueDate < DateTime.UtcNow),
+                    group.Count(x => x.Record.ReturnDate != null), null))
+                .ToListAsync(ct);
+            var unclassifiedRows = await periodRecords
+                .Where(x => !x.BookCopy.Book.Categories.Any())
+                .GroupBy(x => x.BorrowDate!.Value.Date)
+                .Select(group => new ReportRowDto(group.Key, "Chưa phân loại", group.Count(),
+                    group.Count(x => x.ReturnDate != null),
+                    group.Count(x => x.ReturnDate == null && x.DueDate < DateTime.UtcNow),
+                    group.Count(x => x.ReturnDate != null), null))
+                .ToListAsync(ct);
+            rows = categorizedRows.Concat(unclassifiedRows)
+                .OrderBy(x => x.Date)
+                .ThenBy(x => x.Category)
+                .ToList();
+        }
         var report = new LibraryReport
         {
-            Code = $"RPT-{DateTime.UtcNow:yyMMddHHmmss}-{Random.Shared.Next(100, 999)}", Name = request.Name?.Trim() is { Length: > 0 } name ? name : template.Name,
-            TemplateId = template.Id, SubmittedBy = userId, Format = request.Format,
+            Code = $"RPT-{DateTime.UtcNow:yyMMddHHmmss}-{Random.Shared.Next(100, 999)}",
+            Name = request.Name?.Trim() is { Length: > 0 } name ? name : reportRequest?.Name ?? template.Name,
+            TemplateId = template.Id, RequestId = reportRequest?.Id, SubmittedBy = userId, Format = request.Format,
             PeriodStart = request.PeriodStart.Date, PeriodEnd = reportPeriodEnd,
             Snapshot = JsonSerializer.Serialize(new { summary = stats, categories, rows }, JsonOptions)
         };
         repository.AddReport(report);
+        if (reportRequest is not null)
+        {
+            reportRequest.Status = "Submitted";
+            reportRequest.ReportId = report.Id;
+            reportRequest.Report = report;
+        }
         var admins = await repository.Users.Where(profile => profile.IsActive && profile.Role.Name == "Admin").Select(profile => profile.Id).ToListAsync(ct);
         foreach (var adminId in admins)
-            repository.AddNotification(new Notification { UserId = adminId, Title = "Báo cáo mới", Message = $"Thủ thư đã gửi báo cáo {report.Code}.", Type = "report", Metadata = JsonSerializer.Serialize(new { reportId = report.Id, report.Code }) });
+            repository.AddNotification(new Notification { UserId = adminId, Title = "Báo cáo mới", Message = $"Thủ thư đã gửi báo cáo {report.Code}.", Type = "report", Metadata = JsonSerializer.Serialize(new { reportId = report.Id, report.Code, requestId = reportRequest?.Id }) });
         await repository.SaveChangesAsync(ct);
         return (await DetailAsync(report.Id, ct))!;
     }
@@ -183,10 +353,63 @@ public sealed class ReportService(IReportRepository repository)
             throw new UnauthorizedAccessException("Chỉ quản trị viên đang hoạt động mới được duyệt báo cáo.");
         var report = await repository.FindReportForUpdateAsync(id, ct);
         if (report is null || report.IsDeleted) throw new KeyNotFoundException("Không tìm thấy báo cáo.");
+        if (request.IsRejected == true)
+        {
+            if (request.IsApproved == true)
+                throw new ArgumentException("Không thể vừa duyệt vừa từ chối một báo cáo.");
+            if (report.IsApproved || string.Equals(report.Status, "Approved", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Không thể từ chối báo cáo đã được duyệt.");
+            if (string.IsNullOrWhiteSpace(request.Comment))
+                throw new ArgumentException("Vui lòng nhập lý do từ chối báo cáo.");
+
+            var reason = request.Comment.Trim();
+            report.IsApproved = false;
+            report.Status = "Rejected";
+            report.ReviewedBy = userId;
+            report.ReviewedAt = DateTime.UtcNow;
+            repository.AddReview(new ReportReview
+            {
+                ReportId = report.Id,
+                ReviewerId = userId,
+                Action = "Rejected",
+                Comment = reason
+            });
+
+            if (report.RequestId.HasValue)
+            {
+                var reportRequest = await repository.FindReportRequestForUpdateAsync(report.RequestId.Value, ct);
+                if (reportRequest is not null && reportRequest.ReportId == report.Id && reportRequest.Status == "Submitted")
+                {
+                    reportRequest.Status = "Pending";
+                }
+            }
+            repository.AddNotification(new Notification
+            {
+                UserId = report.SubmittedBy,
+                Title = "Báo cáo cần chỉnh sửa",
+                Message = $"Báo cáo {report.Code} bị từ chối: {reason}",
+                Type = "report",
+                Metadata = JsonSerializer.Serialize(new { reportId = report.Id, requestId = report.RequestId, status = report.Status, reason })
+            });
+            await repository.SaveChangesAsync(ct);
+            return;
+        }
         if (!string.IsNullOrWhiteSpace(request.Name)) report.Name = request.Name.Trim();
         if (!string.IsNullOrWhiteSpace(request.Status)) report.Status = request.Status.Trim();
         if (request.IsViewed.HasValue && request.IsViewed.Value != report.IsViewed) report.IsViewed = request.IsViewed.Value;
+        var wasApproved = report.IsApproved;
+        var wasRejected = string.Equals(report.Status, "Rejected", StringComparison.OrdinalIgnoreCase);
         if (request.IsApproved.HasValue && request.IsApproved.Value != report.IsApproved) report.IsApproved = request.IsApproved.Value;
+        if (request.IsApproved == true && wasRejected)
+        {
+            report.Status = "Approved";
+            if (report.RequestId.HasValue)
+            {
+                var reportRequest = await repository.FindReportRequestForUpdateAsync(report.RequestId.Value, ct);
+                if (reportRequest is not null && reportRequest.ReportId == report.Id && reportRequest.Status == "Pending")
+                    reportRequest.Status = "Submitted";
+            }
+        }
         if (request.IsApproved == true || request.IsViewed == true) { report.ReviewedBy = userId; report.ReviewedAt = DateTime.UtcNow; }
         if (!string.IsNullOrWhiteSpace(request.Comment))
         {
@@ -200,6 +423,15 @@ public sealed class ReportService(IReportRepository repository)
             repository.AddReview(new ReportReview { ReportId = report.Id, ReviewerId = userId, Action = "Approved" });
         else if (request.IsViewed == true && !alreadyHasViewedReview)
             repository.AddReview(new ReportReview { ReportId = report.Id, ReviewerId = userId, Action = "Viewed" });
+        if (request.IsApproved == true && !wasApproved)
+            repository.AddNotification(new Notification
+            {
+                UserId = report.SubmittedBy,
+                Title = "Báo cáo đã được duyệt",
+                Message = $"Báo cáo {report.Code} đã được quản trị viên duyệt.",
+                Type = "report",
+                Metadata = JsonSerializer.Serialize(new { reportId = report.Id, requestId = report.RequestId, status = "Approved" })
+            });
         await repository.SaveChangesAsync(ct);
     }
 
@@ -245,7 +477,29 @@ public sealed class ReportService(IReportRepository repository)
     public async Task<IReadOnlyList<ReportDetailDto>> FindReportDetailsAsync(Guid[] ids, CancellationToken ct)
     {
         var reports = await repository.FindReportDetailsAsync(ids, ct);
-        return reports.Where(x => !x.IsDeleted).Select(x => new ReportDetailDto(x.Id, x.Code, x.Name, x.Submitter.FullName, x.Template.Name, x.CreatedAt, x.PeriodStart, x.PeriodEnd, x.Format, x.Status, x.IsViewed, x.IsApproved, x.Snapshot, [], ReadRows(x.Snapshot), x.TemplateId, x.Template.ReportType, x.Template.Description, x.Template.Configuration)).ToList();
+        return reports.Where(x => !x.IsDeleted)
+            .Select(x => new ReportDetailDto(
+                x.Id,
+                x.Code,
+                x.Name,
+                GetDisplayName(x.Submitter?.FullName, "Không xác định"),
+                GetDisplayName(x.Template?.Name, "Mẫu báo cáo đã bị xóa"),
+                x.CreatedAt,
+                x.PeriodStart,
+                x.PeriodEnd,
+                x.Format,
+                x.Status,
+                x.IsViewed,
+                x.IsApproved,
+                x.Snapshot,
+                [],
+                ReadRows(x.Snapshot),
+                x.TemplateId,
+                x.Template?.ReportType,
+                x.Template?.Description,
+                x.Template?.Configuration,
+                string.Equals(x.Status, "Rejected", StringComparison.OrdinalIgnoreCase)))
+            .ToList();
     }
     public Task SaveChangesAsync(CancellationToken ct) => repository.SaveChangesAsync(ct);
 

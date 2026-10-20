@@ -37,6 +37,7 @@ public class AppDbContext : DbContext
     public DbSet<ReportTemplate> ReportTemplates => Set<ReportTemplate>();
     public DbSet<LibraryReport> LibraryReports => Set<LibraryReport>();
     public DbSet<ReportReview> ReportReviews => Set<ReportReview>();
+    public DbSet<ReportRequest> ReportRequests => Set<ReportRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -109,6 +110,11 @@ public class AppDbContext : DbContext
             );
         });
 
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.Property(x => x.Metadata).HasColumnType("jsonb");
+        });
+
         modelBuilder.Entity<BookCopy>(entity =>
         {
             entity.ToTable("book_copies");
@@ -161,12 +167,31 @@ public class AppDbContext : DbContext
         {
             entity.ToTable("reports");
             entity.Property(x => x.Snapshot).HasColumnType("jsonb");
+            entity.Property(x => x.Status).IsConcurrencyToken();
+            entity.Property(x => x.IsApproved).IsConcurrencyToken();
             entity.HasIndex(x => new { x.Status, x.CreatedAt });
             entity.HasIndex(x => x.TemplateId);
             entity.HasIndex(x => x.SubmittedBy);
+            entity.HasIndex(x => x.RequestId);
             entity.HasIndex(x => x.Code).IsUnique();
             entity.HasOne(x => x.Template).WithMany(x => x.Reports).HasForeignKey(x => x.TemplateId);
             entity.HasOne(x => x.Submitter).WithMany().HasForeignKey(x => x.SubmittedBy);
+            entity.HasOne(x => x.ReportRequest).WithMany(x => x.Reports).HasForeignKey(x => x.RequestId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReportRequest>(entity =>
+        {
+            entity.ToTable("report_requests", table =>
+                table.HasCheckConstraint("ck_report_requests_period", "period_end > period_start"));
+            entity.Property(x => x.Name).HasMaxLength(250);
+            entity.Property(x => x.Status).HasMaxLength(20).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.LibrarianId, x.Status, x.CreatedAt });
+            entity.HasIndex(x => x.TemplateId);
+            entity.HasIndex(x => x.ReportId).IsUnique();
+            entity.HasOne(x => x.Librarian).WithMany().HasForeignKey(x => x.LibrarianId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Requester).WithMany().HasForeignKey(x => x.RequestedBy).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Template).WithMany().HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Report).WithMany().HasForeignKey(x => x.ReportId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<ReportReview>(entity =>

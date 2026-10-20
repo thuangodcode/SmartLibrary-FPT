@@ -33,8 +33,6 @@ interface ReportRow {
   category: string;
   borrowed: number;
   returned: number;
-  overdue: number;
-  returnedCount: number;
   notes: string | null;
 }
 
@@ -51,6 +49,7 @@ interface ReportDetail {
   status: string;
   isViewed: boolean;
   isApproved: boolean;
+  isRejected?: boolean;
   reviews: ReportReview[];
   rows: ReportRow[];
 }
@@ -183,6 +182,10 @@ const LibrarianReportDetailPage: React.FC = () => {
                     <span className="lib-status-badge approved">
                       <CheckCircle2 size={12} /> Đã duyệt
                     </span>
+                  ) : report.isRejected || report.status === 'Rejected' ? (
+                    <span className="lib-status-badge rejected">
+                      <AlertCircle size={12} /> Cần chỉnh sửa
+                    </span>
                   ) : report.isViewed ? (
                     <span className="lib-status-badge viewed">
                       <Eye size={12} /> Đã xem
@@ -198,9 +201,15 @@ const LibrarianReportDetailPage: React.FC = () => {
 
             <div className="lib-admin-feedback-section">
               <div className="lib-admin-feedback-title">
-                <h3>Phản hồi từ Admin</h3>
+                <h3>{report.isRejected || report.status === 'Rejected' ? 'Admin yêu cầu chỉnh sửa báo cáo' : 'Phản hồi từ Admin'}</h3>
                 <MessageSquareText size={18} style={{ color: '#eb753c' }} />
               </div>
+              {(report.isRejected || report.status === 'Rejected') && report.reviews.some((review) => review.action === 'Rejected' && review.comment) && (
+                <div className="lib-report-rejection-notice" role="alert">
+                  <AlertCircle size={18}/>
+                  <div><strong>Vui lòng chỉnh sửa báo cáo theo lý do dưới đây:</strong><p>{report.reviews.find((review) => review.action === 'Rejected' && review.comment)?.comment}</p></div>
+                </div>
+              )}
               {report.reviews.length ? (
                 <div className="lib-admin-timeline">
                   {report.reviews.map((rev, idx) => (
@@ -227,10 +236,8 @@ const LibrarianReportDetailPage: React.FC = () => {
                   <tr>
                     <th>Ngày</th>
                     <th>Nhóm sách</th>
-                    <th>Mượn</th>
-                    <th>Trả</th>
-                    <th>Quá hạn</th>
-                    <th>Đã trả</th>
+                    <th>Lượt mượn</th>
+                    <th>Lượt trả</th>
                     <th>Ghi chú</th>
                   </tr>
                 </thead>
@@ -244,14 +251,12 @@ const LibrarianReportDetailPage: React.FC = () => {
                         </td>
                         <td>{row.borrowed}</td>
                         <td>{row.returned}</td>
-                        <td>{row.overdue}</td>
-                        <td>{row.returnedCount}</td>
                         <td>{row.notes || '—'}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="lib-table-empty">
+                      <td colSpan={5} className="lib-table-empty">
                         Không có dòng dữ liệu.
                       </td>
                     </tr>

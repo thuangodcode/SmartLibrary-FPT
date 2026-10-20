@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Reports;
 
@@ -14,8 +15,8 @@ public sealed class AdminReportsController(ReportService reports) : ControllerBa
     private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<ReportListDto>>> List([FromQuery] string? search, [FromQuery] string? month, [FromQuery] string? status, [FromQuery] string? format, [FromQuery] string? sortBy, [FromQuery] string? sortDirection, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
-        => Ok(ApiResponse<ReportListDto>.Ok(await reports.ListAsync(new ReportQuery(search, month, status, format, sortBy, sortDirection, page, pageSize), ct)));
+    public async Task<ActionResult<ApiResponse<ReportListDto>>> List([FromQuery] string? search, [FromQuery] string? month, [FromQuery] string? status, [FromQuery] string? format, [FromQuery] string? sortBy, [FromQuery] string? sortDirection, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] bool? isApproved = null, CancellationToken ct = default)
+        => Ok(ApiResponse<ReportListDto>.Ok(await reports.ListAsync(new ReportQuery(search, month, status, format, sortBy, sortDirection, page, pageSize, IsApproved: isApproved), ct)));
 
     [HttpGet("summary")]
     public async Task<ActionResult<ApiResponse<ReportSummaryDto>>> Summary([FromQuery] DateTime? from, [FromQuery] DateTime? to, CancellationToken ct)
@@ -58,6 +59,27 @@ public sealed class AdminReportsController(ReportService reports) : ControllerBa
         return copy is null ? NotFound(ApiResponse<object>.Fail("Không tìm thấy mẫu báo cáo.")) : Ok(ApiResponse<TemplateDto>.Ok(copy));
     }
 
+    [HttpGet("requests")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ReportRequestDto>>>> Requests(CancellationToken ct)
+        => Ok(ApiResponse<IReadOnlyList<ReportRequestDto>>.Ok(await reports.ReportRequestsAsync(UserId, true, ct)));
+
+    [HttpPost("requests")]
+    public async Task<ActionResult<ApiResponse<ReportRequestDto>>> CreateRequest(CreateReportRequestAssignment request, CancellationToken ct)
+    {
+        try
+        {
+            return Ok(ApiResponse<ReportRequestDto>.Ok(await reports.CreateReportRequestAsync(request, UserId, ct)));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<object>.Fail(ex.Message));
+        }
+    }
+
     [HttpPost]
     public async Task<ActionResult<ApiResponse<ReportDetailDto>>> Create(CreateReportRequest request, CancellationToken ct)
         => Ok(ApiResponse<ReportDetailDto>.Ok(await reports.CreateAsync(request, UserId, ct)));
@@ -71,7 +93,29 @@ public sealed class AdminReportsController(ReportService reports) : ControllerBa
 
     [HttpPatch("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, UpdateReportRequest request, CancellationToken ct)
-    { await reports.UpdateAsync(id, request, UserId, ct); return NoContent(); }
+    {
+        try
+        {
+            await reports.UpdateAsync(id, request, UserId, ct);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(ApiResponse<object>.Fail("Báo cáo hoặc yêu cầu đã được xử lý. Tải lại dữ liệu rồi thử lại."));
+        }
+    }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
@@ -92,10 +136,10 @@ public sealed class AdminReportsController(ReportService reports) : ControllerBa
         if (ids.Length == 0) return BadRequest(ApiResponse<object>.Fail("Chọn ít nhất một báo cáo."));
         if (ids.Length > 100) return BadRequest(ApiResponse<object>.Fail("Mỗi lần chỉ có thể xuất tối đa 100 báo cáo."));
         var reportsToExport = await reports.FindReportDetailsAsync(ids, ct);
-        var builder = new System.Text.StringBuilder("\uFEFFMã báo cáo,Tên báo cáo,Thủ thư,Kỳ bắt đầu,Kỳ kết thúc,Ngày,Nhóm sách,Mượn,Trả,Quá hạn,Đã trả,Ghi chú\r\n");
+        var builder = new System.Text.StringBuilder("\uFEFFMã báo cáo,Tên báo cáo,Thủ thư,Kỳ bắt đầu,Kỳ kết thúc,Ngày,Nhóm sách,Lượt mượn,Lượt trả,Ghi chú\r\n");
         foreach (var report in reportsToExport)
             foreach (var row in report.Rows)
-                builder.AppendLine($"{Escape(report.Code)},{Escape(report.Name)},{Escape(report.Submitter)},{report.PeriodStart:dd/MM/yyyy},{report.PeriodEnd:dd/MM/yyyy},{row.Date:dd/MM/yyyy},{Escape(row.Category)},{row.Borrowed},{row.Returned},{row.Overdue},{row.ReturnedCount},{Escape(row.Notes ?? string.Empty)}");
+                builder.AppendLine($"{Escape(report.Code)},{Escape(report.Name)},{Escape(report.Submitter)},{report.PeriodStart:dd/MM/yyyy},{report.PeriodEnd:dd/MM/yyyy},{row.Date:dd/MM/yyyy},{Escape(row.Category)},{row.Borrowed},{row.Returned},{Escape(row.Notes ?? string.Empty)}");
         return File(System.Text.Encoding.UTF8.GetBytes(builder.ToString()), "text/csv; charset=utf-8", "bao-cao-da-chon.csv");
     }
 
@@ -118,8 +162,8 @@ public sealed class AdminReportsController(ReportService reports) : ControllerBa
         if (!string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase)) return BadRequest(ApiResponse<object>.Fail("Bản xuất báo cáo hiện hỗ trợ CSV."));
         var csv = new System.Text.StringBuilder("\uFEFFMã báo cáo,Tên báo cáo,Thủ thư,Kỳ bắt đầu,Kỳ kết thúc\r\n");
         csv.AppendLine($"{Escape(report.Code)},{Escape(report.Name)},{Escape(report.Submitter)},{report.PeriodStart:dd/MM/yyyy},{report.PeriodEnd:dd/MM/yyyy}");
-        csv.AppendLine(); csv.AppendLine("Ngày,Nhóm sách,Mượn,Trả,Quá hạn,Đã trả,Ghi chú");
-        foreach (var row in report.Rows) csv.AppendLine($"{row.Date:dd/MM/yyyy},{Escape(row.Category)},{row.Borrowed},{row.Returned},{row.Overdue},{row.ReturnedCount},{Escape(row.Notes ?? string.Empty)}");
+        csv.AppendLine(); csv.AppendLine("Ngày,Nhóm sách,Lượt mượn,Lượt trả,Ghi chú");
+        foreach (var row in report.Rows) csv.AppendLine($"{row.Date:dd/MM/yyyy},{Escape(row.Category)},{row.Borrowed},{row.Returned},{Escape(row.Notes ?? string.Empty)}");
         return File(System.Text.Encoding.UTF8.GetBytes(csv.ToString()), "text/csv; charset=utf-8", $"{report.Code}.csv");
     }
 

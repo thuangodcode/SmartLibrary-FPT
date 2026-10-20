@@ -5,19 +5,20 @@ import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import './AdminReportTemplatesPage.css';
+import './AdminReportsExperience.css';
 
 interface Envelope<T>{success?:boolean;data?:T;error?:string}
 interface Template{id:string;name:string;reportType:string;description:string|null;configuration:string;isEnabled:boolean;createdAt:string}
 interface FormValue{name:string;reportType:string;description:string;period:string;groupBy:string;metrics:string[];formats:string[];enabled:boolean}
-const blank:FormValue={name:'',reportType:'Activity',description:'',period:'Month',groupBy:'Day',metrics:['Borrowed','Returned','Overdue','ReturnedCount'],formats:['CSV'],enabled:true};
+const blank:FormValue={name:'',reportType:'Activity',description:'',period:'Month',groupBy:'Day',metrics:['Borrowed','Returned'],formats:['CSV'],enabled:true};
 const periodLabels:Record<string,string>={Day:'Ngày',Week:'Tuần',Month:'Tháng',Quarter:'Quý',Custom:'Tùy chọn'};
-const metricOptions=[['Borrowed','Mượn'],['Returned','Trả'],['Overdue','Quá hạn'],['ReturnedCount','Đã trả']];
+const metricOptions=[['Borrowed','Lượt mượn'],['Returned','Lượt trả']];
 const AdminReportTemplatesPage:React.FC=()=>{
   const navigate=useNavigate();
   const token=useAuthStore(s=>s.accessToken);const[templates,setTemplates]=useState<Template[]>([]);const[loading,setLoading]=useState(true);const[error,setError]=useState<string|null>(null);const[form,setForm]=useState<FormValue|null>(null);const[editingId,setEditingId]=useState<string|null>(null);const[original,setOriginal]=useState<FormValue|null>(null);const[busy,setBusy]=useState(false);const[notice,setNotice]=useState<string|null>(null);const[confirmDelete,setConfirmDelete]=useState<Template|null>(null);
   const load=useCallback(async(signal?:AbortSignal)=>{if(!token){setError('Vui lòng đăng nhập Admin để quản lý mẫu.');setLoading(false);return}setLoading(true);setError(null);try{const response=await fetch(`${API_BASE_URL}/api/admin/reports/templates`,{headers:{Authorization:`Bearer ${token}`},signal});if(response.status===404)throw new Error('API đang chạy phiên bản chưa có module báo cáo. Hãy khởi động lại SmartLibrary API mới và áp dụng migration 00007_reports.sql.');const result=await parseApiResponse<Envelope<Template[]>>(response);if(!response.ok||!result?.success)throw new Error(result?.error||`Không tải được danh sách mẫu (HTTP ${response.status}).`);setTemplates(result.data??[])}catch(e){if(!signal?.aborted)setError(e instanceof Error?e.message:'Không tải được danh sách mẫu.')}finally{if(!signal?.aborted)setLoading(false)}},[token]);
   useEffect(()=>{const controller=new AbortController();const timer=window.setTimeout(()=>void load(controller.signal),0);return()=>{window.clearTimeout(timer);controller.abort()}},[load]);
-  const toForm=(template?:Template):FormValue=>{if(!template)return{...blank};try{const config=JSON.parse(template.configuration) as Partial<FormValue>;return{...blank,...config,name:template.name,reportType:template.reportType,description:template.description??'',enabled:template.isEnabled}}catch{return{...blank,name:template.name,reportType:template.reportType,description:template.description??'',enabled:template.isEnabled}}};
+  const toForm=(template?:Template):FormValue=>{if(!template)return{...blank};try{const config=JSON.parse(template.configuration) as Partial<FormValue>;const metrics=(config.metrics??[]).filter(metric=>metric==='Borrowed'||metric==='Returned');return{...blank,...config,metrics:metrics.length?metrics:blank.metrics,name:template.name,reportType:template.reportType,description:template.description??'',enabled:template.isEnabled}}catch{return{...blank,name:template.name,reportType:template.reportType,description:template.description??'',enabled:template.isEnabled}}};
   const begin=(template?:Template)=>{const value=toForm(template);setForm(value);setOriginal(value);setEditingId(template?.id??null)};
   const dirty=!!form&&!!original&&JSON.stringify(form)!==JSON.stringify(original);
   const closeForm=()=>{if(dirty&&!window.confirm('Mẫu có thay đổi chưa lưu. Bạn có muốn rời khỏi biểu mẫu?'))return;setForm(null);setOriginal(null);setEditingId(null)};

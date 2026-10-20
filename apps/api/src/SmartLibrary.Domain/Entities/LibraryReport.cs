@@ -8,6 +8,8 @@ public class LibraryReport : AuditableEntity, ISoftDeletable
     public string Name { get; set; } = string.Empty;
     public Guid TemplateId { get; set; }
     public ReportTemplate Template { get; set; } = null!;
+    public Guid? RequestId { get; set; }
+    public ReportRequest? ReportRequest { get; set; }
     public Guid SubmittedBy { get; set; }
     public UserProfile Submitter { get; set; } = null!;
     public string Format { get; set; } = "CSV";

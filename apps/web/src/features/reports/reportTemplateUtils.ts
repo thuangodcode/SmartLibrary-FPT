@@ -1,4 +1,4 @@
-export type ReportMetric = 'Borrowed' | 'Returned' | 'Overdue' | 'ReturnedCount';
+export type ReportMetric = 'Borrowed' | 'Returned';
 
 export interface TemplateConfigShape {
   period?: string;
@@ -12,8 +12,6 @@ export interface ManualReportRow {
   category: string;
   borrowed: number;
   returned: number;
-  overdue: number;
-  returnedCount: number;
   notes: string;
 }
 
@@ -25,17 +23,13 @@ export interface ImportIssue {
 }
 
 const metricLabels: Record<string, string> = {
-  Borrowed: 'Mượn',
-  Returned: 'Trả',
-  Overdue: 'Quá hạn',
-  ReturnedCount: 'Đã trả',
+  Borrowed: 'Lượt mượn',
+  Returned: 'Lượt trả',
 };
 
 const metricHeaderAliases: Record<ReportMetric, string[]> = {
-  Borrowed: ['Mượn', 'Borrowed', 'borrowed'],
-  Returned: ['Trả', 'Tra', 'Returned', 'returned'],
-  Overdue: ['Quá hạn', 'Qua han', 'Overdue', 'overdue'],
-  ReturnedCount: ['Đã trả', 'Da tra', 'ReturnedCount', 'returnedCount'],
+  Borrowed: ['Lượt mượn', 'Mượn', 'Borrowed', 'borrowed'],
+  Returned: ['Lượt trả', 'Trả', 'Tra', 'Returned', 'returned'],
 };
 
 export const parseTemplateConfiguration = (raw?: string | null): TemplateConfigShape | null => {
@@ -51,14 +45,30 @@ export const parseTemplateConfiguration = (raw?: string | null): TemplateConfigS
 
 export const getTemplateMetrics = (config: TemplateConfigShape | null): ReportMetric[] => {
   const fromConfig = (config?.metrics ?? []).filter((m): m is ReportMetric =>
-    ['Borrowed', 'Returned', 'Overdue', 'ReturnedCount'].includes(m),
+    ['Borrowed', 'Returned'].includes(m),
   );
-  return fromConfig.length ? fromConfig : ['Borrowed', 'Returned', 'Overdue', 'ReturnedCount'];
+  return fromConfig.length ? fromConfig : ['Borrowed', 'Returned'];
 };
 
 export const getExpectedColumnLabels = (config: TemplateConfigShape | null): string[] => {
   const metrics = getTemplateMetrics(config);
   return ['Ngày', 'Nhóm sách', ...metrics.map((m) => metricLabels[m] ?? m)];
+};
+
+export const getSampleCsvRows = (config: TemplateConfigShape | null): string[][] => {
+  const metrics = getTemplateMetrics(config);
+  const headers = [...getExpectedColumnLabels(config), 'Ghi chú'];
+  const firstValues: Record<ReportMetric, number> = { Borrowed: 12, Returned: 10 };
+  const secondValues: Record<ReportMetric, number> = { Borrowed: 8, Returned: 7 };
+  const first = ['01/10/2026', 'Khoa học', ...metrics.map((metric) => String(firstValues[metric])), 'Số liệu mẫu'];
+  const second = ['02/10/2026', 'Văn học', ...metrics.map((metric) => String(secondValues[metric])), 'Số liệu mẫu'];
+  const totals = metrics.map((metric) => String(firstValues[metric] + secondValues[metric]));
+  return [
+    headers,
+    first,
+    second,
+    ['', 'Tổng', ...totals, ''],
+  ];
 };
 
 export const metricLabel = (metric: string) => metricLabels[metric] ?? metric;
@@ -68,8 +78,6 @@ export const emptyManualRow = (): ManualReportRow => ({
   category: '',
   borrowed: 0,
   returned: 0,
-  overdue: 0,
-  returnedCount: 0,
   notes: '',
 });
 
@@ -78,8 +86,8 @@ export const manualRowToApi = (row: ManualReportRow, metrics: ReportMetric[]) =>
   category: row.category.trim(),
   borrowed: metrics.includes('Borrowed') ? row.borrowed : 0,
   returned: metrics.includes('Returned') ? row.returned : 0,
-  overdue: metrics.includes('Overdue') ? row.overdue : 0,
-  returnedCount: metrics.includes('ReturnedCount') ? row.returnedCount : 0,
+  overdue: 0,
+  returnedCount: 0,
   notes: row.notes.trim() || null,
 });
 
@@ -141,10 +149,7 @@ const parseIntCell = (raw: string): number => {
 };
 
 export const buildSampleCsv = (config: TemplateConfigShape | null): string => {
-  const metrics = getTemplateMetrics(config);
-  const headers = ['Ngày', 'Nhóm sách', ...metrics.map((m) => metricLabels[m]), 'Ghi chú'];
-  const sample = ['01/10/2026', 'Khoa học', ...metrics.map(() => '0'), ''];
-  return `\uFEFF${headers.join(',')}\r\n${sample.join(',')}\r\n`;
+  return `\uFEFF${getSampleCsvRows(config).map((row) => row.join(',')).join('\r\n')}\r\n`;
 };
 
 export const parseReportCsv = (
@@ -190,6 +195,10 @@ export const parseReportCsv = (
     const cells = splitCsvLine(lines[i]);
     if (cells.every((c) => !c.trim())) continue;
     const rowNumber = i;
+    const category = categoryIdx >= 0 ? (cells[categoryIdx] ?? '').trim().replace(/^"|"$/g, '') : '';
+    if (['Tổng', 'Total'].some((label) => category.localeCompare(label, 'vi', { sensitivity: 'base' }) === 0)) {
+      continue;
+    }
     const dateRaw = dateIdx >= 0 ? cells[dateIdx] ?? '' : '';
     const isoDate = parseDateCell(dateRaw);
     if (!isoDate) {
@@ -201,7 +210,6 @@ export const parseReportCsv = (
       });
     }
 
-    const category = categoryIdx >= 0 ? (cells[categoryIdx] ?? '').trim().replace(/^"|"$/g, '') : '';
     if (!category) {
       issues.push({ row: rowNumber, field: 'Category', message: `Dòng ${rowNumber}: Thiếu Nhóm sách.`, severity: 'error' });
     }
@@ -222,8 +230,6 @@ export const parseReportCsv = (
       }
       if (metric === 'Borrowed') row.borrowed = Math.max(0, val);
       if (metric === 'Returned') row.returned = Math.max(0, val);
-      if (metric === 'Overdue') row.overdue = Math.max(0, val);
-      if (metric === 'ReturnedCount') row.returnedCount = Math.max(0, val);
     }
     if (notesIdx >= 0) row.notes = (cells[notesIdx] ?? '').trim().replace(/^"|"$/g, '');
     rows.push(row);
@@ -251,11 +257,7 @@ export const validateManualRows = (rows: ManualReportRow[], config: TemplateConf
       const val =
         metric === 'Borrowed'
           ? row.borrowed
-          : metric === 'Returned'
-            ? row.returned
-            : metric === 'Overdue'
-              ? row.overdue
-              : row.returnedCount;
+          : row.returned;
       if (val < 0 || !Number.isFinite(val)) {
         issues.push({
           row: rowNumber,
