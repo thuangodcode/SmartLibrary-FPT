@@ -56,7 +56,12 @@ const AdminRegulationFormPage: React.FC<AdminRegulationFormPageProps> = ({ mode 
   }, [authHeaders, navigate]);
 
   useEffect(() => {
-    if (mode === 'edit' && regulationId) void loadDetail(regulationId);
+    if (mode === 'edit' && regulationId) {
+      const timer = window.setTimeout(() => {
+        void loadDetail(regulationId);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
   }, [mode, regulationId, loadDetail]);
 
   const onTypeChange = (policyType: RegulationType) => {

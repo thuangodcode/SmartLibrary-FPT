@@ -67,13 +67,18 @@ const AdminRegulationDetailPage: React.FC = () => {
 
   useEffect(() => {
     if (!regulationId) {
-      setNotFound(true);
-      setLoading(false);
-      return;
+      const timer = window.setTimeout(() => {
+        setNotFound(true);
+        setLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
-    void loadDetail(regulationId);
-    setDetailTab('content');
-    setMenuOpen(false);
+    const timer = window.setTimeout(() => {
+      void loadDetail(regulationId);
+      setDetailTab('content');
+      setMenuOpen(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [regulationId, loadDetail]);
 
   useEffect(() => {

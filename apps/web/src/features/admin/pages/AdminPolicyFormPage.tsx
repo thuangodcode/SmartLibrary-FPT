@@ -56,7 +56,12 @@ const AdminPolicyFormPage: React.FC<AdminPolicyFormPageProps> = ({ mode }) => {
   }, [authHeaders, navigate]);
 
   useEffect(() => {
-    if (mode === 'edit' && policyCode) void loadDetail(policyCode);
+    if (mode === 'edit' && policyCode) {
+      const timer = window.setTimeout(() => {
+        void loadDetail(policyCode);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
   }, [mode, policyCode, loadDetail]);
 
   const onTypeChange = (policyType: PolicyType) => {

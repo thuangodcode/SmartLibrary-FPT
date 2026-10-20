@@ -63,7 +63,10 @@ const AdminRegulationsPage: React.FC = () => {
   }, [authHeaders, category, page, search, statusFilter]);
 
   useEffect(() => {
-    void loadList();
+    const timer = window.setTimeout(() => {
+      void loadList();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadList]);
 
   useEffect(() => {

@@ -66,13 +66,18 @@ const AdminPolicyDetailPage: React.FC = () => {
 
   useEffect(() => {
     if (!policyCode) {
-      setNotFound(true);
-      setLoading(false);
-      return;
+      const timer = window.setTimeout(() => {
+        setNotFound(true);
+        setLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
-    void loadDetail(policyCode);
-    setDetailTab('general');
-    setMenuOpen(false);
+    const timer = window.setTimeout(() => {
+      void loadDetail(policyCode);
+      setDetailTab('general');
+      setMenuOpen(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [policyCode, loadDetail]);
 
   useEffect(() => {
