@@ -14,6 +14,7 @@ import meditationsCover from '../../../assets/figma/MeditationMarcusAurelius.web
 import pragmaticProgrammerCover from '../../../assets/figma/ThePragmaticProgrammer.jpg';
 import republicCover from '../../../assets/figma/TheRepublicPlato.webp';
 import { useAuthStore } from '../../auth/store/useAuthStore';
+import { useToast } from '../../../components/ui/useToast';
 import { MOCK_BOOKS, MOCK_CATEGORIES, MOCK_FAQS, MOCK_NEWS, MOCK_SERVICES } from '../mock';
 import './HomePage.css';
 
@@ -37,6 +38,12 @@ export const HomePage = () => {
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const logout = useAuthStore((state) => state.logout);
+  const { showToast } = useToast();
+
+  const handleLogout = () => {
+    logout();
+    showToast({ type: 'success', title: 'Đăng xuất thành công', message: 'Bạn đã đăng xuất khỏi SmartLibrary.' });
+  };
 
   const totalBooks = useMemo(() => MOCK_CATEGORIES.reduce((total, category) => total + category.bookCount, 0), []);
   const visibleBooks = useMemo(() => {
@@ -72,7 +79,7 @@ export const HomePage = () => {
               {user.role === 'Admin' && <Link to="/admin" onClick={closeMenu}><ShieldCheck size={16} /> Quản trị</Link>}
               {user.role === 'Librarian' && <Link to="/librarian" onClick={closeMenu}><BookOpen size={16} /> Thủ thư</Link>}
               <span className="annual-user-name">{user.fullName || user.email}</span>
-              <button type="button" onClick={() => { logout(); closeMenu(); }}><LogOut size={16} /> Đăng xuất</button>
+              <button type="button" onClick={() => { handleLogout(); closeMenu(); }}><LogOut size={16} /> Đăng xuất</button>
             </div> : <div className="annual-auth"><Link to="/login" onClick={closeMenu}>Đăng nhập</Link><Link to="/register" className="annual-action" onClick={closeMenu}>Đăng ký</Link></div>}
           </nav>
         </div>
@@ -123,7 +130,7 @@ export const HomePage = () => {
         <section className="annual-cta"><div className="annual-cta-photo"><img src={campusPhoto} alt="Khoảng xanh tại FPT University TP. Hồ Chí Minh" /></div><div className="annual-frame annual-cta-inner"><h2>Mở sách.<br />Mở một lối đi.</h2><div><p>{isAuthenticated ? `Chào ${user?.fullName || 'bạn'}, tủ sách vẫn đang mở.` : 'Tạo tài khoản để giữ sách, gia hạn và nhận gợi ý phù hợp với ngành học.'}</p>{cta.to.startsWith('#') ? <a href={cta.to} className="annual-cta-button">{cta.label} <ArrowRight /></a> : <Link to={cta.to} className="annual-cta-button">{cta.label} <ArrowRight /></Link>}</div></div></section>
       </main>
 
-      <footer className="annual-footer"><div className="annual-frame annual-footer-top"><Link to="/" className="annual-footer-logo"><img src={smartLibraryLogo} alt="SmartLibrary" /></Link><p>Một thư viện sống cùng nhịp học tập của sinh viên FPT.</p></div><div className="annual-frame annual-footer-grid"><div><strong>Ghé thư viện</strong><p>Tòa Alpha, Khu Công nghệ cao<br />TP. Thủ Đức, TP. Hồ Chí Minh</p></div><div><strong>Khám phá</strong><a href="#categories">Danh mục</a><a href="#books">Tủ sách</a><a href="#services">Dịch vụ</a></div><div><strong>Thời gian</strong><p>Thứ Hai – Thứ Sáu<br />07:00 – 19:00</p><p>Thứ Bảy<br />07:00 – 17:00</p><p>Chủ Nhật · Không phục vụ</p></div><div><strong>Tài khoản</strong>{isAuthenticated ? <button type="button" onClick={logout}>Đăng xuất</button> : <><Link to="/login">Đăng nhập</Link><Link to="/register">Đăng ký</Link></>}</div></div><div className="annual-frame annual-footer-mark">SmartLibrary</div><div className="annual-frame annual-footer-legal">© 2026 FPT University HCMC · Tri thức dành cho cộng đồng.</div></footer>
+      <footer className="annual-footer"><div className="annual-frame annual-footer-top"><Link to="/" className="annual-footer-logo"><img src={smartLibraryLogo} alt="SmartLibrary" /></Link><p>Một thư viện sống cùng nhịp học tập của sinh viên FPT.</p></div><div className="annual-frame annual-footer-grid"><div><strong>Ghé thư viện</strong><p>Tòa Alpha, Khu Công nghệ cao<br />TP. Thủ Đức, TP. Hồ Chí Minh</p></div><div><strong>Khám phá</strong><a href="#categories">Danh mục</a><a href="#books">Tủ sách</a><a href="#services">Dịch vụ</a></div><div><strong>Thời gian</strong><p>Thứ Hai – Thứ Sáu<br />07:00 – 19:00</p><p>Thứ Bảy<br />07:00 – 17:00</p><p>Chủ Nhật · Không phục vụ</p></div><div><strong>Tài khoản</strong>{isAuthenticated ? <button type="button" onClick={handleLogout}>Đăng xuất</button> : <><Link to="/login">Đăng nhập</Link><Link to="/register">Đăng ký</Link></>}</div></div><div className="annual-frame annual-footer-mark">SmartLibrary</div><div className="annual-frame annual-footer-legal">© 2026 FPT University HCMC · Tri thức dành cho cộng đồng.</div></footer>
     </div>
   );
 };
