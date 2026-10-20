@@ -60,16 +60,17 @@ export const Header: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    const token = useAuthStore.getState().accessToken;
+    logout();
+    showToast({ type: 'success', title: 'Đăng xuất thành công', message: 'Bạn đã đăng xuất khỏi SmartLibrary.' });
+    navigate('/login');
+
     try {
-      const token = useAuthStore.getState().accessToken;
       await fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/logout`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
     } catch { /* ignore */ }
-    logout();
-    showToast({ type: 'success', title: 'Đăng xuất thành công', message: 'Bạn đã đăng xuất khỏi SmartLibrary.' });
-    navigate('/login');
   };
 
   const getInitials = (name: string) => {

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ToastNotification, type ToastMessage } from './ToastNotification';
 import { ToastContext, type ToastInput } from './ToastContext';
 import './ToastNotification.css';
@@ -32,11 +33,14 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   return (
     <ToastContext.Provider value={contextValue}>
       {children}
-      <div className="toast-viewport" aria-label="Thông báo">
-        {toasts.map((toast) => (
-          <ToastItem key={toast.id} toast={toast} dismissToast={dismissToast} />
-        ))}
-      </div>
+      {createPortal(
+        <div className="toast-viewport" aria-label="Thông báo">
+          {toasts.map((toast) => (
+            <ToastItem key={toast.id} toast={toast} dismissToast={dismissToast} />
+          ))}
+        </div>,
+        document.body,
+      )}
     </ToastContext.Provider>
   );
 };
