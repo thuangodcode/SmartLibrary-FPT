@@ -118,7 +118,7 @@ const AdminReportDetailPage: React.FC = () => {
     } catch {
       return null;
     }
-  }, [report?.templateConfiguration]);
+  }, [report]);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {

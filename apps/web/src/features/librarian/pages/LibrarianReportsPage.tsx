@@ -194,14 +194,17 @@ export const LibrarianReportsPage: React.FC = () => {
   }, [token, page, search, monthFilter, statusFilter]);
 
   useEffect(() => {
-    void loadTemplates();
+    const timer = window.setTimeout(() => {
+      void loadTemplates();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadTemplates]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const timer = window.setTimeout(() => {
       void loadReports();
     }, 250);
-    return () => clearTimeout(timer);
+    return () => window.clearTimeout(timer);
   }, [loadReports]);
 
   // Auto-generate name when template or date changes
@@ -233,7 +236,10 @@ export const LibrarianReportsPage: React.FC = () => {
   useEffect(() => {
     if (activeTemplate) {
       const now = new Date();
-      setReportName(`${activeTemplate.name} - T${now.getMonth() + 1}/${now.getFullYear()}`);
+      const timer = window.setTimeout(() => {
+        setReportName(`${activeTemplate.name} - T${now.getMonth() + 1}/${now.getFullYear()}`);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, [activeTemplate]);
 

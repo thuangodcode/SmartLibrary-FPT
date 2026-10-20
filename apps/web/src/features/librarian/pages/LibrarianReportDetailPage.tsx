@@ -100,8 +100,13 @@ const LibrarianReportDetailPage: React.FC = () => {
 
   useEffect(() => {
     const controller = new AbortController();
-    void load(controller.signal);
-    return () => controller.abort();
+    const timer = window.setTimeout(() => {
+      void load(controller.signal);
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [load]);
 
   const downloadCsv = async () => {
