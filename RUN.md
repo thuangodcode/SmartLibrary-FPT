@@ -13,13 +13,13 @@ dotnet run --project src/SmartLibrary.Api
 
 ---
 
-## Cách 2: Chạy song song cả Backend (API) + Frontend (Web) + Mobile bằng 1 lệnh duy nhất
+## Cách 2: Chạy song song cả Backend (API) + Frontend (Web) bằng 1 lệnh duy nhất
 Tại thư mục gốc `SmartLibrary-FPT`:
 
 ```powershell
 npm run dev
 ```
-> Lệnh này sẽ dùng `concurrently` để kích hoạt cả 3 dự án Backend API, React Web Admin, và Expo Mobile cùng một lúc trong 1 Terminal.
+> Lệnh này sẽ dùng `concurrently` để kích hoạt cả Backend API và React Web Admin cùng một lúc trong 1 Terminal.
 
 ---
 
@@ -29,7 +29,6 @@ npm run dev
 | --- | --- |
 | `npm run dev:api` | Khởi chạy duy nhất .NET Backend API (`http://localhost:5278/swagger`) |
 | `npm run dev:web` | Khởi chạy React Web (Vite dev server) |
-| `npm run dev:mobile` | Khởi chạy Expo React Native Mobile |
 | `npm run test:api` | Chạy toàn bộ Unit Tests của Backend API |
 | `npm run build:api` | Build kiểm tra toàn bộ Solution .NET Backend |
-| `npm run dev` | Khởi chạy đồng thời Backend + Web + Mobile |
+| `npm run dev` | Khởi chạy đồng thời Backend + Web |
