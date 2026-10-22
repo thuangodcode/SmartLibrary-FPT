@@ -38,6 +38,7 @@ public class AppDbContext : DbContext
     public DbSet<LibraryReport> LibraryReports => Set<LibraryReport>();
     public DbSet<ReportReview> ReportReviews => Set<ReportReview>();
     public DbSet<ReportRequest> ReportRequests => Set<ReportRequest>();
+    public DbSet<BookIncident> BookIncidents => Set<BookIncident>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -192,6 +193,23 @@ public class AppDbContext : DbContext
             entity.HasOne(x => x.Requester).WithMany().HasForeignKey(x => x.RequestedBy).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Template).WithMany().HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Report).WithMany().HasForeignKey(x => x.ReportId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<BookIncident>(entity =>
+        {
+            entity.ToTable("book_incidents");
+            entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Severity).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(40);
+            entity.Property(x => x.ReplacementValue).HasColumnType("decimal(12,2)");
+            entity.Property(x => x.AssessedFee).HasColumnType("decimal(12,2)");
+            entity.HasIndex(x => x.ReaderId);
+            entity.HasIndex(x => x.Status);
+            entity.HasOne(x => x.BorrowRecord).WithMany().HasForeignKey(x => x.BorrowRecordId);
+            entity.HasOne(x => x.BookCopy).WithMany().HasForeignKey(x => x.BookCopyId);
+            entity.HasOne(x => x.Reader).WithMany().HasForeignKey(x => x.ReaderId);
+            entity.HasOne(x => x.CompensationFine).WithMany().HasForeignKey(x => x.CompensationFineId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.OverdueFine).WithMany().HasForeignKey(x => x.OverdueFineId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<ReportReview>(entity =>

@@ -106,7 +106,7 @@ export const TYPE_LABELS: Record<PolicyType, string> = {
   Reservation: 'Đặt trước sách',
   FineFee: 'Phí phạt & lệ phí',
   CategoryOverride: 'Theo danh mục sách',
-  Other: 'Quy định khác',
+  Other: 'Chính sách khác',
 };
 
 export const STATUS_LABELS: Record<PolicyStatus, string> = {
@@ -129,15 +129,25 @@ export const CHIP_ORDER = ['All', ...Object.keys(TYPE_LABELS)];
 
 export const DEFAULT_PARAMS: Record<PolicyType, PolicyParameter[]> = {
   BorrowLimit: [
-    { key: 'max_books', value: '5', label: 'Số lượng sách tối đa' },
-    { key: 'exception_note', value: '', label: 'Ngoại lệ' },
+    { key: 'max_books', value: '10', label: 'Hạn mức chung (fallback)' },
+    { key: 'max_books_student', value: '10', label: 'Hạn mức sinh viên (tham khảo, có thể cấu hình)' },
+    { key: 'max_books_lecturer', value: '20', label: 'Hạn mức cán bộ/giảng viên (tham khảo, có thể cấu hình)' },
+    { key: 'exception_note', value: '', label: 'Lưu ý / ngoại lệ' },
   ],
-  BorrowDuration: [{ key: 'max_days', value: '14', label: 'Số ngày mượn tối đa' }],
+  BorrowDuration: [
+    { key: 'max_days', value: '14', label: 'Số ngày mượn fallback' },
+    { key: 'max_days_vi', value: '7', label: 'Sách tiếng Việt (ngày, tham khảo)' },
+    { key: 'max_days_foreign', value: '14', label: 'Sách ngoại văn/song ngữ (ngày, tham khảo)' },
+  ],
   Renewal: [
-    { key: 'max_renewals', value: '2', label: 'Số lần gia hạn tối đa' },
-    { key: 'renewal_days', value: '7', label: 'Số ngày mỗi lần gia hạn' },
+    { key: 'max_renewals', value: '4', label: 'Số lần gia hạn tối đa (tham khảo, có thể cấu hình)' },
+    { key: 'renewal_days_vi', value: '7', label: 'Số ngày gia hạn sách tiếng Việt' },
+    { key: 'renewal_days_foreign', value: '14', label: 'Số ngày gia hạn sách ngoại văn' },
+    { key: 'self_renew_before_days', value: '1', label: 'Tự gia hạn trước hạn (ngày)' },
+    { key: 'self_renew_after_days', value: '1', label: 'Tự gia hạn sau hạn (ngày)' },
     { key: 'block_if_overdue', value: 'true', label: 'Không gia hạn khi quá hạn' },
-    { key: 'block_if_reserved', value: 'true', label: 'Không gia hạn khi có đặt trước' },
+    { key: 'block_if_reserved', value: 'false', label: 'Không gia hạn khi có đặt trước (chưa xác nhận FPT HCM)' },
+    { key: 'textbook_requires_approval', value: 'true', label: 'Giáo trình cần thủ thư duyệt gia hạn' },
   ],
   Reservation: [
     { key: 'allow_reservation', value: 'true', label: 'Cho phép đặt trước' },
@@ -145,15 +155,16 @@ export const DEFAULT_PARAMS: Record<PolicyType, PolicyParameter[]> = {
     { key: 'pickup_deadline_hours', value: '24', label: 'Hạn nhận sách (giờ)' },
   ],
   FineFee: [
-    { key: 'overdue_fee_per_day', value: '5000', label: 'Phạt quá hạn mỗi ngày (VND)' },
-    { key: 'lost_book_multiplier', value: '1.5', label: 'Hệ số bồi thường mất sách' },
+    { key: 'overdue_fee_per_day', value: '5000', label: 'Phạt quá hạn mỗi ngày (VND, có thể cấu hình)' },
+    { key: 'restrict_if_unpaid', value: 'true', label: 'Hạn chế mượn khi còn phí chưa thanh toán' },
+    { key: 'lost_book_multiplier', value: '1.5', label: 'Hệ số bồi thường mất sách (không tự áp dụng)' },
   ],
   CategoryOverride: [
     { key: 'max_books', value: '2', label: 'Số lượng sách tối đa' },
     { key: 'max_days', value: '7', label: 'Số ngày mượn tối đa' },
     { key: 'on_site_only', value: 'false', label: 'Chỉ đọc tại chỗ' },
   ],
-  Other: [{ key: 'note', value: '', label: 'Nội dung quy định' }],
+  Other: [{ key: 'note', value: '', label: 'Lưu ý chính sách' }],
 };
 
 export const emptyForm = (type: PolicyType = 'BorrowLimit'): FormState => ({

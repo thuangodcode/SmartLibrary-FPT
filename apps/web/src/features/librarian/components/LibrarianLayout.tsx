@@ -4,12 +4,16 @@ import {
   BookOpen,
   ChartNoAxesCombined,
   ChevronDown,
+  ChevronRight,
+  Clock3,
   FileCheck,
   LayoutDashboard,
   LogOut,
   Menu,
-  Settings,
+  RotateCcw,
+  Search,
   Users,
+  Wallet,
   X,
   Check,
 } from 'lucide-react';
@@ -21,13 +25,20 @@ import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import './LibrarianLayout.css';
 
+const circulationChildren = [
+  { label: 'Mượn sách', to: '/librarian/circulation/loans', icon: BookOpen, end: false },
+  { label: 'Trả sách', to: '/librarian/circulation/return', icon: RotateCcw, end: false },
+  { label: 'Quá hạn', to: '/librarian/circulation/overdue', icon: Clock3, end: false },
+  { label: 'Phí phạt', to: '/librarian/circulation/fines', icon: Wallet, end: false },
+];
+
 const navigation = [
   { label: 'Tổng quan', to: '/librarian', icon: LayoutDashboard, end: true },
   { label: 'Duyệt tài khoản', to: '/librarian/registrations', icon: FileCheck, end: false, hasBadge: true },
   { label: 'Quản lý sách', to: '/librarian/books', icon: BookOpen, end: false },
+  { label: 'Quản lý dịch vụ', to: '/librarian/circulation', icon: RotateCcw, end: false, children: circulationChildren },
   { label: 'Quản lý độc giả', to: '/librarian/readers', icon: Users, end: false },
   { label: 'Quản lý báo cáo', to: '/librarian/reports', icon: ChartNoAxesCombined, end: false },
-  { label: 'Cài đặt', to: '/librarian/settings', icon: Settings, end: false },
 ];
 
 interface ApiEnvelope<T> {
@@ -47,6 +58,8 @@ interface ReportDecisionNotice {
 
 export const LibrarianLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [headerSearch, setHeaderSearch] = useState('');
+  const [circulationOpen, setCirculationOpen] = useState(true);
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const [decisionNotices, setDecisionNotices] = useState<ReportDecisionNotice[]>([]);
   const [notificationError, setNotificationError] = useState<string | null>(null);
@@ -57,9 +70,13 @@ export const LibrarianLayout: React.FC = () => {
   const { showToast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
-  const currentPage = navigation.find((item) =>
-    item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
-  )?.label ?? 'Tổng quan';
+  const currentPage = circulationChildren.find((item) => item.end
+    ? location.pathname === item.to
+    : location.pathname.startsWith(item.to))?.label
+    ?? navigation.find((item) => item.end
+      ? location.pathname === item.to
+      : location.pathname.startsWith(item.to) && item.to !== '/librarian/circulation')?.label
+    ?? 'Tổng quan';
 
   const lastFetchRef = React.useRef<number>(0);
   React.useEffect(() => {
@@ -162,7 +179,7 @@ export const LibrarianLayout: React.FC = () => {
             <img src={smartLibraryLogo} alt="" className="lib-brand-logo" />
             <span>
               <strong>SmartLibrary</strong>
-              <small>THỦ THƯ</small>
+              <small>THƯ VIỆN THÔNG MINH – ĐH FPT TP.HCM</small>
             </span>
           </Link>
           <button
@@ -177,20 +194,46 @@ export const LibrarianLayout: React.FC = () => {
 
         <div className="lib-nav-caption">MENU CHÍNH</div>
         <nav className="lib-navigation" aria-label="Điều hướng thủ thư">
-          {navigation.map(({ label, to, icon: Icon, end, hasBadge }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) => `lib-nav-link${isActive ? ' lib-nav-link-active' : ''}`}
-            >
-              <Icon size={19} strokeWidth={1.9} />
-              <span>{label}</span>
-              {hasBadge && (pendingCount ?? 0) > 0 && (
-                <span className="lib-nav-badge">{pendingCount}</span>
-              )}
-            </NavLink>
+          {navigation.map(({ label, to, icon: Icon, end, hasBadge, children }) => (
+            children ? (
+              <div className="lib-nav-group" key={to}>
+                <button
+                  type="button"
+                  className={`lib-nav-link lib-nav-parent${location.pathname.startsWith('/librarian/circulation') ? ' lib-nav-link-active' : ''}`}
+                  onClick={() => setCirculationOpen((open) => !open)}
+                >
+                  <Icon size={19} strokeWidth={1.9} />
+                  <span>{label}</span>
+                  {circulationOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </button>
+                {circulationOpen && children.map((child) => (
+                  <NavLink
+                    key={child.to}
+                    to={child.to}
+                    end={child.end}
+                    onClick={() => setSidebarOpen(false)}
+                    className={({ isActive }) => `lib-nav-link lib-nav-child${isActive ? ' lib-nav-link-active' : ''}`}
+                  >
+                    <child.icon size={16} strokeWidth={1.9} />
+                    <span>{child.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            ) : (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) => `lib-nav-link${isActive ? ' lib-nav-link-active' : ''}`}
+              >
+                <Icon size={19} strokeWidth={1.9} />
+                <span>{label}</span>
+                {hasBadge && (pendingCount ?? 0) > 0 && (
+                  <span className="lib-nav-badge">{pendingCount}</span>
+                )}
+              </NavLink>
+            )
           ))}
         </nav>
 
@@ -222,6 +265,20 @@ export const LibrarianLayout: React.FC = () => {
             <span className="lib-breadcrumb-separator">/</span>
             <strong>{currentPage}</strong>
           </div>
+          <form
+            className="lib-header-search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              navigate(`/librarian/circulation/loans?q=${encodeURIComponent(headerSearch.trim())}`);
+            }}
+          >
+            <Search size={16} />
+            <input
+              value={headerSearch}
+              onChange={(event) => setHeaderSearch(event.target.value)}
+              placeholder="Tìm sách, mã phiếu, tên bạn đọc..."
+            />
+          </form>
           <div className="lib-topbar-actions">
             <details className="lib-notification-menu">
               <summary className="lib-icon-button" aria-label={`Thông báo${unreadDecisionCount ? `, ${unreadDecisionCount} thông báo chưa xem` : ''}`}>
@@ -255,8 +312,8 @@ export const LibrarianLayout: React.FC = () => {
             <div className="lib-profile">
               <div className="lib-avatar">{user?.fullName?.trim().charAt(0).toUpperCase() || 'T'}</div>
               <div className="lib-profile-copy">
-                <strong>{user?.fullName || 'Thủ thư'}</strong>
-                <span>{user?.email || 'Thủ thư'}</span>
+                <strong>{user?.fullName || 'Thủ thư SmartLibrary'}</strong>
+                <span>Quản lý thư viện</span>
               </div>
               <ChevronDown size={16} className="lib-profile-chevron" />
             </div>
