@@ -109,6 +109,10 @@
   gap: 18px;
 }
 
+.reports-kpis-section {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
 .reports-card,
 .reports-panel,
 .report-meta-card,

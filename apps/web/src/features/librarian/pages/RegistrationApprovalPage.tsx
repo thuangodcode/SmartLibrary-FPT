@@ -266,10 +266,10 @@ export const RegistrationApprovalPage: React.FC = () => {
 
   const downloadTemplate = () => {
     const csvContent =
-      'fullName,email,studentId,phone,readerType,address,dateOfBirth\n' +
-      'Nguyen Van A,anguyen@fpt.edu.vn,SE123456,0987654321,Student,Ha Noi,2002-01-15\n' +
-      'Tran Thi B,btran@fpt.edu.vn,,0912345678,Lecturer,TP HCM,1988-06-20\n' +
-      'Le Van C,cle@gmail.com,,0909090909,External,Da Nang,1995-12-10\n';
+      'fullName,email,studentId,teacherId,phone,readerType,address,dateOfBirth\n' +
+      'Nguyen Van A,anguyen@fpt.edu.vn,SE123456,,0987654321,Student,Ha Noi,2002-01-15\n' +
+      'Tran Thi B,btran@fpt.edu.vn,,T123456,0912345678,Lecturer,TP HCM,1988-06-20\n' +
+      'Le Van C,cle@gmail.com,,,0909090909,External,Da Nang,1995-12-10\n';
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

@@ -9,7 +9,6 @@ import {
   Pencil,
   Plus,
   Search,
-  ShieldCheck,
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
@@ -100,9 +99,8 @@ const AdminRegulationsPage: React.FC = () => {
 
       <header className="reg-heading">
         <div className="reg-heading-copy">
-          <div className="reg-heading-icon"><ShieldCheck size={24} /></div>
           <div>
-            <h1>Quy định thư viện</h1>
+            <h1>Quản lý quy định</h1>
             <p>Nội quy tham khảo. Chỉ công bố sau khi Admin xác nhận tại FPT TP.HCM.</p>
           </div>
         </div>

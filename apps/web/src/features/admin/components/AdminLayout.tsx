@@ -3,15 +3,19 @@ import {
   Bell,
   BookOpen,
   Bot,
+  CalendarDays,
   ChartNoAxesCombined,
   ChevronDown,
   ChevronRight,
-  FileSliders,
+  CircleDollarSign,
   FileText,
   LayoutDashboard,
   LogOut,
   Menu,
   PanelLeft,
+  ClipboardList,
+  BookOpenCheck,
+  Boxes,
   ShieldCheck,
   UsersRound,
   X,
@@ -28,9 +32,18 @@ const navigation = [
   { label: 'Quản lý người dùng', to: '/admin/users', icon: UsersRound, end: false },
   { label: 'Quản lý chính sách', to: '/admin/policies', icon: FileText, end: false },
   { label: 'Quản lý quy định', to: '/admin/regulations', icon: ShieldCheck, end: false },
-  { label: 'Quản lý mẫu báo cáo', to: '/admin/reports/templates', icon: FileSliders, end: true },
   { label: 'Thống kê & báo cáo', to: '/admin/reports', icon: ChartNoAxesCombined, end: false },
   { label: 'Cấu hình AI', to: '/admin/ai-settings', icon: Bot, end: false },
+];
+
+const reportNavigation = [
+  { label: 'Theo dõi giao việc', to: '/admin/reports/assignments', icon: ClipboardList },
+  { label: 'Hoạt động thư viện', to: '/admin/reports/activity', icon: BookOpenCheck },
+  { label: 'Tài chính', to: '/admin/reports/finance', icon: CircleDollarSign },
+  { label: 'Kho sách', to: '/admin/reports/collection', icon: Boxes },
+  { label: 'Báo cáo định kỳ', to: '/admin/reports/periodic', icon: CalendarDays },
+  { label: 'Thư viện báo cáo', to: '/admin/reports/library', icon: FileText },
+  { label: 'Quản lý mẫu báo cáo', to: '/admin/reports/templates', icon: FileText },
 ];
 
 const EXPAND_DELAY_MS = 140;
@@ -39,6 +52,7 @@ export const AdminLayout: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [railExpanded, setRailExpanded] = useState(false);
   const [hoverCapable, setHoverCapable] = useState(true);
+  const [reportsMenuOpen, setReportsMenuOpen] = useState(false);
   const expandTimerRef = useRef<number | null>(null);
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
@@ -48,11 +62,7 @@ export const AdminLayout: React.FC = () => {
 
   const isItemActive = (to: string, end?: boolean) => {
     if (to === '/admin/reports') {
-      return (
-        location.pathname === '/admin/reports' ||
-        (location.pathname.startsWith('/admin/reports/') &&
-          !location.pathname.startsWith('/admin/reports/templates'))
-      );
+      return location.pathname === '/admin/reports' || location.pathname.startsWith('/admin/reports/');
     }
     return end ? location.pathname === to : location.pathname.startsWith(to);
   };
@@ -155,20 +165,50 @@ export const AdminLayout: React.FC = () => {
         <nav className="admin-navigation" aria-label="Điều hướng quản trị">
           {navigation.map(({ label, to, icon: Icon, end }) => {
             const active = isItemActive(to, end);
-            return (
-              <NavLink
-                key={to}
-                to={to}
-                end={end}
-                title={showTooltips ? label : undefined}
-                data-tooltip={label}
-                onClick={() => setMobileOpen(false)}
-                className={`admin-nav-link${active ? ' admin-nav-link-active' : ''}`}
-              >
-                <Icon size={20} strokeWidth={1.9} className="admin-nav-icon" />
-                <span className="admin-nav-label">{label}</span>
-              </NavLink>
-            );
+            return <div className="admin-nav-group" key={to}>
+              {to === '/admin/reports' ? (
+                <button
+                  type="button"
+                  title={showTooltips ? label : undefined}
+                  data-tooltip={label}
+                  aria-expanded={reportsMenuOpen}
+                  aria-controls="admin-report-subnavigation"
+                  onClick={() => setReportsMenuOpen((open) => !open)}
+                  className={`admin-nav-link admin-nav-toggle${active ? ' admin-nav-link-active' : ''}`}
+                >
+                  <Icon size={20} strokeWidth={1.9} className="admin-nav-icon" />
+                  <span className="admin-nav-label">{label}</span>
+                  <ChevronDown size={16} className={`admin-nav-chevron${reportsMenuOpen ? ' admin-nav-chevron-open' : ''}`} />
+                </button>
+              ) : (
+                <NavLink
+                  to={to}
+                  end={end}
+                  title={showTooltips ? label : undefined}
+                  data-tooltip={label}
+                  onClick={() => setMobileOpen(false)}
+                  className={`admin-nav-link${active ? ' admin-nav-link-active' : ''}`}
+                >
+                  <Icon size={20} strokeWidth={1.9} className="admin-nav-icon" />
+                  <span className="admin-nav-label">{label}</span>
+                </NavLink>
+              )}
+              {to === '/admin/reports' && <div id="admin-report-subnavigation" className={`admin-subnavigation${reportsMenuOpen ? ' admin-subnavigation-open' : ''}`} aria-label="Các mục thống kê và báo cáo">
+                {reportNavigation.map(({ label: reportLabel, to: reportTo, icon: ReportIcon }) => (
+                  <NavLink
+                    key={reportTo}
+                    to={reportTo}
+                    title={showTooltips ? reportLabel : undefined}
+                    data-tooltip={reportLabel}
+                    onClick={() => setMobileOpen(false)}
+                    className={({ isActive: reportActive }) => `admin-subnav-link${reportActive ? ' admin-subnav-link-active' : ''}`}
+                  >
+                    <ReportIcon size={16} strokeWidth={1.9} className="admin-subnav-icon" />
+                    <span className="admin-nav-label">{reportLabel}</span>
+                  </NavLink>
+                ))}
+              </div>}
+            </div>;
           })}
         </nav>
 
@@ -214,14 +254,16 @@ export const AdminLayout: React.FC = () => {
               <Bell size={19} />
             </button>
             <span className="admin-topbar-divider" />
-            <div className="admin-profile">
-              <div className="admin-avatar">{user?.fullName?.trim().charAt(0).toUpperCase() || 'A'}</div>
+            <Link className="admin-profile" to="/admin/profile" aria-label="Mở hồ sơ cá nhân">
+              {user?.avatarUrl
+                ? <img className="admin-avatar admin-avatar-image" src={user.avatarUrl} alt="" />
+                : <div className="admin-avatar">{user?.fullName?.trim().charAt(0).toUpperCase() || 'A'}</div>}
               <div className="admin-profile-copy">
                 <strong>{user?.fullName || 'Quản trị viên'}</strong>
                 <span>Quản trị viên</span>
               </div>
               <ChevronDown size={16} className="admin-profile-chevron" />
-            </div>
+            </Link>
           </div>
         </header>
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -12,7 +13,6 @@ import {
   Users,
   UserRound,
   UserRoundCheck,
-  X,
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
@@ -26,7 +26,10 @@ interface ManagedUser {
   id: string;
   fullName: string;
   email: string;
+  avatarUrl?: string | null;
+  employeeId?: string | null;
   studentId?: string | null;
+  teacherId?: string | null;
   phone?: string | null;
   readerType?: ReaderType | null;
   status: string;
@@ -79,14 +82,15 @@ const statusLabels: Record<string, string> = {
 };
 
 const readerTypeLabels: Record<ReaderType, string> = {
-  Student: 'Sinh viên',
-  Lecturer: 'Giảng viên',
+  Student: 'Sinh viên trong trường',
+  Lecturer: 'Giảng viên trong trường',
   External: 'Người bên ngoài trường',
 };
 
 const AdminUsersPage: React.FC = () => {
   const accessToken = useAuthStore((state) => state.accessToken);
-  const [role, setRole] = useState<UserRole>('Reader');
+  const location = useLocation();
+  const [role, setRole] = useState<UserRole>(() => (location.state as { role?: UserRole } | null)?.role ?? 'Reader');
   const [readerType, setReaderType] = useState<'All' | ReaderType>('All');
   const [status, setStatus] = useState('All');
   const [search, setSearch] = useState('');
@@ -94,10 +98,7 @@ const AdminUsersPage: React.FC = () => {
   const [data, setData] = useState<UserListData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<ManagedUser | null>(null);
-  const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
-  const [createBusy, setCreateBusy] = useState(false);
+  const navigate = useNavigate();
 
   const loadUsers = useCallback(async (signal?: AbortSignal) => {
     if (signal?.aborted) return;
@@ -142,10 +143,7 @@ const AdminUsersPage: React.FC = () => {
     return () => controller.abort();
   }, [loadUsers]);
 
-  const showToast = useCallback((message: string, tone: 'success' | 'error') => {
-    setToast({ message, tone });
-    window.setTimeout(() => setToast(null), 4500);
-  }, []);
+  const routeToast = (location.state as { toast?: string } | null)?.toast;
 
   const metrics = useMemo(() => {
     const stats = data?.stats ?? EMPTY_STATS;
@@ -164,42 +162,6 @@ const AdminUsersPage: React.FC = () => {
     ];
   }, [data?.stats, role]);
 
-  const handleCreateLibrarian = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!accessToken) return;
-    const form = new FormData(event.currentTarget);
-    setCreateBusy(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/librarians`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fullName: form.get('fullName'),
-          username: form.get('username'),
-          password: form.get('password'),
-          phone: form.get('phone'),
-        }),
-      });
-      const result = await parseApiResponse<ApiResult<ManagedUser>>(response);
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.error || 'Không thể tạo tài khoản Thủ thư.');
-      }
-
-      setShowCreateDialog(false);
-      setRole('Librarian');
-      setPage(1);
-      showToast('Đã tạo tài khoản Thủ thư thành công.', 'success');
-      await loadUsers();
-    } catch (createError) {
-      showToast(createError instanceof Error ? createError.message : 'Không thể tạo tài khoản Thủ thư.', 'error');
-    } finally {
-      setCreateBusy(false);
-    }
-  };
-
   const setRoleTab = (nextRole: UserRole) => {
     setRole(nextRole);
     setPage(1);
@@ -209,6 +171,13 @@ const AdminUsersPage: React.FC = () => {
 
   return (
     <section className="admin-users-page">
+      {routeToast && (
+        <div className="admin-users-toast admin-users-toast--success" role="status">
+          <Check size={16} />
+          {routeToast}
+          <button type="button" aria-label="Đóng thông báo" onClick={() => navigate('.', { replace: true, state: null })}>×</button>
+        </div>
+      )}
       <header className="admin-users-heading">
         <div>
           <p className="admin-users-eyebrow">QUẢN TRỊ HỆ THỐNG / QUẢN LÝ NGƯỜI DÙNG</p>
@@ -219,7 +188,7 @@ const AdminUsersPage: React.FC = () => {
           <button className="admin-users-button admin-users-button--secondary" onClick={() => void loadUsers()} type="button">
             <RefreshCw size={15} /> Làm mới
           </button>
-          <button className="admin-users-button admin-users-button--primary" onClick={() => setShowCreateDialog(true)} type="button">
+          <button className="admin-users-button admin-users-button--primary" onClick={() => navigate('/admin/users/create-librarian')} type="button">
             <Plus size={16} /> Tạo tài khoản Thủ thư
           </button>
         </div>
@@ -287,6 +256,7 @@ const AdminUsersPage: React.FC = () => {
             <select aria-label="Lọc theo trạng thái" onChange={(event) => { setStatus(event.target.value); setPage(1); }} value={status}>
               <option value="All">Tất cả trạng thái</option>
               <option value="Active">Hoạt động</option>
+              <option value="Inactive">Không hoạt động</option>
               <option value="PendingApproval">Chờ duyệt</option>
               <option value="PendingVerification">Chờ xác minh</option>
               <option value="PendingActivation">Chờ kích hoạt</option>
@@ -309,7 +279,7 @@ const AdminUsersPage: React.FC = () => {
             <thead>
               <tr>
                 <th className="admin-users-check-cell"><input aria-label="Chọn tất cả người dùng" type="checkbox" disabled /></th>
-                <th>{role === 'Reader' ? 'Mã số' : 'Tài khoản'}</th>
+                <th>{role === 'Reader' ? 'MSSV / Teacher ID' : 'Mã nhân viên'}</th>
                 <th>Họ và tên</th>
                 <th>Email</th>
                 {role === 'Reader' && <th>Loại độc giả</th>}
@@ -322,15 +292,33 @@ const AdminUsersPage: React.FC = () => {
               {loading ? (
                 <tr><td className="admin-users-state" colSpan={role === 'Reader' ? 8 : 7}><LoaderCircle className="admin-users-spin" size={20} /> Đang tải danh sách...</td></tr>
               ) : data?.items.length ? data.items.map((user) => (
-                <tr key={user.id}>
+                <tr
+                  className="admin-users-row"
+                  key={user.id}
+                  onClick={() => navigate(`/admin/users/${user.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      navigate(`/admin/users/${user.id}`);
+                    }
+                  }}
+                  tabIndex={0}
+                >
                   <td className="admin-users-check-cell"><input aria-label={`Chọn ${user.fullName}`} type="checkbox" disabled /></td>
-                  <td className="admin-users-id">{role === 'Reader' ? user.studentId || '—' : user.email.split('@')[0]}</td>
-                  <td className="admin-users-name">{user.fullName}</td>
+                  <td className="admin-users-id">{role === 'Reader' ? user.teacherId || user.studentId || '—' : user.employeeId || '—'}</td>
+                  <td className="admin-users-name">
+                    <span className="admin-users-name-content">
+                      {user.avatarUrl
+                        ? <img className="admin-users-avatar" src={user.avatarUrl} alt="" />
+                        : <span className="admin-users-avatar admin-users-avatar-fallback">{user.fullName.trim().charAt(0).toUpperCase()}</span>}
+                      {user.fullName}
+                    </span>
+                  </td>
                   <td className="admin-users-email">{user.email}</td>
-                  {role === 'Reader' && <td>{user.readerType ? readerTypeLabels[user.readerType] : 'Chưa phân loại'}</td>}
+                  {role === 'Reader' && <td>{user.readerType ? readerTypeLabels[user.readerType] : user.teacherId ? readerTypeLabels.Lecturer : user.studentId || user.email.toLowerCase().endsWith('@fpt.edu.vn') ? readerTypeLabels.Student : readerTypeLabels.External}</td>}
                   <td>{new Date(user.createdAt).toLocaleDateString('vi-VN')}</td>
-                  <td><span className={`admin-users-status admin-users-status--${user.status.toLowerCase()}`}>{statusLabels[user.status] || user.status}</span></td>
-                  <td><button className="admin-users-icon-button" aria-label={`Xem ${user.fullName}`} onClick={() => setSelectedUser(user)} type="button"><Eye size={16} /></button></td>
+                  <td><span className={`admin-users-status admin-users-status--${user.isActive ? user.status.toLowerCase() : 'inactive'}`}>{user.isActive ? statusLabels[user.status] || user.status : 'Không hoạt động'}</span></td>
+                  <td><button className="admin-users-icon-button" aria-label={`Xem ${user.fullName}`} onClick={(event) => { event.stopPropagation(); navigate(`/admin/users/${user.id}`); }} type="button"><Eye size={16} /></button></td>
                 </tr>
               )) : (
                 <tr><td className="admin-users-empty" colSpan={role === 'Reader' ? 8 : 7}>
@@ -355,47 +343,6 @@ const AdminUsersPage: React.FC = () => {
         </footer>
       </section>
 
-      {showCreateDialog && (
-        <div className="admin-users-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowCreateDialog(false); }}>
-          <section aria-labelledby="admin-create-title" aria-modal="true" className="admin-users-dialog" role="dialog">
-            <header>
-              <div><span className="admin-users-dialog-icon"><UserRoundCheck size={19} /></span><div><h2 id="admin-create-title">Tạo tài khoản Thủ thư</h2><p>Tài khoản được kích hoạt ngay sau khi tạo.</p></div></div>
-              <button aria-label="Đóng" onClick={() => setShowCreateDialog(false)} type="button"><X size={18} /></button>
-            </header>
-            <form onSubmit={handleCreateLibrarian}>
-              <label>Họ và tên<input autoComplete="name" maxLength={255} name="fullName" placeholder="Nguyễn Văn A" required /></label>
-              <label>Tên đăng nhập<input autoComplete="username" maxLength={50} minLength={3} name="username" placeholder="thuthu01" required /></label>
-              <p className="admin-users-field-hint">Đăng nhập bằng tên này; không cần email. Hệ thống sẽ tạo tài khoản nội bộ.</p>
-              <label>Mật khẩu<input autoComplete="new-password" minLength={8} name="password" placeholder="Ít nhất 8 ký tự" required type="password" /></label>
-              <label>Số điện thoại <span>(không bắt buộc)</span><input autoComplete="tel" name="phone" placeholder="090..." /></label>
-              <footer>
-                <button className="admin-users-button admin-users-button--secondary" onClick={() => setShowCreateDialog(false)} type="button">Hủy</button>
-                <button className="admin-users-button admin-users-button--primary" disabled={createBusy} type="submit">
-                  {createBusy ? <LoaderCircle className="admin-users-spin" size={16} /> : <Check size={16} />} Tạo tài khoản
-                </button>
-              </footer>
-            </form>
-          </section>
-        </div>
-      )}
-
-      {selectedUser && (
-        <div className="admin-users-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedUser(null); }}>
-          <section aria-labelledby="admin-user-detail-title" aria-modal="true" className="admin-users-dialog admin-users-detail" role="dialog">
-            <header><div><span className="admin-users-dialog-icon"><Eye size={18} /></span><div><h2 id="admin-user-detail-title">Thông tin người dùng</h2><p>{selectedUser.roleName === 'Reader' ? 'Độc giả' : 'Thủ thư'}</p></div></div><button aria-label="Đóng" onClick={() => setSelectedUser(null)} type="button"><X size={18} /></button></header>
-            <dl>
-              <div><dt>Họ và tên</dt><dd>{selectedUser.fullName}</dd></div>
-              <div><dt>{selectedUser.roleName === 'Reader' ? 'Mã số' : 'Tên đăng nhập'}</dt><dd>{selectedUser.studentId || selectedUser.email.split('@')[0]}</dd></div>
-              <div><dt>Email / Tài khoản</dt><dd>{selectedUser.email}</dd></div>
-              <div><dt>Số điện thoại</dt><dd>{selectedUser.phone || 'Chưa cập nhật'}</dd></div>
-              <div><dt>Trạng thái</dt><dd>{statusLabels[selectedUser.status] || selectedUser.status}</dd></div>
-              <div><dt>Ngày tạo</dt><dd>{new Date(selectedUser.createdAt).toLocaleString('vi-VN')}</dd></div>
-            </dl>
-          </section>
-        </div>
-      )}
-
-      {toast && <div className={`admin-users-toast admin-users-toast--${toast.tone}`} role="status">{toast.tone === 'success' ? <Check size={16} /> : <AlertCircle size={16} />}{toast.message}</div>}
     </section>
   );
 };

@@ -108,6 +108,17 @@ const statusToneMap: Record<string, string> = {
   Rejected: 'suspended',
 };
 
+const readerInitials = (name?: string | null) =>
+  name
+    ? name.split(' ').map((part) => part[0]).filter(Boolean).slice(-2).join('').toUpperCase()
+    : 'ĐG';
+
+const ReaderAvatar: React.FC<{ name: string; url?: string | null; className: string }> = ({ name, url, className }) => (
+  <div className={className}>
+    {url ? <img src={url} alt={`Ảnh đại diện ${name}`} /> : readerInitials(name)}
+  </div>
+);
+
 const ReadersManagementPage: React.FC = () => {
   const accessToken = useAuthStore((s) => s.accessToken);
   const [data, setData] = useState<ReadersResponse | null>(null);
@@ -347,15 +358,6 @@ const ReadersManagementPage: React.FC = () => {
                 {data?.items.map((reader) => {
                   const normStatus = normalizeStatus(reader.status);
                   const normType = normalizeReaderType(reader.readerType);
-                  const initials = reader.fullName
-                    ? reader.fullName
-                        .split(' ')
-                        .map((n) => n[0])
-                        .slice(-2)
-                        .join('')
-                        .toUpperCase()
-                    : 'ĐG';
-
                   return (
                     <tr key={reader.id}>
                       <td className="lib-readers-id">
@@ -363,7 +365,7 @@ const ReadersManagementPage: React.FC = () => {
                       </td>
                       <td>
                         <div className="lib-readers-user-cell">
-                          <div className="lib-readers-avatar">{initials}</div>
+                          <ReaderAvatar className="lib-readers-avatar" name={reader.fullName} url={reader.avatarUrl} />
                           <div className="lib-readers-names">
                             <strong>{reader.fullName}</strong>
                             <span>{reader.email}</span>
@@ -454,16 +456,11 @@ const ReadersManagementPage: React.FC = () => {
           >
             <header>
               <div className="lib-readers-dialog-head">
-                <div className="lib-readers-dialog-avatar">
-                  {selectedReader.fullName
-                    ? selectedReader.fullName
-                        .split(' ')
-                        .map((n) => n[0])
-                        .slice(-2)
-                        .join('')
-                        .toUpperCase()
-                    : 'ĐG'}
-                </div>
+                <ReaderAvatar
+                  className="lib-readers-dialog-avatar"
+                  name={selectedReader.fullName}
+                  url={selectedReader.avatarUrl}
+                />
                 <div>
                   <h2 id="lib-reader-detail-title">
                     {selectedReader.fullName}

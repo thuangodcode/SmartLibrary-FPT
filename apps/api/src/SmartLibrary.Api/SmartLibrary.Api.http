@@ -84,6 +84,42 @@ Content-Type: application/json
 
 ###
 
+# Read the profile for the authenticated account (Admin, Librarian, or Reader).
+GET {{SmartLibrary.Api_HostAddress}}/api/v1/profile
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+###
+
+# Update editable profile fields. Avatar is optional; add an Avatar file part to upload one.
+PUT {{SmartLibrary.Api_HostAddress}}/api/v1/profile
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=profile-boundary
+
+--profile-boundary
+Content-Disposition: form-data; name="FullName"
+
+Admin Example
+--profile-boundary
+Content-Disposition: form-data; name="Phone"
+
++84901234567
+--profile-boundary
+Content-Disposition: form-data; name="DateOfBirth"
+
+1990-01-15
+--profile-boundary
+Content-Disposition: form-data; name="Address"
+
+Ho Chi Minh City
+--profile-boundary
+Content-Disposition: form-data; name="ClearAvatar"
+
+false
+--profile-boundary--
+
+###
+
 # Admin: approve a report. The existing optional comment continues to be recorded in Reviews.
 PATCH {{SmartLibrary.Api_HostAddress}}/api/admin/reports/{{reportId}}
 Authorization: Bearer {{adminToken}}

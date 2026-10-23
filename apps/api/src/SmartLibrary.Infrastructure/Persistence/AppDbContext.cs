@@ -59,6 +59,7 @@ public class AppDbContext : DbContext
             entity.ToTable("profiles");
             entity.Property(u => u.Status).HasConversion<string>();
             entity.Property(u => u.ReaderType).HasConversion<string>();
+            entity.Property(u => u.EmployeeId).HasMaxLength(50);
         });
 
         modelBuilder.Entity<Role>().ToTable("roles");

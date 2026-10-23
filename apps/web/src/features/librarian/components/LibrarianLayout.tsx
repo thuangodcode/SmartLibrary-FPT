@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import {
   Bell,
+  AlarmClock,
+  ArrowLeftRight,
+  Archive,
   BookOpen,
   ChartNoAxesCombined,
   ChevronDown,
@@ -8,7 +11,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  Settings,
+  Sparkles,
   Users,
   X,
   Check,
@@ -23,11 +26,14 @@ import './LibrarianLayout.css';
 
 const navigation = [
   { label: 'Tổng quan', to: '/librarian', icon: LayoutDashboard, end: true },
-  { label: 'Duyệt tài khoản', to: '/librarian/registrations', icon: FileCheck, end: false, hasBadge: true },
-  { label: 'Quản lý sách', to: '/librarian/books', icon: BookOpen, end: false },
-  { label: 'Quản lý độc giả', to: '/librarian/readers', icon: Users, end: false },
-  { label: 'Quản lý báo cáo', to: '/librarian/reports', icon: ChartNoAxesCombined, end: false },
-  { label: 'Cài đặt', to: '/librarian/settings', icon: Settings, end: false },
+  { label: 'Sách & Biên mục', to: '/librarian/books', icon: BookOpen, end: false },
+  { label: 'Bản sao & Kho', to: '/librarian/copies', icon: Archive, end: false },
+  { label: 'Mượn – Trả', to: '/librarian/loans', icon: ArrowLeftRight, end: false },
+  { label: 'Quá hạn & Phí phạt', to: '/librarian/fines', icon: AlarmClock, end: false },
+  { label: 'Duyệt người đọc', to: '/librarian/registrations', icon: FileCheck, end: false, hasBadge: true },
+  { label: 'Độc giả', to: '/librarian/readers', icon: Users, end: false },
+  { label: 'Gợi ý nhập sách AI', to: '/librarian/ai-recommendations', icon: Sparkles, end: false },
+  { label: 'Thống kê & báo cáo', to: '/librarian/reports', icon: ChartNoAxesCombined, end: false },
 ];
 
 interface ApiEnvelope<T> {
@@ -57,9 +63,11 @@ export const LibrarianLayout: React.FC = () => {
   const { showToast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
-  const currentPage = navigation.find((item) =>
-    item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
-  )?.label ?? 'Tổng quan';
+  const currentPage = location.pathname === '/librarian/profile'
+    ? 'Hồ sơ cá nhân'
+    : navigation.find((item) =>
+      item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
+    )?.label ?? 'Tổng quan';
 
   const lastFetchRef = React.useRef<number>(0);
   React.useEffect(() => {
@@ -252,14 +260,16 @@ export const LibrarianLayout: React.FC = () => {
               </section>
             </details>
             <span className="lib-topbar-divider" />
-            <div className="lib-profile">
-              <div className="lib-avatar">{user?.fullName?.trim().charAt(0).toUpperCase() || 'T'}</div>
+            <Link className="lib-profile" to="/librarian/profile" aria-label="Mở hồ sơ cá nhân">
+              {user?.avatarUrl
+                ? <img className="lib-avatar lib-avatar-image" src={user.avatarUrl} alt="" />
+                : <div className="lib-avatar">{user?.fullName?.trim().charAt(0).toUpperCase() || 'T'}</div>}
               <div className="lib-profile-copy">
                 <strong>{user?.fullName || 'Thủ thư'}</strong>
                 <span>{user?.email || 'Thủ thư'}</span>
               </div>
               <ChevronDown size={16} className="lib-profile-chevron" />
-            </div>
+            </Link>
           </div>
         </header>
 

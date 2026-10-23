@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Eye, LoaderCircle, Pencil, Plus, Search, ShieldCheck } from 'lucide-react';
+import { Eye, LoaderCircle, Pencil, Plus, Search } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import {
@@ -91,9 +91,8 @@ const AdminPoliciesPage: React.FC = () => {
 
       <header className="pol-heading">
         <div className="pol-heading-copy">
-          <div className="pol-heading-icon"><ShieldCheck size={26} /></div>
           <div>
-            <h1>Quản lý chính sách thư viện</h1>
+            <h1>Quản lý chính sách</h1>
             <p>Cấu hình giới hạn, thời hạn, gia hạn, đặt trước và phí phạt áp dụng khi mượn trả.</p>
           </div>
         </div>

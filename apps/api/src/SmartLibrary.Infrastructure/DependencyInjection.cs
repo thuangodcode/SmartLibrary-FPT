@@ -46,6 +46,7 @@ public static class DependencyInjection
         services.AddHttpClient<IEmailService, EmailService>();
         services.AddHttpClient();
         services.AddScoped<IAdminUserManagementService, AdminUserManagementService>();
+        services.AddScoped<IUserProfileService, UserProfileService>();
         services.AddScoped<IStorageService, StorageService>();
         services.AddScoped<IReportExportService, ReportExportService>();
 

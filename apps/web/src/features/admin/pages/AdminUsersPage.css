@@ -306,6 +306,17 @@
   font-size: 10px;
 }
 
+.admin-users-row {
+  cursor: pointer;
+  transition: background .14s ease;
+}
+
+.admin-users-row:hover,
+.admin-users-row:focus-visible {
+  outline: none;
+  background: #fffaf7;
+}
+
 .admin-users-table th:first-child,
 .admin-users-table td:first-child {
   padding-left: 16px;
@@ -347,6 +358,30 @@
   font-weight: 620;
 }
 
+.admin-users-name-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.admin-users-avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border: 1px solid #f0e2da;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.admin-users-avatar-fallback {
+  display: grid;
+  place-items: center;
+  color: #d5622c;
+  background: #fff1e8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .admin-users-email {
   color: #818b9c !important;
 }
@@ -383,6 +418,7 @@
 }
 
 .admin-users-status--suspended,
+.admin-users-status--inactive,
 .admin-users-status--rejected {
   color: #b84c4a;
   background: #fff0ee;

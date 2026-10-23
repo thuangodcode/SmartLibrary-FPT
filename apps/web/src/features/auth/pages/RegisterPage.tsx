@@ -434,7 +434,7 @@ export const RegisterPage: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3.5 rounded-2xl bg-slate-900 dark:bg-indigo-600 text-white font-semibold text-xs sm:text-sm shadow-xl hover:bg-slate-800 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            className="auth-submit w-full shadow-xl"
           >
             {isLoading ? (
               <>

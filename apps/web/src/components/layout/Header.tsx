@@ -201,9 +201,9 @@ export const Header: React.FC = () => {
                       <p className="text-xs font-bold text-slate-900 dark:text-white">{user.fullName}</p>
                       <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
                     </div>
-                    <a href="/profile" className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Link to="/profile" className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">
                       <UserIcon className="w-4 h-4" /> Hồ sơ cá nhân
-                    </a>
+                    </Link>
                     <a href="/settings" className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">
                       <Settings className="w-4 h-4" /> Cài đặt
                     </a>
