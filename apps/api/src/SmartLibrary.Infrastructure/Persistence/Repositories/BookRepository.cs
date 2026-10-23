@@ -12,19 +12,25 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
 {
     public BookRepository(AppDbContext context) : base(context) { }
 
-    public async Task<PagedResult<Book>> GetPagedAsync(int page, int pageSize, string? search = null, CancellationToken ct = default)
+    public async Task<PagedResult<Book>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, CancellationToken ct = default)
     {
         var query = _dbSet
             .Include(b => b.Authors)
             .Include(b => b.Categories)
+            .Where(b => !b.IsDeleted)
             .AsQueryable();
+
+        if (categoryId.HasValue)
+        {
+            query = query.Where(b => b.Categories.Any(c => c.Id == categoryId.Value && !c.IsDeleted));
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var searchLower = search.ToLower();
+            var searchLower = search.Trim().ToLower();
             query = query.Where(b =>
                 b.Title.ToLower().Contains(searchLower) ||
-                (b.Isbn != null && b.Isbn.Contains(searchLower)));
+                (b.Isbn != null && b.Isbn.ToLower().Contains(searchLower)));
         }
 
         var totalCount = await query.CountAsync(ct);

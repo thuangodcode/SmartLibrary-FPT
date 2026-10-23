@@ -1,0 +1,445 @@
+/* ==========================================================================
+   Librarian Create Category Page Styling
+   ========================================================================== */
+
+.lib-create-cat-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 840px;
+  margin: 0 auto;
+  padding-bottom: 50px;
+}
+
+/* ─── Breadcrumb & Back ─── */
+.lib-create-cat-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.lib-create-cat-btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.lib-create-cat-btn-back:hover {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.lib-create-cat-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #94a3b8;
+}
+
+.lib-create-cat-breadcrumb strong {
+  color: #0f172a;
+}
+
+/* ─── Main Card ─── */
+.lib-create-cat-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 32px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+}
+
+.lib-create-cat-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.lib-create-cat-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  background: #fff7ed;
+  color: #ea580c;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.lib-create-cat-header h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.lib-create-cat-header p {
+  margin: 0;
+  font-size: 13.5px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+/* ─── Alerts ─── */
+.lib-create-cat-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  margin-bottom: 20px;
+}
+
+.lib-create-cat-alert.error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.lib-create-cat-alert.success {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+/* ─── Form ─── */
+.lib-create-cat-form {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.lib-create-cat-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lib-create-cat-form-group label {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lib-create-cat-form-group label .required {
+  color: #dc2626;
+}
+
+.lib-create-cat-form-group label .optional {
+  color: #94a3b8;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.lib-create-cat-form-group input[type="text"],
+.lib-create-cat-form-group textarea {
+  width: 100%;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #0f172a;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.lib-create-cat-form-group input[type="text"]:focus,
+.lib-create-cat-form-group textarea:focus {
+  background: #ffffff;
+  border-color: #ea580c;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+}
+
+.lib-create-cat-form-group textarea {
+  resize: vertical;
+  min-height: 90px;
+  line-height: 1.5;
+}
+
+.lib-create-cat-help {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* ─── Dropzone (From PC) ─── */
+.lib-create-cat-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 34px 20px;
+  background: #fbfcfe;
+  border: 2px dashed #cbd5e1;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.lib-create-cat-dropzone:hover,
+.lib-create-cat-dropzone.dragging {
+  background: #fff7ed;
+  border-color: #ea580c;
+}
+
+.lib-create-cat-dropzone-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #ea580c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+}
+
+.lib-create-cat-dropzone:hover .lib-create-cat-dropzone-icon {
+  transform: translateY(-3px);
+  background: #ffedd5;
+}
+
+.lib-create-cat-dropzone-text strong {
+  display: block;
+  font-size: 14px;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.lib-create-cat-dropzone-text span {
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+.lib-create-cat-dropzone-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.lib-create-cat-dropzone-badges span {
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lib-create-cat-dropzone-badges span.badge-cloud {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+/* ─── Preview Box ─── */
+.lib-create-cat-preview-box {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.lib-create-cat-preview-img-wrapper {
+  width: 140px;
+  height: 100px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #e2e8f0;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.lib-create-cat-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lib-create-cat-preview-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lib-create-cat-preview-file-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lib-create-cat-preview-file-info .file-icon {
+  color: #ea580c;
+}
+
+.lib-create-cat-preview-file-info strong {
+  display: block;
+  font-size: 13.5px;
+  color: #0f172a;
+}
+
+.lib-create-cat-preview-file-info span {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.lib-create-cat-cloud-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.lib-create-cat-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.lib-create-cat-btn-change {
+  padding: 6px 12px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+}
+
+.lib-create-cat-btn-change:hover {
+  background: #f1f5f9;
+}
+
+.lib-create-cat-btn-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #dc2626;
+  cursor: pointer;
+}
+
+.lib-create-cat-btn-remove:hover {
+  background: #fee2e2;
+}
+
+.lib-create-cat-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+/* ─── Form Actions ─── */
+.lib-create-cat-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 20px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.lib-create-cat-btn-cancel {
+  padding: 10px 20px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  color: #475569;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.lib-create-cat-btn-cancel:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.lib-create-cat-btn-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border: none;
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(234, 88, 12, 0.3);
+  transition: all 0.2s;
+}
+
+.lib-create-cat-btn-submit:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  box-shadow: 0 6px 20px rgba(234, 88, 12, 0.4);
+  transform: translateY(-1px);
+}
+
+.lib-create-cat-btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.lib-create-cat-btn-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}

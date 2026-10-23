@@ -28,9 +28,10 @@ public class BooksController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null,
+        [FromQuery] Guid? categoryId = null,
         CancellationToken ct = default)
     {
-        var result = await _bookService.GetPagedAsync(page, pageSize, search, ct);
+        var result = await _bookService.GetPagedAsync(page, pageSize, search, categoryId, ct);
         return Ok(ApiResponse<object>.Ok(result.Items, new
         {
             result.TotalCount,
@@ -71,6 +72,22 @@ public class BooksController : ControllerBase
     }
 
     /// <summary>
+    /// Create a new book from form with cover image upload to Cloudinary.
+    /// </summary>
+    [HttpPost("form")]
+    [Authorize]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> CreateFromForm([FromForm] CreateBookForm form, CancellationToken ct = default)
+    {
+        var result = await _bookService.CreateFromFormAsync(form, ct);
+        if (!result.IsSuccess)
+            return BadRequest(ApiResponse<object>.Fail(result.Error!));
+
+        return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id },
+            ApiResponse<BookDto>.Ok(result.Data));
+    }
+
+    /// <summary>
     /// Update a book (Librarian/Admin only).
     /// </summary>
     [HttpPut("{id:guid}")]
@@ -85,10 +102,25 @@ public class BooksController : ControllerBase
     }
 
     /// <summary>
-    /// Soft delete a book (Admin only).
+    /// Update a book from form with optional cover image upload (Librarian/Admin only).
+    /// </summary>
+    [HttpPut("{id:guid}/form")]
+    [Authorize(Policy = "LibrarianOnly")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UpdateFromForm(Guid id, [FromForm] UpdateBookForm form, CancellationToken ct = default)
+    {
+        var result = await _bookService.UpdateFromFormAsync(id, form, ct);
+        if (!result.IsSuccess)
+            return BadRequest(ApiResponse<object>.Fail(result.Error!));
+
+        return Ok(ApiResponse<BookDto>.Ok(result.Data!));
+    }
+
+    /// <summary>
+    /// Soft delete a book (Librarian/Admin only).
     /// </summary>
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = "AdminOnly")]
+    [Authorize(Policy = "LibrarianOnly")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
     {
         var result = await _bookService.DeleteAsync(id, ct);

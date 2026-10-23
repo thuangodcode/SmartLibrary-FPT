@@ -81,6 +81,15 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        try
+        {
+            db.Database.ExecuteSqlRaw("ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url TEXT;");
+        }
+        catch (Exception exSql)
+        {
+            Log.Warning(exSql, "Could not ensure image_url column on categories table.");
+        }
+
         db.Database.Migrate();
     }
 }
