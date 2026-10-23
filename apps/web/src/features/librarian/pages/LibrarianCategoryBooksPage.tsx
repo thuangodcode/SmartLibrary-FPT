@@ -251,8 +251,6 @@ const LibrarianCategoryBooksPage: React.FC = () => {
   // Fetch Category info
   const fetchCategoryInfo = useCallback(async () => {
     if (!categoryId) return;
-    setLoadingCategory(true);
-    setCategoryError(null);
     try {
       const headers: Record<string, string> = {};
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
@@ -263,6 +261,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
         throw new Error(json?.error || 'Không tìm thấy danh mục sách.');
       }
       setCategory(json.data);
+      setCategoryError(null);
     } catch (err) {
       console.error('Error fetching category info:', err);
       setCategoryError(err instanceof Error ? err.message : 'Không thể tải thông tin danh mục sách.');
@@ -275,8 +274,6 @@ const LibrarianCategoryBooksPage: React.FC = () => {
   // Fetch Books belonging to this category
   const fetchCategoryBooks = useCallback(async () => {
     if (!categoryId) return;
-    setLoadingBooks(true);
-    setError(null);
     try {
       const headers: Record<string, string> = {};
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
@@ -307,6 +304,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       }>(res);
 
       if (json && json.data) {
+        setError(null);
         setBooks(json.data);
         if (json.pagination) {
           setTotalCount(json.pagination.totalCount);
@@ -320,9 +318,9 @@ const LibrarianCategoryBooksPage: React.FC = () => {
         setTotalCount(0);
         setTotalPages(1);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching category books:', err);
-      setError('Không thể tải danh sách đầu sách thuộc danh mục này.');
+      setError(err instanceof Error ? err.message : 'Không thể tải danh sách đầu sách thuộc danh mục này.');
     } finally {
       setLoadingBooks(false);
       markInitialRequestComplete('books');
@@ -330,11 +328,11 @@ const LibrarianCategoryBooksPage: React.FC = () => {
   }, [categoryId, currentPage, pageSize, debouncedSearch, accessToken]);
 
   useEffect(() => {
-    fetchCategoryInfo();
+    void Promise.resolve().then(fetchCategoryInfo);
   }, [fetchCategoryInfo]);
 
   useEffect(() => {
-    fetchCategoryBooks();
+    void Promise.resolve().then(fetchCategoryBooks);
   }, [fetchCategoryBooks]);
 
   // Step 1 of Edit: Prompt confirmation modal
@@ -456,12 +454,12 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       }
 
       handleCloseEdit();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error updating category:', err);
       showToast({
         type: 'error',
         title: 'Cập nhật thất bại',
-        message: err.message || 'Có lỗi xảy ra khi lưu thay đổi.',
+        message: err instanceof Error ? err.message : 'Có lỗi xảy ra khi lưu thay đổi.',
       });
     } finally {
       setSavingEdit(false);
@@ -494,11 +492,11 @@ const LibrarianCategoryBooksPage: React.FC = () => {
 
       setConfirmDeleteOpen(false);
       navigate('/librarian/books');
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast({
         type: 'error',
         title: 'Lỗi xóa danh mục',
-        message: err.message || 'Có lỗi xảy ra khi xóa danh mục.',
+        message: err instanceof Error ? err.message : 'Có lỗi xảy ra khi xóa danh mục.',
       });
     } finally {
       setDeletingCategory(false);
@@ -623,12 +621,12 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       // Refresh list
       fetchCategoryBooks();
       fetchCategoryInfo();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error creating book:', err);
       showToast({
         type: 'error',
         title: 'Lỗi thêm đầu sách',
-        message: err.message || 'Có lỗi xảy ra khi tạo đầu sách.',
+        message: err instanceof Error ? err.message : 'Có lỗi xảy ra khi tạo đầu sách.',
       });
     } finally {
       setSavingBook(false);

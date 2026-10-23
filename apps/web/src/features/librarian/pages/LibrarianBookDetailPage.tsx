@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -122,10 +122,8 @@ const LibrarianBookDetailPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch Book Details
-  const fetchBookDetails = async () => {
+  const fetchBookDetails = useCallback(async () => {
     if (!bookId) return;
-    setLoading(true);
-    setError(null);
     try {
       const headers: Record<string, string> = {};
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
@@ -135,12 +133,13 @@ const LibrarianBookDetailPage: React.FC = () => {
 
       if (json && json.data) {
         setBook(json.data);
+        setError(null);
       } else {
         throw new Error('Không tìm thấy thông tin đầu sách.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching book details:', err);
-      setError(err.message || 'Không thể tải thông tin đầu sách.');
+      setError(err instanceof Error ? err.message : 'Không thể tải thông tin đầu sách.');
       showToast({
         type: 'error',
         title: 'Lỗi tải sách',
@@ -149,10 +148,10 @@ const LibrarianBookDetailPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, bookId, showToast]);
 
   // Fetch Categories for Edit Modal selection
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const headers: Record<string, string> = {};
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
@@ -164,12 +163,12 @@ const LibrarianBookDetailPage: React.FC = () => {
     } catch (err) {
       console.error('Error fetching categories for dropdown:', err);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
-    fetchBookDetails();
-    fetchCategories();
-  }, [bookId, accessToken]);
+    void Promise.resolve().then(fetchBookDetails);
+    void Promise.resolve().then(fetchCategories);
+  }, [fetchBookDetails, fetchCategories]);
 
   useEffect(() => {
     if (!bookId) return;
@@ -330,12 +329,12 @@ const LibrarianBookDetailPage: React.FC = () => {
         })));
         setEditLocationOriginal(editLocation);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error updating book:', err);
       showToast({
         type: 'error',
         title: 'Cập nhật thất bại',
-        message: err.message || 'Có lỗi xảy ra khi cập nhật đầu sách.',
+        message: err instanceof Error ? err.message : 'Có lỗi xảy ra khi cập nhật đầu sách.',
       });
     } finally {
       setSavingEdit(false);
@@ -369,12 +368,12 @@ const LibrarianBookDetailPage: React.FC = () => {
       setConfirmDeleteOpen(false);
       // Navigate back to the previous screen or categories
       navigate(-1);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error deleting book:', err);
       showToast({
         type: 'error',
         title: 'Xóa thất bại',
-        message: err.message || 'Có lỗi xảy ra khi xóa đầu sách.',
+        message: err instanceof Error ? err.message : 'Có lỗi xảy ra khi xóa đầu sách.',
       });
     } finally {
       setDeleting(false);

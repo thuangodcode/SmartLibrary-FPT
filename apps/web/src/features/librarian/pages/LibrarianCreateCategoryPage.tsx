@@ -146,9 +146,11 @@ const LibrarianCreateCategoryPage: React.FC = () => {
       setTimeout(() => {
         navigate('/librarian/books');
       }, 1000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error creating category:', err);
-      const errText = err.message || 'Có lỗi xảy ra khi tạo danh mục sách. Vui lòng kiểm tra lại kết nối.';
+      const errText = err instanceof Error
+        ? err.message
+        : 'Có lỗi xảy ra khi tạo danh mục sách. Vui lòng kiểm tra lại kết nối.';
       setErrorMessage(errText);
       showToast({
         type: 'error',

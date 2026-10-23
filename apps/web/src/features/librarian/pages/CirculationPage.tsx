@@ -61,6 +61,31 @@ interface IncidentDraft {
   notes: string;
 }
 
+function DebouncedSearchInput({
+  value,
+  onSearch,
+}: {
+  value: string;
+  onSearch: (value: string) => void;
+}) {
+  const [input, setInput] = useState(value);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (input !== value) onSearch(input);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [input, onSearch, value]);
+
+  return (
+    <input
+      value={input}
+      placeholder="Tìm theo mã phiếu, tên sách, mã độc giả..."
+      onChange={(event) => setInput(event.target.value)}
+    />
+  );
+}
+
 function Chrome({ tab, stats, loading }: { tab: CirculationTab; stats: CirculationStats | null; loading?: boolean }) {
   const current = TABS.find((item) => item.id === tab)!;
   const HeroIcon = TAB_ICONS[tab];
@@ -146,28 +171,15 @@ function LoansView() {
   const search = params.get('q') ?? '';
   const status = params.get('status') ?? 'All';
   const page = Number(params.get('page') ?? '1') || 1;
-  const [searchInput, setSearchInput] = useState(search);
-
-  useEffect(() => { setSearchInput(search); }, [search]);
-
-  const setFilter = (key: string, value: string) => {
+  const setFilter = useCallback((key: string, value: string) => {
     const next = new URLSearchParams(params);
     if (value && value !== 'All') next.set(key, value);
     else next.delete(key);
     if (key !== 'page') next.delete('page');
     setParams(next);
-  };
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      if (searchInput !== search) setFilter('q', searchInput);
-    }, 400);
-    return () => window.clearTimeout(timer);
-  }, [searchInput, search]);
+  }, [params, setParams]);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
       const query = new URLSearchParams({ page: String(page), pageSize: '8' });
       if (search.trim()) query.set('search', search.trim());
@@ -183,6 +195,7 @@ function LoansView() {
       const fineJson = await parseApiResponse<ApiResult<CirculationFine[]>>(fineRes);
       const pendingJson = await parseApiResponse<ApiResult<CirculationLoan[]>>(pendingRes);
       if (!listRes.ok || !listJson?.success || !listJson.data) throw new Error(listJson?.error || 'Không tải được danh sách mượn.');
+      setError(null);
       setStats(statsJson?.data ?? null);
       setList(listJson.data);
       setFines(fineJson?.data ?? []);
@@ -194,7 +207,7 @@ function LoansView() {
     }
   }, [headers, page, search, status]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   const post = async (url: string, body?: object) => {
     setBusy(true);
@@ -253,7 +266,7 @@ function LoansView() {
             <div className="circ-card-head">
               <h2>Danh sách mượn sách</h2>
               <div className="circ-toolbar">
-                <input value={searchInput} placeholder="Tìm theo mã phiếu, tên sách, mã độc giả..." onChange={(e) => setSearchInput(e.target.value)} />
+                <DebouncedSearchInput key={search} value={search} onSearch={(value) => setFilter('q', value)} />
                 <select value={status} onChange={(e) => setFilter('status', e.target.value)}>
                   <option value="All">Tất cả trạng thái</option>
                   <option value="Borrowed">Đang mượn</option>
@@ -460,13 +473,7 @@ function ReturnView() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const barcode = params.get('barcode');
-    if (barcode) setReturnBarcode(barcode);
-  }, [params]);
-
   const load = useCallback(async () => {
-    setLoading(true);
     try {
       const [statsRes, reservationRes, activityRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
@@ -488,7 +495,7 @@ function ReturnView() {
     }
   }, [headers]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   const post = async (url: string, body?: object) => {
     setBusy(true);
@@ -624,8 +631,6 @@ function OverdueView() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
       const [statsRes, overdueRes, incidentRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
@@ -636,6 +641,7 @@ function OverdueView() {
       const overdueJson = await parseApiResponse<ApiResult<CirculationLoan[]>>(overdueRes);
       const incidentJson = await parseApiResponse<ApiResult<CirculationIncident[]>>(incidentRes);
       if (!overdueRes.ok || !overdueJson?.success) throw new Error(overdueJson?.error || 'Không tải được sách quá hạn.');
+      setError(null);
       setStats(statsJson?.data ?? null);
       setItems(overdueJson.data ?? []);
       setIncidents(incidentJson?.data ?? []);
@@ -646,7 +652,7 @@ function OverdueView() {
     }
   }, [headers]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   const draftOf = (item: CirculationIncident): IncidentDraft => drafts[item.id] ?? {
     severity: item.kind === 'Lost' ? 'Lost' : 'Light',
@@ -873,8 +879,6 @@ function FinesView() {
   }, [searchInput]);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
       const query = new URLSearchParams();
       if (search.trim()) query.set('search', search.trim());
@@ -886,6 +890,7 @@ function FinesView() {
       const statsJson = await parseApiResponse<ApiResult<CirculationStats>>(statsRes);
       const fineJson = await parseApiResponse<ApiResult<CirculationFine[]>>(fineRes);
       if (!fineRes.ok || !fineJson?.success) throw new Error(fineJson?.error || 'Không tải được phí phạt.');
+      setError(null);
       setStats(statsJson?.data ?? null);
       setItems(fineJson.data ?? []);
     } catch (err) {
@@ -895,7 +900,7 @@ function FinesView() {
     }
   }, [headers, search, status]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   const pay = async (id: string) => {
     if (!window.confirm('Xác nhận đã thu tiền phạt này? Hệ thống không tự đánh dấu đã thanh toán.')) return;
@@ -978,9 +983,10 @@ const VIEWS = {
 
 const CirculationPage: React.FC = () => {
   const { tab } = useParams();
+  const [params] = useSearchParams();
   if (!isCirculationTab(tab)) return <Navigate to={tabPath('loans')} replace />;
   const View = VIEWS[tab];
-  return <View />;
+  return <View key={tab === 'return' ? params.get('barcode') ?? '' : tab} />;
 };
 
 export default CirculationPage;
