@@ -1,25 +1,18 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  BookOpen,
-  Calendar,
-  Check,
   Clock,
   Eye,
   FileText,
   LoaderCircle,
-  Mail,
-  MapPin,
-  Phone,
   RefreshCw,
   Search,
-  ShieldAlert,
   UserCheck,
   Users,
   UserX,
-  X,
 } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { parseApiResponse } from '../../../lib/api';
@@ -120,6 +113,7 @@ const ReaderAvatar: React.FC<{ name: string; url?: string | null; className: str
 );
 
 const ReadersManagementPage: React.FC = () => {
+  const navigate = useNavigate();
   const accessToken = useAuthStore((s) => s.accessToken);
   const [data, setData] = useState<ReadersResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -130,10 +124,6 @@ const ReadersManagementPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-
-  // Detail Modal
-  const [selectedReader, setSelectedReader] = useState<ReaderItem | null>(null);
-  const [toast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
 
   const fetchReaders = useCallback(async () => {
     setLoading(true);
@@ -359,7 +349,20 @@ const ReadersManagementPage: React.FC = () => {
                   const normStatus = normalizeStatus(reader.status);
                   const normType = normalizeReaderType(reader.readerType);
                   return (
-                    <tr key={reader.id}>
+                    <tr
+                      key={reader.id}
+                      className="lib-readers-clickable-row"
+                      onClick={() => navigate(`/librarian/readers/${reader.id}`)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          navigate(`/librarian/readers/${reader.id}`);
+                        }
+                      }}
+                      tabIndex={0}
+                      role="link"
+                      aria-label={`Xem chi tiết độc giả ${reader.fullName}`}
+                    >
                       <td className="lib-readers-id">
                         {reader.studentId || `#${reader.id.slice(0, 8).toUpperCase()}`}
                       </td>
@@ -398,7 +401,7 @@ const ReadersManagementPage: React.FC = () => {
                           className="lib-readers-icon-button"
                           title="Xem chi tiết bạn đọc"
                           aria-label="Xem chi tiết bạn đọc"
-                          onClick={() => setSelectedReader(reader)}
+                          onClick={() => navigate(`/librarian/readers/${reader.id}`)}
                         >
                           <Eye size={14} />
                         </button>
@@ -439,161 +442,6 @@ const ReadersManagementPage: React.FC = () => {
         )}
       </section>
 
-      {/* ─── Detail Modal (Matching Admin User Detail Dialog) ─── */}
-      {selectedReader && (
-        <div
-          className="lib-readers-overlay"
-          role="presentation"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setSelectedReader(null);
-          }}
-        >
-          <section
-            aria-labelledby="lib-reader-detail-title"
-            aria-modal="true"
-            className="lib-readers-dialog"
-            role="dialog"
-          >
-            <header>
-              <div className="lib-readers-dialog-head">
-                <ReaderAvatar
-                  className="lib-readers-dialog-avatar"
-                  name={selectedReader.fullName}
-                  url={selectedReader.avatarUrl}
-                />
-                <div>
-                  <h2 id="lib-reader-detail-title">
-                    {selectedReader.fullName}
-                    <span
-                      className={`lib-readers-status lib-readers-status--${
-                        statusToneMap[normalizeStatus(selectedReader.status)] || 'pending'
-                      }`}
-                    >
-                      {statusLabels[normalizeStatus(selectedReader.status)]}
-                    </span>
-                  </h2>
-                  <p>
-                    {readerTypeLabels[normalizeReaderType(selectedReader.readerType)]} · Mã thẻ:{' '}
-                    {selectedReader.studentId || `#${selectedReader.id.slice(0, 8).toUpperCase()}`}
-                  </p>
-                </div>
-              </div>
-              <button
-                aria-label="Đóng"
-                className="lib-readers-dialog-close"
-                onClick={() => setSelectedReader(null)}
-                type="button"
-              >
-                <X size={18} />
-              </button>
-            </header>
-
-            <div className="lib-readers-dialog-body">
-              {/* Info Cards Grid */}
-              <div className="lib-readers-info-grid">
-                <div className="lib-readers-info-card">
-                  <Mail size={16} />
-                  <div>
-                    <p>Địa chỉ Email</p>
-                    <strong>{selectedReader.email}</strong>
-                  </div>
-                </div>
-
-                <div className="lib-readers-info-card">
-                  <Phone size={16} />
-                  <div>
-                    <p>Số điện thoại</p>
-                    <strong>{selectedReader.phone || 'Chưa cập nhật'}</strong>
-                  </div>
-                </div>
-
-                <div className="lib-readers-info-card">
-                  <Calendar size={16} />
-                  <div>
-                    <p>Ngày sinh</p>
-                    <strong>
-                      {selectedReader.dateOfBirth
-                        ? new Date(selectedReader.dateOfBirth).toLocaleDateString('vi-VN')
-                        : 'Chưa cập nhật'}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="lib-readers-info-card">
-                  <MapPin size={16} />
-                  <div>
-                    <p>Địa chỉ</p>
-                    <strong>{selectedReader.address || 'Chưa cập nhật'}</strong>
-                  </div>
-                </div>
-
-                <div className="lib-readers-info-card">
-                  <Clock size={16} />
-                  <div>
-                    <p>Thời hạn thẻ thành viên</p>
-                    <strong>
-                      {selectedReader.membershipExpiresAt
-                        ? new Date(selectedReader.membershipExpiresAt).toLocaleDateString('vi-VN')
-                        : 'Vô thời hạn'}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="lib-readers-info-card">
-                  <BookOpen size={16} />
-                  <div>
-                    <p>Tình trạng mượn trả</p>
-                    <strong>
-                      {selectedReader.borrowingCount ?? 0} cuốn đang mượn (
-                      {selectedReader.overdueCount ?? 0} quá hạn)
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="lib-readers-info-card">
-                  <Calendar size={16} />
-                  <div>
-                    <p>Ngày tham gia thư viện</p>
-                    <strong>
-                      {selectedReader.createdAt
-                        ? new Date(selectedReader.createdAt).toLocaleDateString('vi-VN')
-                        : '—'}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="lib-readers-info-card">
-                  <ShieldAlert size={16} />
-                  <div>
-                    <p>Tiền phạt chưa thanh toán</p>
-                    <strong style={{ color: (selectedReader.unpaidFines ?? 0) > 0 ? '#dc2626' : '#192235' }}>
-                      {Number(selectedReader.unpaidFines ?? 0).toLocaleString('vi-VN')} đ
-                    </strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <footer>
-              <button
-                className="lib-readers-button lib-readers-button--secondary"
-                onClick={() => setSelectedReader(null)}
-                type="button"
-              >
-                Đóng
-              </button>
-            </footer>
-          </section>
-        </div>
-      )}
-
-      {/* ─── Toast ─── */}
-      {toast && (
-        <div className={`reg-toast reg-toast--${toast.tone}`} role="status">
-          {toast.tone === 'success' ? <Check size={16} /> : <AlertCircle size={16} />}
-          {toast.message}
-        </div>
-      )}
     </div>
   );
 };

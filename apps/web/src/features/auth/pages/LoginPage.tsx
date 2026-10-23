@@ -92,8 +92,15 @@ export const LoginPage: React.FC = () => {
       showToast({
         type: 'success',
         title: 'Đăng nhập thành công',
-        message: `Xin chào ${user.fullName || 'bạn'}!`,
+        message: user.email?.toLowerCase().endsWith('@smartlibrary.local')
+          ? `Xin chào ${user.fullName || 'bạn'}! Bạn có thể xác minh email cá nhân trong Hồ sơ bất cứ lúc nào.`
+          : `Xin chào ${user.fullName || 'bạn'}!`,
       });
+
+      if (role === 'Reader' && user.email?.toLowerCase().endsWith('@smartlibrary.local')) {
+        navigate('/profile');
+        return;
+      }
 
       // Role-based redirect
       if (role === 'Admin') {
@@ -125,7 +132,7 @@ export const LoginPage: React.FC = () => {
             type="text"
             autoComplete="username"
             {...register('email')}
-            placeholder="adminfpt hoặc email của bạn"
+            placeholder="Mã số sinh viên hoặc email của bạn"
             className="auth-input"
           />
           {errors.email && (

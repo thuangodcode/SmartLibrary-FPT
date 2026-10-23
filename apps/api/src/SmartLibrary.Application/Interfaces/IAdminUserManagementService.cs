@@ -13,6 +13,8 @@ public interface IAdminUserManagementService
 
     Task<object?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken);
 
+    Task<object?> GetReaderByIdAsync(Guid userId, CancellationToken cancellationToken);
+
     Task<object?> UpdateUserAsync(
         Guid userId,
         UpdateManagedUserRequest request,

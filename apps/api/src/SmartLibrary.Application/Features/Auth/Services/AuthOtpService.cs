@@ -41,7 +41,7 @@ public class AuthOtpService : IAuthOtpService
         var cleanEmail = email.Trim().ToLowerInvariant();
         var otp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
 
-        var subject = $"[SmartLibrary] Mã xác thực OTP: {otp}";
+        var subject = $"[SmartLibrary] Mã xác minh email: {otp}";
         var body = $@"
 <div style=""font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);"">
   <div style=""background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); padding: 32px 24px; text-align: center;"">
@@ -49,9 +49,9 @@ public class AuthOtpService : IAuthOtpService
     <p style=""color: #c7d2fe; margin: 8px 0 0; font-size: 14px;"">Hệ Thống Quản Lý Thư Viện Thông Minh</p>
   </div>
   <div style=""padding: 32px 24px;"">
-    <h2 style=""color: #1e293b; font-size: 18px; margin: 0 0 12px; font-weight: 600;"">Mã xác thực email đăng ký</h2>
+    <h2 style=""color: #1e293b; font-size: 18px; margin: 0 0 12px; font-weight: 600;"">Xác minh email SmartLibrary</h2>
     <p style=""color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 24px;"">
-      Chào bạn, bạn đang thực hiện đăng ký tài khoản tại <strong>SmartLibrary - Đại học FPT</strong>. Dưới đây là mã xác thực OTP của bạn:
+      Chào bạn, hãy sử dụng mã OTP dưới đây để xác minh địa chỉ email cho tài khoản <strong>SmartLibrary - Đại học FPT</strong>:
     </p>
     <div style=""background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px;"">
       <span style=""font-family: monospace; font-size: 36px; font-weight: 700; letter-spacing: 10px; color: #4f46e5; display: inline-block;"">{otp}</span>

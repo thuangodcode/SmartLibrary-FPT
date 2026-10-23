@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Interfaces;
+using SmartLibrary.Domain.Exceptions;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -103,6 +104,66 @@ public sealed class ProfileController(
                 : Ok(ApiResponse<UserProfileResponse>.Ok(profile));
         }
         catch (ArgumentException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
+    }
+
+    /// <summary>Sends a one-time verification code to an imported student's personal email.</summary>
+    [HttpPost("email-verification/send")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> SendEmailVerification(
+        [FromBody] SendProfileEmailVerificationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetCurrentUserId(out var userId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản hiện tại."));
+
+        try
+        {
+            var message = await profileService.SendEmailVerificationOtpAsync(
+                userId,
+                request.Email,
+                cancellationToken);
+            return Ok(ApiResponse<object>.Ok(new { message }));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
+    }
+
+    /// <summary>Verifies and saves an imported student's personal email address.</summary>
+    [HttpPost("email-verification/verify")]
+    [ProducesResponseType(typeof(ApiResponse<UserProfileResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> VerifyEmail(
+        [FromBody] VerifyProfileEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetCurrentUserId(out var userId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản hiện tại."));
+
+        try
+        {
+            var profile = await profileService.VerifyAndUpdateEmailAsync(
+                userId,
+                request.Email,
+                request.Otp,
+                cancellationToken);
+            return profile is null
+                ? NotFound(ApiResponse<object>.Fail("Không tìm thấy hồ sơ người dùng."))
+                : Ok(ApiResponse<UserProfileResponse>.Ok(profile));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
+        catch (ValidationException exception)
         {
             return BadRequest(ApiResponse<object>.Fail(exception.Message));
         }

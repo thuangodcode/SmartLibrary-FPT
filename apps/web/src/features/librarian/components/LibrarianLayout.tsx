@@ -1,18 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Bell,
-  AlarmClock,
-  ArrowLeftRight,
   Archive,
   BookOpen,
   ChartNoAxesCombined,
   ChevronDown,
+  ChevronRight,
+  Clock3,
   FileCheck,
   LayoutDashboard,
   LogOut,
   Menu,
+  PanelLeft,
   Sparkles,
+  RotateCcw,
+  Search,
   Users,
+  Wallet,
   X,
   Check,
 } from 'lucide-react';
@@ -24,17 +28,25 @@ import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import './LibrarianLayout.css';
 
+const circulationChildren = [
+  { label: 'Mượn sách', to: '/librarian/circulation/loans', icon: BookOpen, end: false },
+  { label: 'Trả sách', to: '/librarian/circulation/return', icon: RotateCcw, end: false },
+  { label: 'Quá hạn', to: '/librarian/circulation/overdue', icon: Clock3, end: false },
+  { label: 'Phí phạt', to: '/librarian/circulation/fines', icon: Wallet, end: false },
+];
+
 const navigation = [
   { label: 'Tổng quan', to: '/librarian', icon: LayoutDashboard, end: true },
   { label: 'Sách & Biên mục', to: '/librarian/books', icon: BookOpen, end: false },
   { label: 'Bản sao & Kho', to: '/librarian/copies', icon: Archive, end: false },
-  { label: 'Mượn – Trả', to: '/librarian/loans', icon: ArrowLeftRight, end: false },
-  { label: 'Quá hạn & Phí phạt', to: '/librarian/fines', icon: AlarmClock, end: false },
-  { label: 'Duyệt người đọc', to: '/librarian/registrations', icon: FileCheck, end: false, hasBadge: true },
+  { label: 'Quản lý dịch vụ', to: '/librarian/circulation', icon: RotateCcw, end: false, children: circulationChildren },
+  { label: 'Duyệt người đọc', to: '/librarian/registrations', icon: FileCheck, end: false },
   { label: 'Độc giả', to: '/librarian/readers', icon: Users, end: false },
   { label: 'Gợi ý nhập sách AI', to: '/librarian/ai-recommendations', icon: Sparkles, end: false },
   { label: 'Thống kê & báo cáo', to: '/librarian/reports', icon: ChartNoAxesCombined, end: false },
 ];
+
+const EXPAND_DELAY_MS = 140;
 
 interface ApiEnvelope<T> {
   success?: boolean;
@@ -53,6 +65,10 @@ interface ReportDecisionNotice {
 
 export const LibrarianLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [railExpanded, setRailExpanded] = useState(false);
+  const [hoverCapable, setHoverCapable] = useState(true);
+  const [headerSearch, setHeaderSearch] = useState('');
+  const [circulationOpen, setCirculationOpen] = useState(true);
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const [decisionNotices, setDecisionNotices] = useState<ReportDecisionNotice[]>([]);
   const [notificationError, setNotificationError] = useState<string | null>(null);
@@ -63,11 +79,46 @@ export const LibrarianLayout: React.FC = () => {
   const { showToast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
+  const hiddenModuleLabels: Record<string, string> = {
+    '/librarian/loans': 'Mượn – Trả',
+    '/librarian/fines': 'Quá hạn & Phí phạt',
+  };
+  const expandTimerRef = useRef<number | null>(null);
+  const showTooltips = !railExpanded && !sidebarOpen;
+  const sidebarClassName = [
+    'lib-sidebar',
+    sidebarOpen ? 'lib-sidebar-open' : '',
+    railExpanded ? 'lib-sidebar--expanded' : 'lib-sidebar--collapsed',
+  ].filter(Boolean).join(' ');
+
+  useEffect(() => {
+    const mq = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const sync = () => setHoverCapable(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => () => {
+    if (expandTimerRef.current !== null) window.clearTimeout(expandTimerRef.current);
+  }, []);
+
+  const clearExpandTimer = () => {
+    if (expandTimerRef.current !== null) {
+      window.clearTimeout(expandTimerRef.current);
+      expandTimerRef.current = null;
+    }
+  };
+
   const currentPage = location.pathname === '/librarian/profile'
     ? 'Hồ sơ cá nhân'
-    : navigation.find((item) =>
-      item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
-    )?.label ?? 'Tổng quan';
+    : hiddenModuleLabels[location.pathname]
+      ?? circulationChildren.find((item) => location.pathname.startsWith(item.to))?.label
+      ?? navigation.find((item) =>
+        item.end ? location.pathname === item.to
+          : location.pathname.startsWith(item.to) && item.to !== '/librarian/circulation',
+      )?.label
+      ?? 'Tổng quan';
 
   const lastFetchRef = React.useRef<number>(0);
   React.useEffect(() => {
@@ -164,13 +215,28 @@ export const LibrarianLayout: React.FC = () => {
         />
       )}
 
-      <aside className={`lib-sidebar${sidebarOpen ? ' lib-sidebar-open' : ''}`}>
+      <aside
+        className={sidebarClassName}
+        onMouseEnter={() => {
+          if (!hoverCapable) return;
+          clearExpandTimer();
+          expandTimerRef.current = window.setTimeout(() => {
+            setRailExpanded(true);
+            expandTimerRef.current = null;
+          }, EXPAND_DELAY_MS);
+        }}
+        onMouseLeave={() => {
+          if (!hoverCapable) return;
+          clearExpandTimer();
+          setRailExpanded(false);
+        }}
+      >
         <div className="lib-brand-row">
-          <Link to="/librarian" className="lib-brand">
+          <Link to="/librarian" className="lib-brand" title="SmartLibrary">
             <img src={smartLibraryLogo} alt="" className="lib-brand-logo" />
-            <span>
+            <span className="lib-brand-text">
               <strong>SmartLibrary</strong>
-              <small>THỦ THƯ</small>
+              <small>QUẢN TRỊ HỆ THỐNG</small>
             </span>
           </Link>
           <button
@@ -183,34 +249,87 @@ export const LibrarianLayout: React.FC = () => {
           </button>
         </div>
 
+        {!hoverCapable && (
+          <button
+            type="button"
+            className="lib-rail-toggle"
+            aria-label={railExpanded ? 'Thu gọn menu' : 'Mở rộng menu'}
+            aria-expanded={railExpanded}
+            onClick={() => setRailExpanded((expanded) => !expanded)}
+          >
+            {railExpanded ? <PanelLeft size={18} /> : <ChevronRight size={18} />}
+            <span className="lib-rail-toggle-label">{railExpanded ? 'Thu gọn' : 'Mở rộng'}</span>
+          </button>
+        )}
+
         <div className="lib-nav-caption">MENU CHÍNH</div>
         <nav className="lib-navigation" aria-label="Điều hướng thủ thư">
-          {navigation.map(({ label, to, icon: Icon, end, hasBadge }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) => `lib-nav-link${isActive ? ' lib-nav-link-active' : ''}`}
-            >
-              <Icon size={19} strokeWidth={1.9} />
-              <span>{label}</span>
-              {hasBadge && (pendingCount ?? 0) > 0 && (
-                <span className="lib-nav-badge">{pendingCount}</span>
-              )}
-            </NavLink>
+          {navigation.map(({ label, to, icon: Icon, end, children }) => (
+            children ? (
+              <div className="lib-nav-group" key={to}>
+                <button
+                  type="button"
+                  title={showTooltips ? label : undefined}
+                  data-tooltip={label}
+                  aria-expanded={circulationOpen}
+                  className={`lib-nav-link lib-nav-parent${location.pathname.startsWith('/librarian/circulation') ? ' lib-nav-link-active' : ''}`}
+                  onClick={() => setCirculationOpen((open) => !open)}
+                >
+                  <Icon size={20} strokeWidth={1.9} className="lib-nav-icon" />
+                  <span className="lib-nav-label">{label}</span>
+                  <ChevronDown size={16} className={`lib-nav-chevron${circulationOpen ? ' lib-nav-chevron-open' : ''}`} />
+                </button>
+                <div className={`lib-subnavigation${circulationOpen ? ' lib-subnavigation-open' : ''}`}>
+                  {children.map((child) => (
+                    <NavLink
+                      key={child.to}
+                      to={child.to}
+                      end={child.end}
+                      title={showTooltips ? child.label : undefined}
+                      data-tooltip={child.label}
+                      onClick={() => setSidebarOpen(false)}
+                      className={({ isActive }) => `lib-nav-link lib-nav-child${isActive ? ' lib-nav-link-active' : ''}`}
+                    >
+                      <child.icon size={16} strokeWidth={1.9} className="lib-nav-icon" />
+                      <span className="lib-nav-label">{child.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                title={showTooltips ? label : undefined}
+                data-tooltip={label}
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) => `lib-nav-link${isActive ? ' lib-nav-link-active' : ''}`}
+              >
+                <Icon size={20} strokeWidth={1.9} className="lib-nav-icon" />
+                <span className="lib-nav-label">{label}</span>
+              </NavLink>
+            )
           ))}
         </nav>
 
         <div className="lib-sidebar-bottom">
           <div className="lib-sidebar-help">
             <span className="lib-help-icon"><BookOpen size={18} /></span>
-            <strong>SmartLibrary</strong>
-            <p>Quản lý thư viện trong một không gian thống nhất.</p>
+            <div className="lib-help-copy">
+              <strong>SmartLibrary</strong>
+              <p>Quản lý thư viện trong một không gian thống nhất.</p>
+            </div>
           </div>
-          <button type="button" className="lib-logout-button" onClick={handleLogout}>
-            <LogOut size={17} />
-            <span>Đăng xuất</span>
+          <button
+            type="button"
+            className="lib-logout-button"
+            onClick={handleLogout}
+            title={showTooltips ? 'Đăng xuất' : undefined}
+            data-tooltip="Đăng xuất"
+          >
+            <LogOut size={18} className="lib-nav-icon" />
+            <span className="lib-nav-label">Đăng xuất</span>
           </button>
         </div>
       </aside>
@@ -230,6 +349,20 @@ export const LibrarianLayout: React.FC = () => {
             <span className="lib-breadcrumb-separator">/</span>
             <strong>{currentPage}</strong>
           </div>
+          <form
+            className="lib-header-search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              navigate(`/librarian/circulation/loans?q=${encodeURIComponent(headerSearch.trim())}`);
+            }}
+          >
+            <Search size={16} />
+            <input
+              value={headerSearch}
+              onChange={(event) => setHeaderSearch(event.target.value)}
+              placeholder="Tìm sách, mã phiếu, tên bạn đọc..."
+            />
+          </form>
           <div className="lib-topbar-actions">
             <details className="lib-notification-menu">
               <summary className="lib-icon-button" aria-label={`Thông báo${unreadDecisionCount ? `, ${unreadDecisionCount} thông báo chưa xem` : ''}`}>
@@ -265,8 +398,8 @@ export const LibrarianLayout: React.FC = () => {
                 ? <img className="lib-avatar lib-avatar-image" src={user.avatarUrl} alt="" />
                 : <div className="lib-avatar">{user?.fullName?.trim().charAt(0).toUpperCase() || 'T'}</div>}
               <div className="lib-profile-copy">
-                <strong>{user?.fullName || 'Thủ thư'}</strong>
-                <span>{user?.email || 'Thủ thư'}</span>
+                <strong>{user?.fullName || 'Thủ thư SmartLibrary'}</strong>
+                <span>Quản lý thư viện</span>
               </div>
               <ChevronDown size={16} className="lib-profile-chevron" />
             </Link>

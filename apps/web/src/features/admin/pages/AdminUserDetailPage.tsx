@@ -85,9 +85,11 @@ const formatDate = (value: string | null, includeTime = false) => {
     : date.toLocaleString('vi-VN', includeTime ? undefined : { dateStyle: 'medium' });
 };
 
-const AdminUserDetailPage: React.FC = () => {
+const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ audience = 'admin' }) => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
+  const isLibrarianView = audience === 'librarian';
+  const usersPath = isLibrarianView ? '/librarian/readers' : '/admin/users';
   const accessToken = useAuthStore((state) => state.accessToken);
   const [user, setUser] = useState<ManagedUserDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,7 +106,7 @@ const AdminUserDetailPage: React.FC = () => {
 
   const loadUser = useCallback(async (signal?: AbortSignal) => {
     if (!userId || !accessToken) {
-      setLoadError('Không thể xác thực phiên Admin hoặc tài khoản không hợp lệ.');
+      setLoadError(`Không thể xác thực phiên ${isLibrarianView ? 'Thủ thư' : 'Admin'} hoặc tài khoản không hợp lệ.`);
       setLoading(false);
       return;
     }
@@ -112,7 +114,8 @@ const AdminUserDetailPage: React.FC = () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}`, {
+      const endpoint = isLibrarianView ? 'librarian/users' : 'admin/users';
+      const response = await fetch(`${API_BASE_URL}/api/v1/${endpoint}/${userId}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
         signal,
       });
@@ -127,7 +130,7 @@ const AdminUserDetailPage: React.FC = () => {
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [accessToken, userId]);
+  }, [accessToken, isLibrarianView, userId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -262,7 +265,7 @@ const AdminUserDetailPage: React.FC = () => {
   if (loadError || !user) {
     return (
       <section className="admin-user-detail-page">
-        <Link className="admin-user-back-link" to="/admin/users"><ArrowLeft size={16} /> Quay lại danh sách</Link>
+        <Link className="admin-user-back-link" to={usersPath}><ArrowLeft size={16} /> Quay lại danh sách</Link>
         <div className="admin-user-detail-error" role="alert"><AlertCircle size={18} />{loadError || 'Không tìm thấy người dùng.'}</div>
       </section>
     );
@@ -289,11 +292,11 @@ const AdminUserDetailPage: React.FC = () => {
     <section className="admin-user-detail-page">
       <header className="admin-user-detail-heading">
         <div>
-          <p className="admin-user-detail-eyebrow"><Link to="/admin/users">Quản lý người dùng</Link> / Chi tiết tài khoản</p>
+          <p className="admin-user-detail-eyebrow"><Link to={usersPath}>{isLibrarianView ? 'Quản lý độc giả' : 'Quản lý người dùng'}</Link> / Chi tiết tài khoản</p>
           <h1>Chi tiết {isReader ? 'độc giả' : 'thủ thư'}</h1>
-          <p>Xem và cập nhật thông tin cá nhân, trạng thái hoạt động của tài khoản.</p>
+          <p>{isLibrarianView ? 'Xem thông tin cá nhân và hồ sơ độc giả.' : 'Xem và cập nhật thông tin cá nhân, trạng thái hoạt động của tài khoản.'}</p>
         </div>
-        <button className="admin-user-detail-button admin-user-detail-button--secondary" onClick={() => navigate('/admin/users')} type="button">
+        <button className="admin-user-detail-button admin-user-detail-button--secondary" onClick={() => navigate(usersPath)} type="button">
           <ArrowLeft size={15} /> Quay lại
         </button>
       </header>
@@ -321,7 +324,7 @@ const AdminUserDetailPage: React.FC = () => {
             <h2>{user.fullName}</h2>
             <p>{isReader ? (user.studentId || 'Chưa có mã độc giả') : user.email.split('@')[0]} <span>·</span> {user.email}</p>
           </div>
-          <div className="admin-user-profile-actions">
+          {!isLibrarianView && <div className="admin-user-profile-actions">
             {isAccountEnabled ? (
               <button className="admin-user-detail-button admin-user-detail-button--danger" disabled={busy} onClick={() => { setFormError(null); setEditing(false); setDeactivating(true); }} type="button">
                 <Ban size={15} /> Ngừng hoạt động
@@ -340,14 +343,14 @@ const AdminUserDetailPage: React.FC = () => {
             <button className="admin-user-detail-button admin-user-detail-button--primary" disabled={busy} onClick={() => { setEditing((current) => !current); setFormError(null); setDeactivating(false); }} type="button">
               {editing ? <X size={15} /> : <Pencil size={15} />}{editing ? 'Hủy chỉnh sửa' : 'Chỉnh sửa'}
             </button>
-          </div>
+          </div>}
         </header>
 
         {!isAccountEnabled && user.statusReason && (
           <div className="admin-user-reason-note"><Ban size={16} /><div><strong>Lý do ngừng hoạt động</strong><p>{user.statusReason}</p></div></div>
         )}
 
-        {(showIdentityDocuments || identityDocumentsError) && (
+        {!isLibrarianView && (showIdentityDocuments || identityDocumentsError) && (
           <section className="admin-user-documents-section" aria-label="Giấy tờ xác minh danh tính">
             <div className="admin-user-section-heading">
               <div><span>HỒ SƠ XÁC MINH</span><h3>Giấy tờ xác minh danh tính</h3></div>
@@ -420,7 +423,7 @@ const AdminUserDetailPage: React.FC = () => {
 
         {formError && !editing && !deactivating && <div className="admin-user-form-error" role="alert"><AlertCircle size={15} />{formError}</div>}
       </article>
-      <div className="admin-user-detail-footnote"><Check size={14} /> Chỉ Admin mới có quyền xem và thay đổi hồ sơ người dùng.</div>
+      <div className="admin-user-detail-footnote"><Check size={14} /> {isLibrarianView ? 'Hồ sơ độc giả được hiển thị ở chế độ chỉ xem.' : 'Chỉ Admin mới có quyền xem và thay đổi hồ sơ người dùng.'}</div>
       {lightboxDocument && (
         <div className="admin-user-document-lightbox" onClick={() => setLightboxDocument(null)} role="presentation">
           <div onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={lightboxDocument.label}>

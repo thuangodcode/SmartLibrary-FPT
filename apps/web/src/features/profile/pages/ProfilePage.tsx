@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Camera, Check, LoaderCircle, UserRound, X } from 'lucide-react';
+import { AlertCircle, Camera, Check, LoaderCircle, Mail, UserRound, X } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
@@ -44,6 +44,10 @@ const ProfilePage: React.FC = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [clearAvatar, setClearAvatar] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [emailVerificationEmail, setEmailVerificationEmail] = useState('');
+  const [emailVerificationOtp, setEmailVerificationOtp] = useState('');
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailVerificationBusy, setEmailVerificationBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -71,7 +75,12 @@ const ProfilePage: React.FC = () => {
         if (!response.ok || !result?.success || !result.data) {
           throw new Error(result?.error || 'Không thể tải hồ sơ cá nhân.');
         }
-        if (!cancelled) setProfile(result.data);
+        if (!cancelled) {
+          setProfile(result.data);
+          if (!result.data.email.toLowerCase().endsWith('@smartlibrary.local')) {
+            setEmailVerificationEmail(result.data.email);
+          }
+        }
       } catch (caught) {
         if (!cancelled) setError(caught instanceof Error ? caught.message : 'Không thể tải hồ sơ cá nhân.');
       } finally {
@@ -125,6 +134,65 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  const sendEmailVerificationOtp = async () => {
+    if (!accessToken) return;
+    setEmailVerificationBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/profile/email-verification/send`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: emailVerificationEmail }),
+      });
+      const result = await parseApiResponse<ApiResult<{ message?: string }>>(response);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || 'Không thể gửi mã xác minh email.');
+      }
+      setEmailOtpSent(true);
+      setNotice(result.data?.message || 'Mã xác minh đã được gửi đến email cá nhân của bạn.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Không thể gửi mã xác minh email.');
+    } finally {
+      setEmailVerificationBusy(false);
+    }
+  };
+
+  const verifyAndUpdateEmail = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!accessToken || !currentUser) return;
+    setEmailVerificationBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/profile/email-verification/verify`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: emailVerificationEmail, otp: emailVerificationOtp }),
+      });
+      const result = await parseApiResponse<ApiResult<UserProfile>>(response);
+      if (!response.ok || !result?.success || !result.data) {
+        throw new Error(result?.error || 'Không thể xác minh email.');
+      }
+
+      setProfile(result.data);
+      setEmailOtpSent(false);
+      setEmailVerificationOtp('');
+      setAuth({ ...currentUser, email: result.data.email }, accessToken, permissions);
+      setNotice('Email cá nhân đã được xác minh và cập nhật thành công.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Không thể xác minh email.');
+    } finally {
+      setEmailVerificationBusy(false);
+    }
+  };
+
   const selectAvatar = (file: File | undefined, input: HTMLInputElement) => {
     if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
@@ -160,6 +228,74 @@ const ProfilePage: React.FC = () => {
 
       {visibleError && <div className="profile-message profile-message--error" role="alert"><AlertCircle size={17} />{visibleError}</div>}
       {notice && <div className="profile-message profile-message--success" role="status"><Check size={17} />{notice}</div>}
+
+      {profile?.email.toLowerCase().endsWith('@smartlibrary.local') && (
+        <section className="profile-email-verification">
+          <div>
+            <h2>Xác minh email cá nhân (không bắt buộc)</h2>
+            <p>
+              Tài khoản này được cấp sẵn. Bạn có thể tiếp tục đăng nhập bằng MSSV và số điện thoại đã được cấp,
+              hoặc thêm email cá nhân để sử dụng các chức năng email như khôi phục mật khẩu.
+            </p>
+          </div>
+          <form onSubmit={(event) => void verifyAndUpdateEmail(event)}>
+            <label>
+              Email cá nhân
+              <input
+                autoComplete="email"
+                maxLength={320}
+                onChange={(event) => {
+                  setEmailVerificationEmail(event.target.value);
+                  setEmailOtpSent(false);
+                  setEmailVerificationOtp('');
+                }}
+                required
+                type="email"
+                value={emailVerificationEmail}
+              />
+            </label>
+            {emailOtpSent && (
+              <label>
+                Mã OTP
+                <input
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  maxLength={6}
+                  onChange={(event) => setEmailVerificationOtp(event.target.value)}
+                  pattern="[0-9]{6}"
+                  required
+                  value={emailVerificationOtp}
+                />
+              </label>
+            )}
+            {emailOtpSent ? (
+              <div className="profile-email-actions">
+                <button disabled={emailVerificationBusy} type="submit">
+                  {emailVerificationBusy ? <LoaderCircle size={16} className="profile-spinner" /> : <Check size={16} />}
+                  Xác minh và cập nhật
+                </button>
+                <button
+                  className="profile-email-resend"
+                  disabled={emailVerificationBusy}
+                  onClick={() => void sendEmailVerificationOtp()}
+                  type="button"
+                >
+                  Gửi lại mã
+                </button>
+              </div>
+            ) : (
+              <button
+                disabled={emailVerificationBusy || !emailVerificationEmail.trim()}
+                onClick={() => void sendEmailVerificationOtp()}
+                type="button"
+              >
+                {emailVerificationBusy ? <LoaderCircle size={16} className="profile-spinner" /> : <Mail size={16} />}
+                Gửi mã xác minh
+              </button>
+            )}
+          </form>
+        </section>
+      )}
 
       {loading && accessToken ? (
         <div className="profile-loading"><LoaderCircle size={20} className="profile-spinner" /> Đang tải hồ sơ...</div>

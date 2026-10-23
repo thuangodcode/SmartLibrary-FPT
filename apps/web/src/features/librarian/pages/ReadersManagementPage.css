@@ -348,8 +348,14 @@
   transition: background 0.14s ease;
 }
 
-.lib-readers-table tbody tr:hover {
-  background: #fafbfc;
+.lib-readers-table tbody tr.lib-readers-clickable-row {
+  cursor: pointer;
+}
+
+.lib-readers-table tbody tr.lib-readers-clickable-row:hover,
+.lib-readers-table tbody tr.lib-readers-clickable-row:focus-visible {
+  outline: none;
+  background: #fff6f0;
 }
 
 .lib-readers-id {

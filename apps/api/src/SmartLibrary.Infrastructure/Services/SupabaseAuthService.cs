@@ -13,17 +13,25 @@ public class SupabaseAuthService : IIdentityProvider
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly ILogger<SupabaseAuthService> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly string _supabaseUrl;
     private readonly string _anonKey;
+    private readonly string _serviceRoleKey;
     private readonly string _connectionString;
 
-    public SupabaseAuthService(HttpClient httpClient, IConfiguration configuration, ILogger<SupabaseAuthService> logger)
+    public SupabaseAuthService(
+        HttpClient httpClient,
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration,
+        ILogger<SupabaseAuthService> logger)
     {
         _httpClient = httpClient;
+        _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _logger = logger;
         _supabaseUrl = configuration["Supabase:Url"] ?? "https://placeholder.supabase.co";
         _anonKey = configuration["Supabase:AnonKey"] ?? string.Empty;
+        _serviceRoleKey = configuration["Supabase:ServiceRoleKey"] ?? string.Empty;
         _connectionString = configuration.GetConnectionString("DefaultConnection") ?? "";
 
         _httpClient.BaseAddress = new Uri($"{_supabaseUrl.TrimEnd('/')}/auth/v1/");
@@ -310,6 +318,32 @@ public class SupabaseAuthService : IIdentityProvider
         var request = new HttpRequestMessage(HttpMethod.Post, "logout");
         request.Headers.Add("Authorization", $"Bearer {accessToken}");
         await _httpClient.SendAsync(request);
+    }
+
+    public async Task UpdateEmailAsync(string userId, string email, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_serviceRoleKey) || string.IsNullOrWhiteSpace(_supabaseUrl))
+            throw new InvalidOperationException("Supabase Admin API chưa được cấu hình.");
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Put,
+            $"{_supabaseUrl.TrimEnd('/')}/auth/v1/admin/users/{Uri.EscapeDataString(userId)}")
+        {
+            Content = JsonContent.Create(new { email, email_confirm = true })
+        };
+        request.Headers.Add("apikey", _serviceRoleKey);
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _serviceRoleKey);
+
+        using var client = _httpClientFactory.CreateClient();
+        using var response = await client.SendAsync(request, cancellationToken);
+        if (response.IsSuccessStatusCode)
+            return;
+
+        if (response.StatusCode is System.Net.HttpStatusCode.Conflict or System.Net.HttpStatusCode.UnprocessableEntity)
+            throw new ValidationException("Email này đã được tài khoản khác sử dụng.");
+
+        _logger.LogError("Supabase email update failed with HTTP {StatusCode}.", (int)response.StatusCode);
+        throw new InvalidOperationException("Không thể cập nhật email trên dịch vụ xác thực.");
     }
 
     public async Task SendPasswordResetEmailAsync(string email)

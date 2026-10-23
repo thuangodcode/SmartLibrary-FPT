@@ -2,7 +2,7 @@ import React from 'react';
 import { BookOpen, CheckCircle, ShieldCheck, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AnnouncementBar } from '../../../components/layout/AnnouncementBar';
-import libraryImage from '../../../assets/figma/auth-campus-library.jpeg';
+import libraryImage from '../../../assets/figma/auth-library-interior.jpg';
 import libraryLogo from '../../../assets/figma/auth-logo-fpt.png';
 import './AuthLayout.css';
 
@@ -47,7 +47,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
           <img
             className="figma-auth-visual-image"
             src={libraryImage}
-            alt="Tòa nhà thư viện Đại học FPT trong khuôn viên học tập"
+            alt="Không gian bên trong thư viện với các kệ sách"
           />
         </aside>
       </div>

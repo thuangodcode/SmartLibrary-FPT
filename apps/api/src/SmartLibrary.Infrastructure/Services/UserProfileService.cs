@@ -1,12 +1,22 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Domain.Entities;
+using SmartLibrary.Domain.Enums;
+using SmartLibrary.Domain.Exceptions;
 using SmartLibrary.Infrastructure.Persistence;
 
 namespace SmartLibrary.Infrastructure.Services;
 
-public sealed class UserProfileService(AppDbContext dbContext) : IUserProfileService
+public sealed class UserProfileService(
+    AppDbContext dbContext,
+    IAuthOtpService authOtpService,
+    IIdentityProvider identityProvider,
+    ILogger<UserProfileService> logger) : IUserProfileService
 {
+    private const string InternalEmailDomain = "@smartlibrary.local";
+
     public async Task<UserProfileResponse?> GetAsync(Guid userId, CancellationToken cancellationToken)
     {
         var profile = await dbContext.UserProfiles
@@ -50,6 +60,125 @@ public sealed class UserProfileService(AppDbContext dbContext) : IUserProfileSer
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return Map(profile);
+    }
+
+    public async Task<string> SendEmailVerificationOtpAsync(
+        Guid userId,
+        string email,
+        CancellationToken cancellationToken)
+    {
+        var profile = await GetImportedStudentAsync(userId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(email))
+            throw new ArgumentException("Vui lòng nhập email cá nhân.");
+        ValidatePersonalEmail(profile, email);
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        await EnsureEmailAvailableAsync(userId, normalizedEmail, cancellationToken);
+
+        var result = await authOtpService.SendOtpAsync(normalizedEmail, cancellationToken);
+        if (!result.IsSuccess)
+            throw new ArgumentException(result.Error ?? "Không thể gửi mã xác minh email.");
+
+        return result.Data?.Message ?? "Mã xác minh đã được gửi đến email của bạn.";
+    }
+
+    public async Task<UserProfileResponse?> VerifyAndUpdateEmailAsync(
+        Guid userId,
+        string email,
+        string otp,
+        CancellationToken cancellationToken)
+    {
+        var profile = await GetImportedStudentAsync(userId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(email))
+            throw new ArgumentException("Vui lòng nhập email cá nhân.");
+        ValidatePersonalEmail(profile, email);
+        if (string.IsNullOrWhiteSpace(otp))
+            throw new ArgumentException("Vui lòng nhập mã OTP.");
+
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        await EnsureEmailAvailableAsync(userId, normalizedEmail, cancellationToken);
+        var verification = authOtpService.VerifyOtp(normalizedEmail, otp);
+        if (!verification.IsSuccess || verification.Data?.Verified != true)
+            throw new ArgumentException(verification.Error ?? "Mã OTP không chính xác hoặc đã hết hạn.");
+
+        var previousEmail = profile.Email;
+        await identityProvider.UpdateEmailAsync(profile.Id.ToString(), normalizedEmail, cancellationToken);
+        try
+        {
+            profile.Email = normalizedEmail;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception updateException)
+        {
+            try
+            {
+                await identityProvider.UpdateEmailAsync(
+                    profile.Id.ToString(),
+                    previousEmail,
+                    CancellationToken.None);
+            }
+            catch (Exception rollbackException)
+            {
+                logger.LogCritical(
+                    rollbackException,
+                    "Could not restore auth email for user {UserId} after profile email update failed.",
+                    userId);
+                throw new InvalidOperationException(
+                    "Email đã được cập nhật trên hệ thống xác thực nhưng chưa đồng bộ được hồ sơ. Vui lòng liên hệ quản trị viên.",
+                    updateException);
+            }
+
+            throw;
+        }
+
+        return Map(profile);
+    }
+
+    private async Task<UserProfile> GetImportedStudentAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var profile = await dbContext.UserProfiles
+            .Include(user => user.Role)
+            .FirstOrDefaultAsync(user => user.Id == userId, cancellationToken);
+        if (profile is null)
+            throw new ArgumentException("Không tìm thấy hồ sơ người dùng.");
+        if (profile.Role.Name != "Reader" ||
+            profile.ReaderType != ReaderType.Student ||
+            !profile.Email.EndsWith(InternalEmailDomain, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Chức năng này chỉ áp dụng cho tài khoản sinh viên được nhập từ danh sách.");
+        }
+
+        return profile;
+    }
+
+    private static void ValidatePersonalEmail(UserProfile profile, string email)
+    {
+        var normalizedEmail = email?.Trim() ?? string.Empty;
+        if (normalizedEmail.Length > 320 ||
+            !new EmailAddressAttribute().IsValid(normalizedEmail) ||
+            normalizedEmail.EndsWith(InternalEmailDomain, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Vui lòng nhập email cá nhân hợp lệ.");
+        }
+
+        if (string.Equals(profile.Email, normalizedEmail, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Email này đã được xác minh cho tài khoản.");
+    }
+
+    private async Task EnsureEmailAvailableAsync(
+        Guid userId,
+        string email,
+        CancellationToken cancellationToken)
+    {
+        if (await dbContext.UserProfiles
+                .IgnoreQueryFilters()
+                .AnyAsync(profile =>
+                    profile.Id != userId &&
+                    !profile.IsDeleted &&
+                    profile.Email.ToLower() == email,
+                    cancellationToken))
+        {
+            throw new ArgumentException("Email này đã được một tài khoản khác sử dụng.");
+        }
     }
 
     private static UserProfileResponse Map(UserProfile profile) => new(

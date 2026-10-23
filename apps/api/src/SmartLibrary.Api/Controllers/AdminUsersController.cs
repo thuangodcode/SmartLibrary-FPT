@@ -11,7 +11,7 @@ namespace SmartLibrary.Api.Controllers;
 [Authorize(Policy = "AdminOnly")]
 public sealed class AdminUsersController : ControllerBase
 {
-    private const long MaximumCsvFileSize = 2 * 1024 * 1024;
+    private const long MaximumImportFileSize = 2 * 1024 * 1024;
     private const long MaximumAvatarFileSize = 5 * 1024 * 1024;
     private readonly IAdminUserManagementService _userManagementService;
     private readonly IStorageService _storageService;
@@ -190,7 +190,7 @@ public sealed class AdminUsersController : ControllerBase
 
     [HttpPost("import")]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(MaximumCsvFileSize)]
+    [RequestSizeLimit(MaximumImportFileSize)]
     public async Task<IActionResult> ImportReaders(
         IFormFile? file,
         CancellationToken cancellationToken)
@@ -198,11 +198,11 @@ public sealed class AdminUsersController : ControllerBase
         if (!TryGetCurrentUserId(out var adminId))
             return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản Admin."));
         if (file is null || file.Length == 0)
-            return BadRequest(ApiResponse<object>.Fail("Vui lòng chọn tệp CSV không rỗng."));
-        if (file.Length > MaximumCsvFileSize)
-            return BadRequest(ApiResponse<object>.Fail("Kích thước tệp CSV không được vượt quá 2 MB."));
-        if (!Path.GetExtension(file.FileName).Equals(".csv", StringComparison.OrdinalIgnoreCase))
-            return BadRequest(ApiResponse<object>.Fail("Chỉ hỗ trợ tệp CSV."));
+            return BadRequest(ApiResponse<object>.Fail("Vui lòng chọn tệp CSV hoặc Excel không rỗng."));
+        if (file.Length > MaximumImportFileSize)
+            return BadRequest(ApiResponse<object>.Fail("Kích thước tệp không được vượt quá 2 MB."));
+        if (!IsSupportedImportFile(file.FileName))
+            return BadRequest(ApiResponse<object>.Fail("Chỉ hỗ trợ tệp CSV hoặc Excel (.xlsx)."));
 
         try
         {
@@ -226,6 +226,10 @@ public sealed class AdminUsersController : ControllerBase
                     ?? User.FindFirst("sub")?.Value;
         return Guid.TryParse(value, out userId) && userId != Guid.Empty;
     }
+
+    private static bool IsSupportedImportFile(string fileName) =>
+        Path.GetExtension(fileName).Equals(".csv", StringComparison.OrdinalIgnoreCase) ||
+        Path.GetExtension(fileName).Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
 
     private static string? GetAvatarExtension(string? contentType) => contentType?.ToLowerInvariant() switch
     {

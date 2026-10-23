@@ -7,6 +7,15 @@ public interface IUserProfileService
         Guid userId,
         UpdateUserProfileRequest request,
         CancellationToken cancellationToken);
+    Task<string> SendEmailVerificationOtpAsync(
+        Guid userId,
+        string email,
+        CancellationToken cancellationToken);
+    Task<UserProfileResponse?> VerifyAndUpdateEmailAsync(
+        Guid userId,
+        string email,
+        string otp,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>Profile information for the authenticated user.</summary>
@@ -31,3 +40,9 @@ public sealed record UpdateUserProfileRequest(
     DateOnly? DateOfBirth,
     bool ClearAvatar,
     string? AvatarUrl);
+
+/// <summary>Request to send an email verification code to a student's personal email.</summary>
+public sealed record SendProfileEmailVerificationRequest(string Email);
+
+/// <summary>Request to verify and save a student's personal email address.</summary>
+public sealed record VerifyProfileEmailRequest(string Email, string Otp);
