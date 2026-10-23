@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom';
 import smartLibraryLogo from '../../../assets/figma/smartlibrary-logo.png';
 import { useToast } from '../../../components/ui/useToast';
 import { useAuthStore } from '../../auth/store/useAuthStore';
-import { MOCK_CATEGORIES } from '../mock';
+import { useHomeCategories } from '../hooks/useHomeData';
 
-type HomeNavSection = 'services' | 'news' | 'policies';
+type HomeNavSection = 'catalog' | 'services' | 'news' | 'policies';
 
 const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactNode }> = ({ activeSection, searchSlot }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -14,14 +14,15 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const logout = useAuthStore((state) => state.logout);
+  const categoriesQuery = useHomeCategories();
   const { showToast } = useToast();
+  const categories = categoriesQuery.data ?? [];
   const closeMenu = () => {
     setIsMenuOpen(false);
     setIsCategoriesOpen(false);
   };
-  const sectionHref = (anchor: string) => activeSection ? `/#${anchor}` : `#${anchor}`;
   const defaultSearch = (
-    <form className="annual-search" action="/" method="get" role="search" aria-label="Tìm sách trong thư viện">
+    <form className="annual-search" action="/books" method="get" role="search" aria-label="Tìm sách trong thư viện">
       <Search size={22} aria-hidden="true" />
       <label className="sr-only" htmlFor="annual-navbar-book-search">Tìm sách</label>
       <input id="annual-navbar-book-search" name="q" placeholder="Tên sách, tác giả, ISBN hoặc điều bạn muốn học" />
@@ -76,15 +77,22 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
               Danh mục <ChevronDown size={15} aria-hidden="true" />
             </button>
             <div className="annual-nav-submenu">
-              {MOCK_CATEGORIES.map((category) => (
-                <a key={category.id} href={sectionHref('categories')} onClick={closeMenu}>{category.name}</a>
+              {categoriesQuery.isPending && <span className="annual-nav-feedback">Đang tải danh mục…</span>}
+              {categoriesQuery.isError && <span className="annual-nav-feedback" role="alert">Không tải được danh mục.</span>}
+              {!categoriesQuery.isPending && !categoriesQuery.isError && categories.map((category) => (
+                <Link key={category.id} to={`/books?category=${encodeURIComponent(category.id)}`} onClick={closeMenu}>
+                  {category.name}
+                </Link>
               ))}
+              {!categoriesQuery.isPending && !categoriesQuery.isError && categories.length === 0 && (
+                <span className="annual-nav-feedback">Chưa có danh mục sách.</span>
+              )}
             </div>
           </div>
-          <a href={sectionHref('books')} onClick={closeMenu}>Tủ sách</a>
+          <Link to="/books" aria-current={activeSection === 'catalog' ? 'page' : undefined} onClick={closeMenu}>Khám phá sách</Link>
           <Link to="/services" aria-current={activeSection === 'services' ? 'page' : undefined} onClick={closeMenu}>Dịch vụ</Link>
           <Link to="/news" aria-current={activeSection === 'news' ? 'page' : undefined} onClick={closeMenu}>Tin tức</Link>
-          <a href={sectionHref('library')} onClick={closeMenu}>Thư viện</a>
+          <a href="/#library" onClick={closeMenu}>Thư viện</a>
         </nav>
       </div>
     </header>

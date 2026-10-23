@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   BookOpen,
   Plus,
@@ -12,10 +12,12 @@ import {
   Library,
   ChevronLeft,
   ChevronRight,
+  Archive,
 } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { parseApiResponse } from '../../../lib/api';
+import LibrarianCopiesPage from './LibrarianCopiesPage';
 import './LibrarianCategoriesPage.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5278';
@@ -42,6 +44,8 @@ const FALLBACK_GRADIENTS = [
 
 const LibrarianCategoriesPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeView = searchParams.get('view') === 'copies' ? 'copies' : 'categories';
   const accessToken = useAuthStore((s) => s.accessToken);
   const { showToast } = useToast();
 
@@ -52,37 +56,61 @@ const LibrarianCategoriesPage: React.FC = () => {
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const fetchCategories = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const headers: Record<string, string> = {};
+  const requestCategories = useCallback(async () => {
+    const headers: Record<string, string> = {};
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-      const res = await fetch(`${API_BASE_URL}/api/v1/categories`, { headers });
-      const json = await parseApiResponse<{ success?: boolean; data?: CategoryItem[]; error?: string }>(res);
+    const res = await fetch(`${API_BASE_URL}/api/v1/categories`, { headers });
+    const json = await parseApiResponse<{ success?: boolean; data?: CategoryItem[]; error?: string }>(res);
 
-      if (json && json.data && Array.isArray(json.data)) {
-        setCategories(json.data);
-      } else {
-        setCategories([]);
-      }
-    } catch (err: any) {
-      console.error('Error fetching categories:', err);
-      setError('Không thể tải danh sách danh mục sách. Vui lòng thử lại sau.');
-      showToast({
-        type: 'error',
-        title: 'Lỗi tải danh mục',
-        message: 'Không thể kết nối đến máy chủ để tải danh mục.',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    if (!res.ok) throw new Error(json?.error || 'Không thể tải danh sách danh mục sách.');
+    return Array.isArray(json?.data) ? json.data : [];
+  }, [accessToken]);
 
   useEffect(() => {
-    fetchCategories();
-  }, [accessToken]);
+    if (activeView === 'copies') return;
+    let cancelled = false;
+    const loadCategories = async () => {
+      try {
+        const data = await requestCategories();
+        if (!cancelled) setCategories(data);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        console.error('Error fetching categories:', err);
+        setError('Không thể tải danh sách danh mục sách. Vui lòng thử lại sau.');
+        showToast({
+          type: 'error',
+          title: 'Lỗi tải danh mục',
+          message: err instanceof Error
+            ? `Không thể tải danh mục: ${err.message}`
+            : 'Không thể kết nối đến máy chủ để tải danh mục.',
+        });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void loadCategories();
+    return () => { cancelled = true; };
+  }, [activeView, requestCategories, showToast]);
+
+  const retryFetchCategories = () => {
+    setLoading(true);
+    setError(null);
+    void requestCategories()
+      .then(setCategories)
+      .catch((err: unknown) => {
+        console.error('Error fetching categories:', err);
+        setError('Không thể tải danh sách danh mục sách. Vui lòng thử lại sau.');
+        showToast({
+          type: 'error',
+          title: 'Lỗi tải danh mục',
+          message: err instanceof Error
+            ? `Không thể tải danh mục: ${err.message}`
+            : 'Không thể kết nối đến máy chủ để tải danh mục.',
+        });
+      })
+      .finally(() => setLoading(false));
+  };
 
   // Filtered categories
   const filteredCategories = useMemo(() => {
@@ -116,13 +144,15 @@ const LibrarianCategoriesPage: React.FC = () => {
             <BookOpen size={15} />
             <span>KHÔNG GIAN THỦ THƯ • QUẢN LÝ BIÊN MỤC</span>
           </div>
-          <h1>Sách & Biên mục</h1>
+          <h1>{activeView === 'copies' ? 'Bản sao & Kệ sách' : 'Danh mục & Đầu sách'}</h1>
           <p className="lib-cat-desc">
-            Phân loại danh mục sách, quản lý đầu sách và sắp xếp kho tài liệu thư viện trường FPT.
+            {activeView === 'copies'
+              ? 'Theo dõi từng cuốn sách bằng mã riêng, quản lý tình trạng và vị trí trên kệ.'
+              : 'Phân loại danh mục sách, quản lý đầu sách và sắp xếp kho tài liệu thư viện trường FPT.'}
           </p>
         </div>
 
-        <div className="lib-cat-actions">
+        {activeView === 'categories' && <div className="lib-cat-actions">
           <button
             type="button"
             className="lib-cat-btn-add"
@@ -131,9 +161,32 @@ const LibrarianCategoriesPage: React.FC = () => {
             <Plus size={18} />
             <span>Thêm danh mục sách</span>
           </button>
-        </div>
+        </div>}
       </header>
 
+      <div className="lib-cat-view-tabs" role="tablist" aria-label="Quản lý biên mục và kho">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeView === 'categories'}
+          className={activeView === 'categories' ? 'is-active' : ''}
+          onClick={() => setSearchParams({})}
+        >
+          <BookOpen size={17} /> Danh mục & Đầu sách
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeView === 'copies'}
+          className={activeView === 'copies' ? 'is-active' : ''}
+          onClick={() => setSearchParams({ view: 'copies' })}
+        >
+          <Archive size={17} /> Bản sao & Kệ sách
+        </button>
+      </div>
+
+      {activeView === 'copies' ? <LibrarianCopiesPage embedded /> : (
+        <>
       {/* Quick Metrics Bar */}
       <section className="lib-cat-metrics-grid">
         <div className="lib-cat-metric-card">
@@ -194,7 +247,7 @@ const LibrarianCategoriesPage: React.FC = () => {
             <button
               type="button"
               className="lib-cat-refresh-btn"
-              onClick={fetchCategories}
+              onClick={retryFetchCategories}
               title="Làm mới danh sách"
             >
               <RefreshCw size={16} className={loading ? 'spinning' : ''} />
@@ -232,7 +285,7 @@ const LibrarianCategoriesPage: React.FC = () => {
           <div className="lib-cat-pnc-error">
             <AlertCircle size={28} />
             <p>{error}</p>
-            <button type="button" onClick={fetchCategories} className="lib-cat-retry-btn">
+            <button type="button" onClick={retryFetchCategories} className="lib-cat-retry-btn">
               Thử lại
             </button>
           </div>
@@ -288,6 +341,8 @@ const LibrarianCategoriesPage: React.FC = () => {
           </div>
         )}
       </section>
+        </>
+      )}
     </div>
   );
 };

@@ -83,6 +83,7 @@ public class BookServiceTests
         // Arrange
         var request = new CreateBookRequest
         {
+            Code = "NEWBOOK",
             Title = "New Book",
             Isbn = "1234567890123",
             Language = "vi"

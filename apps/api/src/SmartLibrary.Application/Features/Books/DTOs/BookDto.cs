@@ -6,6 +6,7 @@ namespace SmartLibrary.Application.Features.Books.DTOs;
 public class BookDto
 {
     public Guid Id { get; set; }
+    public string Code { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string? Isbn { get; set; }
     public string? Description { get; set; }
@@ -21,3 +22,6 @@ public class BookDto
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
+
+/// <summary>Current physical-copy availability for a book.</summary>
+public sealed record BookAvailabilityDto(int TotalCopies, int AvailableCopies, bool CanBorrow);

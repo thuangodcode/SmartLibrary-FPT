@@ -21,24 +21,29 @@ import {
   User,
   Barcode,
   HelpCircle,
+  MapPin,
 } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { parseApiResponse } from '../../../lib/api';
+import { STORAGE_LOCATIONS } from '../storageLocations';
 import type { CategoryItem } from './LibrarianCategoriesPage';
 import './LibrarianCategoryBooksPage.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5278';
+const BOOK_CODE_PATTERN = /^[a-zA-Z0-9]{1,32}$/;
+
+type BookCodeAvailability = 'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'error';
 
 export interface BookItem {
   id: string;
+  code: string;
   title: string;
   isbn?: string | null;
   description?: string | null;
   coverImageUrl?: string | null;
   publishedYear?: number | null;
   language?: string;
-  pageCount?: number | null;
   totalCopies: number;
   availableCopies: number;
   averageRating: number;
@@ -76,6 +81,8 @@ const BookCard: React.FC<{ book: BookItem }> = ({ book }) => {
             <img
               src={book.coverImageUrl}
               alt={book.title}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full rounded-xl sm:rounded-2xl object-cover transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
@@ -115,6 +122,10 @@ const BookCard: React.FC<{ book: BookItem }> = ({ book }) => {
             Tác giả: {authorDisplay}
           </p>
 
+          <p className="mt-1 text-[11px] font-semibold tracking-wide text-slate-500">
+            Mã sách: {book.code}
+          </p>
+
           <div className="mt-3 sm:mt-4 flex justify-between items-center">
             <p className="text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300">
               {book.publishedYear ? `Năm: ${book.publishedYear}` : (book.language ? `Ngôn ngữ: ${book.language.toUpperCase()}` : 'Kho sách')}
@@ -138,6 +149,9 @@ const LibrarianCategoryBooksPage: React.FC = () => {
   // Category details
   const [category, setCategory] = useState<CategoryItem | null>(null);
   const [loadingCategory, setLoadingCategory] = useState(true);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const initialRequestsRef = useRef({ category: false, books: false });
 
   // Books list
   const [books, setBooks] = useState<BookItem[]>([]);
@@ -167,12 +181,15 @@ const LibrarianCategoryBooksPage: React.FC = () => {
   // Add Book modal states
   const [isAddBookModalOpen, setIsAddBookModalOpen] = useState(false);
   const [bookTitle, setBookTitle] = useState('');
+  const [bookCode, setBookCode] = useState('');
+  const [bookCodeAvailability, setBookCodeAvailability] = useState<BookCodeAvailability>('idle');
   const [bookAuthor, setBookAuthor] = useState('');
   const [bookIsbn, setBookIsbn] = useState('');
   const [bookYear, setBookYear] = useState('');
   const [bookLanguage, setBookLanguage] = useState('vi');
-  const [bookPageCount, setBookPageCount] = useState('');
+  const [customBookLanguage, setCustomBookLanguage] = useState('');
   const [bookTotalCopies, setBookTotalCopies] = useState(1);
+  const [bookLocation, setBookLocation] = useState('');
   const [bookDescription, setBookDescription] = useState('');
   const [bookCoverFile, setBookCoverFile] = useState<File | null>(null);
   const [bookCoverPreview, setBookCoverPreview] = useState<string | null>(null);
@@ -181,32 +198,77 @@ const LibrarianCategoryBooksPage: React.FC = () => {
   const editFileInputRef = useRef<HTMLInputElement>(null);
   const bookCoverInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    const code = bookCode.trim();
+    if (!isAddBookModalOpen || !code || !BOOK_CODE_PATTERN.test(code)) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const headers: Record<string, string> = {};
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+        const params = new URLSearchParams({ code });
+        const response = await fetch(`${API_BASE_URL}/api/v1/books/code-availability?${params}`, { headers });
+        const result = await parseApiResponse<{
+          success?: boolean;
+          data?: { available: boolean };
+          error?: string;
+        }>(response);
+        if (!response.ok || !result?.success || !result.data) {
+          throw new Error(result?.error || 'Không thể kiểm tra mã sách.');
+        }
+        if (!cancelled) {
+          setBookCodeAvailability(result.data.available ? 'available' : 'taken');
+        }
+      } catch {
+        if (!cancelled) setBookCodeAvailability('error');
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [accessToken, bookCode, isAddBookModalOpen]);
+
+  const markInitialRequestComplete = (request: 'category' | 'books') => {
+    initialRequestsRef.current[request] = true;
+    if (initialRequestsRef.current.category && initialRequestsRef.current.books) {
+      setInitialLoading(false);
+    }
+  };
+
   // Debounce search
   useEffect(() => {
+    if (searchTerm === debouncedSearch) return;
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
       setCurrentPage(1);
-    }, 400);
+    }, 250);
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, debouncedSearch]);
 
   // Fetch Category info
   const fetchCategoryInfo = useCallback(async () => {
     if (!categoryId) return;
     setLoadingCategory(true);
+    setCategoryError(null);
     try {
       const headers: Record<string, string> = {};
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
       const res = await fetch(`${API_BASE_URL}/api/v1/categories/${categoryId}`, { headers });
       const json = await parseApiResponse<{ success?: boolean; data?: CategoryItem; error?: string }>(res);
-      if (json?.data) {
-        setCategory(json.data);
+      if (!res.ok || !json?.data) {
+        throw new Error(json?.error || 'Không tìm thấy danh mục sách.');
       }
+      setCategory(json.data);
     } catch (err) {
       console.error('Error fetching category info:', err);
+      setCategoryError(err instanceof Error ? err.message : 'Không thể tải thông tin danh mục sách.');
     } finally {
       setLoadingCategory(false);
+      markInitialRequestComplete('category');
     }
   }, [categoryId, accessToken]);
 
@@ -263,6 +325,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       setError('Không thể tải danh sách đầu sách thuộc danh mục này.');
     } finally {
       setLoadingBooks(false);
+      markInitialRequestComplete('books');
     }
   }, [categoryId, currentPage, pageSize, debouncedSearch, accessToken]);
 
@@ -482,16 +545,41 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       return;
     }
 
+    const trimmedCode = bookCode.trim();
+    if (!BOOK_CODE_PATTERN.test(trimmedCode) || bookCodeAvailability !== 'available') {
+      showToast({
+        type: 'warning',
+        title: 'Mã sách chưa hợp lệ',
+        message: bookCodeAvailability === 'taken'
+          ? 'Mã sách đã được sử dụng. Vui lòng chọn mã khác.'
+          : bookCodeAvailability === 'error'
+            ? 'Chưa kiểm tra được mã sách. Hãy thử lại trước khi lưu.'
+            : 'Nhập mã gồm 1–32 chữ cái hoặc chữ số và chờ hệ thống xác nhận chưa được sử dụng.',
+      });
+      return;
+    }
+
+    const language = bookLanguage === 'custom' ? customBookLanguage.trim() : bookLanguage;
+    if (!language) {
+      showToast({
+        type: 'warning',
+        title: 'Thiếu ngôn ngữ',
+        message: 'Vui lòng chọn hoặc nhập ngôn ngữ của sách.',
+      });
+      return;
+    }
+
     setSavingBook(true);
     try {
       const formData = new FormData();
+      formData.append('Code', trimmedCode);
       formData.append('Title', trimmedTitle);
       if (bookAuthor.trim()) formData.append('AuthorName', bookAuthor.trim());
       if (bookIsbn.trim()) formData.append('Isbn', bookIsbn.trim());
       if (bookYear) formData.append('PublishedYear', bookYear);
-      formData.append('Language', bookLanguage || 'vi');
-      if (bookPageCount) formData.append('PageCount', bookPageCount);
+      formData.append('Language', language);
       formData.append('TotalCopies', String(Math.max(1, bookTotalCopies || 1)));
+      if (bookLocation) formData.append('Location', bookLocation);
       if (bookDescription.trim()) formData.append('Description', bookDescription.trim());
       formData.append('CategoryId', categoryId);
       if (bookCoverFile) formData.append('CoverImage', bookCoverFile);
@@ -513,17 +601,20 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       showToast({
         type: 'success',
         title: 'Thành công',
-        message: `Đã thêm đầu sách "${trimmedTitle}" vào danh mục thành công!`,
+        message: `Đã thêm "${trimmedTitle}" với mã ${trimmedCode}; mã bản sao bắt đầu từ ${trimmedCode}-01.`,
       });
 
       // Reset form
       setBookTitle('');
+      setBookCode('');
+      setBookCodeAvailability('idle');
       setBookAuthor('');
       setBookIsbn('');
       setBookYear('');
       setBookLanguage('vi');
-      setBookPageCount('');
+      setCustomBookLanguage('');
       setBookTotalCopies(1);
+      setBookLocation('');
       setBookDescription('');
       setBookCoverFile(null);
       setBookCoverPreview(null);
@@ -543,6 +634,27 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       setSavingBook(false);
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="lib-cat-initial-loading" role="status" aria-live="polite">
+        <div>
+          <span className="lib-cat-initial-spinner" aria-hidden="true" />
+          <p>Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (categoryError && !category) {
+    return (
+      <div className="lib-cat-books-error" role="alert">
+        <AlertCircle size={32} />
+        <p>{categoryError}</p>
+        <button type="button" onClick={fetchCategoryInfo} className="retry-btn">Thử lại</button>
+      </div>
+    );
+  }
 
   return (
     <div className="lib-cat-books-page">
@@ -983,6 +1095,48 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                 </div>
 
                 <div className="lib-cat-form-group">
+                  <label htmlFor="book-code">
+                    <Barcode size={14} />
+                    <span>Mã sách</span>
+                    <span className="req">*</span>
+                  </label>
+                  <input
+                    id="book-code"
+                    type="text"
+                    value={bookCode}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      const normalized = value.trim();
+                      setBookCode(value);
+                      setBookCodeAvailability(
+                        !normalized
+                          ? 'idle'
+                          : BOOK_CODE_PATTERN.test(normalized)
+                            ? 'checking'
+                            : 'invalid',
+                      );
+                    }}
+                    maxLength={32}
+                    pattern="[A-Za-z0-9]{1,32}"
+                    placeholder="Ví dụ: py01"
+                    aria-describedby="book-code-hint"
+                    required
+                  />
+                  <small
+                    id="book-code-hint"
+                    className={`lib-cat-book-code-status is-${bookCodeAvailability}`}
+                    role={bookCodeAvailability === 'taken' || bookCodeAvailability === 'error' ? 'alert' : 'status'}
+                  >
+                    {bookCodeAvailability === 'checking' && 'Đang kiểm tra mã sách...'}
+                    {bookCodeAvailability === 'available' && 'Mã sách chưa được sử dụng.'}
+                    {bookCodeAvailability === 'taken' && 'Mã này đã tồn tại. Hãy nhập mã khác.'}
+                    {bookCodeAvailability === 'invalid' && 'Chỉ dùng chữ cái và chữ số, tối đa 32 ký tự.'}
+                    {bookCodeAvailability === 'error' && 'Không kiểm tra được mã. Vui lòng thử lại.'}
+                    {bookCodeAvailability === 'idle' && 'Mã bản sao sẽ theo dạng mã sách-01, mã sách-02...'}
+                  </small>
+                </div>
+
+                <div className="lib-cat-form-group">
                   <label htmlFor="book-author">
                     <User size={14} />
                     <span>Tác giả</span>
@@ -1035,10 +1189,11 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                     id="book-copies"
                     type="number"
                     min="1"
-                    max="100"
+                    max="500"
                     value={bookTotalCopies}
                     onChange={(e) => setBookTotalCopies(parseInt(e.target.value, 10) || 1)}
                   />
+                  <small>Hệ thống tự tạo mã riêng cho từng cuốn.</small>
                 </div>
 
                 <div className="lib-cat-form-group">
@@ -1055,22 +1210,44 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                     <option value="en">Tiếng Anh (en)</option>
                     <option value="ja">Tiếng Nhật (ja)</option>
                     <option value="ko">Tiếng Hàn (ko)</option>
+                    <option value="custom">Thêm ngôn ngữ mới...</option>
                   </select>
                 </div>
 
+                {bookLanguage === 'custom' && (
+                  <div className="lib-cat-form-group">
+                    <label htmlFor="book-custom-language">
+                      <Globe size={14} />
+                      <span>Ngôn ngữ mới</span>
+                      <span className="req">*</span>
+                    </label>
+                    <input
+                      id="book-custom-language"
+                      type="text"
+                      maxLength={50}
+                      value={customBookLanguage}
+                      onChange={(e) => setCustomBookLanguage(e.target.value)}
+                      placeholder="Nhập tên hoặc mã ngôn ngữ"
+                      required
+                    />
+                  </div>
+                )}
+
                 <div className="lib-cat-form-group">
-                  <label htmlFor="book-pages">
-                    <FileText size={14} />
-                    <span>Số trang</span>
+                  <label htmlFor="book-location">
+                    <MapPin size={14} />
+                    <span>Vị trí kệ sách</span>
                   </label>
-                  <input
-                    id="book-pages"
-                    type="number"
-                    min="1"
-                    value={bookPageCount}
-                    onChange={(e) => setBookPageCount(e.target.value)}
-                    placeholder="Ví dụ: 350"
-                  />
+                  <select
+                    id="book-location"
+                    value={bookLocation}
+                    onChange={(e) => setBookLocation(e.target.value)}
+                  >
+                    <option value="">Chưa xếp kệ</option>
+                    {STORAGE_LOCATIONS.map((location) => (
+                      <option value={location} key={location}>{location}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="lib-cat-form-group col-span-2">
@@ -1144,7 +1321,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                   type="button"
                   className="lib-cat-modal-btn-cancel"
                   onClick={() => setIsAddBookModalOpen(false)}
-                  disabled={savingBook}
+                  disabled={savingBook || bookCodeAvailability !== 'available'}
                 >
                   Hủy bỏ
                 </button>

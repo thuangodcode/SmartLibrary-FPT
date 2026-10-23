@@ -120,10 +120,27 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<BookCopy>(entity =>
         {
             entity.ToTable("book_copies");
+            entity.Property(bc => bc.Barcode)
+                .HasMaxLength(100)
+                .IsRequired();
+            entity.HasIndex(bc => bc.Barcode).IsUnique();
             entity.Property(bc => bc.Condition).HasConversion(
                 v => v.ToString().ToLower(),
                 v => Enum.Parse<BookCondition>(v, true)
             );
+        });
+
+        modelBuilder.Entity<Review>(entity =>
+        {
+            entity.ToTable("reviews");
+            entity.HasKey(review => review.Id);
+            entity.Property(review => review.Rating).IsRequired();
+            entity.Property(review => review.Comment).HasMaxLength(2000);
+            entity.Property(review => review.IsDeleted).HasDefaultValue(false);
+            entity.HasIndex(review => new { review.BookId, review.ReaderId }).IsUnique();
+            entity.HasIndex(review => new { review.BookId, review.CreatedAt });
+            entity.HasOne(review => review.Book).WithMany(book => book.Reviews).HasForeignKey(review => review.BookId);
+            entity.HasOne(review => review.Reader).WithMany().HasForeignKey(review => review.ReaderId);
         });
 
         modelBuilder.Entity<PolicyRule>(entity =>

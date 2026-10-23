@@ -139,6 +139,19 @@ public class CirculationService
         return Result<CirculationLoanDto>.Success((await _repository.GetLoanAsync(loan.Id, settings.FinePerDay, ct))!);
     }
 
+    public async Task<Result<CirculationLoanDto>> RequestBorrowBookAsync(
+        Guid readerId, Guid bookId, CancellationToken ct = default)
+    {
+        if (bookId == Guid.Empty)
+            return Result<CirculationLoanDto>.Failure("Không tìm thấy đầu sách.");
+
+        var copy = await _repository.FindAvailableCopyForBookAsync(bookId, ct);
+        if (copy is null)
+            return Result<CirculationLoanDto>.Failure("Hiện không còn bản sao sẵn sàng để mượn.");
+
+        return await RequestBorrowAsync(readerId, new BorrowRequest { Barcode = copy.Barcode }, ct);
+    }
+
     // Trả sách: ghi ngày trả → xử lý mất/hỏng hoặc phí quá hạn → mở lượt đặt trước nếu sách còn dùng được.
     public async Task<Result<CirculationLoanDto>> ReturnAsync(
         ReturnLoanRequest request, Guid librarianId, CancellationToken ct = default)

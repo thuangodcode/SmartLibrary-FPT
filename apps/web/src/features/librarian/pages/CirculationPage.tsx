@@ -239,7 +239,7 @@ function LoansView() {
           </label>
           <label className="circ-field">
             Mã vạch sách
-            <input value={borrowBarcode} onChange={(e) => setBorrowBarcode(e.target.value)} placeholder="Quét hoặc nhập mã vạch, ví dụ SL-000101" />
+            <input value={borrowBarcode} onChange={(e) => setBorrowBarcode(e.target.value)} placeholder="Quét hoặc nhập mã bản sao, ví dụ py01-01" />
           </label>
           <button type="submit" className="circ-btn circ-btn--primary" disabled={busy}>
             Xác nhận mượn <ArrowRight size={14} />
@@ -533,7 +533,7 @@ function ReturnView() {
           <h2>Trả sách</h2>
           <label className="circ-field">
             Mã vạch sách
-            <input value={returnBarcode} onChange={(e) => setReturnBarcode(e.target.value)} placeholder="Quét hoặc nhập mã vạch" />
+            <input value={returnBarcode} onChange={(e) => setReturnBarcode(e.target.value)} placeholder="Quét hoặc nhập mã bản sao, ví dụ py01-01" />
           </label>
           <label className="circ-field">
             Tình trạng khi trả
@@ -563,7 +563,7 @@ function ReturnView() {
             </label>
             <label className="circ-field">
               Mã vạch sách cần đặt chỗ
-              <input value={reserveBarcode} onChange={(e) => setReserveBarcode(e.target.value)} placeholder="Mã vạch sách cần đặt chỗ" />
+              <input value={reserveBarcode} onChange={(e) => setReserveBarcode(e.target.value)} placeholder="Mã bản sao cần đặt chỗ, ví dụ py01-01" />
             </label>
             <button type="submit" className="circ-btn circ-btn--primary" disabled={busy} style={{ marginTop: 8 }}>Tạo đặt chỗ</button>
             <p className="circ-hint">Không giữ một bản sao cụ thể cho đến khi sách sẵn sàng.</p>

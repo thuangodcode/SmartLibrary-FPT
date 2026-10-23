@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Bell,
-  Archive,
   BookOpen,
   ChartNoAxesCombined,
   ChevronDown,
@@ -38,7 +37,6 @@ const circulationChildren = [
 const navigation = [
   { label: 'Tổng quan', to: '/librarian', icon: LayoutDashboard, end: true },
   { label: 'Sách & Biên mục', to: '/librarian/books', icon: BookOpen, end: false },
-  { label: 'Bản sao & Kho', to: '/librarian/copies', icon: Archive, end: false },
   { label: 'Quản lý dịch vụ', to: '/librarian/circulation', icon: RotateCcw, end: false, children: circulationChildren },
   { label: 'Duyệt người đọc', to: '/librarian/registrations', icon: FileCheck, end: false },
   { label: 'Độc giả', to: '/librarian/readers', icon: Users, end: false },
@@ -73,6 +71,7 @@ export const LibrarianLayout: React.FC = () => {
   const [decisionNotices, setDecisionNotices] = useState<ReportDecisionNotice[]>([]);
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const [dismissedNoticeIds, setDismissedNoticeIds] = useState<string[]>([]);
+  const profileMenuRef = useRef<HTMLDetailsElement>(null);
   const user = useAuthStore((state) => state.user);
   const accessToken = useAuthStore((state) => state.accessToken);
   const logout = useAuthStore((state) => state.logout);
@@ -321,16 +320,6 @@ export const LibrarianLayout: React.FC = () => {
               <p>Quản lý thư viện trong một không gian thống nhất.</p>
             </div>
           </div>
-          <button
-            type="button"
-            className="lib-logout-button"
-            onClick={handleLogout}
-            title={showTooltips ? 'Đăng xuất' : undefined}
-            data-tooltip="Đăng xuất"
-          >
-            <LogOut size={18} className="lib-nav-icon" />
-            <span className="lib-nav-label">Đăng xuất</span>
-          </button>
         </div>
       </aside>
 
@@ -393,16 +382,26 @@ export const LibrarianLayout: React.FC = () => {
               </section>
             </details>
             <span className="lib-topbar-divider" />
-            <Link className="lib-profile" to="/librarian/profile" aria-label="Mở hồ sơ cá nhân">
-              {user?.avatarUrl
-                ? <img className="lib-avatar lib-avatar-image" src={user.avatarUrl} alt="" />
-                : <div className="lib-avatar">{user?.fullName?.trim().charAt(0).toUpperCase() || 'T'}</div>}
-              <div className="lib-profile-copy">
-                <strong>{user?.fullName || 'Thủ thư SmartLibrary'}</strong>
-                <span>Quản lý thư viện</span>
+            <details className="lib-profile-menu" ref={profileMenuRef}>
+              <summary className="lib-profile" aria-label="Mở menu tài khoản">
+                {user?.avatarUrl
+                  ? <img className="lib-avatar lib-avatar-image" src={user.avatarUrl} alt="" />
+                  : <div className="lib-avatar">{user?.fullName?.trim().charAt(0).toUpperCase() || 'T'}</div>}
+                <div className="lib-profile-copy">
+                  <strong>{user?.fullName || 'Thủ thư SmartLibrary'}</strong>
+                  <span>Quản lý thư viện</span>
+                </div>
+                <ChevronDown size={16} className="lib-profile-chevron" />
+              </summary>
+              <div className="lib-profile-dropdown">
+                <Link to="/librarian/profile" onClick={() => { if (profileMenuRef.current) profileMenuRef.current.open = false; }}>
+                  <Users size={16} /> Hồ sơ cá nhân
+                </Link>
+                <button type="button" onClick={handleLogout}>
+                  <LogOut size={16} /> Đăng xuất
+                </button>
               </div>
-              <ChevronDown size={16} className="lib-profile-chevron" />
-            </Link>
+            </details>
           </div>
         </header>
 

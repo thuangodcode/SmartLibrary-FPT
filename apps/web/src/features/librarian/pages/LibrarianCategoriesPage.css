@@ -76,6 +76,41 @@
   background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
 }
 
+.lib-cat-view-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 5px;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid #e8edf4;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.lib-cat-view-tabs button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+
+.lib-cat-view-tabs button:hover { color: #c2410c; }
+.lib-cat-view-tabs button.is-active {
+  background: #fff;
+  color: #c2410c;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, .1);
+}
+
 /* ─── Metrics Grid ─── */
 .lib-cat-metrics-grid {
   display: grid;
@@ -465,6 +500,11 @@
 
 .spinning {
   animation: spin 0.8s linear infinite;
+}
+
+@media (max-width: 600px) {
+  .lib-cat-view-tabs { width: 100%; }
+  .lib-cat-view-tabs button { flex: 1; padding: 0 8px; font-size: 12px; }
 }
 
 /* ─── Modal Styles (Edit & Delete) ─── */

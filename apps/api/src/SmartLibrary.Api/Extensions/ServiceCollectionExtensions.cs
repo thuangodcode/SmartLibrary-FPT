@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
 
         // Business services
         services.AddScoped<BookService>();
+        services.AddScoped<IBookReviewService, BookReviewService>();
         services.AddScoped<CategoryService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<ReaderService>();

@@ -11,6 +11,8 @@ public class UpdateBookForm
     public int? PublishedYear { get; set; }
     public string Language { get; set; } = "vi";
     public int? PageCount { get; set; }
+    public int? TotalCopies { get; set; }
+    public string? Location { get; set; }
     public Guid? CategoryId { get; set; }
     public IFormFile? CoverImage { get; set; }
     public bool RemoveCoverImage { get; set; }

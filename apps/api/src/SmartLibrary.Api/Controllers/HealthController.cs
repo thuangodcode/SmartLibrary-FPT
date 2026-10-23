@@ -318,7 +318,7 @@ public class HealthController : ControllerBase
                         CREATE CAST (text AS registration_request_status) WITH INOUT AS IMPLICIT;
                     END IF;
                     IF NOT EXISTS (SELECT 1 FROM pg_cast c JOIN pg_type s ON c.castsource = s.oid JOIN pg_type t ON c.casttarget = t.oid WHERE s.typname = 'registration_request_status' AND t.typname = 'text') THEN
-                        CREATE CAST (registration_request_status AS text) WITH INOUT AS IMPLICIT;
+                        CREATE CAST (registration_request_status AS text) WITH INOUT AS ASSIGNMENT;
                     END IF;
 
                     -- document_type
@@ -326,7 +326,7 @@ public class HealthController : ControllerBase
                         CREATE CAST (text AS document_type) WITH INOUT AS IMPLICIT;
                     END IF;
                     IF NOT EXISTS (SELECT 1 FROM pg_cast c JOIN pg_type s ON c.castsource = s.oid JOIN pg_type t ON c.casttarget = t.oid WHERE s.typname = 'document_type' AND t.typname = 'text') THEN
-                        CREATE CAST (document_type AS text) WITH INOUT AS IMPLICIT;
+                        CREATE CAST (document_type AS text) WITH INOUT AS ASSIGNMENT;
                     END IF;
 
                     -- document_side
@@ -334,7 +334,7 @@ public class HealthController : ControllerBase
                         CREATE CAST (text AS document_side) WITH INOUT AS IMPLICIT;
                     END IF;
                     IF NOT EXISTS (SELECT 1 FROM pg_cast c JOIN pg_type s ON c.castsource = s.oid JOIN pg_type t ON c.casttarget = t.oid WHERE s.typname = 'document_side' AND t.typname = 'text') THEN
-                        CREATE CAST (document_side AS text) WITH INOUT AS IMPLICIT;
+                        CREATE CAST (document_side AS text) WITH INOUT AS ASSIGNMENT;
                     END IF;
 
                     -- account_status
@@ -342,7 +342,7 @@ public class HealthController : ControllerBase
                         CREATE CAST (text AS account_status) WITH INOUT AS IMPLICIT;
                     END IF;
                     IF NOT EXISTS (SELECT 1 FROM pg_cast c JOIN pg_type s ON c.castsource = s.oid JOIN pg_type t ON c.casttarget = t.oid WHERE s.typname = 'account_status' AND t.typname = 'text') THEN
-                        CREATE CAST (account_status AS text) WITH INOUT AS IMPLICIT;
+                        CREATE CAST (account_status AS text) WITH INOUT AS ASSIGNMENT;
                     END IF;
 
                     -- reader_type
@@ -350,7 +350,7 @@ public class HealthController : ControllerBase
                         CREATE CAST (text AS reader_type) WITH INOUT AS IMPLICIT;
                     END IF;
                     IF NOT EXISTS (SELECT 1 FROM pg_cast c JOIN pg_type s ON c.castsource = s.oid JOIN pg_type t ON c.casttarget = t.oid WHERE s.typname = 'reader_type' AND t.typname = 'text') THEN
-                        CREATE CAST (reader_type AS text) WITH INOUT AS IMPLICIT;
+                        CREATE CAST (reader_type AS text) WITH INOUT AS ASSIGNMENT;
                     END IF;
 
                     -- borrow_status
@@ -358,7 +358,7 @@ public class HealthController : ControllerBase
                         CREATE CAST (text AS borrow_status) WITH INOUT AS IMPLICIT;
                     END IF;
                     IF NOT EXISTS (SELECT 1 FROM pg_cast c JOIN pg_type s ON c.castsource = s.oid JOIN pg_type t ON c.casttarget = t.oid WHERE s.typname = 'borrow_status' AND t.typname = 'text') THEN
-                        CREATE CAST (borrow_status AS text) WITH INOUT AS IMPLICIT;
+                        CREATE CAST (borrow_status AS text) WITH INOUT AS ASSIGNMENT;
                     END IF;
 
                     -- reservation_status
@@ -366,7 +366,7 @@ public class HealthController : ControllerBase
                         CREATE CAST (text AS reservation_status) WITH INOUT AS IMPLICIT;
                     END IF;
                     IF NOT EXISTS (SELECT 1 FROM pg_cast c JOIN pg_type s ON c.castsource = s.oid JOIN pg_type t ON c.casttarget = t.oid WHERE s.typname = 'reservation_status' AND t.typname = 'text') THEN
-                        CREATE CAST (reservation_status AS text) WITH INOUT AS IMPLICIT;
+                        CREATE CAST (reservation_status AS text) WITH INOUT AS ASSIGNMENT;
                     END IF;
 
                     -- fine_status
@@ -374,7 +374,7 @@ public class HealthController : ControllerBase
                         CREATE CAST (text AS fine_status) WITH INOUT AS IMPLICIT;
                     END IF;
                     IF NOT EXISTS (SELECT 1 FROM pg_cast c JOIN pg_type s ON c.castsource = s.oid JOIN pg_type t ON c.casttarget = t.oid WHERE s.typname = 'fine_status' AND t.typname = 'text') THEN
-                        CREATE CAST (fine_status AS text) WITH INOUT AS IMPLICIT;
+                        CREATE CAST (fine_status AS text) WITH INOUT AS ASSIGNMENT;
                     END IF;
 
                     -- book_condition
@@ -382,7 +382,7 @@ public class HealthController : ControllerBase
                         CREATE CAST (text AS book_condition) WITH INOUT AS IMPLICIT;
                     END IF;
                     IF NOT EXISTS (SELECT 1 FROM pg_cast c JOIN pg_type s ON c.castsource = s.oid JOIN pg_type t ON c.casttarget = t.oid WHERE s.typname = 'book_condition' AND t.typname = 'text') THEN
-                        CREATE CAST (book_condition AS text) WITH INOUT AS IMPLICIT;
+                        CREATE CAST (book_condition AS text) WITH INOUT AS ASSIGNMENT;
                     END IF;
                 END $$;
             ";
@@ -390,7 +390,46 @@ public class HealthController : ControllerBase
             await using var cmd = new Npgsql.NpgsqlCommand(sql, conn);
             await cmd.ExecuteNonQueryAsync();
 
-            return Ok(new { success = true, message = "Implicit casts created successfully!" });
+            const string repairEnumCastsSql = """
+                DO $$
+                DECLARE
+                    enum_name TEXT;
+                BEGIN
+                    FOREACH enum_name IN ARRAY ARRAY[
+                        'registration_request_status',
+                        'document_type',
+                        'document_side',
+                        'account_status',
+                        'reader_type',
+                        'borrow_status',
+                        'reservation_status',
+                        'fine_status',
+                        'book_condition'
+                    ] LOOP
+                        IF to_regtype(enum_name) IS NULL THEN
+                            CONTINUE;
+                        END IF;
+
+                        IF EXISTS (
+                            SELECT 1
+                            FROM pg_cast c
+                            JOIN pg_type source_type ON c.castsource = source_type.oid
+                            JOIN pg_type target_type ON c.casttarget = target_type.oid
+                            WHERE source_type.typname = enum_name
+                              AND target_type.typname = 'text'
+                        ) THEN
+                            EXECUTE format('DROP CAST (%I AS text)', enum_name);
+                        END IF;
+
+                        EXECUTE format('CREATE CAST (%I AS text) WITH INOUT AS ASSIGNMENT', enum_name);
+                    END LOOP;
+                END $$;
+                """;
+
+            await using var repairCommand = new Npgsql.NpgsqlCommand(repairEnumCastsSql, conn);
+            await repairCommand.ExecuteNonQueryAsync();
+
+            return Ok(new { success = true, message = "Enum casts repaired successfully!" });
         }
         catch (Exception ex)
         {

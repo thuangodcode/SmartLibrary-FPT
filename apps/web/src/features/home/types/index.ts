@@ -7,6 +7,7 @@ export interface Book {
   isbn: string;
   publishYear: number;
   publisher: string;
+  coverImageUrl?: string | null;
   coverGradient: string;
   rating: number;
   reviewCount: number;

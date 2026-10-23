@@ -552,6 +552,66 @@
   gap: 19px;
 }
 
+.lib-profile-menu {
+  position: relative;
+}
+
+.lib-profile-menu > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.lib-profile-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.lib-profile-menu[open] .lib-profile-chevron {
+  transform: rotate(180deg);
+}
+
+.lib-profile-dropdown {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 12px);
+  right: 0;
+  display: grid;
+  min-width: 190px;
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid #e9ecf3;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 14%);
+}
+
+.lib-profile-dropdown a,
+.lib-profile-dropdown button {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0 11px;
+  color: #333c4e;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.lib-profile-dropdown a:hover,
+.lib-profile-dropdown button:hover {
+  background: #fff6f0;
+  color: #d95f27;
+}
+
+.lib-profile-dropdown button {
+  color: #b42318;
+}
+
 .lib-icon-button {
   position: relative;
   display: grid;

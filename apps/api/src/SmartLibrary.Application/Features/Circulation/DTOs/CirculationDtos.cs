@@ -199,6 +199,9 @@ public class BorrowRequest
     public string Barcode { get; set; } = string.Empty;
 }
 
+/// <summary>Request to borrow an available copy of a book.</summary>
+public sealed record RequestBookBorrowRequest(Guid BookId);
+
 public class ReportIncidentRequest
 {
     public string Kind { get; set; } = "Lost";

@@ -1,131 +1,138 @@
 import { useQuery } from '@tanstack/react-query';
-import { MOCK_SERVICES, MOCK_NEWS, MOCK_FAQS } from '../mock';
-import type { Book, Category, NewsItem, FaqItem, ServiceItem } from '../types';
+import { API_BASE_URL } from '../../../config';
+import { parseApiResponse } from '../../../lib/api';
 
-export interface HomeData {
-  aiRecommendations: Book[];
-  popularBooks: Book[];
-  recentArrivals: Book[];
-  categories: Category[];
-  services: ServiceItem[];
-  news: NewsItem[];
-  faqs: FaqItem[];
-  stats: {
-    totalTitles: number;
-    availableCopies: number;
-    activeReaders: number;
-    monthlyBorrows: number;
+export interface HomeCategory {
+  id: string;
+  name: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  bookCount: number;
+}
+
+export interface HomeBook {
+  id: string;
+  code: string;
+  title: string;
+  isbn?: string | null;
+  description?: string | null;
+  coverImageUrl?: string | null;
+  publishedYear?: number | null;
+  language?: string;
+  totalCopies: number;
+  availableCopies: number;
+  averageRating?: number;
+  authorNames: string[];
+  categoryNames: string[];
+}
+
+export interface BookReview {
+  id: string;
+  readerName: string;
+  rating: number;
+  comment?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isMine: boolean;
+}
+
+export interface BookAvailability {
+  totalCopies: number;
+  availableCopies: number;
+  canBorrow: boolean;
+}
+
+interface ApiEnvelope<T> {
+  success?: boolean;
+  data?: T;
+  error?: string;
+  meta?: {
+    totalCount?: number;
+    totalPages?: number;
   };
 }
 
-const GRADIENTS = [
-  'from-blue-600 to-indigo-800',
-  'from-emerald-600 to-teal-800',
-  'from-amber-500 to-rose-700',
-  'from-violet-600 to-purple-800',
-  'from-rose-500 to-red-700',
-];
+async function getApiData<T>(response: Response, message: string): Promise<{ data: T; meta?: ApiEnvelope<T>['meta'] }> {
+  const result = await parseApiResponse<ApiEnvelope<T>>(response);
+  if (!response.ok || !result?.success || result.data === undefined) {
+    throw new Error(result?.error || `${message} (HTTP ${response.status}).`);
+  }
+  return { data: result.data, meta: result.meta };
+}
 
-const CATEGORY_ICONS: Record<string, string> = {
-  'c0000000-0000-0000-0000-000000000001': 'Code',
-  'c0000000-0000-0000-0000-000000000002': 'BookOpen',
-  'c0000000-0000-0000-0000-000000000003': 'Atom',
-  'c0000000-0000-0000-0000-000000000004': 'TrendingUp',
-};
+export function useHomeCategories() {
+  return useQuery({
+    queryKey: ['public-home-categories'],
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`${API_BASE_URL}/api/v1/categories`, { signal });
+      const result = await getApiData<HomeCategory[]>(response, 'Không tải được danh mục sách');
+      if (!Array.isArray(result.data)) throw new Error('Dữ liệu danh mục sách không hợp lệ.');
+      return result.data;
+    },
+    staleTime: 60_000,
+  });
+}
 
-const CATEGORY_COLORS = [
-  'text-blue-500 bg-blue-50 dark:bg-blue-500/10',
-  'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10',
-  'text-purple-500 bg-purple-50 dark:bg-purple-500/10',
-  'text-amber-500 bg-amber-50 dark:bg-amber-500/10',
-];
+export function useHomeBooks(categoryId: string, search: string, page: number) {
+  return useQuery({
+    queryKey: ['public-home-books', categoryId, search, page],
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: '18',
+      });
+      if (categoryId) params.set('categoryId', categoryId);
+      if (search.trim()) params.set('search', search.trim());
 
-export function useHomeData() {
-  return useQuery<HomeData>({
-    queryKey: ['homeData'],
-    queryFn: async () => {
-      const [booksRes, categoriesRes, statsRes] = await Promise.allSettled([
-        fetch(`${import.meta.env.VITE_API_URL}/api/v1/books?pageSize=20`).then((r) => r.json()),
-        fetch(`${import.meta.env.VITE_API_URL}/api/v1/categories`).then((r) => r.json()),
-        fetch(`${import.meta.env.VITE_API_URL}/api/v1/dashboard/stats`).then((r) => r.json()),
-      ]);
-      interface RawBookItem {
-        id: string;
-        title: string;
-        authorNames?: string[];
-        categoryNames?: string[];
-        isbn?: string;
-        publishedYear?: number;
-        averageRating?: number;
-        availableCopies: number;
-        totalCopies: number;
-        description?: string;
-      }
-
-      interface RawCategoryItem {
-        id: string;
-        name: string;
-        bookCount?: number;
-        description?: string;
-      }
-
-      const rawBooks: RawBookItem[] =
-        booksRes.status === 'fulfilled' && booksRes.value?.success && booksRes.value?.data ? booksRes.value.data : [];
-      const rawCategories: RawCategoryItem[] =
-        categoriesRes.status === 'fulfilled' && categoriesRes.value?.success && categoriesRes.value?.data ? categoriesRes.value.data : [];
-      const rawStats = statsRes.status === 'fulfilled' && statsRes.value?.success && statsRes.value?.data ? statsRes.value.data : null;
-
-      const books: Book[] = rawBooks.map((b, idx) => ({
-        id: b.id,
-        categoryId: b.categoryNames?.[0] || 'c1',
-        title: b.title,
-        author: b.authorNames?.length ? b.authorNames.join(', ') : 'Nhiều tác giả',
-        category: b.categoryNames?.[0] || 'Công nghệ thông tin',
-        isbn: b.isbn || '9780000000000',
-        publishYear: b.publishedYear || 2024,
-        publisher: 'FPT University Press',
-        coverGradient: GRADIENTS[idx % GRADIENTS.length],
-        rating: typeof b.averageRating === 'number' && b.averageRating > 0 ? b.averageRating : 4.8,
-        reviewCount: 15,
-        availableCopies: b.availableCopies,
-        totalCopies: b.totalCopies,
-        status: b.availableCopies > 0 ? 'available' : 'reserved_only',
-        description: b.description || 'Tài liệu học tập và nghiên cứu chuẩn FPT University.',
-        matchScore: 90 + ((idx * 3) % 10),
-        recommendReason: 'Phù hợp với lộ trình học tập chuyên ngành CNTT & Phần mềm',
-        isNewArrival: true,
-        borrowCount: b.totalCopies - b.availableCopies + 10,
-      }));
-
-      const categories: Category[] = rawCategories.map((c, idx) => ({
-        id: c.id,
-        name: c.name,
-        iconName: CATEGORY_ICONS[c.id] || 'BookOpen',
-        bookCount: c.bookCount || 0,
-        colorClass: CATEGORY_COLORS[idx % CATEGORY_COLORS.length],
-        description: c.description || 'Tài liệu và giáo trình theo chuẩn đào tạo',
-      }));
-
-      const popularBooks = [...books].sort((a, b) => (b.borrowCount || 0) - (a.borrowCount || 0));
-      const recentArrivals = books.filter((b) => b.isNewArrival);
-      const aiRecommendations = books.filter((b) => b.matchScore !== undefined);
-
+      const response = await fetch(`${API_BASE_URL}/api/v1/books?${params}`, { signal });
+      const result = await getApiData<HomeBook[]>(response, 'Không tải được đầu sách');
+      if (!Array.isArray(result.data)) throw new Error('Dữ liệu đầu sách không hợp lệ.');
       return {
-        aiRecommendations: aiRecommendations.length ? aiRecommendations : books,
-        popularBooks: popularBooks.length ? popularBooks : books,
-        recentArrivals: recentArrivals.length ? recentArrivals : books,
-        categories,
-        services: MOCK_SERVICES,
-        news: MOCK_NEWS,
-        faqs: MOCK_FAQS,
-        stats: {
-          totalTitles: rawStats?.totalBooks || 4,
-          availableCopies: rawStats?.availableCopies || 10,
-          activeReaders: rawStats?.totalReaders || 4,
-          monthlyBorrows: (rawStats?.borrowedCount || 0) + 12,
-        },
+        books: result.data,
+        totalCount: result.meta?.totalCount ?? result.data.length,
+        totalPages: result.meta?.totalPages ?? 1,
       };
     },
-    staleTime: 1000 * 60 * 5, // Cache 5 phút
+    staleTime: 60_000,
+  });
+}
+
+export function useHomeBook(bookId: string) {
+  return useQuery({
+    queryKey: ['public-book-detail', bookId],
+    enabled: Boolean(bookId),
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`${API_BASE_URL}/api/v1/books/${encodeURIComponent(bookId)}`, { signal });
+      const result = await getApiData<HomeBook>(response, 'Không tải được thông tin sách');
+      return result.data;
+    },
+  });
+}
+
+export function useBookAvailability(bookId: string) {
+  return useQuery({
+    queryKey: ['public-book-availability', bookId],
+    enabled: Boolean(bookId),
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`${API_BASE_URL}/api/v1/books/${encodeURIComponent(bookId)}/availability`, { signal });
+      const result = await getApiData<BookAvailability>(response, 'Không tải được trạng thái bản sao');
+      return result.data;
+    },
+    refetchInterval: 30_000,
+  });
+}
+
+export function useBookReviews(bookId: string, accessToken: string | null) {
+  return useQuery({
+    queryKey: ['public-book-reviews', bookId, accessToken ? 'authenticated' : 'anonymous'],
+    enabled: Boolean(bookId),
+    queryFn: async ({ signal }) => {
+      const headers = new Headers();
+      if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+      const response = await fetch(`${API_BASE_URL}/api/v1/books/${encodeURIComponent(bookId)}/reviews`, { headers, signal });
+      const result = await getApiData<BookReview[]>(response, 'Không tải được đánh giá');
+      if (!Array.isArray(result.data)) throw new Error('Dữ liệu đánh giá không hợp lệ.');
+      return result.data;
+    },
   });
 }

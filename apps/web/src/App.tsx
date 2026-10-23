@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './features/home/pages/HomePage';
+import HomeCatalogPage from './features/home/pages/HomeCatalogPage';
+import BookDetailPage from './features/home/pages/BookDetailPage';
 import HomeInfoPage from './features/home/pages/HomeInfoPage';
 import LoginPage from './features/auth/pages/LoginPage';
 import RegisterPage from './features/auth/pages/RegisterPage';
@@ -29,6 +31,7 @@ import AdminLibrarianCreatePage from './features/admin/pages/AdminLibrarianCreat
 import AdminUserDetailPage from './features/admin/pages/AdminUserDetailPage';
 import AdminPoliciesPage from './features/admin/pages/AdminPoliciesPage';
 import AdminReportsPage from './features/admin/pages/AdminReportsPage';
+import AdminCollectionPage from './features/admin/pages/AdminCollectionPage';
 import AdminReportDetailPage from './features/admin/pages/AdminReportDetailPage';
 import AdminReportTemplatesPage from './features/admin/pages/AdminReportTemplatesPage';
 import AdminReportTemplateDetailPage from './features/admin/pages/AdminReportTemplateDetailPage';
@@ -54,6 +57,8 @@ function App() {
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<HomePage />} />
+      <Route path="/books" element={<HomeCatalogPage />} />
+      <Route path="/books/:bookId" element={<BookDetailPage />} />
       <Route path="/services" element={<HomeInfoPage section="services" />} />
       <Route path="/news" element={<HomeInfoPage section="news" />} />
       <Route path="/policies" element={<HomeInfoPage section="policies" />} />
@@ -83,7 +88,7 @@ function App() {
         <Route path="books/categories/new" element={<LibrarianCreateCategoryPage />} />
         <Route path="books/categories/:categoryId" element={<LibrarianCategoryBooksPage />} />
         <Route path="books/:bookId" element={<LibrarianBookDetailPage />} />
-        <Route path="copies" element={<LibrarianModulePage />} />
+        <Route path="copies" element={<Navigate to="/librarian/books?view=copies" replace />} />
         <Route path="loans" element={<LibrarianModulePage />} />
         <Route path="fines" element={<LibrarianModulePage />} />
         <Route path="ai-recommendations" element={<LibrarianModulePage />} />
@@ -106,6 +111,8 @@ function App() {
         <Route path="users/create-librarian" element={<AdminLibrarianCreatePage />} />
         <Route path="users/:userId" element={<AdminUserDetailPage />} />
         <Route path="books" element={<AdminSectionPage title="Quản lý sách" />} />
+        <Route path="collection" element={<AdminCollectionPage />} />
+        <Route path="collection/:categoryId" element={<AdminCollectionPage />} />
         <Route path="policies" element={<AdminPoliciesPage />} />
         <Route path="policies/create" element={<AdminPoliciesPage mode="create" />} />
         <Route path="policies/:policyCode/edit" element={<AdminPoliciesPage mode="edit" />} />
@@ -119,7 +126,7 @@ function App() {
         <Route path="reports/assignments" element={<AdminReportsPage />} />
         <Route path="reports/activity" element={<AdminReportsPage />} />
         <Route path="reports/finance" element={<AdminReportsPage />} />
-        <Route path="reports/collection" element={<AdminReportsPage />} />
+        <Route path="reports/collection" element={<Navigate to="/admin/collection" replace />} />
         <Route path="reports/periodic" element={<AdminReportsPage />} />
         <Route path="reports/library" element={<AdminReportsPage />} />
         <Route path="reports/templates" element={<AdminReportTemplatesPage />} />

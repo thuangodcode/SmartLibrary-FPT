@@ -449,6 +449,66 @@
   gap: 19px;
 }
 
+.admin-profile-menu {
+  position: relative;
+}
+
+.admin-profile-menu > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.admin-profile-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-profile-menu[open] .admin-profile-chevron {
+  transform: rotate(180deg);
+}
+
+.admin-profile-dropdown {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 12px);
+  right: 0;
+  display: grid;
+  min-width: 190px;
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid #e9ecf3;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 14%);
+}
+
+.admin-profile-dropdown a,
+.admin-profile-dropdown button {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0 11px;
+  color: #333c4e;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.admin-profile-dropdown a:hover,
+.admin-profile-dropdown button:hover {
+  background: #fff6f0;
+  color: #d95f27;
+}
+
+.admin-profile-dropdown button {
+  color: #b42318;
+}
+
 .admin-icon-button {
   position: relative;
   display: grid;

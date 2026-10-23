@@ -45,6 +45,7 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
           title={book.title}
           author={book.author}
           category={book.category}
+          coverImageUrl={book.coverImageUrl}
           coverGradient={book.coverGradient}
           size="md"
         />

@@ -16,10 +16,14 @@ import {
   User,
   Clock,
   Sparkles,
+  MapPin,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { parseApiResponse } from '../../../lib/api';
+import { STORAGE_LOCATIONS } from '../storageLocations';
 import type { CategoryItem } from './LibrarianCategoriesPage';
 import './LibrarianBookDetailPage.css';
 
@@ -27,13 +31,13 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5278';
 
 export interface BookDetailData {
   id: string;
+  code: string;
   title: string;
   isbn?: string | null;
   description?: string | null;
   coverImageUrl?: string | null;
   publishedYear?: number | null;
   language?: string;
-  pageCount?: number | null;
   totalCopies: number;
   availableCopies: number;
   averageRating: number;
@@ -43,6 +47,38 @@ export interface BookDetailData {
   updatedAt: string;
 }
 
+interface BookCopyItem {
+  id: string;
+  barcode: string;
+  condition: 'New' | 'Good' | 'Fair' | 'Damaged' | 'Lost';
+  location: string | null;
+  isAvailable: boolean;
+  hasOverdueLoan: boolean;
+  hasActiveLoan: boolean;
+  hasApprovedLoan: boolean;
+}
+
+interface BookCopiesResponse {
+  success?: boolean;
+  data?: BookCopyItem[];
+  error?: string;
+  meta?: {
+    totalPages?: number;
+  };
+}
+
+const COPY_PAGE_SIZE = 20;
+
+const getCopyStatus = (copy: BookCopyItem) => {
+  if (copy.condition === 'Lost') return { label: 'Thất lạc', className: 'is-lost' };
+  if (copy.condition === 'Damaged') return { label: 'Hư hỏng', className: 'is-damaged' };
+  if (copy.hasOverdueLoan) return { label: 'Quá hạn', className: 'is-overdue' };
+  if (copy.hasActiveLoan) return { label: 'Đang mượn', className: 'is-borrowed' };
+  if (copy.hasApprovedLoan) return { label: 'Đã duyệt mượn', className: 'is-reserved' };
+  if (copy.isAvailable) return { label: 'Sẵn sàng', className: 'is-available' };
+  return { label: 'Không khả dụng', className: 'is-unavailable' };
+};
+
 const LibrarianBookDetailPage: React.FC = () => {
   const { bookId } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
@@ -50,6 +86,12 @@ const LibrarianBookDetailPage: React.FC = () => {
   const { showToast } = useToast();
 
   const [book, setBook] = useState<BookDetailData | null>(null);
+  const [copies, setCopies] = useState<BookCopyItem[]>([]);
+  const [copiesLoading, setCopiesLoading] = useState(true);
+  const [copiesError, setCopiesError] = useState<string | null>(null);
+  const [copiesPage, setCopiesPage] = useState(1);
+  const [copiesPageCount, setCopiesPageCount] = useState(1);
+  const [copiesRefreshKey, setCopiesRefreshKey] = useState(0);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +108,10 @@ const LibrarianBookDetailPage: React.FC = () => {
   const [editIsbn, setEditIsbn] = useState('');
   const [editYear, setEditYear] = useState('');
   const [editLanguage, setEditLanguage] = useState('vi');
-  const [editPageCount, setEditPageCount] = useState('');
+  const [editCustomLanguage, setEditCustomLanguage] = useState('');
+  const [editTotalCopies, setEditTotalCopies] = useState(1);
+  const [editLocation, setEditLocation] = useState('');
+  const [editLocationOriginal, setEditLocationOriginal] = useState('');
   const [editCategoryId, setEditCategoryId] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
@@ -126,6 +171,43 @@ const LibrarianBookDetailPage: React.FC = () => {
     fetchCategories();
   }, [bookId, accessToken]);
 
+  useEffect(() => {
+    if (!bookId) return;
+    let cancelled = false;
+
+    const loadCopies = async () => {
+      setCopiesLoading(true);
+      setCopiesError(null);
+      try {
+        const headers: Record<string, string> = {};
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+        const params = new URLSearchParams({
+          bookId,
+          page: String(copiesPage),
+          pageSize: String(COPY_PAGE_SIZE),
+        });
+        const response = await fetch(`${API_BASE_URL}/api/v1/copies?${params}`, { headers });
+        const result = await parseApiResponse<BookCopiesResponse>(response);
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error || 'Không thể tải danh sách bản sao của đầu sách.');
+        }
+        if (!cancelled) {
+          setCopies(result.data ?? []);
+          setCopiesPageCount(Math.max(1, result.meta?.totalPages ?? 1));
+        }
+      } catch (caught) {
+        if (!cancelled) {
+          setCopiesError(caught instanceof Error ? caught.message : 'Không thể tải danh sách bản sao.');
+        }
+      } finally {
+        if (!cancelled) setCopiesLoading(false);
+      }
+    };
+
+    void loadCopies();
+    return () => { cancelled = true; };
+  }, [accessToken, bookId, copiesPage, copiesRefreshKey]);
+
   // Handle Opening Edit Modal (after confirmation)
   const handleOpenEditModal = () => {
     if (!book) return;
@@ -134,8 +216,13 @@ const LibrarianBookDetailPage: React.FC = () => {
     setEditAuthor(book.authorNames && book.authorNames.length > 0 ? book.authorNames[0] : '');
     setEditIsbn(book.isbn || '');
     setEditYear(book.publishedYear ? String(book.publishedYear) : '');
-    setEditLanguage(book.language || 'vi');
-    setEditPageCount(book.pageCount ? String(book.pageCount) : '');
+    const knownLanguages = ['vi', 'en', 'ja', 'ko', 'fr'];
+    setEditLanguage(book.language && knownLanguages.includes(book.language) ? book.language : 'custom');
+    setEditCustomLanguage(book.language && !knownLanguages.includes(book.language) ? book.language : '');
+    setEditTotalCopies(book.totalCopies);
+    const currentLocation = copies.find((copy) => copy.location)?.location ?? '';
+    setEditLocation(currentLocation);
+    setEditLocationOriginal(currentLocation);
     setEditDescription(book.description || '');
     setEditCoverFile(null);
     setEditCoverPreview(book.coverImageUrl || null);
@@ -198,8 +285,15 @@ const LibrarianBookDetailPage: React.FC = () => {
       if (editAuthor.trim()) formData.append('AuthorName', editAuthor.trim());
       if (editIsbn.trim()) formData.append('Isbn', editIsbn.trim());
       if (editYear) formData.append('PublishedYear', editYear);
-      formData.append('Language', editLanguage || 'vi');
-      if (editPageCount) formData.append('PageCount', editPageCount);
+      const language = editLanguage === 'custom' ? editCustomLanguage.trim() : editLanguage || 'vi';
+      if (!language) {
+        throw new Error('Vui lòng nhập ngôn ngữ của sách.');
+      }
+      formData.append('Language', language);
+      formData.append('TotalCopies', String(editTotalCopies));
+      if (editLocation !== editLocationOriginal) {
+        formData.append('Location', editLocation);
+      }
       if (editCategoryId) formData.append('CategoryId', editCategoryId);
       if (editDescription.trim()) formData.append('Description', editDescription.trim());
       if (editCoverFile) formData.append('CoverImage', editCoverFile);
@@ -227,6 +321,15 @@ const LibrarianBookDetailPage: React.FC = () => {
 
       setIsEditModalOpen(false);
       fetchBookDetails();
+      setCopiesPage(1);
+      setCopiesRefreshKey((current) => current + 1);
+      if (editLocation !== editLocationOriginal) {
+        setCopies((currentCopies) => currentCopies.map((copy) => ({
+          ...copy,
+          location: editLocation.trim() || null,
+        })));
+        setEditLocationOriginal(editLocation);
+      }
     } catch (err: any) {
       console.error('Error updating book:', err);
       showToast({
@@ -423,6 +526,11 @@ const LibrarianBookDetailPage: React.FC = () => {
           {/* Metadata Grid */}
           <div className="lib-book-meta-grid">
             <div className="lib-book-meta-card">
+              <span className="lib-book-meta-label">Mã sách</span>
+              <span className="lib-book-meta-value">{book.code}</span>
+            </div>
+
+            <div className="lib-book-meta-card">
               <span className="lib-book-meta-label">Mã ISBN</span>
               <span className="lib-book-meta-value">
                 {book.isbn || <span style={{ color: '#94a3b8' }}>Chưa cập nhật</span>}
@@ -454,13 +562,6 @@ const LibrarianBookDetailPage: React.FC = () => {
             </div>
 
             <div className="lib-book-meta-card">
-              <span className="lib-book-meta-label">Số trang</span>
-              <span className="lib-book-meta-value">
-                {book.pageCount ? `${book.pageCount} trang` : '---'}
-              </span>
-            </div>
-
-            <div className="lib-book-meta-card">
               <span className="lib-book-meta-label">Tổng bản sao</span>
               <span className="lib-book-meta-value">{book.totalCopies} cuốn</span>
             </div>
@@ -488,6 +589,71 @@ const LibrarianBookDetailPage: React.FC = () => {
           <div className="lib-book-desc-content">{book.description}</div>
         ) : (
           <div className="lib-book-desc-empty">Chưa có thông tin mô tả chi tiết cho đầu sách này.</div>
+        )}
+      </section>
+
+      <section className="lib-book-copies-panel">
+        <div className="lib-book-copies-heading">
+          <div>
+            <h2 className="lib-book-section-title">
+              <MapPin size={18} color="#ea580c" />
+              <span>Danh sách bản sao & vị trí kệ</span>
+            </h2>
+            <p>Thông tin từng cuốn được tạo từ đầu sách này.</p>
+          </div>
+          <span>{book.totalCopies} bản sao</span>
+        </div>
+        {copiesError ? (
+          <div className="lib-book-copies-message is-error" role="alert">{copiesError}</div>
+        ) : copiesLoading ? (
+          <div className="lib-book-copies-message" role="status">Đang tải danh sách bản sao...</div>
+        ) : copies.length === 0 ? (
+          <div className="lib-book-copies-message">Đầu sách này chưa có bản sao.</div>
+        ) : (
+          <>
+            <div className="lib-book-copies-table-wrap">
+              <table className="lib-book-copies-table">
+                <thead>
+                  <tr><th>ID bản sao sách</th><th>Trạng thái</th><th>Vị trí kệ</th></tr>
+                </thead>
+                <tbody>
+                  {copies.map((copy) => {
+                    const status = getCopyStatus(copy);
+                    return (
+                      <tr key={copy.id}>
+                        <td><code>{copy.barcode}</code></td>
+                        <td><span className={`lib-book-copy-status ${status.className}`}>{status.label}</span></td>
+                        <td>{copy.location || <span className="lib-book-copy-unassigned">Chưa xếp kệ</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {copiesPageCount > 1 && (
+              <div className="lib-book-copies-pagination">
+                <span>Trang {copiesPage} / {copiesPageCount}</span>
+                <div>
+                  <button
+                    type="button"
+                    aria-label="Trang trước"
+                    disabled={copiesPage <= 1 || copiesLoading}
+                    onClick={() => setCopiesPage((current) => Math.max(1, current - 1))}
+                  >
+                    <ChevronLeft size={17} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Trang sau"
+                    disabled={copiesPage >= copiesPageCount || copiesLoading}
+                    onClick={() => setCopiesPage((current) => Math.min(copiesPageCount, current + 1))}
+                  >
+                    <ChevronRight size={17} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
 
@@ -564,6 +730,12 @@ const LibrarianBookDetailPage: React.FC = () => {
                 />
               </div>
 
+              <div className="lib-cat-form-group">
+                <label>Mã sách</label>
+                <input type="text" value={book?.code ?? ''} readOnly />
+                <small>Mã sách giữ cố định để không làm thay đổi mã bản sao đã cấp.</small>
+              </div>
+
               <div className="lib-form-grid-2">
                 <div className="lib-cat-form-group">
                   <label>Tác giả</label>
@@ -610,36 +782,71 @@ const LibrarianBookDetailPage: React.FC = () => {
                     <option value="ja">Tiếng Nhật (JA)</option>
                     <option value="ko">Tiếng Hàn (KO)</option>
                     <option value="fr">Tiếng Pháp (FR)</option>
+                    <option value="custom">Thêm ngôn ngữ mới...</option>
                   </select>
                 </div>
               </div>
 
-              <div className="lib-form-grid-2">
+              {editLanguage === 'custom' && (
                 <div className="lib-cat-form-group">
-                  <label>Số trang</label>
+                  <label>Ngôn ngữ mới</label>
                   <input
-                    type="number"
-                    min="1"
-                    value={editPageCount}
-                    onChange={(e) => setEditPageCount(e.target.value)}
-                    placeholder="Ví dụ: 350..."
+                    type="text"
+                    value={editCustomLanguage}
+                    onChange={(e) => setEditCustomLanguage(e.target.value)}
+                    placeholder="Nhập tên ngôn ngữ"
+                    required
                   />
                 </div>
+              )}
 
-                <div className="lib-cat-form-group">
-                  <label>Danh mục sách</label>
-                  <select
-                    value={editCategoryId}
-                    onChange={(e) => setEditCategoryId(e.target.value)}
-                  >
-                    <option value="">-- Giữ nguyên danh mục hiện tại --</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="lib-cat-form-group">
+                <label htmlFor="book-edit-total-copies">Số lượng cuốn bản sao</label>
+                <input
+                  id="book-edit-total-copies"
+                  type="number"
+                  min="1"
+                  max="500"
+                  value={editTotalCopies}
+                  onChange={(e) => setEditTotalCopies(Number(e.target.value))}
+                  required
+                />
+                <small>
+                  Tăng số lượng sẽ tạo mã bản sao mới. Chỉ có thể giảm số lượng bằng các bản sao đang sẵn sàng thu hồi.
+                </small>
+              </div>
+
+              <div className="lib-cat-form-group">
+                <label>Danh mục sách</label>
+                <select
+                  value={editCategoryId}
+                  onChange={(e) => setEditCategoryId(e.target.value)}
+                >
+                  <option value="">-- Giữ nguyên danh mục hiện tại --</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="lib-cat-form-group">
+                <label htmlFor="book-edit-location">Vị trí kệ sách</label>
+                <select
+                  id="book-edit-location"
+                  value={editLocation}
+                  onChange={(e) => setEditLocation(e.target.value)}
+                >
+                  <option value="">Chưa xếp kệ</option>
+                  {editLocation && !STORAGE_LOCATIONS.includes(editLocation) && (
+                    <option value={editLocation}>{editLocation} (vị trí hiện tại)</option>
+                  )}
+                  {STORAGE_LOCATIONS.map((location) => (
+                    <option key={location} value={location}>{location}</option>
+                  ))}
+                </select>
+                <small>Thay đổi vị trí tại đây sẽ áp dụng cho tất cả bản sao của đầu sách.</small>
               </div>
 
               <div className="lib-cat-form-group">
