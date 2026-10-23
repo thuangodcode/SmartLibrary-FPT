@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowDown, ArrowRight, ChevronLeft, ChevronRight, Clock3, MapPin, Search } from 'lucide-react';
 import campusPhoto from '../../../assets/figma/HCM-Campus.jpg';
 import libraryPhoto from '../../../assets/figma/home-library.png';
@@ -27,8 +27,10 @@ const specialBookCovers: Record<string, string> = {
   b15: republicCover,
 };
 export const HomePage = () => {
-  const [searchInput, setSearchInput] = useState('');
-  const [appliedSearch, setAppliedSearch] = useState('');
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get('q') ?? '';
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [appliedSearch, setAppliedSearch] = useState(initialSearch);
   const [activeCategory, setActiveCategory] = useState('');
   const categoryRailRef = useRef<HTMLDivElement>(null);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -41,6 +43,12 @@ export const HomePage = () => {
   };
 
   const totalBooks = useMemo(() => MOCK_CATEGORIES.reduce((total, category) => total + category.bookCount, 0), []);
+  useEffect(() => {
+    if (initialSearch) {
+      window.setTimeout(() => document.getElementById('books')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 20);
+    }
+  }, [initialSearch]);
+
   const visibleBooks = useMemo(() => {
     const query = appliedSearch.trim().toLocaleLowerCase('vi');
     return MOCK_BOOKS.filter((book) => {
@@ -56,7 +64,16 @@ export const HomePage = () => {
   const clearFilters = () => { setSearchInput(''); setAppliedSearch(''); setActiveCategory(''); };
   return (
     <div className="annual-home">
-      <HomeNavbar />
+      <HomeNavbar
+        searchSlot={
+          <form className="annual-search" onSubmit={submitSearch} role="search">
+            <Search size={22} aria-hidden="true" />
+            <label className="sr-only" htmlFor="annual-book-search">Tìm sách</label>
+            <input id="annual-book-search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Tên sách, tác giả, ISBN hoặc điều bạn muốn học" />
+            <button type="submit">Tìm trong thư viện</button>
+          </form>
+        }
+      />
 
       <main>
         <section className="annual-hero" id="top">
@@ -66,9 +83,6 @@ export const HomePage = () => {
           </div>
           <div className="annual-hero-media">
             <img src={campusPhoto} alt="Khuôn viên xanh của FPT University TP. Hồ Chí Minh" />
-            <div className="annual-frame annual-search-dock">
-              <form className="annual-search" onSubmit={submitSearch} role="search"><Search size={22} aria-hidden="true" /><label className="sr-only" htmlFor="annual-book-search">Tìm sách</label><input id="annual-book-search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Tên sách, tác giả, ISBN hoặc điều bạn muốn học" /><button type="submit">Tìm trong thư viện</button></form>
-            </div>
             <div className="annual-hero-stat"><strong>{totalBooks.toLocaleString('vi-VN')}+</strong><span>đầu sách đang chờ được mở</span></div>
           </div>
         </section>
