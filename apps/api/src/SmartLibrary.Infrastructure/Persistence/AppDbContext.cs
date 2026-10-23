@@ -34,6 +34,11 @@ public class AppDbContext : DbContext
     public DbSet<PolicyRuleParameter> PolicyRuleParameters => Set<PolicyRuleParameter>();
     public DbSet<PolicyRuleTarget> PolicyRuleTargets => Set<PolicyRuleTarget>();
     public DbSet<PolicyRuleHistory> PolicyRuleHistories => Set<PolicyRuleHistory>();
+    public DbSet<ReportTemplate> ReportTemplates => Set<ReportTemplate>();
+    public DbSet<LibraryReport> LibraryReports => Set<LibraryReport>();
+    public DbSet<ReportReview> ReportReviews => Set<ReportReview>();
+    public DbSet<ReportRequest> ReportRequests => Set<ReportRequest>();
+    public DbSet<BookIncident> BookIncidents => Set<BookIncident>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +60,7 @@ public class AppDbContext : DbContext
             entity.ToTable("profiles");
             entity.Property(u => u.Status).HasConversion<string>();
             entity.Property(u => u.ReaderType).HasConversion<string>();
+            entity.Property(u => u.EmployeeId).HasMaxLength(50);
         });
 
         modelBuilder.Entity<Role>().ToTable("roles");
@@ -106,6 +112,11 @@ public class AppDbContext : DbContext
             );
         });
 
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.Property(x => x.Metadata).HasColumnType("jsonb");
+        });
+
         modelBuilder.Entity<BookCopy>(entity =>
         {
             entity.ToTable("book_copies");
@@ -118,13 +129,18 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<PolicyRule>(entity =>
         {
             entity.ToTable("policy_rules");
+            entity.Property(p => p.Code).HasColumnName("code").HasMaxLength(20).IsRequired();
+            entity.HasIndex(p => p.Code).IsUnique();
             entity.Property(p => p.PolicyType).HasConversion<string>();
             entity.Property(p => p.Status).HasConversion<string>();
-            entity.HasOne(p => p.CreatedByUser).WithMany().HasForeignKey(p => p.CreatedBy);
-            entity.HasOne(p => p.UpdatedByUser).WithMany().HasForeignKey(p => p.UpdatedBy);
-            entity.HasMany(p => p.Parameters).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId);
-            entity.HasMany(p => p.Targets).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId);
-            entity.HasMany(p => p.Histories).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId);
+            entity.HasOne(p => p.CreatedByUser).WithMany().HasForeignKey(p => p.CreatedBy).IsRequired(false);
+            entity.HasOne(p => p.UpdatedByUser).WithMany().HasForeignKey(p => p.UpdatedBy).IsRequired(false);
+            entity.HasMany(p => p.Parameters).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId)
+                .IsRequired(false).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(p => p.Targets).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId)
+                .IsRequired(false).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(p => p.Histories).WithOne(x => x.PolicyRule).HasForeignKey(x => x.PolicyRuleId)
+                .IsRequired(false).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<PolicyRuleParameter>(entity =>
@@ -140,6 +156,73 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<PolicyRuleHistory>(entity =>
         {
             entity.ToTable("policy_rule_histories");
+        });
+
+        modelBuilder.Entity<ReportTemplate>(entity =>
+        {
+            entity.ToTable("report_templates");
+            entity.Property(x => x.Configuration).HasColumnType("jsonb");
+            entity.HasIndex(x => x.IsEnabled);
+        });
+
+        modelBuilder.Entity<LibraryReport>(entity =>
+        {
+            entity.ToTable("reports");
+            entity.Property(x => x.Snapshot).HasColumnType("jsonb");
+            entity.Property(x => x.Status).IsConcurrencyToken();
+            entity.Property(x => x.IsApproved).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.Status, x.CreatedAt });
+            entity.HasIndex(x => x.TemplateId);
+            entity.HasIndex(x => x.SubmittedBy);
+            entity.HasIndex(x => x.RequestId);
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasOne(x => x.Template).WithMany(x => x.Reports).HasForeignKey(x => x.TemplateId);
+            entity.HasOne(x => x.Submitter).WithMany().HasForeignKey(x => x.SubmittedBy);
+            entity.HasOne(x => x.ReportRequest).WithMany(x => x.Reports).HasForeignKey(x => x.RequestId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReportRequest>(entity =>
+        {
+            entity.ToTable("report_requests", table =>
+                table.HasCheckConstraint("ck_report_requests_period", "period_end > period_start"));
+            entity.Property(x => x.Name).HasMaxLength(250);
+            entity.Property(x => x.Status).HasMaxLength(20).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.LibrarianId, x.Status, x.CreatedAt });
+            entity.HasIndex(x => x.TemplateId);
+            entity.HasIndex(x => x.ReportId).IsUnique();
+            entity.HasOne(x => x.Librarian).WithMany().HasForeignKey(x => x.LibrarianId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Requester).WithMany().HasForeignKey(x => x.RequestedBy).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Template).WithMany().HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Report).WithMany().HasForeignKey(x => x.ReportId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<BookIncident>(entity =>
+        {
+            entity.ToTable("book_incidents");
+            entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Severity).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(40);
+            entity.Property(x => x.ReplacementValue).HasColumnType("decimal(12,2)");
+            entity.Property(x => x.AssessedFee).HasColumnType("decimal(12,2)");
+            entity.HasIndex(x => x.ReaderId);
+            entity.HasIndex(x => x.Status);
+            entity.HasOne(x => x.BorrowRecord).WithMany().HasForeignKey(x => x.BorrowRecordId);
+            entity.HasOne(x => x.BookCopy).WithMany().HasForeignKey(x => x.BookCopyId);
+            entity.HasOne(x => x.Reader).WithMany().HasForeignKey(x => x.ReaderId);
+            entity.HasOne(x => x.CompensationFine).WithMany().HasForeignKey(x => x.CompensationFineId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.OverdueFine).WithMany().HasForeignKey(x => x.OverdueFineId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<ReportReview>(entity =>
+        {
+            entity.ToTable("report_reviews");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
+            entity.Property(x => x.IsDeleted).HasDefaultValue(false);
+            entity.HasIndex(x => new { x.ReportId, x.CreatedAt });
+            entity.HasOne(x => x.Report).WithMany(x => x.Reviews).HasForeignKey(x => x.ReportId);
+            entity.HasOne(x => x.Reviewer).WithMany().HasForeignKey(x => x.ReviewerId);
         });
 
         // Global query filter for soft delete

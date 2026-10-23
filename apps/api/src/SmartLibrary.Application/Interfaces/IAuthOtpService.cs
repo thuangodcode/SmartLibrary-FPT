@@ -14,13 +14,16 @@ public interface IAuthOtpService
         IFormFile? selfie,
         string? otp,
         CancellationToken ct = default);
+
+    Task<Result<bool>> SendPasswordResetOtpAsync(string email, string? clientOrigin = null, CancellationToken ct = default);
+    Task<Result<bool>> ResetPasswordWithOtpOrTokenAsync(string? email, string? token, string? otp, string newPassword, CancellationToken ct = default);
 }
 
 public sealed class SendOtpResultDto
 {
     public string Message { get; init; } = string.Empty;
     public string Email { get; init; } = string.Empty;
-    public string Otp { get; init; } = string.Empty;
+    public string? Otp { get; init; }
 }
 
 public sealed class VerifyOtpResultDto

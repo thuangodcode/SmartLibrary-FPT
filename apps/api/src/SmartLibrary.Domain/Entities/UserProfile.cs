@@ -10,11 +10,14 @@ public class UserProfile : AuditableEntity, ISoftDeletable
     public string? AvatarUrl { get; set; }
     public string? Phone { get; set; }
     public string? StudentId { get; set; }
+    public string? TeacherId { get; set; }
+    public string? EmployeeId { get; set; }
 
     public Guid RoleId { get; set; }
     public Role Role { get; set; } = null!;
 
     public AccountStatus Status { get; set; } = AccountStatus.PendingVerification;
+    public string? StatusReason { get; set; }
     public DateTime? LastLoginAt { get; set; }
     public bool IsActive { get; set; } = true;
     public bool IsDeleted { get; set; }

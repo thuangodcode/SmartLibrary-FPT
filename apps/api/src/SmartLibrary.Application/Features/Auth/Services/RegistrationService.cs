@@ -136,6 +136,7 @@ public class RegistrationService : IRegistrationService
         if (req.Status == RegistrationRequestStatus.Approved)
         {
             req.User.Status = AccountStatus.Active;
+            req.User.ReaderType = ReaderType.External;
             await _unitOfWork.SaveChangesAsync();
             return;
         }
@@ -151,6 +152,7 @@ public class RegistrationService : IRegistrationService
         req.Note = note;
 
         req.User.Status = AccountStatus.Active;
+        req.User.ReaderType = ReaderType.External;
         req.User.MembershipExpiresAt = membershipExpiresAt ?? DateTime.UtcNow.AddYears(1);
 
         await _unitOfWork.SaveChangesAsync();

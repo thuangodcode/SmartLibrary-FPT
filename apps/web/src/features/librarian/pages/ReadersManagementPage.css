@@ -348,8 +348,14 @@
   transition: background 0.14s ease;
 }
 
-.lib-readers-table tbody tr:hover {
-  background: #fafbfc;
+.lib-readers-table tbody tr.lib-readers-clickable-row {
+  cursor: pointer;
+}
+
+.lib-readers-table tbody tr.lib-readers-clickable-row:hover,
+.lib-readers-table tbody tr.lib-readers-clickable-row:focus-visible {
+  outline: none;
+  background: #fff6f0;
 }
 
 .lib-readers-id {
@@ -367,6 +373,7 @@
 .lib-readers-avatar {
   width: 32px;
   height: 32px;
+  overflow: hidden;
   border-radius: 50%;
   background: #f1f4f9;
   color: #4d5c75;
@@ -375,6 +382,13 @@
   font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
+}
+
+.lib-readers-avatar img,
+.lib-readers-dialog-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .lib-readers-names strong {
@@ -550,8 +564,9 @@
 }
 
 .lib-readers-dialog-avatar {
-  width: 50px;
-  height: 50px;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
   border-radius: 50%;
   background: #fff1e8;
   color: #d95f27;

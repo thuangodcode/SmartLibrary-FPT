@@ -1,7 +1,7 @@
 .figma-auth-page {
   display: grid;
   min-height: 100vh;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   color: #272b32;
   background: #fff;
   font-family: Inter, "Be Vietnam Pro", Arial, sans-serif;
@@ -12,7 +12,7 @@
   min-width: 0;
   min-height: 100vh;
   flex-direction: column;
-  padding: 30px clamp(28px, 6vw, 88px) 26px;
+  padding: 30px clamp(24px, 4.5vw, 68px) 26px;
   background: #fff;
 }
 
@@ -53,8 +53,8 @@
 }
 
 .figma-auth-content {
-  width: min(100%, 590px);
-  margin: clamp(42px, 8vh, 82px) auto 0;
+  width: min(100%, 640px);
+  margin: clamp(42px, 7vh, 72px) auto 0;
 }
 
 .figma-auth-intro {
@@ -82,8 +82,8 @@
 .figma-auth-subtitle {
   margin: 9px 0 0;
   color: #777c85;
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.65;
 }
 
 .figma-auth-legal {
@@ -120,6 +120,223 @@
   gap: 18px;
 }
 
+.password-recovery-form {
+  gap: 20px;
+}
+
+.password-recovery-field {
+  gap: 8px;
+}
+
+.figma-auth-page .password-recovery-input {
+  min-height: 54px;
+  border-radius: 11px;
+  padding: 14px 16px;
+  font-size: 14px;
+}
+
+.figma-auth-page .password-recovery-input.auth-icon-input {
+  padding-left: 48px;
+}
+
+.figma-auth-page .password-recovery-input[aria-invalid="true"] {
+  border-color: #dc6b6b;
+}
+
+.password-recovery-help {
+  margin: 0;
+  color: #777c85;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.password-recovery-error {
+  margin-bottom: 18px;
+}
+
+.auth-submit {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 10px;
+  background: #e8783b;
+  padding: 12px 18px;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.auth-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #d95e22;
+  box-shadow: 0 7px 16px rgb(217 94 34 / 18%);
+}
+
+.auth-submit:focus-visible,
+.password-recovery-text-button:focus-visible {
+  outline: 3px solid rgb(232 120 59 / 28%);
+  outline-offset: 2px;
+}
+
+.auth-submit:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.password-reset-submit {
+  margin-top: 2px;
+}
+
+.password-recovery-footer {
+  padding-top: 12px;
+}
+
+.password-recovery-success {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.password-recovery-success-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  border: 1px solid #f1dfd3;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fff9f5, #fff);
+  padding: 20px;
+}
+
+.password-recovery-success-icon,
+.password-reset-success-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff0e5;
+  color: #d95e22;
+}
+
+.password-recovery-success-icon svg,
+.password-reset-success-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.password-recovery-success-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+  color: #626873;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.password-recovery-success-copy h2,
+.password-reset-success-copy h3 {
+  margin: 0;
+  color: #292d33;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.password-recovery-success-copy p,
+.password-reset-success-copy p {
+  margin: 0;
+}
+
+.password-recovery-success-copy strong {
+  overflow-wrap: anywhere;
+  color: #d95e22;
+  font-size: 13px;
+}
+
+.password-recovery-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.password-recovery-secondary-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.password-recovery-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  color: #747983;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.password-recovery-text-button:hover:not(:disabled) {
+  color: #d95e22;
+}
+
+.password-recovery-resend {
+  color: #d95e22;
+}
+
+.password-recovery-resend:disabled {
+  color: #9a9da3;
+  cursor: not-allowed;
+}
+
+.password-reset-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 0 4px;
+  text-align: center;
+}
+
+.password-reset-success-icon {
+  width: 58px;
+  height: 58px;
+  flex-basis: 58px;
+  background: #eaf7ef;
+  color: #25824b;
+}
+
+.password-reset-success-icon svg {
+  width: 30px;
+  height: 30px;
+}
+
+.password-reset-success-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #747983;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.password-reset-success-copy h3 {
+  color: #292d33;
+  font-size: 18px;
+}
+
 .auth-field {
   display: flex;
   flex-direction: column;
@@ -129,7 +346,7 @@
 .auth-label,
 .auth-register-form label {
   color: #34383e;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -149,6 +366,10 @@
   font-size: 13px;
   outline: none;
   transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.auth-icon-input {
+  padding-left: 48px;
 }
 
 .auth-input:focus,
@@ -344,7 +565,7 @@
     width: min(100%, 700px);
     min-height: 100vh;
     margin: 0 auto;
-    padding: 26px clamp(22px, 6vw, 64px);
+    padding: 26px clamp(22px, 5vw, 48px);
   }
 
   .figma-auth-visual {
@@ -358,7 +579,7 @@
   }
 
   .figma-auth-content {
-    margin-top: 42px;
+    margin-top: 34px;
   }
 
   .figma-auth-intro {
@@ -379,6 +600,15 @@
 
   .auth-otp input {
     width: min(42px, calc((100vw - 92px) / 6));
+  }
+
+  .password-recovery-success-card {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .password-recovery-secondary-actions {
+    align-items: flex-start;
   }
 
   .figma-auth-legal {

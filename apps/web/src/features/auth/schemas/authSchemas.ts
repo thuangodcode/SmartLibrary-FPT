@@ -42,13 +42,9 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z
   .object({
-    password: z
-      .string()
-      .min(8, 'Mật khẩu tối thiểu 8 ký tự.')
-      .regex(/[A-Z]/, 'Chứa ít nhất 1 chữ cái viết hoa.')
-      .regex(/[a-z]/, 'Chứa ít nhất 1 chữ cái viết thường.')
-      .regex(/[0-9]/, 'Chứa ít nhất 1 chữ số.')
-      .regex(/[^a-zA-Z0-9]/, 'Chứa ít nhất 1 ký tự đặc biệt.'),
+    email: z.string().email('Định dạng email không hợp lệ.').optional().or(z.literal('')),
+    otp: z.string().optional().or(z.literal('')),
+    password: z.string().min(1, 'Vui lòng nhập mật khẩu mới.'),
     confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu.'),
   })
   .refine((data) => data.password === data.confirmPassword, {

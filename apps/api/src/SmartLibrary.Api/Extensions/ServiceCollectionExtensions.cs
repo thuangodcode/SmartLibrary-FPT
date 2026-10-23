@@ -5,6 +5,9 @@ using SmartLibrary.Application.Features.Books;
 using SmartLibrary.Application.Features.Categories;
 using SmartLibrary.Application.Features.Statistics;
 using SmartLibrary.Application.Features.Policies;
+using SmartLibrary.Application.Features.Circulation;
+using SmartLibrary.Application.Features.Reports;
+using SmartLibrary.Application.Features.Regulations;
 using SmartLibrary.Application.Features.Users;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Application.Mapping;
@@ -31,6 +34,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<DashboardService>();
         services.AddScoped<ReaderService>();
         services.AddScoped<PolicyRuleService>();
+        services.AddScoped<ReportService>();
+        services.AddScoped<RegulationService>();
+        services.AddScoped<CirculationService>();
         services.AddScoped<IRegistrationService, RegistrationService>();
         services.AddScoped<IAuthOtpService, AuthOtpService>();
 

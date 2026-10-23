@@ -12,5 +12,5 @@ public class PolicyRuleHistory : BaseEntity
     public string? AfterJson { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    public PolicyRule PolicyRule { get; set; } = null!;
+    public PolicyRule? PolicyRule { get; set; }
 }

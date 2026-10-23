@@ -107,9 +107,60 @@ supabase db reset   # Apply migrations + seed data
 | `ConnectionStrings__DefaultConnection` | PostgreSQL connection string | API |
 | `Jwt__Secret` | JWT signing secret (Supabase) | API |
 | `Supabase__Url` | Supabase URL | API |
+| `Supabase__AnonKey` | Supabase anon key | API |
 | `Supabase__ServiceRoleKey` | Supabase service role key | API |
+| `Resend__ApiKey` | Resend email API key | API |
+| `Smtp__Username`, `Smtp__Password` | SMTP account credentials | API |
+| `Smtp__FromAddress` | Sender email address | API |
+| `Cloudinary__CloudName`, `Cloudinary__ApiKey`, `Cloudinary__ApiSecret` | Cloudinary credentials | API |
 
 > ⚠️ **Không commit file `.env`!** Chỉ commit `.env.example`.
+> Backend đọc biến môi trường hoặc .NET User Secrets trong môi trường Development. Ví dụ:
+> `dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<connection-string>" --project apps/api/src/SmartLibrary.Api`
+> và cấu hình các key còn lại theo cùng cách, ví dụ `dotnet user-secrets set "Supabase:ServiceRoleKey" "<key>" --project apps/api/src/SmartLibrary.Api`.
+> Các tài khoản/khóa từng xuất hiện trong file cấu hình hoặc ảnh chụp cần được đổi/thu hồi tại nhà cung cấp; xóa khỏi file hiện tại không thu hồi các khóa đó hay xóa chúng khỏi lịch sử Git.
+>
+> **Nếu GitGuardian báo SMTP credentials đã bị đẩy lên GitHub:** thu hồi ngay Google App Password cũ tại Google Account → Security → App passwords, tạo mật khẩu ứng dụng mới, cập nhật `Smtp__Password` (và `Smtp__Username`/`Smtp__FromAddress` nếu cần) trong Render, rồi redeploy. Chỉ đánh dấu cảnh báo GitGuardian là đã xử lý sau khi khóa cũ bị thu hồi. Đổi mật khẩu/khóa không xóa bí mật khỏi lịch sử commit; việc xóa khỏi lịch sử Git cần phối hợp với cộng tác viên, làm sạch mọi nhánh/tag và force-push theo hướng dẫn GitHub Secret Scanning. Không viết lại lịch sử repo dùng chung khi chưa thống nhất với nhóm.
+>
+> Trên Render, cấu hình đủ `Cloudinary__CloudName`, `Cloudinary__ApiKey`, `Cloudinary__ApiSecret` từ Cloudinary Dashboard rồi redeploy API. Nếu thiếu cấu hình, API sẽ từ chối upload thay vì lưu một URL ảnh giả. Các hồ sơ đã lưu URL giả trước khi sửa cần tải ảnh lên lại; deploy mới không thể khôi phục các file chưa từng được upload.
+
+Tài khoản Supabase Auth cũng cần hồ sơ trong `public.profiles` với trạng thái `Active`, cờ `is_active = true`, chưa bị xóa và có role. Tài khoản thiếu hồ sơ được backfill bởi migration nhưng giữ trạng thái chờ kích hoạt; quản trị viên vẫn cần phê duyệt/kích hoạt theo quy trình.
+
+RBAC mới của ứng dụng lấy role từ `profiles.role_id` → `roles.name`. Cột `profiles.role` là enum cũ, vẫn được một số RLS policy sử dụng. Migration `00006_sync_legacy_profile_role.sql` đồng bộ hai cột để tránh policy/UI cũ và API mới diễn giải role khác nhau. Để kiểm tra các tài khoản sau khi migration chạy:
+
+```sql
+SELECT
+  p.email,
+  p.id AS profile_id,
+  u.id AS auth_user_id,
+  p.role::text AS legacy_role,
+  r.name AS rbac_role,
+  p.role_id,
+  p.status::text AS account_status,
+  p.is_active,
+  p.is_deleted
+FROM public.profiles AS p
+LEFT JOIN public.roles AS r ON r.id = p.role_id
+LEFT JOIN auth.users AS u ON u.id = p.id
+WHERE lower(p.email) IN (
+  lower('admin-email'),
+  lower('librarian-email'),
+  lower('reader-email')
+)
+ORDER BY p.email;
+```
+
+Không tự suy role Admin/Thủ thư từ tên hiển thị hoặc email. Xác nhận `rbac_role` của từng tài khoản trước; chỉ quản trị viên có thẩm quyền mới gán role đặc quyền.
+
+Nếu Supabase Auth log báo `Scan error ... "confirmation_token": converting NULL to string is unsupported`, hãy áp dụng migration `00005_repair_null_auth_confirmation_tokens.sql` lên đúng project production. Có thể sửa ngay trong Supabase SQL Editor bằng:
+
+```sql
+UPDATE auth.users
+SET confirmation_token = ''
+WHERE confirmation_token IS NULL;
+```
+
+Lệnh trên chỉ thay token `NULL` bằng chuỗi rỗng (trạng thái không có confirmation token); nó không xác minh email hay kích hoạt tài khoản. Không sửa schema của `auth.users` hoặc đặt token xác nhận tùy ý.
 
 ## 👥 Vai trò người dùng
 

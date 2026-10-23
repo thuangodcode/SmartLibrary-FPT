@@ -4,5 +4,6 @@ public enum PolicyRuleStatus
 {
     Draft = 0,
     Active = 1,
-    Inactive = 2
+    Inactive = 2,
+    PendingReview = 3
 }

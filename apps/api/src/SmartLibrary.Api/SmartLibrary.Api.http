@@ -1,6 +1,133 @@
 @SmartLibrary.Api_HostAddress = http://localhost:5278
+@adminToken = replace-with-admin-access-token
+@librarianToken = replace-with-librarian-access-token
+@librarianId = 00000000-0000-0000-0000-000000000001
+@templateId = 00000000-0000-0000-0000-000000000002
+@requestId = 00000000-0000-0000-0000-000000000003
+@reportId = 00000000-0000-0000-0000-000000000004
 
 GET {{SmartLibrary.Api_HostAddress}}/weatherforecast/
 Accept: application/json
+
+###
+
+# Admin: list all report assignments.
+GET {{SmartLibrary.Api_HostAddress}}/api/admin/reports/requests
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+###
+
+# Admin: assign an enabled template and reporting period to a specific active librarian.
+POST {{SmartLibrary.Api_HostAddress}}/api/admin/reports/requests
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "librarianId": "{{librarianId}}",
+  "templateId": "{{templateId}}",
+  "periodStart": "2026-10-01T00:00:00Z",
+  "periodEnd": "2026-11-01T00:00:00Z",
+  "name": "October activity report"
+}
+
+###
+
+# Librarian: list only requests assigned to the authenticated librarian.
+GET {{SmartLibrary.Api_HostAddress}}/api/librarian/reports/requests
+Authorization: Bearer {{librarianToken}}
+Accept: application/json
+
+###
+
+# Librarian: submit the assigned request; use the same template and period as the request.
+POST {{SmartLibrary.Api_HostAddress}}/api/librarian/reports
+Authorization: Bearer {{librarianToken}}
+Content-Type: application/json
+
+{
+  "templateId": "{{templateId}}",
+  "format": "CSV",
+  "periodStart": "2026-10-01T00:00:00Z",
+  "periodEnd": "2026-11-01T00:00:00Z",
+  "requestId": "{{requestId}}"
+}
+
+###
+
+# Admin: reject an unapproved report with a required correction reason.
+PATCH {{SmartLibrary.Api_HostAddress}}/api/admin/reports/{{reportId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "isRejected": true,
+  "comment": "Please include a breakdown by book category."
+}
+
+###
+
+# Librarian: after rejection, the request remains Pending and exposes the latest report,
+# its Rejected status, and lastReviewComment. Resubmit against the same requestId.
+POST {{SmartLibrary.Api_HostAddress}}/api/librarian/reports
+Authorization: Bearer {{librarianToken}}
+Content-Type: application/json
+
+{
+  "templateId": "{{templateId}}",
+  "format": "CSV",
+  "periodStart": "2026-10-01T00:00:00Z",
+  "periodEnd": "2026-11-01T00:00:00Z",
+  "requestId": "{{requestId}}",
+  "name": "October activity report - corrected"
+}
+
+###
+
+# Read the profile for the authenticated account (Admin, Librarian, or Reader).
+GET {{SmartLibrary.Api_HostAddress}}/api/v1/profile
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+###
+
+# Update editable profile fields. Avatar is optional; add an Avatar file part to upload one.
+PUT {{SmartLibrary.Api_HostAddress}}/api/v1/profile
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=profile-boundary
+
+--profile-boundary
+Content-Disposition: form-data; name="FullName"
+
+Admin Example
+--profile-boundary
+Content-Disposition: form-data; name="Phone"
+
++84901234567
+--profile-boundary
+Content-Disposition: form-data; name="DateOfBirth"
+
+1990-01-15
+--profile-boundary
+Content-Disposition: form-data; name="Address"
+
+Ho Chi Minh City
+--profile-boundary
+Content-Disposition: form-data; name="ClearAvatar"
+
+false
+--profile-boundary--
+
+###
+
+# Admin: approve a report. The existing optional comment continues to be recorded in Reviews.
+PATCH {{SmartLibrary.Api_HostAddress}}/api/admin/reports/{{reportId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "isApproved": true,
+  "comment": "Reviewed and approved."
+}
 
 ###

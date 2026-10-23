@@ -8,16 +8,17 @@ import { useAuthStore } from '../store/useAuthStore';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { parseApiResponse } from '../../../lib/api';
 import { API_BASE_URL } from '../../../config';
+import { useToast } from '../../../components/ui/useToast';
 
 export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const setAuth = useAuthStore((state) => state.setAuth);
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect');
 
@@ -39,7 +40,6 @@ export const LoginPage: React.FC = () => {
 
   const onSubmit = async (data: LoginInput) => {
     setIsLoading(true);
-    setErrorMessage(null);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
@@ -51,9 +51,15 @@ export const LoginPage: React.FC = () => {
         }),
       });
 
-      const resData = await parseApiResponse<{ success?: boolean; error?: string; data?: { user?: { id?: string; email?: string; fullName?: string; avatarUrl?: string | null; role?: string; status?: string; permissions?: string[] }; accessToken?: string } }>(response);
+      const resData = await parseApiResponse<{ success?: boolean; error?: string; meta?: { code?: string }; data?: { user?: { id?: string; email?: string; fullName?: string; avatarUrl?: string | null; role?: string; status?: string; permissions?: string[] }; accessToken?: string } }>(response);
       if (!response.ok || !resData?.success) {
-        setErrorMessage(resData?.error || 'Email hoặc mật khẩu không đúng. Vui lòng thử lại.');
+        const fallbackMessage = response.status === 503
+          ? 'Dịch vụ đăng nhập đang tạm thời không khả dụng. Vui lòng thử lại sau.'
+          : response.status === 429
+            ? 'Bạn đã thử đăng nhập quá nhiều lần. Vui lòng chờ rồi thử lại.'
+            : 'Email hoặc mật khẩu không đúng. Vui lòng thử lại.';
+        const message = resData?.error || fallbackMessage;
+        showToast({ type: 'error', title: 'Đăng nhập thất bại', message });
         return;
       }
 
@@ -66,7 +72,8 @@ export const LoginPage: React.FC = () => {
         user.status !== 'Active' ||
         (role !== 'Admin' && role !== 'Librarian' && role !== 'Reader')
       ) {
-        setErrorMessage('Tài khoản chưa được xác thực hoặc chưa được cấp quyền hợp lệ.');
+        const message = 'Tài khoản chưa được xác thực hoặc chưa được cấp quyền hợp lệ.';
+        showToast({ type: 'error', title: 'Không thể đăng nhập', message });
         return;
       }
 
@@ -82,6 +89,18 @@ export const LoginPage: React.FC = () => {
         accessToken,
         user?.permissions || []
       );
+      showToast({
+        type: 'success',
+        title: 'Đăng nhập thành công',
+        message: user.email?.toLowerCase().endsWith('@smartlibrary.local')
+          ? `Xin chào ${user.fullName || 'bạn'}! Bạn có thể xác minh email cá nhân trong Hồ sơ bất cứ lúc nào.`
+          : `Xin chào ${user.fullName || 'bạn'}!`,
+      });
+
+      if (role === 'Reader' && user.email?.toLowerCase().endsWith('@smartlibrary.local')) {
+        navigate('/profile');
+        return;
+      }
 
       // Role-based redirect
       if (role === 'Admin') {
@@ -92,7 +111,8 @@ export const LoginPage: React.FC = () => {
         navigate(redirect && !redirect.startsWith('/admin') && !redirect.startsWith('/librarian') ? redirect : '/');
       }
     } catch {
-      setErrorMessage('Không thể kết nối với Backend API. Vui lòng kiểm tra lại dịch vụ Backend.');
+      const message = 'Không thể kết nối với Backend API. Vui lòng kiểm tra lại dịch vụ Backend.';
+      showToast({ type: 'error', title: 'Lỗi kết nối', message });
     } finally {
       setIsLoading(false);
     }
@@ -104,12 +124,6 @@ export const LoginPage: React.FC = () => {
       title="Đăng nhập"
       subtitle="Chào mừng trở lại. Những cuốn sách hay đang chờ bạn."
     >
-      {errorMessage && (
-        <div className="auth-error" role="alert">
-          {errorMessage}
-        </div>
-      )}
-
       <form onSubmit={handleSubmit(onSubmit)} className="auth-form">
         <div className="auth-field">
           <label htmlFor="login-email" className="auth-label">Email, tên đăng nhập hoặc mã sinh viên</label>
@@ -118,7 +132,7 @@ export const LoginPage: React.FC = () => {
             type="text"
             autoComplete="username"
             {...register('email')}
-            placeholder="adminfpt hoặc email của bạn"
+            placeholder="Mã số sinh viên hoặc email của bạn"
             className="auth-input"
           />
           {errors.email && (

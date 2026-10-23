@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowUpRight, BookOpen, CheckCircle2, Clock3, LoaderCircle, Users, WalletCards } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, BookOpen, CheckCircle2, Clock3, FileCheck2, LoaderCircle, Users, WalletCards } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
@@ -16,6 +16,20 @@ interface AdminOverview {
   pendingBorrowRequests: number;
   monthlyBorrowing: Array<{ year: number; month: number; count: number }>;
   borrowStatusBreakdown: Array<{ status: string; count: number }>;
+}
+
+interface ReportList {
+  items: Array<{
+    id: string;
+    code: string;
+    name: string;
+    submitter: string;
+    createdAt: string;
+    isViewed: boolean;
+    isApproved: boolean;
+    status: string;
+  }>;
+  totalCount: number;
 }
 
 const statusLabels: Record<string, string> = {
@@ -41,6 +55,9 @@ const AdminOverviewPage: React.FC = () => {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reportList, setReportList] = useState<ReportList | null>(null);
+  const [reportsLoading, setReportsLoading] = useState(true);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -69,6 +86,45 @@ const AdminOverviewPage: React.FC = () => {
     };
 
     void loadOverview();
+    return () => controller.abort();
+  }, [accessToken]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadLatestReports = async () => {
+      if (!accessToken) {
+        setReportError('Vui lòng đăng nhập Admin để xem báo cáo.');
+        setReportsLoading(false);
+        return;
+      }
+
+      setReportsLoading(true);
+      setReportError(null);
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/admin/reports?page=1&pageSize=5&sortBy=createdAt&sortDirection=desc`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            signal: controller.signal,
+          },
+        );
+        const result = await parseApiResponse<{ success?: boolean; error?: string; data?: ReportList }>(response);
+
+        if (!response.ok || !result?.success || !result.data) {
+          throw new Error(result?.error || `Không tải được báo cáo mới nhất (HTTP ${response.status}).`);
+        }
+
+        setReportList(result.data);
+      } catch (loadError) {
+        if (controller.signal.aborted) return;
+        setReportError(loadError instanceof Error ? loadError.message : 'Không tải được báo cáo mới nhất.');
+      } finally {
+        if (!controller.signal.aborted) setReportsLoading(false);
+      }
+    };
+
+    void loadLatestReports();
     return () => controller.abort();
   }, [accessToken]);
 
@@ -217,28 +273,40 @@ const AdminOverviewPage: React.FC = () => {
             <p className="admin-panel-kicker">CẦN QUAN TÂM</p>
             <h2>Công việc cần xử lý</h2>
           </div>
-          <span className="admin-task-count">{(overview?.pendingRegistrations ?? 0) + (overview?.pendingBorrowRequests ?? 0) + (overview?.overdueLoans ?? 0)} việc</span>
+          <span className="admin-task-count">
+            {reportsLoading ? 'Đang tải' : reportError ? 'Không tải được' : `${Math.min(reportList?.totalCount ?? 0, 5)} báo cáo mới nhất`}
+          </span>
         </div>
-        <div className="admin-task-list">
-          <Link to="/librarian/registrations" className="admin-task-row">
-            <span className="admin-task-icon admin-task-orange"><Users size={17} /></span>
-            <span className="admin-task-copy"><strong>Duyệt đăng ký độc giả</strong><small>Kiểm tra hồ sơ đang chờ xét duyệt</small></span>
-            <span className="admin-task-number">{(overview?.pendingRegistrations ?? 0).toLocaleString('vi-VN')}</span>
-            <ArrowUpRight size={16} className="admin-task-arrow" />
+        {reportsLoading ? (
+          <div className="admin-report-empty"><LoaderCircle size={18} className="admin-spin" /> Đang tải báo cáo mới nhất…</div>
+        ) : reportError ? (
+          <div className="admin-report-error" role="alert"><AlertCircle size={17} />{reportError}</div>
+        ) : reportList?.items.length ? (
+          <div className="admin-report-list">
+            {reportList.items.map((report) => (
+              <Link to={`/admin/reports/${report.id}`} className="admin-report-row" key={report.id}>
+                <span className="admin-report-icon"><FileCheck2 size={19} /></span>
+                <span className="admin-report-copy">
+                  <strong>{report.name}</strong>
+                  <small>{report.code} · {report.submitter} · {new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(report.createdAt))}</small>
+                </span>
+                <span className={`admin-report-status ${report.isApproved ? 'is-approved' : 'is-pending'}`}>
+                  {report.isApproved ? <CheckCircle2 size={15} /> : <Clock3 size={15} />}
+                  {report.isApproved ? 'Đã duyệt' : 'Chưa duyệt'}
+                </span>
+                <ArrowUpRight size={17} className="admin-report-arrow" />
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="admin-report-empty">Chưa có báo cáo nào được Thủ thư gửi.</div>
+        )}
+        {reportList && reportList.totalCount > reportList.items.length && (
+          <Link to="/admin/reports" className="admin-report-view-all">
+            Xem tất cả {reportList.totalCount.toLocaleString('vi-VN')} báo cáo
+            <ArrowUpRight size={15} />
           </Link>
-          <div className="admin-task-row">
-            <span className="admin-task-icon admin-task-blue"><BookOpen size={17} /></span>
-            <span className="admin-task-copy"><strong>Xác nhận yêu cầu mượn</strong><small>Các yêu cầu đang chờ được xử lý</small></span>
-            <span className="admin-task-number">{(overview?.pendingBorrowRequests ?? 0).toLocaleString('vi-VN')}</span>
-            <span className="admin-task-status"><Clock3 size={15} /> Cần xử lý</span>
-          </div>
-          <div className="admin-task-row">
-            <span className="admin-task-icon admin-task-red"><AlertCircle size={17} /></span>
-            <span className="admin-task-copy"><strong>Theo dõi sách quá hạn</strong><small>Liên hệ độc giả và cập nhật tình trạng trả</small></span>
-            <span className="admin-task-number">{(overview?.overdueLoans ?? 0).toLocaleString('vi-VN')}</span>
-            <span className="admin-task-status"><CheckCircle2 size={15} /> Theo dõi</span>
-          </div>
-        </div>
+        )}
       </section>
     </div>
   );

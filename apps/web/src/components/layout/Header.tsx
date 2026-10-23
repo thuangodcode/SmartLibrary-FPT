@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Sparkles, Sun, Moon, Bell, Menu, X, ChevronDown, BookOpen, LogOut, User as UserIcon, Settings } from 'lucide-react';
 import { useAuthStore } from '../../features/auth/store/useAuthStore';
+import { useToast } from '../ui/useToast';
 
 interface CategoryNav {
   id: string;
@@ -18,6 +19,7 @@ export const Header: React.FC = () => {
   const [categories, setCategories] = useState<CategoryNav[]>([]);
 
   const { user, isAuthenticated, logout } = useAuthStore();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -58,15 +60,17 @@ export const Header: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    const token = useAuthStore.getState().accessToken;
+    logout();
+    showToast({ type: 'success', title: 'Đăng xuất thành công', message: 'Bạn đã đăng xuất khỏi SmartLibrary.' });
+    navigate('/login');
+
     try {
-      const token = useAuthStore.getState().accessToken;
       await fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/logout`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
     } catch { /* ignore */ }
-    logout();
-    navigate('/login');
   };
 
   const getInitials = (name: string) => {
@@ -197,9 +201,9 @@ export const Header: React.FC = () => {
                       <p className="text-xs font-bold text-slate-900 dark:text-white">{user.fullName}</p>
                       <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
                     </div>
-                    <a href="/profile" className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Link to="/profile" className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">
                       <UserIcon className="w-4 h-4" /> Hồ sơ cá nhân
-                    </a>
+                    </Link>
                     <a href="/settings" className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">
                       <Settings className="w-4 h-4" /> Cài đặt
                     </a>

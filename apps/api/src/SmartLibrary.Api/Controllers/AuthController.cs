@@ -53,9 +53,15 @@ public class AuthController : ControllerBase
         if (!result.IsSuccess)
         {
             if (result.ErrorCode == "AUTH_SERVICE_UNAVAILABLE")
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse<object>.Fail(result.ErrorMessage ?? "Dịch vụ xác thực tạm thời không khả dụng."));
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, AuthFailure(result));
+            if (result.ErrorCode == "AUTH_PROFILE_SERVICE_UNAVAILABLE")
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, AuthFailure(result));
+            if (result.ErrorCode == "AUTH_RATE_LIMITED")
+                return StatusCode(StatusCodes.Status429TooManyRequests, AuthFailure(result));
+            if (result.ErrorCode is "AUTH_PROFILE_MISSING" or "AUTH_ACCOUNT_NOT_ACTIVE" or "AUTH_ACCOUNT_SUSPENDED" or "AUTH_ROLE_MISSING")
+                return StatusCode(StatusCodes.Status403Forbidden, AuthFailure(result));
 
-            return Unauthorized(ApiResponse<object>.Fail(result.ErrorMessage ?? "Đăng nhập thất bại."));
+            return Unauthorized(AuthFailure(result));
         }
 
         var isMobile = Request.Headers["X-Client-Type"] == "mobile";
@@ -77,7 +83,15 @@ public class AuthController : ControllerBase
             userProfile = await _identityProvider.GetUserProfileWithPermissionsAsync(result.UserId);
         }
         if (userProfile is null)
-            return Unauthorized(ApiResponse<object>.Fail("Tài khoản không hoạt động hoặc chưa được cấp quyền truy cập."));
+        {
+            _logger.LogError("Authentication succeeded for user {UserId}, but the application profile could not be loaded.", result.UserId);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new ApiResponse<object>
+            {
+                Success = false,
+                Error = "Đã xác thực được tài khoản nhưng tạm thời không đọc được hồ sơ thư viện. Vui lòng thử lại.",
+                Meta = new { code = "AUTH_PROFILE_SERVICE_UNAVAILABLE" }
+            });
+        }
 
         var responseData = new
         {
@@ -89,6 +103,14 @@ public class AuthController : ControllerBase
 
         return Ok(ApiResponse<object>.Ok(responseData));
     }
+
+    private static ApiResponse<object> AuthFailure(AuthResult result) =>
+        new()
+        {
+            Success = false,
+            Error = result.ErrorMessage ?? "Đăng nhập thất bại.",
+            Meta = new { code = result.ErrorCode }
+        };
 
     [Authorize]
     [HttpGet("me")]
@@ -166,20 +188,32 @@ public class AuthController : ControllerBase
     /// Gửi email quên mật khẩu
     /// </summary>
     [HttpPost("forgot-password")]
-    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken ct)
     {
-        await _identityProvider.SendPasswordResetEmailAsync(request.Email);
-        return Ok(ApiResponse<object>.Ok(true, new { message = "Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi." }));
+        var origin = Request.Headers["Origin"].ToString();
+        if (string.IsNullOrWhiteSpace(origin))
+            origin = Request.Headers["Referer"].ToString();
+
+        var result = await _authOtpService.SendPasswordResetOtpAsync(request.Email, origin, ct);
+        if (!result.IsSuccess)
+            return BadRequest(ApiResponse<object>.Fail(result.Error!));
+
+        return Ok(ApiResponse<object>.Ok(true, new { message = "Nếu email tồn tại trong hệ thống, hướng dẫn và mã xác thực đặt lại mật khẩu đã được gửi đến hộp thư của bạn." }));
     }
 
     /// <summary>
-    /// Đặt lại mật khẩu mới bằng token
+    /// Đặt lại mật khẩu mới bằng token hoặc mã OTP
     /// </summary>
     [HttpPost("reset-password")]
-    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken ct)
     {
-        await _identityProvider.ResetPasswordAsync(request.Token, request.NewPassword);
-        return Ok(ApiResponse<object>.Ok(true, new { message = "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại." }));
+        var result = await _authOtpService.ResetPasswordWithOtpOrTokenAsync(
+            request.Email, request.Token, request.Otp, request.NewPassword, ct);
+
+        if (!result.IsSuccess)
+            return BadRequest(ApiResponse<object>.Fail(result.Error!));
+
+        return Ok(ApiResponse<object>.Ok(true, new { message = "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại bằng mật khẩu mới." }));
     }
 
     /// <summary>
@@ -195,8 +229,7 @@ public class AuthController : ControllerBase
         return Ok(ApiResponse<object>.Ok(new
         {
             message = result.Data!.Message,
-            email = result.Data.Email,
-            otp = result.Data.Otp
+            email = result.Data.Email
         }));
     }
 
@@ -250,7 +283,7 @@ public class AuthController : ControllerBase
 
     public record RefreshRequest(string? RefreshToken);
     public record ForgotPasswordRequest(string Email);
-    public record ResetPasswordRequest(string Token, string NewPassword);
+    public record ResetPasswordRequest(string? Email, string? Token, string? Otp, string NewPassword);
     public record SendOtpRequest(string Email, string? FullName);
     public record VerifyOtpRequest(string Email, string Otp);
 }

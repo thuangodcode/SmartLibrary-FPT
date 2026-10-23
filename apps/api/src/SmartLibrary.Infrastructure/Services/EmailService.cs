@@ -22,7 +22,48 @@ public class EmailService : IEmailService
 
     public async Task<bool> SendEmailAsync(string to, string subject, string body, CancellationToken ct = default)
     {
-        // 1. Prioritize Resend API (HTTPS port 443 - works everywhere including Render/AWS)
+        // 1. Prioritize Brevo API (HTTPS port 443 - works everywhere including Render/AWS, sends to any recipient)
+        var brevoApiKey = _configuration["Brevo:ApiKey"];
+        if (!string.IsNullOrWhiteSpace(brevoApiKey))
+        {
+            try
+            {
+                var senderEmail = _configuration["Brevo:SenderEmail"] ?? _configuration["Smtp:FromAddress"] ?? "120304thuan@gmail.com";
+                var senderName = _configuration["Brevo:SenderName"] ?? _configuration["Smtp:FromName"] ?? "SmartLibrary FPT";
+
+                var brevoHtml = body.Contains("<div", StringComparison.OrdinalIgnoreCase) || body.Contains("<html", StringComparison.OrdinalIgnoreCase)
+                    ? body
+                    : $"<div style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding: 24px; max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0;'><div style='text-align: center; margin-bottom: 20px;'><h1 style='color: #4f46e5; margin: 0; font-size: 22px;'>SmartLibrary - Đại học FPT</h1></div><div style='font-size: 15px; color: #1e293b; line-height: 1.6;'>{body}</div><hr style='border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;' /><p style='font-size: 12px; color: #64748b; text-align: center; margin: 0;'>Hệ thống Quản lý Thư viện Thông minh SmartLibrary &copy; 2026</p></div>";
+
+                var payload = new
+                {
+                    sender = new { name = senderName, email = senderEmail },
+                    to = new[] { new { email = to } },
+                    subject = subject,
+                    htmlContent = brevoHtml
+                };
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.brevo.com/v3/smtp/email");
+                request.Headers.Add("api-key", brevoApiKey.Trim());
+                request.Content = JsonContent.Create(payload);
+
+                var response = await _httpClient.SendAsync(request, ct);
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("Brevo email delivered successfully to {To}: {Subject}", to, subject);
+                    return true;
+                }
+
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                _logger.LogError("Brevo email failed: HTTP {StatusCode} - {Error}", response.StatusCode, errorBody);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception while sending email via Brevo API to {To}", to);
+            }
+        }
+
+        // 2. Resend API (HTTPS port 443)
         var resendApiKey = _configuration["Resend:ApiKey"];
         if (!string.IsNullOrWhiteSpace(resendApiKey))
         {
@@ -44,12 +85,16 @@ public class EmailService : IEmailService
             try
             {
                 var from = _configuration["Resend:From"] ?? "SmartLibrary <onboarding@resend.dev>";
+                var resendHtml = body.Contains("<div", StringComparison.OrdinalIgnoreCase) || body.Contains("<html", StringComparison.OrdinalIgnoreCase)
+                    ? body
+                    : $"<div style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding: 24px; max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0;'><div style='text-align: center; margin-bottom: 20px;'><h1 style='color: #4f46e5; margin: 0; font-size: 22px;'>SmartLibrary - Đại học FPT</h1></div><div style='font-size: 15px; color: #1e293b; line-height: 1.6;'>{body}</div><hr style='border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;' /><p style='font-size: 12px; color: #64748b; text-align: center; margin: 0;'>Hệ thống Quản lý Thư viện Thông minh SmartLibrary &copy; 2026</p></div>";
+
                 var payload = new
                 {
                     from = from,
                     to = new[] { to },
                     subject = subject,
-                    html = $"<div style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding: 24px; max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0;'><div style='text-align: center; margin-bottom: 20px;'><h1 style='color: #4f46e5; margin: 0; font-size: 22px;'>SmartLibrary - Đại học FPT</h1></div><div style='font-size: 15px; color: #1e293b; line-height: 1.6;'>{body}</div><hr style='border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;' /><p style='font-size: 12px; color: #64748b; text-align: center; margin: 0;'>Hệ thống Quản lý Thư viện Thông minh SmartLibrary &copy; 2026</p></div>"
+                    html = resendHtml
                 };
 
                 using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.resend.com/emails");
@@ -92,14 +137,18 @@ public class EmailService : IEmailService
 
         try
         {
+            var htmlBody = body.Contains("<div", StringComparison.OrdinalIgnoreCase) || body.Contains("<html", StringComparison.OrdinalIgnoreCase)
+                ? body
+                : $"<div style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding: 24px; max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0;'><div style='text-align: center; margin-bottom: 20px;'><h1 style='color: #4f46e5; margin: 0; font-size: 22px;'>SmartLibrary - Đại học FPT</h1></div><div style='font-size: 15px; color: #1e293b; line-height: 1.6;'>{body}</div><hr style='border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;' /><p style='font-size: 12px; color: #64748b; text-align: center; margin: 0;'>Hệ thống Quản lý Thư viện Thông minh SmartLibrary &copy; 2026</p></div>";
+
             using var message = new MailMessage
             {
                 From = new MailAddress(fromAddress, fromName),
                 Subject = subject,
-                Body = body,
+                Body = htmlBody,
                 SubjectEncoding = System.Text.Encoding.UTF8,
                 BodyEncoding = System.Text.Encoding.UTF8,
-                IsBodyHtml = false
+                IsBodyHtml = true
             };
             message.To.Add(new MailAddress(to));
 
@@ -108,7 +157,7 @@ public class EmailService : IEmailService
                 EnableSsl = enableSsl,
                 UseDefaultCredentials = false,
                 Credentials = new NetworkCredential(username, password),
-                Timeout = 10000
+                Timeout = 15000
             };
 
             await client.SendMailAsync(message, ct);

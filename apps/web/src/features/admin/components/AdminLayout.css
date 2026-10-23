@@ -3,7 +3,16 @@
   display: flex;
   color: #172033;
   background: #f7f8fc;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Be Vietnam Pro", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.admin-shell h1,
+.admin-shell h2,
+.admin-shell h3,
+.admin-shell h4,
+.admin-shell h5,
+.admin-shell h6 {
+  font-family: "Be Vietnam Pro", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 /* —— Desktop rail: collapsed by default, expands on hover / touch toggle —— */
@@ -176,6 +185,12 @@
   margin-top: 10px;
 }
 
+.admin-nav-group {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
 .admin-nav-link {
   position: relative;
   min-height: 46px;
@@ -193,10 +208,35 @@
   transition: background-color .16s ease, color .16s ease;
 }
 
+.admin-nav-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
 .admin-sidebar--collapsed .admin-nav-link {
   justify-content: center;
   padding: 0;
   gap: 0;
+}
+
+.admin-nav-chevron {
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: transform .16s ease;
+}
+
+.admin-nav-chevron-open {
+  transform: rotate(180deg);
+}
+
+.admin-sidebar--collapsed .admin-nav-chevron {
+  display: none;
 }
 
 .admin-nav-icon {
@@ -225,6 +265,42 @@
 .admin-nav-link-active {
   color: #e86b24;
   background: #fff1e8;
+}
+
+.admin-subnavigation {
+  display: none;
+  gap: 3px;
+  padding-left: 12px;
+}
+
+.admin-subnavigation-open {
+  display: grid;
+}
+
+.admin-subnav-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: #778196;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color .16s ease, color .16s ease;
+}
+
+.admin-subnav-icon {
+  flex-shrink: 0;
+}
+
+.admin-subnav-link:hover,
+.admin-subnav-link-active {
+  color: #e86b24;
+  background: #fff6f0;
 }
 
 /* Tooltip when rail is collapsed */
@@ -357,27 +433,10 @@
   height: 76px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 0 34px;
   border-bottom: 1px solid #e9ecf3;
   background: #fff;
-}
-
-.admin-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #9aa1af;
-  font-size: 12px;
-}
-
-.admin-breadcrumb strong {
-  color: #30394b;
-  font-weight: 650;
-}
-
-.admin-breadcrumb-separator {
-  color: #c1c6d0;
 }
 
 .admin-topbar-actions,
@@ -416,6 +475,8 @@
 
 .admin-profile {
   gap: 10px;
+  color: inherit;
+  text-decoration: none;
 }
 
 .admin-avatar {
@@ -428,6 +489,14 @@
   background: #e8783e;
   font-size: 14px;
   font-weight: 700;
+}
+
+.admin-avatar-image {
+  object-fit: cover;
+}
+
+.admin-profile:hover .admin-profile-copy strong {
+  color: #d95f27;
 }
 
 .admin-profile-copy strong,
@@ -517,6 +586,19 @@
   .admin-sidebar--expanded .admin-nav-link {
     padding: 0 13px;
     gap: 12px;
+  }
+
+  .admin-sidebar--collapsed .admin-nav-chevron {
+    display: block;
+  }
+
+  .admin-sidebar--collapsed .admin-subnavigation {
+    padding-left: 12px;
+  }
+
+  .admin-subnav-link {
+    min-height: 40px;
+    padding: 0 10px;
   }
 
   .admin-sidebar--collapsed .admin-logout-button {

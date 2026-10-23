@@ -9,5 +9,5 @@ public class PolicyRuleTarget : BaseEntity
     public string TargetValue { get; set; } = string.Empty;
     public string? TargetLabel { get; set; }
 
-    public PolicyRule PolicyRule { get; set; } = null!;
+    public PolicyRule? PolicyRule { get; set; }
 }

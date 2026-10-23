@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Policies;
 using SmartLibrary.Application.Features.Policies.DTOs;
+using SmartLibrary.Domain.Enums;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -27,16 +28,17 @@ public class PolicyRulesController : ControllerBase
         [FromQuery] int pageSize = 10,
         CancellationToken ct = default)
     {
-        var result = await _policyRuleService.GetPagedAsync(search, type, status, page, pageSize, ct);
+        var result = await _policyRuleService.GetPagedAsync(
+            search, type, status, page, pageSize, PolicyRuleKinds.PolicyTypes, ct);
         return Ok(ApiResponse<PolicyRuleListResultDto>.Ok(result));
     }
 
-    [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken ct = default)
+    [HttpGet("{key}")]
+    public async Task<IActionResult> GetByKey(string key, CancellationToken ct = default)
     {
-        var result = await _policyRuleService.GetByIdAsync(id, ct);
-        if (!result.IsSuccess)
-            return NotFound(ApiResponse<object>.Fail(result.Error!));
+        var result = await _policyRuleService.GetByKeyAsync(key, ct);
+        if (!result.IsSuccess || !PolicyRuleKinds.IsPolicy(result.Data!.PolicyType))
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy chính sách."));
 
         return Ok(ApiResponse<PolicyRuleDetailDto>.Ok(result.Data!));
     }
@@ -47,6 +49,9 @@ public class PolicyRulesController : ControllerBase
         if (!TryGetCurrentUserId(out var actorId))
             return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản Admin."));
 
+        if (!TryEnsurePolicyType(request.PolicyType, out var typeError))
+            return BadRequest(ApiResponse<object>.Fail(typeError));
+
         var result = await _policyRuleService.CreateAsync(request, actorId, ct);
         if (!result.IsSuccess)
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
@@ -54,13 +59,19 @@ public class PolicyRulesController : ControllerBase
         return Ok(ApiResponse<PolicyRuleDetailDto>.Ok(result.Data!, new { message = "Tạo chính sách thành công." }));
     }
 
-    [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpsertPolicyRuleRequest request, CancellationToken ct = default)
+    [HttpPut("{key}")]
+    public async Task<IActionResult> Update(string key, [FromBody] UpsertPolicyRuleRequest request, CancellationToken ct = default)
     {
         if (!TryGetCurrentUserId(out var actorId))
             return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản Admin."));
 
-        var result = await _policyRuleService.UpdateAsync(id, request, actorId, ct);
+        var existing = await _policyRuleService.GetByKeyAsync(key, ct);
+        if (!existing.IsSuccess || !PolicyRuleKinds.IsPolicy(existing.Data!.PolicyType))
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy chính sách."));
+        if (!TryEnsurePolicyType(request.PolicyType, out var typeError))
+            return BadRequest(ApiResponse<object>.Fail(typeError));
+
+        var result = await _policyRuleService.UpdateAsync(key, request, actorId, ct);
         if (!result.IsSuccess)
         {
             if (result.Error!.Contains("không tìm thấy", StringComparison.OrdinalIgnoreCase))
@@ -71,16 +82,20 @@ public class PolicyRulesController : ControllerBase
         return Ok(ApiResponse<PolicyRuleDetailDto>.Ok(result.Data!, new { message = "Cập nhật chính sách thành công." }));
     }
 
-    [HttpPut("{id:guid}/status")]
+    [HttpPut("{key}/status")]
     public async Task<IActionResult> UpdateStatus(
-        Guid id,
+        string key,
         [FromBody] UpdatePolicyStatusRequest request,
         CancellationToken ct = default)
     {
         if (!TryGetCurrentUserId(out var actorId))
             return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản Admin."));
 
-        var result = await _policyRuleService.UpdateStatusAsync(id, request, actorId, ct);
+        var existing = await _policyRuleService.GetByKeyAsync(key, ct);
+        if (!existing.IsSuccess || !PolicyRuleKinds.IsPolicy(existing.Data!.PolicyType))
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy chính sách."));
+
+        var result = await _policyRuleService.UpdateStatusAsync(key, request, actorId, ct);
         if (!result.IsSuccess)
         {
             if (result.Error!.Contains("không tìm thấy", StringComparison.OrdinalIgnoreCase))
@@ -89,6 +104,38 @@ public class PolicyRulesController : ControllerBase
         }
 
         return Ok(ApiResponse<PolicyRuleDetailDto>.Ok(result.Data!, new { message = "Cập nhật trạng thái thành công." }));
+    }
+
+    [HttpDelete("{key}")]
+    public async Task<IActionResult> Delete(string key, CancellationToken ct = default)
+    {
+        if (!TryGetCurrentUserId(out var actorId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản Admin."));
+
+        var existing = await _policyRuleService.GetByKeyAsync(key, ct);
+        if (!existing.IsSuccess || !PolicyRuleKinds.IsPolicy(existing.Data!.PolicyType))
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy chính sách."));
+
+        var result = await _policyRuleService.DeleteAsync(key, actorId, ct);
+        if (!result.IsSuccess)
+        {
+            if (result.Error!.Contains("không tìm thấy", StringComparison.OrdinalIgnoreCase))
+                return NotFound(ApiResponse<object>.Fail(result.Error));
+            return BadRequest(ApiResponse<object>.Fail(result.Error));
+        }
+
+        return Ok(ApiResponse<bool>.Ok(true, new { message = "Đã xóa chính sách." }));
+    }
+
+    private static bool TryEnsurePolicyType(string? policyType, out string error)
+    {
+        error = "Loại chính sách không hợp lệ.";
+        if (string.IsNullOrWhiteSpace(policyType)
+            || !Enum.TryParse<PolicyRuleType>(policyType, true, out var parsed)
+            || !PolicyRuleKinds.IsPolicy(parsed))
+            return false;
+        error = string.Empty;
+        return true;
     }
 
     private bool TryGetCurrentUserId(out Guid userId)

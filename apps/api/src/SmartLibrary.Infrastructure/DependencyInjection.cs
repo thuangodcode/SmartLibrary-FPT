@@ -5,6 +5,8 @@ using SmartLibrary.Application.Features.Books;
 using SmartLibrary.Application.Features.Categories;
 using SmartLibrary.Application.Features.Statistics;
 using SmartLibrary.Application.Features.Policies;
+using SmartLibrary.Application.Features.Circulation;
+using SmartLibrary.Application.Features.Reports;
 using SmartLibrary.Application.Features.Users;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Infrastructure.Persistence;
@@ -37,6 +39,8 @@ public static class DependencyInjection
         services.AddScoped<IDashboardRepository, DashboardRepository>();
         services.AddScoped<IReaderRepository, ReaderRepository>();
         services.AddScoped<IPolicyRuleRepository, PolicyRuleRepository>();
+        services.AddScoped<IReportRepository, ReportRepository>();
+        services.AddScoped<ICirculationRepository, CirculationRepository>();
 
         // Services
         services.AddScoped<IAiEmbeddingService, AiEmbeddingService>();
@@ -44,6 +48,7 @@ public static class DependencyInjection
         services.AddHttpClient<IEmailService, EmailService>();
         services.AddHttpClient();
         services.AddScoped<IAdminUserManagementService, AdminUserManagementService>();
+        services.AddScoped<IUserProfileService, UserProfileService>();
         services.AddScoped<IStorageService, StorageService>();
         services.AddScoped<IReportExportService, ReportExportService>();
 

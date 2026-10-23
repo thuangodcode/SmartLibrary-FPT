@@ -8,6 +8,7 @@ public interface IIdentityProvider
     Task<AuthResult> LoginWithEmailPasswordAsync(string email, string password);
     Task<AuthResult> RefreshTokenAsync(string refreshToken);
     Task LogoutAsync(string accessToken);
+    Task UpdateEmailAsync(string userId, string email, CancellationToken cancellationToken);
     Task SendPasswordResetEmailAsync(string email);
     Task ResetPasswordAsync(string token, string newPassword);
     Task ChangePasswordAsync(string userId, string currentPassword, string newPassword);

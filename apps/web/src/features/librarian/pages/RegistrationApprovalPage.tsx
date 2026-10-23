@@ -49,12 +49,10 @@ interface ImportResult {
   totalRows: number;
   successRows: number;
   failedRows: number;
-  notificationFailureCount: number;
   results: Array<{
     row: number;
-    email: string;
+    identifier: string;
     success: boolean;
-    passwordSetupEmailSent: boolean;
     message?: string | null;
   }>;
 }
@@ -128,6 +126,7 @@ export const RegistrationApprovalPage: React.FC = () => {
 
   // Lightbox for document inspection
   const [lightboxImg, setLightboxImg] = useState<{ src: string; caption: string } | null>(null);
+  const [failedImageUrls, setFailedImageUrls] = useState<Set<string>>(() => new Set());
 
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
 
@@ -254,7 +253,7 @@ export const RegistrationApprovalPage: React.FC = () => {
 
       setImportResult(result.data);
       setImportFile(null);
-      showToast(`Đã nhập thành công ${result.data.successRows}/${result.data.totalRows} độc giả!`);
+      showToast(`Đã tạo ${result.data.successRows}/${result.data.totalRows} tài khoản độc giả!`);
       await fetchRegistrations();
     } catch (importError) {
       showToast(importError instanceof Error ? importError.message : 'Không thể nhập tệp CSV.', 'error');
@@ -265,12 +264,11 @@ export const RegistrationApprovalPage: React.FC = () => {
 
   const downloadTemplate = () => {
     const csvContent =
-      'fullName,email,studentId,phone,readerType,address,dateOfBirth\n' +
-      'Nguyen Van A,anguyen@fpt.edu.vn,SE123456,0987654321,Student,Ha Noi,2002-01-15\n' +
-      'Tran Thi B,btran@fpt.edu.vn,,0912345678,Lecturer,TP HCM,1988-06-20\n' +
-      'Le Van C,cle@gmail.com,,0909090909,External,Da Nang,1995-12-10\n';
+      'fullName,studentId,dateOfBirth,phone,address\n' +
+      'Nguyen Van A,SE180001,2002-01-15,0901234567,TP HCM\n' +
+      'Tran Thi B,SE180002,2002-06-20,0912345678,TP HCM\n';
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF', csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -298,6 +296,9 @@ export const RegistrationApprovalPage: React.FC = () => {
   }, [registrations, filter, search]);
 
   const selected = registrations.find((r) => r.id === selectedId);
+  const markImageFailed = (url: string) => {
+    setFailedImageUrls((previous) => new Set(previous).add(url));
+  };
 
   // Metrics
   const stats = useMemo(() => {
@@ -674,11 +675,12 @@ export const RegistrationApprovalPage: React.FC = () => {
                   <div className="reg-doc-frame-box">
                     <p className="reg-doc-frame-label">MẶT TRƯỚC GIẤY TỜ</p>
                     <div className="reg-doc-preview">
-                      {selected.frontDocUrl ? (
+                      {selected.frontDocUrl && !failedImageUrls.has(selected.frontDocUrl) ? (
                         <>
                           <img
                             src={selected.frontDocUrl}
                             alt="Mặt trước"
+                            onError={() => markImageFailed(selected.frontDocUrl!)}
                             onClick={() =>
                               setLightboxImg({ src: selected.frontDocUrl!, caption: 'Mặt trước giấy tờ tùy thân' })
                             }
@@ -688,6 +690,8 @@ export const RegistrationApprovalPage: React.FC = () => {
                             <span>Phóng to</span>
                           </div>
                         </>
+                      ) : selected.frontDocUrl ? (
+                        <span className="reg-doc-empty-note">Ảnh không tải được. Kiểm tra lại cấu hình Cloudinary hoặc đường dẫn ảnh.</span>
                       ) : (
                         <span className="reg-doc-empty-note">Không có ảnh</span>
                       )}
@@ -698,11 +702,12 @@ export const RegistrationApprovalPage: React.FC = () => {
                   <div className="reg-doc-frame-box">
                     <p className="reg-doc-frame-label">MẶT SAU GIẤY TỜ</p>
                     <div className="reg-doc-preview">
-                      {selected.backDocUrl ? (
+                      {selected.backDocUrl && !failedImageUrls.has(selected.backDocUrl) ? (
                         <>
                           <img
                             src={selected.backDocUrl}
                             alt="Mặt sau"
+                            onError={() => markImageFailed(selected.backDocUrl!)}
                             onClick={() =>
                               setLightboxImg({ src: selected.backDocUrl!, caption: 'Mặt sau giấy tờ tùy thân' })
                             }
@@ -712,6 +717,8 @@ export const RegistrationApprovalPage: React.FC = () => {
                             <span>Phóng to</span>
                           </div>
                         </>
+                      ) : selected.backDocUrl ? (
+                        <span className="reg-doc-empty-note">Ảnh không tải được. Kiểm tra lại cấu hình Cloudinary hoặc đường dẫn ảnh.</span>
                       ) : (
                         <span className="reg-doc-empty-note">Không có ảnh</span>
                       )}
@@ -722,11 +729,12 @@ export const RegistrationApprovalPage: React.FC = () => {
                   <div className="reg-doc-frame-box">
                     <p className="reg-doc-frame-label">ẢNH CHÂN DUNG / SELFIE</p>
                     <div className="reg-doc-preview">
-                      {selected.selfieUrl ? (
+                      {selected.selfieUrl && !failedImageUrls.has(selected.selfieUrl) ? (
                         <>
                           <img
                             src={selected.selfieUrl}
                             alt="Chân dung selfie"
+                            onError={() => markImageFailed(selected.selfieUrl!)}
                             onClick={() =>
                               setLightboxImg({ src: selected.selfieUrl!, caption: 'Ảnh chụp chân dung đối chiếu' })
                             }
@@ -736,6 +744,8 @@ export const RegistrationApprovalPage: React.FC = () => {
                             <span>Phóng to</span>
                           </div>
                         </>
+                      ) : selected.selfieUrl ? (
+                        <span className="reg-doc-empty-note">Ảnh không tải được. Kiểm tra lại cấu hình Cloudinary hoặc đường dẫn ảnh.</span>
                       ) : (
                         <span className="reg-doc-empty-note">Không có ảnh</span>
                       )}
@@ -783,7 +793,7 @@ export const RegistrationApprovalPage: React.FC = () => {
                 </span>
                 <div>
                   <h2 id="reg-import-title">Nhập danh sách độc giả</h2>
-                  <p>Tải lên tệp CSV tối đa 2 MB, không quá 1.000 dòng.</p>
+                  <p>Tải lên CSV hoặc Excel (.xlsx), tối đa 2 MB và 1.000 sinh viên.</p>
                 </div>
               </div>
               <button aria-label="Đóng" disabled={importBusy} onClick={() => setShowImportDialog(false)} type="button">
@@ -791,39 +801,52 @@ export const RegistrationApprovalPage: React.FC = () => {
               </button>
             </header>
             <button className="reg-template-link" onClick={downloadTemplate} type="button">
-              <Download size={15} /> Tải tệp CSV mẫu
+              <Download size={15} /> Tải tệp mẫu CSV (mở được bằng Excel)
             </button>
             <form onSubmit={handleImport}>
               <label className="reg-file-picker">
                 <Upload size={22} />
-                <strong>{importFile?.name ?? 'Chọn tệp CSV để tải lên'}</strong>
-                <span>CSV · Tối đa 2 MB</span>
+                <strong>{importFile?.name ?? 'Chọn tệp CSV hoặc Excel để tải lên'}</strong>
+                <span>CSV, Excel (.xlsx) · Tối đa 2 MB</span>
                 <input
-                  accept=".csv,text/csv"
+                    accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                   disabled={importBusy}
                   onChange={(event) => {
-                    setImportFile(event.target.files?.[0] ?? null);
-                    setImportResult(null);
-                  }}
+                      const selectedFile = event.target.files?.[0] ?? null;
+                      const extension = selectedFile?.name.split('.').pop()?.toLowerCase();
+                      if (selectedFile && selectedFile.size > 2 * 1024 * 1024) {
+                        setImportFile(null);
+                        event.target.value = '';
+                        showToast('Kích thước tệp không được vượt quá 2 MB.', 'error');
+                        return;
+                      }
+                      if (selectedFile && extension !== 'csv' && extension !== 'xlsx') {
+                        setImportFile(null);
+                        event.target.value = '';
+                        showToast('Chỉ hỗ trợ tệp CSV hoặc Excel (.xlsx).', 'error');
+                        return;
+                      }
+                      setImportFile(selectedFile);
+                      setImportResult(null);
+                    }}
                   type="file"
                 />
               </label>
               <p className="reg-field-hint">
-                Cột bắt buộc: fullName, email. Tùy chọn: studentId, phone, readerType (Student/Lecturer/External), address, dateOfBirth.
-              </p>
+                  Cột bắt buộc: MSSV (studentId), họ tên (fullName), số điện thoại (phone). Ngày sinh và địa chỉ là tùy chọn.
+                  Tài khoản đăng nhập bằng MSSV; mật khẩu ban đầu là đúng số điện thoại trong tệp. Không gửi email khi nhập.
+                  Sinh viên có thể thêm và xác minh email cá nhân sau trong Hồ sơ. Đặt số điện thoại ở dạng văn bản để giữ số 0 ở đầu.
+                </p>
               {importResult && (
                 <div className="reg-import-summary" role="status">
                   <strong>
                     Đã xử lý {importResult.totalRows} dòng: {importResult.successRows} tạo thành công, {importResult.failedRows} thất bại.
                   </strong>
-                  {importResult.notificationFailureCount > 0 && (
-                    <span>{importResult.notificationFailureCount} người dùng chưa nhận được email tạo mật khẩu.</span>
-                  )}
                   {importResult.results
-                    .filter((item) => !item.success || !item.passwordSetupEmailSent)
+                    .filter((item) => !item.success)
                     .map((item) => (
-                      <span className="reg-import-issue" key={`${item.row}-${item.email}`}>
-                        Dòng {item.row} · {item.email}: {item.message || 'Không gửi được email đặt mật khẩu.'}
+                      <span className="reg-import-issue" key={`${item.row}-${item.identifier}`}>
+                        Dòng {item.row} · {item.identifier || 'Không có MSSV'}: {item.message || 'Không thể tạo tài khoản.'}
                       </span>
                     ))}
                 </div>

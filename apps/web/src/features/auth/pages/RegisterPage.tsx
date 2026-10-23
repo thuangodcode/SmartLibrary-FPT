@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Mail, Lock, User as UserIcon, ArrowRight, Check, Phone, MapPin, Calendar, UploadCloud, FileText, Loader2, Sparkles, RotateCcw } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, ArrowRight, Check, Phone, MapPin, Calendar, UploadCloud, FileText, Loader2, RotateCcw } from 'lucide-react';
 import { AuthLayout } from '../components/AuthLayout';
-import { ToastNotification } from '../../../components/ui/ToastNotification';
+import { useToast } from '../../../components/ui/useToast';
 import { registerSchema, type RegisterInput } from '../schemas/authSchemas';
 import { DocumentUploader } from '../components/DocumentUploader';
 import { parseApiResponse } from '../../../lib/api';
@@ -14,14 +14,13 @@ import { API_BASE_URL } from '../../../config';
 export const RegisterPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [toast, setToast] = useState<{ id: string; type: 'success' | 'error' | 'info'; title: string; message: string } | null>(null);
+  const { showToast } = useToast();
 
   // Stored form data from Step 1
   const [savedInfo, setSavedInfo] = useState<RegisterInput | null>(null);
 
   // Step 2: OTP State
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
-  const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
   const [resendCountdown, setResendCountdown] = useState<number>(0);
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -51,7 +50,6 @@ export const RegisterPage: React.FC = () => {
   // Step 1: Submit info and send OTP to real email / backend
   const onSubmitInfo = async (data: RegisterInput) => {
     setIsLoading(true);
-    setToast(null);
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/send-otp`, {
         method: 'POST',
@@ -66,20 +64,15 @@ export const RegisterPage: React.FC = () => {
       }
 
       setSavedInfo(data);
-      if (resJson.data?.otp) {
-        setDevOtpHint(resJson.data.otp);
-      }
       setResendCountdown(60);
       setStep(2); // Go to Email Verification
-      setToast({
-        id: 'toast-otp-success',
+      showToast({
         type: 'success',
         title: 'Đã gửi mã OTP',
         message: 'Mã xác thực gồm 6 chữ số đã được gửi tới email của bạn.',
       });
     } catch (err: unknown) {
-      setToast({
-        id: 'toast-otp-error',
+      showToast({
         type: 'error',
         title: 'Lỗi',
         message: err instanceof Error ? err.message : 'Không thể gửi mã xác minh',
@@ -132,23 +125,18 @@ export const RegisterPage: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: savedInfo.email, fullName: savedInfo.fullName }),
       });
-      const resJson = await parseApiResponse<{ success?: boolean; error?: string; data?: { otp?: string } }>(response);
+      const resJson = await parseApiResponse<{ success?: boolean; error?: string }>(response);
       if (!response.ok || !resJson?.success) {
         throw new Error(resJson?.error || 'Gửi lại mã OTP thất bại.');
       }
-      if (resJson.data?.otp) {
-        setDevOtpHint(resJson.data.otp);
-      }
       setResendCountdown(60);
-      setToast({
-        id: Date.now().toString(),
+      showToast({
         type: 'info',
         title: 'Đã gửi lại OTP',
         message: 'Mã xác thực mới đã được gửi tới email của bạn.',
       });
     } catch (err: unknown) {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
         type: 'error',
         title: 'Lỗi',
         message: err instanceof Error ? err.message : 'Không thể gửi lại mã',
@@ -162,8 +150,7 @@ export const RegisterPage: React.FC = () => {
   const handleVerifyEmail = async () => {
     const fullOtp = otpDigits.join('');
     if (fullOtp.length < 6) {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
         type: 'error',
         title: 'Chưa đủ 6 số',
         message: 'Vui lòng nhập đủ 6 chữ số mã OTP đã gửi qua email.',
@@ -172,8 +159,7 @@ export const RegisterPage: React.FC = () => {
     }
 
     if (!savedInfo?.email) {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
         type: 'error',
         title: 'Lỗi',
         message: 'Thông tin email không hợp lệ. Vui lòng quay lại bước 1.',
@@ -182,7 +168,6 @@ export const RegisterPage: React.FC = () => {
     }
 
     setIsLoading(true);
-    setToast(null);
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/verify-otp`, {
         method: 'POST',
@@ -196,8 +181,7 @@ export const RegisterPage: React.FC = () => {
         throw new Error(resJson?.error || 'Mã xác thực OTP không chính xác hoặc đã hết hạn.');
       }
 
-      setToast({
-        id: Date.now().toString(),
+      showToast({
         type: 'success',
         title: 'Xác thực thành công',
         message: 'Email của bạn đã được xác minh. Hãy nộp ảnh giấy tờ tùy thân.',
@@ -205,8 +189,7 @@ export const RegisterPage: React.FC = () => {
 
       setStep(3); // Advance to Step 3
     } catch (err: unknown) {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
         type: 'error',
         title: 'Xác minh thất bại',
         message: err instanceof Error ? err.message : 'Mã OTP không hợp lệ',
@@ -218,19 +201,17 @@ export const RegisterPage: React.FC = () => {
 
   // Step 3: Upload files and submit reader registration
   const handleSubmitDocs = async () => {
-    if (!frontDoc) {
-      setToast({
-        id: Date.now().toString(),
-        type: 'error',
-        title: 'Thiếu giấy tờ',
-        message: 'Vui lòng tải lên ảnh mặt trước của giấy tờ tùy thân.',
+  if (!frontDoc) {
+    showToast({
+      type: 'error',
+      title: 'Thiếu giấy tờ',
+      message: 'Vui lòng tải lên ảnh mặt trước của giấy tờ tùy thân.',
       });
       return;
     }
 
     if (docType === 'NationalId' && !backDoc) {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
         type: 'error',
         title: 'Thiếu mặt sau',
         message: 'CCCD/CMND yêu cầu phải có cả ảnh mặt sau.',
@@ -239,17 +220,15 @@ export const RegisterPage: React.FC = () => {
     }
 
     if (!savedInfo) {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
         type: 'error',
         title: 'Lỗi',
         message: 'Thông tin cá nhân bị thiếu. Vui lòng thử lại từ đầu.',
       });
       return;
     }
-
     setIsLoading(true);
-    setToast(null);
+    setIsLoading(true);
 
     try {
       const formData = new FormData();
@@ -277,8 +256,7 @@ export const RegisterPage: React.FC = () => {
         throw new Error(resJson?.error || 'Nộp hồ sơ thất bại. Vui lòng kiểm tra lại ảnh hoặc kết nối mạng.');
       }
 
-      setToast({
-        id: Date.now().toString(),
+      showToast({
         type: 'success',
         title: 'Thành công',
         message: 'Đăng ký tài khoản và nộp hồ sơ thành công! Đơn đã được chuyển đến Thủ thư.',
@@ -286,8 +264,7 @@ export const RegisterPage: React.FC = () => {
 
       setStep(4); // Advance to Wait for Approval
     } catch (err: unknown) {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
         type: 'error',
         title: 'Gửi thất bại',
         message: err instanceof Error ? err.message : 'Không thể gửi giấy tờ đến máy chủ.',
@@ -457,7 +434,7 @@ export const RegisterPage: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3.5 rounded-2xl bg-slate-900 dark:bg-indigo-600 text-white font-semibold text-xs sm:text-sm shadow-xl hover:bg-slate-800 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            className="auth-submit w-full shadow-xl"
           >
             {isLoading ? (
               <>
@@ -489,25 +466,11 @@ export const RegisterPage: React.FC = () => {
             </p>
           </div>
 
-          {/* Development OTP quick-fill helper */}
-          {devOtpHint && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between">
-              <span className="flex items-center gap-1.5 font-medium">
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                Mã xác thực: <strong className="font-mono text-sm tracking-widest">{devOtpHint}</strong>
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setOtpDigits(devOtpHint.split(''));
-                  otpInputRefs.current[5]?.focus();
-                }}
-                className="text-[11px] font-bold px-2.5 py-1 bg-amber-200 dark:bg-amber-800/80 hover:bg-amber-300 rounded-lg transition-colors"
-              >
-                Tự động điền
-              </button>
-            </div>
-          )}
+          <div className="p-3.5 bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl text-xs text-slate-600 dark:text-slate-300">
+            <p>
+              Vui lòng kiểm tra hộp thư đến (hoặc thư mục <strong>Thư rác/Spam</strong>) của địa chỉ email trên để nhận mã OTP gồm 6 chữ số.
+            </p>
+          </div>
 
           {/* 6 Digit Inputs */}
           <div className="auth-otp flex justify-center gap-2" onPaste={handleOtpPaste}>
@@ -673,8 +636,6 @@ export const RegisterPage: React.FC = () => {
           </p>
         </div>
       )}
-
-      <ToastNotification toast={toast} onClose={() => setToast(null)} />
     </AuthLayout>
   );
 };
