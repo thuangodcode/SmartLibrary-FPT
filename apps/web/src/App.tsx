@@ -16,6 +16,10 @@ import ReadersManagementPage from './features/librarian/pages/ReadersManagementP
 import LibrarianReportsPage from './features/librarian/pages/LibrarianReportsPage';
 import LibrarianReportDetailPage from './features/librarian/pages/LibrarianReportDetailPage';
 import LibrarianModulePage from './features/librarian/pages/LibrarianModulePage';
+import LibrarianCategoriesPage from './features/librarian/pages/LibrarianCategoriesPage';
+import LibrarianCreateCategoryPage from './features/librarian/pages/LibrarianCreateCategoryPage';
+import LibrarianCategoryBooksPage from './features/librarian/pages/LibrarianCategoryBooksPage';
+import LibrarianBookDetailPage from './features/librarian/pages/LibrarianBookDetailPage';
 import CirculationPage from './features/librarian/pages/CirculationPage';
 import { AdminLayout } from './features/admin/components/AdminLayout';
 import AdminOverviewPage from './features/admin/pages/AdminOverviewPage';
@@ -75,7 +79,10 @@ function App() {
         <Route path="registrations" element={<RegistrationApprovalPage />} />
         <Route path="readers" element={<ReadersManagementPage />} />
         <Route path="readers/:userId" element={<AdminUserDetailPage audience="librarian" />} />
-        <Route path="books" element={<LibrarianModulePage />} />
+        <Route path="books" element={<LibrarianCategoriesPage />} />
+        <Route path="books/categories/new" element={<LibrarianCreateCategoryPage />} />
+        <Route path="books/categories/:categoryId" element={<LibrarianCategoryBooksPage />} />
+        <Route path="books/:bookId" element={<LibrarianBookDetailPage />} />
         <Route path="copies" element={<LibrarianModulePage />} />
         <Route path="loans" element={<LibrarianModulePage />} />
         <Route path="fines" element={<LibrarianModulePage />} />

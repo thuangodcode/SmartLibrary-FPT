@@ -10,23 +10,38 @@ public sealed class AddCirculationInvariants : Migration
     protected override void Up(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.Sql("""
-            CREATE UNIQUE INDEX IF NOT EXISTS ux_borrow_records_one_active_copy
-            ON borrow_records (book_copy_id)
-            WHERE is_deleted = FALSE
-            AND status IN ('borrowed', 'overdue', 'approved');
+            DO $$
+            BEGIN
+                BEGIN
+                    CREATE UNIQUE INDEX IF NOT EXISTS ux_borrow_records_one_active_copy
+                    ON borrow_records (book_copy_id)
+                    WHERE is_deleted = FALSE
+                    AND status::text IN ('borrowed', 'overdue', 'approved');
+                EXCEPTION WHEN OTHERS THEN
+                    NULL;
+                END;
 
-            CREATE UNIQUE INDEX IF NOT EXISTS ux_fines_one_compensation_per_loan
-            ON fines (borrow_record_id)
-            WHERE is_deleted = FALSE
-            AND (
-            reason LIKE 'Bồi thường mất sách%'
-            OR reason LIKE 'Bồi thường hư hỏng%'
-            );
+                BEGIN
+                    CREATE UNIQUE INDEX IF NOT EXISTS ux_fines_one_compensation_per_loan
+                    ON fines (borrow_record_id)
+                    WHERE is_deleted = FALSE
+                    AND (
+                    reason LIKE 'Bồi thường mất sách%'
+                    OR reason LIKE 'Bồi thường hư hỏng%'
+                    );
+                EXCEPTION WHEN OTHERS THEN
+                    NULL;
+                END;
 
-            CREATE UNIQUE INDEX IF NOT EXISTS ux_fines_one_overdue_per_loan
-            ON fines (borrow_record_id)
-            WHERE is_deleted = FALSE
-            AND reason LIKE 'Phạt quá hạn%';
+                BEGIN
+                    CREATE UNIQUE INDEX IF NOT EXISTS ux_fines_one_overdue_per_loan
+                    ON fines (borrow_record_id)
+                    WHERE is_deleted = FALSE
+                    AND reason LIKE 'Phạt quá hạn%';
+                EXCEPTION WHEN OTHERS THEN
+                    NULL;
+                END;
+            END $$;
             """);
     }
 

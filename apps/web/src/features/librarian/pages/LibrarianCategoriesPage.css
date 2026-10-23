@@ -1,0 +1,780 @@
+/* ==========================================================================
+   Librarian Categories Page - Modern Horizontal Strip (Nhà Sách Phương Nam Style)
+   ========================================================================== */
+
+.lib-cat-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 40px;
+  color: #1e293b;
+}
+
+/* ─── Header ─── */
+.lib-cat-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.lib-cat-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: #ea580c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lib-cat-header h1 {
+  margin: 0 0 6px 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+
+.lib-cat-desc {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+  max-width: 620px;
+  line-height: 1.5;
+}
+
+.lib-cat-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lib-cat-btn-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);
+  transition: all 0.2s ease;
+}
+
+.lib-cat-btn-add:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(234, 88, 12, 0.35);
+  background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+}
+
+/* ─── Metrics Grid ─── */
+.lib-cat-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.lib-cat-metric-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.lib-cat-metric-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+
+.lib-cat-metric-icon.orange {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.lib-cat-metric-icon.blue {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.lib-cat-metric-icon.green {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.lib-cat-metric-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.lib-cat-metric-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* ─── Model 1 Panel (Nhà Sách Phương Nam Style) ─── */
+.lib-cat-pnc-panel {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.lib-cat-pnc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.lib-cat-pnc-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lib-cat-pnc-pill {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  background: #fff7ed;
+  color: #ea580c;
+  border-radius: 20px;
+  border: 1px solid #ffedd5;
+}
+
+.lib-cat-pnc-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.lib-cat-pnc-count {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.lib-cat-pnc-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lib-cat-pnc-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.lib-cat-pnc-search svg {
+  position: absolute;
+  left: 12px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.lib-cat-pnc-search input {
+  padding: 7px 30px 7px 34px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  width: 190px;
+  outline: none;
+  background: #f8fafc;
+  transition: all 0.2s ease;
+}
+
+.lib-cat-pnc-search input:focus {
+  border-color: #ea580c;
+  background: #ffffff;
+  width: 230px;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.1);
+}
+
+.lib-cat-pnc-clear {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.lib-cat-btn-refresh-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lib-cat-btn-refresh-icon:hover {
+  background: #ffffff;
+  color: #ea580c;
+  border-color: #ea580c;
+}
+
+.lib-cat-scroll-arrows {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lib-cat-scroll-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.lib-cat-scroll-btn:hover {
+  background: #ea580c;
+  color: #ffffff;
+  border-color: #ea580c;
+  transform: translateY(-1px);
+}
+
+/* ─── Horizontal Strip Container ─── */
+.lib-cat-pnc-strip-wrapper {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.lib-cat-pnc-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding: 10px 4px 18px 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.lib-cat-pnc-strip::-webkit-scrollbar {
+  height: 6px;
+}
+
+.lib-cat-pnc-strip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lib-cat-pnc-strip::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 4px;
+}
+
+.lib-cat-pnc-strip::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+/* ─── Category Item (Exact Sample 1 Pattern: Icon on top, Name below) ─── */
+.lib-cat-pnc-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 110px;
+  min-width: 110px;
+  cursor: pointer;
+  text-align: center;
+  position: relative;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.lib-cat-pnc-item:hover {
+  transform: translateY(-4px);
+}
+
+/* Icon / Image Box */
+.lib-cat-pnc-icon-box {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  overflow: visible;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.25s ease;
+}
+
+.lib-cat-pnc-item:hover .lib-cat-pnc-icon-box {
+  border-color: #ea580c;
+  box-shadow: 0 8px 20px rgba(234, 88, 12, 0.2);
+  background: #ffffff;
+}
+
+.lib-cat-pnc-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  transition: transform 0.25s ease;
+}
+
+.lib-cat-pnc-item:hover .lib-cat-pnc-img {
+  transform: scale(1.06);
+}
+
+.lib-cat-pnc-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  transition: transform 0.25s ease;
+}
+
+.lib-cat-pnc-item:hover .lib-cat-pnc-fallback {
+  transform: scale(1.05);
+}
+
+/* Category Name (Sample 1 Style: Uppercase, Bold, Centered, Clean) */
+.lib-cat-pnc-name {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #334155;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  transition: color 0.2s ease;
+}
+
+.lib-cat-pnc-item:hover .lib-cat-pnc-name {
+  color: #ea580c;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Empty / Loading / Error States */
+.lib-cat-pnc-loading,
+.lib-cat-pnc-error,
+.lib-cat-pnc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #64748b;
+  text-align: center;
+  gap: 12px;
+}
+
+.lib-cat-pnc-error {
+  color: #dc2626;
+}
+
+.lib-cat-retry-btn,
+.lib-cat-btn-add-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #ea580c;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lib-cat-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #ea580c;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+/* ─── Modal Styles (Edit & Delete) ─── */
+.lib-cat-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.lib-cat-modal-content {
+  background: #ffffff;
+  border-radius: 20px;
+  max-width: 520px;
+  width: 100%;
+  padding: 28px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.lib-cat-modal-content.edit-modal {
+  max-width: 560px;
+}
+
+@keyframes scaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.lib-cat-modal-header {
+  margin-bottom: 20px;
+}
+
+.lib-cat-modal-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.lib-cat-modal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 4px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lib-cat-modal-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.lib-cat-modal-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.lib-cat-modal-header h3 {
+  margin: 0 0 4px 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.lib-cat-modal-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+/* Edit Form */
+.lib-cat-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lib-cat-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lib-cat-form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.lib-cat-form-group label .req {
+  color: #ef4444;
+}
+
+.lib-cat-form-group input,
+.lib-cat-form-group textarea {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.lib-cat-form-group input:focus,
+.lib-cat-form-group textarea:focus {
+  border-color: #ea580c;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15);
+}
+
+.lib-cat-edit-image-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+}
+
+.lib-cat-edit-preview-box {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.lib-cat-edit-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lib-cat-edit-remove-img {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: rgba(15, 23, 42, 0.7);
+  color: #ffffff;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.lib-cat-edit-no-image {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 10px;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.lib-cat-edit-upload-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lib-cat-btn-choose-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lib-cat-btn-choose-file:hover {
+  background: #fff7ed;
+  border-color: #ea580c;
+  color: #ea580c;
+}
+
+.lib-cat-edit-file-hint {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* Modal Actions */
+.lib-cat-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.lib-cat-modal-btn-cancel {
+  padding: 10px 18px;
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lib-cat-modal-btn-cancel:hover {
+  background: #e2e8f0;
+}
+
+.lib-cat-modal-btn-save {
+  padding: 10px 20px;
+  background: #ea580c;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lib-cat-modal-btn-save:hover {
+  background: #c2410c;
+}
+
+.lib-cat-modal-btn-save:disabled,
+.lib-cat-modal-btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Delete Danger Modal Icon */
+.lib-cat-modal-icon-danger {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #fef2f2;
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.lib-cat-modal-btn-confirm {
+  padding: 10px 20px;
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lib-cat-modal-btn-confirm:hover {
+  background: #b91c1c;
+}
+
+.lib-cat-modal-warning-highlight {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #b45309;
+  background: #fef3c7;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
