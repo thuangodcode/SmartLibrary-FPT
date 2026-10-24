@@ -31,7 +31,8 @@ const AdminAiSettingsPage = () => {
   const accessToken = useAuthStore((state) => state.accessToken);
   const { showToast } = useToast();
   const [status, setStatus] = useState<AiSettingsStatus | null>(null);
-  const [loading, setLoading] = useState(() => Boolean(accessToken));
+  const [loadedToken, setLoadedToken] = useState<string | null>(null);
+  const loading = Boolean(accessToken) && loadedToken !== accessToken;
   const [saving, setSaving] = useState(false);
   const [reindexing, setReindexing] = useState(false);
   const [error, setError] = useState<string | null>(accessToken ? null : 'Vui lòng đăng nhập Admin.');
@@ -70,7 +71,6 @@ const AdminAiSettingsPage = () => {
   useEffect(() => {
     if (!accessToken) return;
     const controller = new AbortController();
-    setLoading(true);
     void getAiSettings(accessToken)
       .then((next) => {
         if (!controller.signal.aborted) {
@@ -83,7 +83,7 @@ const AdminAiSettingsPage = () => {
         setError(loadError instanceof Error ? loadError.message : 'Không tải được cấu hình AI.');
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) setLoadedToken(accessToken);
       });
     return () => controller.abort();
   }, [accessToken]);

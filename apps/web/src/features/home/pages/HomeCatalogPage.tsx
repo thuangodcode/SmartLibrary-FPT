@@ -22,8 +22,17 @@ const HomeCatalogPage = () => {
   const categoriesQuery = useHomeCategories();
   const booksQuery = useHomeBooks(activeCategory, search, page);
   const accessToken = useAuthStore((state) => state.accessToken);
-  const [personalized, setPersonalized] = useState<AiBookSuggestion[]>([]);
-  const [personalizedNote, setPersonalizedNote] = useState<string | null>(null);
+  const [recommendations, setRecommendations] = useState<{
+    accessToken: string;
+    items: AiBookSuggestion[];
+    note: string | null;
+  } | null>(null);
+  const personalized = recommendations?.accessToken === accessToken
+    ? recommendations.items
+    : [];
+  const personalizedNote = recommendations?.accessToken === accessToken
+    ? recommendations.note
+    : null;
   const categories = categoriesQuery.data ?? [];
   const categoryName = categories.find(
     (category) => category.id === activeCategory,
@@ -41,28 +50,30 @@ const HomeCatalogPage = () => {
   const clearFilters = () => setSearchParams({});
 
   useEffect(() => {
-    if (!accessToken) {
-      setPersonalized([]);
-      setPersonalizedNote(null);
-      return;
-    }
+    if (!accessToken) return;
 
     let cancelled = false;
     void getPersonalizedRecommendations(accessToken)
       .then((items) => {
         if (cancelled) return;
-        setPersonalized(items);
-        setPersonalizedNote(items.length === 0
-          ? 'Chưa có đủ dữ liệu cá nhân hóa. Gợi ý sẽ xuất hiện khi có sở thích đọc, đánh giá hoặc lịch sử mượn.'
-          : null);
+        setRecommendations({
+          accessToken,
+          items,
+          note: items.length === 0
+            ? 'Chưa có đủ dữ liệu cá nhân hóa. Gợi ý sẽ xuất hiện khi có sở thích đọc, đánh giá hoặc lịch sử mượn.'
+            : null,
+        });
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        setPersonalized([]);
         const message = error instanceof Error ? error.message : '';
-        setPersonalizedNote(/tắt/i.test(message)
-          ? 'Gợi ý sách cá nhân hóa đang tắt. Liên hệ Admin nếu cần bật.'
-          : null);
+        setRecommendations({
+          accessToken,
+          items: [],
+          note: /tắt/i.test(message)
+            ? 'Gợi ý sách cá nhân hóa đang tắt. Liên hệ Admin nếu cần bật.'
+            : null,
+        });
       });
     return () => {
       cancelled = true;

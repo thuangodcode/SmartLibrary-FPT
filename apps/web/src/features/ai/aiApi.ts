@@ -206,7 +206,7 @@ export const saveMyAiSettings = (token: string, payload: Record<string, unknown>
     body: JSON.stringify(payload),
   });
 
-export const useMyAiForLibrary = (token: string) =>
+export const markMyAiForLibrary = (token: string) =>
   callApi<AiSettingsStatus>(token, '/api/v1/ai/my-settings/use-for-library', { method: 'POST' });
 
 export const setLibrarianAiAccountEnabled = (token: string, userId: string, isEnabled: boolean) =>
