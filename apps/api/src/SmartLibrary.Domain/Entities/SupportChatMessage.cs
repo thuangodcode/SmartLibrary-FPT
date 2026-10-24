@@ -9,4 +9,6 @@ public sealed class SupportChatMessage : AuditableEntity
     public Guid SenderId { get; set; }
     public UserProfile Sender { get; set; } = null!;
     public string Message { get; set; } = string.Empty;
+    public bool IsReadByLibrarian { get; set; }
+    public bool IsReadByReader { get; set; }
 }

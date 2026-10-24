@@ -117,6 +117,14 @@ const SupportPage = () => {
   useEffect(() => {
     if (!token) return undefined;
     let active = true;
+    const markChatRead = async () => {
+      try {
+        await fetchData<{ unreadCount: number }>('/api/v1/support/chat/read', token, { method: 'POST' });
+        if (active) window.dispatchEvent(new Event('reader-support-read'));
+      } catch {
+        // Reading messages still works if the acknowledgement request is temporarily unavailable.
+      }
+    };
     const hub = new HubConnectionBuilder()
       .withUrl(`${API_BASE_URL}/hubs/support-chat`, { accessTokenFactory: () => token })
       .withAutomaticReconnect()
@@ -128,6 +136,7 @@ const SupportPage = () => {
       setMessages((current) => current.some((item) => item.id === message.id)
         ? current
         : [...current, message].sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+      if (message.senderRole !== 'Reader') void markChatRead();
     });
     hub.on('ComplaintReplied', (complaint: Complaint) => {
       if (!active) return;
@@ -168,6 +177,7 @@ const SupportPage = () => {
         setRequestTypeId((current) => current || requestTypes[0]?.id || '');
         setMessages((current) => mergeMessages(current, chatMessages));
         setComplaints(myComplaints);
+        void markChatRead();
       } catch (caught) {
         if (active) setError(caught instanceof Error ? caught.message : 'Không thể tải trang hỗ trợ.');
       } finally {

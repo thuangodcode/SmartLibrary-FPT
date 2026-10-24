@@ -42,6 +42,31 @@ public sealed class SupportController(
         return Ok(ApiResponse<IReadOnlyList<SupportChatMessageDto>>.Ok(rows));
     }
 
+    [HttpGet("chat/unread-count")]
+    [Authorize(Roles = "Reader")]
+    public async Task<IActionResult> GetMyUnreadChatCount(CancellationToken ct)
+    {
+        if (!TryGetUserId(out var readerId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
+        var count = await db.SupportChatMessages.AsNoTracking()
+            .CountAsync(x => x.ReaderId == readerId && x.SenderId != readerId && !x.IsReadByReader, ct);
+        return Ok(ApiResponse<object>.Ok(new { unreadCount = count }));
+    }
+
+    [HttpPost("chat/read")]
+    [Authorize(Roles = "Reader")]
+    public async Task<IActionResult> MarkMyChatRead(CancellationToken ct)
+    {
+        if (!TryGetUserId(out var readerId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
+        await db.SupportChatMessages
+            .Where(x => x.ReaderId == readerId && x.SenderId != readerId && !x.IsReadByReader)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.IsReadByReader, true)
+                .SetProperty(x => x.UpdatedAt, DateTime.UtcNow), ct);
+        return Ok(ApiResponse<object>.Ok(new { unreadCount = 0 }));
+    }
+
     [HttpGet("complaints/mine")]
     [Authorize(Roles = "Reader")]
     public async Task<IActionResult> GetMyComplaints(CancellationToken ct)
@@ -386,15 +411,44 @@ public sealed class SupportController(
                 x.Message,
                 x.CreatedAt))
             .ToListAsync(ct);
+        var unreadCounts = await db.SupportChatMessages.AsNoTracking()
+            .Where(x => ids.Contains(x.ReaderId) && x.SenderId == x.ReaderId && !x.IsReadByLibrarian)
+            .GroupBy(x => x.ReaderId)
+            .Select(group => new { ReaderId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(x => x.ReaderId, x => x.Count, ct);
         var rows = latest.Select(x =>
         {
             var reader = readers.FirstOrDefault(r => r.Id == x.ReaderId);
             var lastMessage = lastMessages.FirstOrDefault(m => m.ReaderId == x.ReaderId);
             return reader is null || lastMessage is null
                 ? null
-                : new SupportConversationDto(reader.Id, reader.FullName, reader.AvatarUrl, reader.StudentId, lastMessage);
+                : new SupportConversationDto(
+                    reader.Id,
+                    reader.FullName,
+                    reader.AvatarUrl,
+                    reader.StudentId,
+                    lastMessage,
+                    unreadCounts.GetValueOrDefault(reader.Id));
         }).OfType<SupportConversationDto>().ToList();
         return Ok(ApiResponse<IReadOnlyList<SupportConversationDto>>.Ok(rows));
+    }
+
+    [HttpPost("chat/conversations/{readerId:guid}/read")]
+    [Authorize(Roles = "Librarian,Admin")]
+    public async Task<IActionResult> MarkConversationRead(Guid readerId, CancellationToken ct)
+    {
+        if (!await db.UserProfiles.AnyAsync(x => x.Id == readerId && x.Role.Name == "Reader", ct))
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy độc giả."));
+
+        await db.SupportChatMessages
+            .Where(x => x.ReaderId == readerId && x.SenderId == readerId && !x.IsReadByLibrarian)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.IsReadByLibrarian, true)
+                .SetProperty(x => x.UpdatedAt, DateTime.UtcNow), ct);
+
+        await chatHub.Clients.Group(SupportChatHub.LibrarianGroup)
+            .SendAsync("ConversationRead", new { readerId }, ct);
+        return Ok(ApiResponse<object>.Ok(new { readerId }));
     }
 
     [HttpGet("chat/conversations/{readerId:guid}/messages")]
@@ -512,4 +566,5 @@ public sealed record SupportConversationDto(
     string ReaderName,
     string? AvatarUrl,
     string? StudentId,
-    SupportChatMessageDto LastMessage);
+    SupportChatMessageDto LastMessage,
+    int UnreadCount);

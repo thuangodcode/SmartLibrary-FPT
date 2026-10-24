@@ -5,16 +5,23 @@ import { Link } from 'react-router-dom';
 import smartLibraryLogo from '../../../assets/figma/smartlibrary-logo.png';
 import { useToast } from '../../../components/ui/useToast';
 import { API_BASE_URL } from '../../../config';
+import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useHomeCategories } from '../hooks/useHomeData';
 import './HomeNavbar.css';
 
 type HomeNavSection = 'catalog' | 'services' | 'news' | 'policies';
 
+interface ApiEnvelope<T> {
+  success?: boolean;
+  data?: T;
+}
+
 const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactNode }> = ({ activeSection, searchSlot }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [supportUnreadCount, setSupportUnreadCount] = useState(0);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -36,6 +43,18 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
   useEffect(() => {
     if (user?.role !== 'Reader' || !accessToken) return undefined;
     let active = true;
+    const loadSupportUnreadCount = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/support/chat/unread-count`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const result = await parseApiResponse<ApiEnvelope<{ unreadCount: number }>>(response);
+        if (active && response.ok && result?.success) setSupportUnreadCount(result.data?.unreadCount ?? 0);
+      } catch {
+        // The support page will surface connectivity errors; the global menu stays quiet.
+      }
+    };
+    const clearSupportUnreadCount = () => setSupportUnreadCount(0);
     const hub = new HubConnectionBuilder()
       .withUrl(`${API_BASE_URL}/hubs/support-chat`, {
         accessTokenFactory: () => accessToken,
@@ -43,6 +62,11 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
       .build();
+    hub.on('ReceiveChatMessage', (message: { senderRole?: string }) => {
+      if (active && message.senderRole !== 'Reader') {
+        setSupportUnreadCount((count) => count + 1);
+      }
+    });
     hub.on('BorrowStatusUpdated', (payload: {
       status?: string;
       bookTitle?: string;
@@ -86,6 +110,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
           await hub.stop();
           return;
         }
+        await loadSupportUnreadCount();
       } catch (caught: unknown) {
         if (active) {
           showToast({
@@ -96,9 +121,12 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
         }
       }
     };
+    window.addEventListener('reader-support-read', clearSupportUnreadCount);
+    void loadSupportUnreadCount();
     void startHub();
     return () => {
       active = false;
+      window.removeEventListener('reader-support-read', clearSupportUnreadCount);
       if (hub.state === HubConnectionState.Connected || hub.state === HubConnectionState.Reconnecting) {
         void hub.stop();
       }
@@ -120,6 +148,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
   );
 
   const handleLogout = () => {
+    setSupportUnreadCount(0);
     logout();
     showToast({ type: 'success', title: 'Đăng xuất thành công', message: 'Bạn đã đăng xuất khỏi SmartLibrary.' });
     closeMenu();
@@ -165,7 +194,15 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
                 <Link to="/profile" role="menuitem" onClick={closeMenu}><UserRound size={16} /> Hồ sơ cá nhân</Link>
                 {user.role === 'Reader' && (
                   <>
-                    <Link to="/support" role="menuitem" onClick={closeMenu}><CircleHelp size={16} /> Hỗ trợ</Link>
+                    <Link to="/support" role="menuitem" onClick={closeMenu}>
+                      <CircleHelp size={16} />
+                      <span className="annual-support-menu-label">Hỗ trợ</span>
+                      {supportUnreadCount > 0 && (
+                        <span className="annual-support-unread" aria-label={`${supportUnreadCount} tin nhắn hỗ trợ chưa đọc`}>
+                          {supportUnreadCount > 99 ? '99+' : supportUnreadCount}
+                        </span>
+                      )}
+                    </Link>
                     <Link to="/history" role="menuitem" onClick={closeMenu}><History size={16} /> Mượn & trả của tôi</Link>
                   </>
                 )}

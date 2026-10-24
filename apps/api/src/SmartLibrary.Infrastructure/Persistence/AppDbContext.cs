@@ -342,7 +342,11 @@ public class AppDbContext : DbContext
         {
             entity.ToTable("support_chat_messages");
             entity.Property(x => x.Message).HasMaxLength(2000).IsRequired();
+            entity.Property(x => x.IsReadByLibrarian).HasDefaultValue(false);
+            entity.Property(x => x.IsReadByReader).HasDefaultValue(false);
             entity.HasIndex(x => new { x.ReaderId, x.CreatedAt });
+            entity.HasIndex(x => new { x.ReaderId, x.IsReadByLibrarian });
+            entity.HasIndex(x => new { x.ReaderId, x.IsReadByReader });
             entity.HasOne(x => x.Reader).WithMany().HasForeignKey(x => x.ReaderId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Sender).WithMany().HasForeignKey(x => x.SenderId).OnDelete(DeleteBehavior.Restrict);
         });

@@ -92,6 +92,27 @@
   cursor: pointer;
 }
 
+.annual-support-menu-label {
+  flex: 1;
+}
+
+.annual-support-unread {
+  display: inline-grid;
+  min-width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: #c4242a;
+  padding: 0 6px;
+  color: #fff;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  line-height: 1;
+}
+
 .annual-user-popover a:hover,
 .annual-user-popover button:hover,
 .annual-user-popover a:focus-visible,
