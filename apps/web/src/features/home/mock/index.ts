@@ -1,4 +1,4 @@
-import type { Book, Category, NewsItem, FaqItem, ServiceItem } from '../types';
+import type { Book, Category, NewsItem, FaqItem } from '../types';
 
 export const MOCK_BOOKS: Book[] = [
   {
@@ -360,31 +360,6 @@ export const MOCK_CATEGORIES: Category[] = [
     bookCount: 760,
     colorClass: 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900',
     description: 'Kỷ luật, tâm lý, lãnh đạo & năng lực làm chủ bản thân.'
-  }
-];
-
-export const MOCK_SERVICES: ServiceItem[] = [
-  {
-    id: 's1',
-    title: 'Mượn Sách Trực Tuyến',
-    description: 'Tra cứu và đăng ký giữ sách tại quầy chỉ với vài cú nhấp chuột.',
-    iconName: 'BookOpen',
-    route: '/borrow',
-    badge: 'Phổ biến'
-  },
-  {
-    id: 's2',
-    title: 'Gia Hạn Tự Động',
-    description: 'Gia hạn thời gian mượn sách nhanh chóng khi chưa có người đặt chờ.',
-    iconName: 'RefreshCw',
-    route: '/renew'
-  },
-  {
-    id: 's4',
-    title: 'Tra Cứu Phạt & Trả',
-    description: 'Xem lịch sử phạt, tính phí trễ hạn minh bạch và thanh toán qua QR Code.',
-    iconName: 'CreditCard',
-    route: '/fines'
   }
 ];
 

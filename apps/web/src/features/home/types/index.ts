@@ -46,12 +46,3 @@ export interface FaqItem {
   answer: string;
   category: string;
 }
-
-export interface ServiceItem {
-  id: string;
-  title: string;
-  description: string;
-  iconName: string;
-  route: string;
-  badge?: string;
-}

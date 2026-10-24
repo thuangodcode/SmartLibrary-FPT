@@ -64,7 +64,7 @@ function App() {
       <Route path="/" element={<HomePage />} />
       <Route path="/books" element={<HomeCatalogPage />} />
       <Route path="/books/:bookId" element={<BookDetailPage />} />
-      <Route path="/services" element={<HomeInfoPage section="services" />} />
+      <Route path="/services" element={<Navigate to="/books" replace />} />
       <Route path="/news" element={<HomeInfoPage section="news" />} />
       <Route path="/policies" element={<HomeInfoPage section="policies" />} />
       <Route path="/login" element={<LoginPage />} />

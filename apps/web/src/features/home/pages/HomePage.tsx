@@ -180,7 +180,7 @@ export const HomePage = () => {
       <footer className="annual-footer">
         <div className="annual-frame annual-footer-grid">
           <div><strong>Ghé thư viện</strong><p>Tòa Alpha, Khu Công nghệ cao, TP. Thủ Đức, TP. Hồ Chí Minh</p></div>
-          <div><strong>Khám phá</strong><Link to="/books">Danh mục & đầu sách</Link><Link to="/services">Dịch vụ</Link><Link to="/news">Tin tức</Link><Link to="/policies">Chính sách</Link></div>
+          <div><strong>Khám phá</strong><Link to="/books">Danh mục & đầu sách</Link><Link to="/news">Tin tức</Link><Link to="/policies">Chính sách</Link></div>
           <div className="annual-footer-hours"><strong>Thời gian</strong><p><span>Thứ Hai – Thứ Sáu</span><span>07:00 – 19:00</span></p><p><span>Thứ Bảy</span><span>07:00 – 17:00</span></p><p><span>Chủ Nhật</span><span>Không phục vụ</span></p></div>
           <div>
             <strong>Tài khoản</strong>

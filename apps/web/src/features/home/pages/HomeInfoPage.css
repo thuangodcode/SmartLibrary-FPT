@@ -40,55 +40,6 @@
   line-height: 1.7;
 }
 
-.annual-info-service-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.annual-info-service {
-  display: flex;
-  min-height: 340px;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: clamp(24px, 3.5vw, 44px);
-}
-
-.annual-info-service--1 { background: var(--orange); color: #fff; }
-.annual-info-service--2 { background: var(--green); color: #fff; }
-.annual-info-service--3 { background: #d5a98a; color: var(--ink); }
-
-.annual-info-service > span {
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.annual-info-service > svg {
-  margin-top: 34px;
-}
-
-.annual-info-service h2 {
-  margin: auto 0 12px;
-  font-family: Newsreader, Georgia, serif;
-  font-size: clamp(25px, 3vw, 38px);
-  line-height: 1.05;
-}
-
-.annual-info-service p {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.65;
-}
-
-.annual-info-service a {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 22px;
-  font-size: 13px;
-  font-weight: 750;
-}
-
 .annual-info-news-list,
 .annual-info-policy-list {
   display: grid;
@@ -179,16 +130,6 @@
 .annual-info-footer > span {
   color: #aeb1ad;
   font-size: 12px;
-}
-
-@media (max-width: 820px) {
-  .annual-info-service-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .annual-info-service {
-    min-height: 290px;
-  }
 }
 
 @media (max-width: 600px) {
