@@ -230,8 +230,17 @@ const BookDetailPage = () => {
         </section>
 
         <section className="book-detail-description">
-          <h2>Mô tả sách</h2>
-          <p>{book.description?.trim() || 'Chưa có phần mô tả cho đầu sách này.'}</p>
+          <div className="book-detail-description-title">
+            <h2>Về cuốn sách</h2>
+            <span aria-hidden="true">“</span>
+          </div>
+          <div className="book-detail-description-copy">
+            <p>{book.description?.trim() || 'Chưa có phần mô tả cho đầu sách này.'}</p>
+            <div className="book-detail-description-meta">
+              <span>Tác giả <strong>{book.authorNames.join(', ') || 'Chưa cập nhật'}</strong></span>
+              <span>Danh mục <strong>{book.categoryNames.join(' · ') || 'Tài liệu thư viện'}</strong></span>
+            </div>
+          </div>
         </section>
 
         <section className="book-reviews-section" aria-labelledby="book-reviews-heading">
