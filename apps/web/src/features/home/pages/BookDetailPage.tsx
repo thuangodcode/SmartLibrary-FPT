@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BookOpen, CalendarDays, CheckCircle2, Globe2, MessageSquareText, Star, UserRound } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarDays, CheckCircle2, Globe2, MapPin, MessageSquareText, Star, UserRound } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useToast } from '../../../components/ui/useToast';
@@ -289,6 +289,12 @@ const BookDetailPage = () => {
               <div><dt><Globe2 size={16} /> Ngôn ngữ</dt><dd>{book.language || 'Chưa cập nhật'}</dd></div>
               <div><dt><BookOpen size={16} /> ISBN</dt><dd>{book.isbn || 'Chưa cập nhật'}</dd></div>
               <div><dt><CheckCircle2 size={16} /> Tổng bản sao</dt><dd>{availabilityQuery.data?.totalCopies ?? book.totalCopies}</dd></div>
+              {book.copyLocations !== undefined && (
+                <div className="book-detail-fact-location">
+                  <dt><MapPin size={16} /> Vị trí kệ</dt>
+                  <dd>{book.copyLocations.join(' · ') || 'Chưa xếp kệ'}</dd>
+                </div>
+              )}
             </dl>
           </div>
         </section>

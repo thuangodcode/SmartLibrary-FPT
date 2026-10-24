@@ -24,6 +24,7 @@ export interface HomeBook {
   averageRating?: number;
   authorNames: string[];
   categoryNames: string[];
+  copyLocations?: string[];
 }
 
 export interface BookReview {
