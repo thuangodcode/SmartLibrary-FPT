@@ -99,7 +99,6 @@ export const HomePage = () => {
           <div className="annual-frame">
             <div className="annual-live-section-heading annual-live-books-heading">
               <div>
-                <span className="annual-live-eyebrow">Thư viện thông minh</span>
                 <h2>{activeCategoryName || 'Gợi ý dành cho bạn'}</h2>
                 <p className="annual-live-books-subtitle">
                   {activeCategoryName
@@ -117,7 +116,7 @@ export const HomePage = () => {
               <div className="annual-live-error" role="alert">Không thể tải đầu sách. {booksQuery.error.message}</div>
             ) : books.length ? (
               <>
-                <div className="annual-live-book-grid" aria-label="Danh sách đầu sách">
+                <div className="annual-live-book-grid" aria-label="Danh sách đầu sách" tabIndex={0}>
                   {books.map((book) => <BookCard key={book.id} book={toBookCardData(book)} onSelect={() => navigate(`/books/${book.id}`)} />)}
                 </div>
                 {booksQuery.data && booksQuery.data.totalPages > 1 && (
