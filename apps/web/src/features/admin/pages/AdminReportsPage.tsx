@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowDownToLine, BookOpen, CalendarDays, ChartNoAxesCombined, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardList, Eye, FileSpreadsheet, Filter, LoaderCircle, Plus, Search, Trash2, UsersRound, X } from 'lucide-react';
+import { AlertCircle, ArrowDownToLine, BookOpen, CalendarDays, ChartNoAxesCombined, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardList, Eye, FileSpreadsheet, Filter, LoaderCircle, Plus, Search, Trash2, UsersRound, WalletCards, X } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
@@ -16,6 +16,7 @@ interface Librarian { id: string; fullName: string; status: string; isActive: bo
 interface LibrarianList { items: Librarian[] }
 interface ReportTemplate { id: string; name: string; reportType: string; isEnabled: boolean }
 interface ReportRequest { id: string; librarianId: string; librarianName: string; templateId: string; templateName: string; reportType: string; periodStart: string; periodEnd: string; name: string; status: string; createdAt: string; reportId?: string | null; lastReportStatus?: string | null; lastReviewComment?: string | null }
+interface FinanceFine { id: string; code: string; readerName: string; bookTitle: string; barcode: string; amount: number; reason: string; status: string; createdAt: string; paidAt?: string | null }
 
 const number = (value: number) => value.toLocaleString('vi-VN');
 const money = (value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value);
@@ -61,6 +62,9 @@ const AdminReportsPage: React.FC = () => {
     return value.toISOString().slice(0, 10);
   });
   const [requestPeriodEnd, setRequestPeriodEnd] = useState(() => new Date().toISOString().slice(0, 10));
+  const [financeFines, setFinanceFines] = useState<FinanceFine[]>([]);
+  const [financeLoading, setFinanceLoading] = useState(false);
+  const [financeError, setFinanceError] = useState<string | null>(null);
 
   const query = useMemo(() => new URLSearchParams(params), [params]);
   const requestedSection = location.pathname.split('/')[3] ?? 'assignments';
@@ -108,6 +112,31 @@ const AdminReportsPage: React.FC = () => {
   useEffect(() => { const timer = window.setTimeout(() => { setParams((current) => { const next = new URLSearchParams(current); if (searchInput.trim()) next.set('search', searchInput.trim()); else next.delete('search'); next.delete('page'); return next; }); }, 350); return () => window.clearTimeout(timer); }, [searchInput, setParams]);
 
   const updateQuery = (key: string, value: string) => setParams((current) => { const next = new URLSearchParams(current); if (value) next.set(key, value); else next.delete(key); if (key !== 'page') next.delete('page'); return next; });
+
+  const loadFinanceFines = useCallback(async (signal?: AbortSignal) => {
+    if (!token || activeSection !== 'finance') return;
+    setFinanceLoading(true);
+    setFinanceError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/reports/finance/fines`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal,
+      });
+      const result = await parseApiResponse<ApiEnvelope<FinanceFine[]>>(response);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không tải được chi tiết phí phạt.');
+      setFinanceFines(result.data ?? []);
+    } catch (caught) {
+      if (!signal?.aborted) setFinanceError(caught instanceof Error ? caught.message : 'Không tải được chi tiết phí phạt.');
+    } finally {
+      if (!signal?.aborted) setFinanceLoading(false);
+    }
+  }, [activeSection, token]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => void loadFinanceFines(controller.signal), 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [loadFinanceFines]);
 
   const loadAssignmentData = useCallback(async () => {
     if (!token) return;
@@ -228,6 +257,12 @@ const AdminReportsPage: React.FC = () => {
     : activeSection === 'finance'
       ? cards.filter((card) => ['Phí đã thu', 'Giao dịch phí'].includes(card.label))
       : [];
+  const pendingFines = financeFines.filter((fine) => fine.status === 'Pending');
+  const pendingFineAmount = pendingFines.reduce((total, fine) => total + fine.amount, 0);
+  const financeCards = summary ? [
+    ...sectionCards,
+    { label: 'Đang chờ thu', value: money(pendingFineAmount), note: `${number(pendingFines.length)} khoản chưa thanh toán`, icon: WalletCards, tone: 'orange' },
+  ] : [];
 
   return <div className="reports-page">
     <div className="reports-heading"><div><p className="reports-eyebrow">QUẢN TRỊ HỆ THỐNG</p><h1>{sectionDetails[activeSection].title}</h1><p>{sectionDetails[activeSection].description}</p></div><div className="reports-actions">{activeSection === 'assignments' && <button type="button" className="reports-button primary" onClick={() => setRequestFormOpen((open) => !open)}><Plus size={16}/> Giao báo cáo cho Thủ thư</button>}{['activity', 'finance'].includes(activeSection) && <button type="button" className="reports-button secondary" onClick={() => void exportCsv()}><FileSpreadsheet size={16}/> Xuất CSV</button>}</div></div>
@@ -256,7 +291,14 @@ const AdminReportsPage: React.FC = () => {
           {request.reportId ? <Link className="reports-assignment-link" to={`/admin/reports/${request.reportId}`}><Eye size={15}/> Xem báo cáo</Link> : <span className="reports-assignment-date">Giao {date(request.createdAt)}</span>}
         </article>)}</div> : <div className="reports-assignment-empty"><ClipboardList size={22}/><strong>Chưa có yêu cầu báo cáo</strong><span>Dùng “Giao báo cáo cho Thủ thư” để chỉ định người phụ trách và loại báo cáo.</span></div>}
     </section>}
-    {sectionCards.length > 0 && <section className="reports-kpis reports-kpis-section" aria-label="Chỉ số báo cáo">{loading && !summary ? Array.from({ length: activeSection === 'activity' ? 3 : 2 }, (_, i) => <div className="reports-card skeleton" key={i}/>) : sectionCards.map(({ label, value, note, icon: Icon, tone }) => <article className="reports-card" key={label}><span className={`reports-icon ${tone}`}><Icon size={19}/></span><div className="reports-card-value">{value}</div><h2>{label}</h2><p>{note}</p></article>)}</section>}
+    {sectionCards.length > 0 && <section className={`reports-kpis reports-kpis-section${activeSection === 'finance' ? ' reports-finance-kpis' : ''}`} aria-label="Chỉ số báo cáo">{loading && !summary ? Array.from({ length: 3 }, (_, i) => <div className="reports-card skeleton" key={i}/>) : (activeSection === 'finance' ? financeCards : sectionCards).map(({ label, value, note, icon: Icon, tone }) => <article className="reports-card" key={label}><span className={`reports-icon ${tone}`}><Icon size={19}/></span><div className="reports-card-value">{value}</div><h2>{label}</h2><p>{note}</p></article>)}</section>}
+    {activeSection === 'finance' && <section className="reports-panel reports-finance-panel">
+      <div className="reports-panel-title"><div><span>CHI TIẾT PHÍ PHẠT</span><h2>Các khoản phạt gần đây</h2></div><div className="reports-finance-heading-meta"><span>{number(financeFines.length)} khoản ghi nhận</span><button type="button" onClick={() => void loadFinanceFines()} disabled={financeLoading}>{financeLoading ? <LoaderCircle className="reports-spin" size={15}/> : 'Làm mới'}</button></div></div>
+      {financeError ? <div className="reports-error" role="alert"><AlertCircle size={17}/><span>{financeError}</span><button type="button" onClick={() => void loadFinanceFines()}>Thử lại</button></div>
+        : financeLoading && !financeFines.length ? <div className="reports-finance-loading"><LoaderCircle className="reports-spin" size={18}/> Đang tải chi tiết phí phạt…</div>
+          : financeFines.length ? <div className="reports-table-wrap"><table className="reports-table reports-finance-table"><thead><tr><th>Khoản phạt</th><th>Độc giả</th><th>Sách</th><th>Lý do</th><th className="num">Số tiền</th><th>Thời điểm</th><th>Trạng thái</th></tr></thead><tbody>{financeFines.slice(0, 8).map((fine) => <tr key={fine.id}><td><strong>{fine.code}</strong><small>Ghi nhận {date(fine.createdAt)}</small></td><td>{fine.readerName}</td><td><strong>{fine.bookTitle}</strong><small>{fine.barcode}</small></td><td className="reports-finance-reason">{fine.reason}</td><td className="num reports-finance-amount">{money(fine.amount)}</td><td>{fine.paidAt ? <><span>{date(fine.paidAt)}</span><small>Đã thu</small></> : <span className="reports-finance-missing">—</span>}</td><td><span className={`status-pill ${fine.status === 'Paid' ? 'approved' : fine.status === 'Waived' ? 'unapproved' : 'pending'}`}>{fine.status === 'Paid' ? 'Đã thanh toán' : fine.status === 'Waived' ? 'Đã miễn' : 'Chưa thanh toán'}</span></td></tr>)}</tbody></table></div>
+            : <div className="reports-finance-empty"><CircleDollarSign size={20}/><strong>Chưa có khoản phạt</strong><span>Khi Thủ thư ghi nhận phí phạt, chi tiết sẽ xuất hiện tại đây.</span></div>}
+    </section>}
     {activeSection === 'activity' && <section className="reports-panel category-panel"><div className="reports-panel-title"><div><span>HOẠT ĐỘNG THƯ VIỆN</span><h2>Mượn theo nhóm sách</h2></div><span className="live-badge"><i/> Dữ liệu trực tiếp</span></div>{loading && !summary ? <p className="reports-muted">Đang tải thống kê…</p> : categories.length ? <div className="category-list">{categories.map((item) => <div className="category-row" key={item.category}><div className="category-copy"><strong>{item.category}</strong><span>{number(item.count)} lượt mượn · {item.percent}%</span></div><div className="category-track"><div style={{ width: `${item.percent}%` }}/></div></div>)}</div> : <div className="reports-empty"><ChartNoAxesCombined size={20}/><span>Chưa có dữ liệu mượn theo nhóm sách trong kỳ.</span></div>}</section>}
     {activeSection === 'collection' && <section className="reports-panel reports-tab-empty"><ChartNoAxesCombined size={22}/><h2>Chưa có thống kê kho sách</h2><p>Hiện chưa có dữ liệu tồn kho được cung cấp cho trang báo cáo này.</p></section>}
     {activeSection === 'periodic' && <section className="reports-panel reports-tab-empty"><ChartNoAxesCombined size={22}/><h2>Chưa có dữ liệu báo cáo định kỳ</h2><p>Các báo cáo định kỳ sẽ hiển thị tại đây khi có dữ liệu.</p></section>}

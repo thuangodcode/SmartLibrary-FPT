@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmartLibrary.Application.Common;
+using SmartLibrary.Application.Features.Circulation;
+using SmartLibrary.Application.Features.Circulation.DTOs;
 using SmartLibrary.Application.Features.Reports;
 
 namespace SmartLibrary.Api.Controllers;
@@ -10,7 +12,7 @@ namespace SmartLibrary.Api.Controllers;
 [ApiController]
 [Route("api/admin/reports")]
 [Authorize(Policy = "AdminOnly")]
-public sealed class AdminReportsController(ReportService reports) : ControllerBase
+public sealed class AdminReportsController(ReportService reports, CirculationService circulation) : ControllerBase
 {
     private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
@@ -25,6 +27,10 @@ public sealed class AdminReportsController(ReportService reports) : ControllerBa
     [HttpGet("summary/borrow-by-category")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<CategoryBorrowDto>>>> BorrowByCategory([FromQuery] DateTime? from, [FromQuery] DateTime? to, CancellationToken ct)
         => Ok(ApiResponse<IReadOnlyList<CategoryBorrowDto>>.Ok(await reports.BorrowByCategoryAsync(from, to, ct)));
+
+    [HttpGet("finance/fines")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<CirculationFineDto>>>> FinanceFines(CancellationToken ct)
+        => Ok(ApiResponse<IReadOnlyList<CirculationFineDto>>.Ok(await circulation.GetFinesAsync(null, null, ct)));
 
     [HttpGet("templates")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<TemplateDto>>>> Templates(CancellationToken ct)
