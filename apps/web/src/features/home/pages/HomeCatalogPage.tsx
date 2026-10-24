@@ -1,8 +1,12 @@
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { getPersonalizedRecommendations, type AiBookSuggestion } from '../../ai/aiApi';
+import { useAuthStore } from '../../auth/store/useAuthStore';
 import { BookCard } from '../components/BookCard';
 import HomeNavbar from '../components/HomeNavbar';
+import RagAskPanel from '../components/RagAskPanel';
 import { useHomeBooks, useHomeCategories } from '../hooks/useHomeData';
-import { toBookCardData } from '../utils/toBookCardData';
+import { toBookCardData, toBookFromSuggestion } from '../utils/toBookCardData';
 import './HomePage.css';
 import './HomeCatalogPage.css';
 
@@ -15,6 +19,9 @@ const HomeCatalogPage = () => {
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const categoriesQuery = useHomeCategories();
   const booksQuery = useHomeBooks(activeCategory, search, page);
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const [personalized, setPersonalized] = useState<AiBookSuggestion[]>([]);
+  const [personalizedNote, setPersonalizedNote] = useState<string | null>(null);
   const categories = categoriesQuery.data ?? [];
   const categoryName = categories.find((category) => category.id === activeCategory)?.name;
   const books = booksQuery.data?.books ?? [];
@@ -28,6 +35,35 @@ const HomeCatalogPage = () => {
   };
 
   const clearFilters = () => setSearchParams({});
+
+  useEffect(() => {
+    if (!accessToken) {
+      setPersonalized([]);
+      setPersonalizedNote(null);
+      return;
+    }
+
+    let cancelled = false;
+    void getPersonalizedRecommendations(accessToken)
+      .then((items) => {
+        if (cancelled) return;
+        setPersonalized(items);
+        setPersonalizedNote(items.length === 0
+          ? 'Chưa có đủ dữ liệu cá nhân hóa. Gợi ý sẽ xuất hiện khi có sở thích đọc, đánh giá hoặc lịch sử mượn.'
+          : null);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setPersonalized([]);
+        const message = error instanceof Error ? error.message : '';
+        setPersonalizedNote(/tắt/i.test(message)
+          ? 'Gợi ý sách cá nhân hóa đang tắt. Liên hệ Admin nếu cần bật.'
+          : null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
 
   const setPage = (nextPage: number) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -90,6 +126,30 @@ const HomeCatalogPage = () => {
           </aside>
 
           <section className="catalog-results" aria-label="Danh sách đầu sách">
+            <RagAskPanel />
+            {!search && (personalized.length > 0 || personalizedNote) && (
+              <section className="catalog-personalized" aria-label="Gợi ý sách cá nhân hóa">
+                <div className="catalog-results-heading">
+                  <div>
+                    <span className="catalog-results-eyebrow">GỢI Ý CÁ NHÂN HÓA</span>
+                    <h2>Sách phù hợp với bạn</h2>
+                    <p>Tách riêng khỏi tìm kiếm. Chỉ dùng sách thật và dữ liệu đọc được phép truy cập.</p>
+                  </div>
+                </div>
+                {personalizedNote && <p className="catalog-message">{personalizedNote}</p>}
+                {personalized.length > 0 && (
+                  <div className="catalog-book-grid">
+                    {personalized.slice(0, 4).map((item) => (
+                      <BookCard
+                        key={item.id}
+                        book={toBookFromSuggestion(item)}
+                        onSelect={() => navigate(`/books/${item.id}`)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
             <div className="catalog-results-heading">
               <div>
                 <span className="catalog-results-eyebrow">{search ? 'KẾT QUẢ TÌM KIẾM' : 'BỘ SƯU TẬP'}</span>

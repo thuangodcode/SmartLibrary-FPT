@@ -8,6 +8,8 @@ using SmartLibrary.Application.Features.Policies;
 using SmartLibrary.Application.Features.Circulation;
 using SmartLibrary.Application.Features.Reports;
 using SmartLibrary.Application.Features.Users;
+using SmartLibrary.Application.Features.Ai;
+using SmartLibrary.Application.Features.Rag;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Infrastructure.Persistence;
 using SmartLibrary.Infrastructure.Persistence.Repositories;
@@ -42,9 +44,20 @@ public static class DependencyInjection
         services.AddScoped<IPolicyRuleRepository, PolicyRuleRepository>();
         services.AddScoped<IReportRepository, ReportRepository>();
         services.AddScoped<ICirculationRepository, CirculationRepository>();
+        services.AddScoped<IAiSettingsRepository, AiSettingsRepository>();
+        services.AddScoped<IAiWorkspaceRepository, AiWorkspaceRepository>();
+        services.AddScoped<IRagDocumentRepository, RagDocumentRepository>();
+        services.AddScoped<IRagIndexer, RagIndexer>();
+        services.AddHostedService<RagWarmupHostedService>();
 
         // Services
-        services.AddScoped<IAiEmbeddingService, AiEmbeddingService>();
+        services.AddSingleton<ISecretProtector, SecretProtector>();
+        services.AddMemoryCache();
+        services.AddScoped<IBookCatalogCache, BookCatalogCache>();
+        services.AddHttpClient<IGeminiClient, GeminiClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(20);
+        });
         services.AddScoped<IAiRecommendationService, AiRecommendationService>();
         services.AddHttpClient<IEmailService, EmailService>();
         services.AddHttpClient();

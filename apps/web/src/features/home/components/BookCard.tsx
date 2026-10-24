@@ -33,9 +33,9 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
   return (
     <div className="group relative bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
       {/* AI Match Badge (if present) */}
-      {book.matchScore && (
+      {book.matchLabel && (
         <div className="absolute top-3 right-3 z-20 px-2.5 py-1 rounded-full bg-ai-gradient text-white text-xs font-semibold shadow-md flex items-center gap-1">
-          <span>{book.matchScore}% Match</span>
+          <span>{book.matchLabel}</span>
         </div>
       )}
 

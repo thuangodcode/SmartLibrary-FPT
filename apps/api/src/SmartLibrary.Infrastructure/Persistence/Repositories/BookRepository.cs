@@ -3,6 +3,7 @@ using SmartLibrary.Application.Common;
 using SmartLibrary.Domain.Enums;
 using SmartLibrary.Application.Features.Books;
 using SmartLibrary.Domain.Entities;
+using SmartLibrary.Infrastructure.Text;
 
 namespace SmartLibrary.Infrastructure.Persistence.Repositories;
 
@@ -11,41 +12,78 @@ namespace SmartLibrary.Infrastructure.Persistence.Repositories;
 /// </summary>
 public class BookRepository : RepositoryBase<Book>, IBookRepository
 {
-    public BookRepository(AppDbContext context) : base(context) { }
+    private readonly IBookCatalogCache _catalog;
+
+    public BookRepository(AppDbContext context, IBookCatalogCache catalog) : base(context)
+    {
+        _catalog = catalog;
+    }
 
     public async Task<PagedResult<Book>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, CancellationToken ct = default)
     {
-        var query = _dbSet
-            .AsNoTracking()
-            .Include(b => b.Authors)
-            .Include(b => b.Categories)
-            .Where(b => !b.IsDeleted)
-            .AsQueryable();
-
-        if (categoryId.HasValue)
-        {
-            query = query.Where(b => b.Categories.Any(c => c.Id == categoryId.Value && !c.IsDeleted));
-        }
-
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var searchLower = search.Trim().ToLower();
-            query = query.Where(b =>
-                b.Title.ToLower().Contains(searchLower) ||
-                b.Code.ToLower().Contains(searchLower) ||
-                (b.Isbn != null && b.Isbn.ToLower().Contains(searchLower)));
+            var snapshots = await _catalog.GetAsync(ct);
+            if (categoryId.HasValue)
+                snapshots = snapshots.Where(book => book.CategoryIds.Contains(categoryId.Value)).ToList();
+
+            var ranked = snapshots
+                .Select(book => (
+                    Book: book,
+                    Score: BookKeywordRanker.Score(
+                        search,
+                        book.Title,
+                        book.Description,
+                        book.Code,
+                        book.Isbn,
+                        book.Authors,
+                        book.Categories,
+                        book.Language)))
+                .Where(item => item.Score > 0)
+                .OrderByDescending(item => item.Score)
+                .ThenBy(item => item.Book.Title)
+                .ToList();
+
+            var pageBooks = ranked
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(item => ToBook(item.Book))
+                .ToList();
+            return new PagedResult<Book>(pageBooks, ranked.Count, page, pageSize);
         }
 
-        var totalCount = await query.CountAsync(ct);
+        var query = _dbSet.AsNoTracking().Where(book => !book.IsDeleted);
+        if (categoryId.HasValue)
+            query = query.Where(book => book.Categories.Any(category => category.Id == categoryId.Value && !category.IsDeleted));
 
+        var totalCount = await query.CountAsync(ct);
         var items = await query
-            .OrderByDescending(b => b.CreatedAt)
+            .AsSplitQuery()
+            .Include(book => book.Authors)
+            .Include(book => book.Categories)
+            .OrderByDescending(book => book.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
 
         return new PagedResult<Book>(items, totalCount, page, pageSize);
     }
+
+    private static Book ToBook(BookCatalogItem item) => new()
+    {
+        Id = item.Id,
+        Title = item.Title,
+        Description = item.Description,
+        Code = item.Code,
+        Isbn = item.Isbn,
+        Language = item.Language ?? "vi",
+        CoverImageUrl = item.CoverImageUrl,
+        PublishedYear = item.PublishedYear,
+        AvailableCopies = item.AvailableCopies,
+        TotalCopies = item.TotalCopies,
+        Authors = item.Authors.Select(name => new Author { Name = name }).ToList(),
+        Categories = item.Categories.Select(name => new Category { Name = name }).ToList()
+    };
 
     public async Task<Book?> GetByIsbnAsync(string isbn, CancellationToken ct = default)
         => await _dbSet.FirstOrDefaultAsync(b => b.Isbn == isbn, ct);

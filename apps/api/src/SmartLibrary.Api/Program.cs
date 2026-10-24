@@ -84,6 +84,47 @@ try
         try
         {
             db.Database.ExecuteSqlRaw("ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url TEXT;");
+            db.Database.ExecuteSqlRaw("""
+                CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
+                CREATE TABLE IF NOT EXISTS ai_settings (
+                    id UUID PRIMARY KEY,
+                    encrypted_api_key TEXT,
+                    api_key_last4 VARCHAR(8),
+                    provider VARCHAR(50) NOT NULL DEFAULT 'gemini',
+                    chat_model VARCHAR(100) NOT NULL DEFAULT 'gemini-3.8-flash',
+                    embedding_model VARCHAR(100) NOT NULL DEFAULT 'gemini-embedding-001',
+                    is_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                    reader_ai_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                    librarian_ai_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                    last_tested_at TIMESTAMPTZ,
+                    last_test_ok BOOLEAN,
+                    last_test_message VARCHAR(500),
+                    documents_synced_at TIMESTAMPTZ,
+                    document_count INTEGER NOT NULL DEFAULT 0,
+                    updated_by UUID,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                CREATE TABLE IF NOT EXISTS rag_documents (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    source_type VARCHAR(20) NOT NULL,
+                    source_id UUID NOT NULL,
+                    title VARCHAR(500) NOT NULL,
+                    content TEXT NOT NULL,
+                    content_hash VARCHAR(64) NOT NULL,
+                    embedding extensions.vector(768),
+                    indexed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    UNIQUE (source_type, source_id)
+                );
+                ALTER TABLE ai_settings ADD COLUMN IF NOT EXISTS base_url VARCHAR(500);
+                ALTER TABLE ai_settings ADD COLUMN IF NOT EXISTS provider_keys_json TEXT;
+                ALTER TABLE ai_settings ADD COLUMN IF NOT EXISTS recommend_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE ai_settings ADD COLUMN IF NOT EXISTS trends_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE ai_settings ADD COLUMN IF NOT EXISTS overdue_predict_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE ai_settings ADD COLUMN IF NOT EXISTS librarian_criteria_json TEXT;
+                """);
         }
         catch (Exception exSql)
         {

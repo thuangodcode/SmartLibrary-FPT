@@ -1,0 +1,927 @@
+using System.Text.Json;
+using SmartLibrary.Application.Common;
+using SmartLibrary.Application.Features.Ai.DTOs;
+using SmartLibrary.Application.Features.Notifications;
+using SmartLibrary.Application.Interfaces;
+using SmartLibrary.Domain.Entities;
+
+namespace SmartLibrary.Application.Features.Ai;
+
+public class AiSettingsService
+{
+    public const string AdminRole = "Admin";
+    public const string LibrarianRole = "Librarian";
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true
+    };
+
+    private static readonly string[] KnownProviders =
+    [
+        "gemini", "openai", "anthropic", "deepseek", "openrouter", "huggingface", "other"
+    ];
+
+    private readonly IAiSettingsRepository _repository;
+    private readonly ISecretProtector _protector;
+    private readonly IGeminiClient _gemini;
+    private readonly INotificationInbox? _inbox;
+
+    public AiSettingsService(
+        IAiSettingsRepository repository,
+        ISecretProtector protector,
+        IGeminiClient gemini,
+        INotificationInbox? inbox = null)
+    {
+        _repository = repository;
+        _protector = protector;
+        _gemini = gemini;
+        _inbox = inbox;
+    }
+
+    public Task<AiSettingsStatusDto> GetStatusAsync(string role, CancellationToken ct = default)
+        => GetStatusAsync(role, Guid.Empty, ct);
+
+    public async Task<AiSettingsStatusDto> GetStatusAsync(string role, Guid actorId, CancellationToken ct = default)
+    {
+        var policy = await _repository.GetOrCreateAsync(ct);
+        var libraryUser = await LoadLibraryUserAsync(policy, ct);
+        if (IsAdmin(role))
+        {
+            var accounts = await _repository.ListLibrarianAccountsAsync(ct) ?? [];
+            return MapAdmin(policy, libraryUser, accounts);
+        }
+
+        var mine = actorId == Guid.Empty ? null : await _repository.GetUserAsync(actorId, ct);
+        return MapLibrarian(policy, mine, libraryUser, actorId);
+    }
+
+    public async Task<Result<AiSettingsStatusDto>> SaveAdminAsync(
+        SaveAiSettingsRequest request,
+        string role,
+        Guid actorId,
+        CancellationToken ct = default)
+    {
+        if (!IsAdmin(role))
+            return Result<AiSettingsStatusDto>.Failure("Chỉ Admin được lưu chính sách AI hệ thống.");
+
+        if (!string.IsNullOrWhiteSpace(request.ApiKey))
+            return Result<AiSettingsStatusDto>.Failure("Admin không lưu API Key. Thủ thư tự cấu hình khóa của mình.");
+
+        var settings = await _repository.GetOrCreateAsync(ct);
+        if (request.IsEnabled.HasValue)
+            settings.IsEnabled = request.IsEnabled.Value;
+        if (request.ReaderAiEnabled.HasValue)
+            settings.ReaderAiEnabled = request.ReaderAiEnabled.Value;
+        if (request.LibrarianAiEnabled.HasValue)
+            settings.LibrarianAiEnabled = request.LibrarianAiEnabled.Value;
+        if (request.RecommendEnabled.HasValue)
+            settings.RecommendEnabled = request.RecommendEnabled.Value;
+        if (request.TrendsEnabled.HasValue)
+            settings.TrendsEnabled = request.TrendsEnabled.Value;
+        if (request.OverduePredictEnabled.HasValue)
+            settings.OverduePredictEnabled = request.OverduePredictEnabled.Value;
+
+        var libraryUser = await LoadLibraryUserAsync(settings, ct);
+        var ragOn = settings.IsEnabled
+            && (settings.ReaderAiEnabled || settings.RecommendEnabled || settings.LibrarianAiEnabled);
+        var provider = libraryUser?.Provider ?? settings.Provider;
+        if (ragOn && libraryUser is not null && !SupportsEmbedding(provider))
+            return Result<AiSettingsStatusDto>.Failure(
+                "Nhà cung cấp thư viện đang dùng không tạo embedding cho RAG. Thủ thư hãy chọn Gemini hoặc OpenAI, hoặc tắt tìm kiếm ngữ nghĩa và gợi ý sách.");
+
+        settings.UpdatedBy = actorId;
+        settings.UpdatedAt = DateTime.UtcNow;
+        await _repository.SaveAsync(settings, ct);
+        return Result<AiSettingsStatusDto>.Success(await GetStatusAsync(role, actorId, ct));
+    }
+
+    public async Task<Result<AiSettingsStatusDto>> SaveMyProviderAsync(
+        SaveAiSettingsRequest request,
+        string role,
+        Guid actorId,
+        CancellationToken ct = default)
+    {
+        if (!IsLibrarianOnly(role))
+            return Result<AiSettingsStatusDto>.Failure("Chỉ Thủ thư được lưu API Key cá nhân.");
+        if (actorId == Guid.Empty)
+            return Result<AiSettingsStatusDto>.Failure("Không xác định được tài khoản.");
+
+        var policy = await _repository.GetOrCreateAsync(ct);
+        var user = await _repository.GetOrCreateUserAsync(actorId, ct);
+        var bag = ReadBag(user);
+
+        if (!string.IsNullOrWhiteSpace(user.EncryptedApiKey))
+        {
+            var active = GetOrCreateState(bag, NormalizeProvider(user.Provider));
+            if (string.IsNullOrWhiteSpace(active.EncryptedApiKey))
+                SyncActiveIntoBag(user, bag);
+        }
+
+        var previousEmbedding = user.EmbeddingModel;
+        if (request.ClearProvider == true)
+        {
+            ClearProvider(user, bag, request.Provider);
+        }
+        else if (!string.IsNullOrWhiteSpace(request.Provider))
+        {
+            var provider = NormalizeProvider(request.Provider);
+            var applied = ApplyProvider(user, bag, provider, request);
+            if (applied is not null)
+                return Result<AiSettingsStatusDto>.Failure(applied);
+        }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(request.ChatModel))
+                user.ChatModel = request.ChatModel.Trim();
+            if (!string.IsNullOrWhiteSpace(request.EmbeddingModel))
+                user.EmbeddingModel = request.EmbeddingModel.Trim();
+            var keyError = TryApplyApiKey(user, request.ApiKey);
+            if (keyError is not null)
+                return Result<AiSettingsStatusDto>.Failure(keyError);
+            SyncActiveIntoBag(user, bag);
+        }
+
+        var ragOn = policy.IsEnabled
+            && (policy.ReaderAiEnabled || policy.RecommendEnabled || policy.LibrarianAiEnabled);
+        var willBeLibrary = request.UseForLibrary == true
+            || policy.ActiveLibrarianUserId == actorId
+            || (policy.ActiveLibrarianUserId is null && !string.IsNullOrWhiteSpace(user.EncryptedApiKey));
+        if (ragOn && willBeLibrary && !SupportsEmbedding(user.Provider) && !string.IsNullOrWhiteSpace(user.EncryptedApiKey))
+            return Result<AiSettingsStatusDto>.Failure(
+                "Nhà cung cấp này không tạo embedding cho RAG. Chọn Gemini hoặc OpenAI, hoặc không dùng cấu hình này cho độc giả.");
+
+        user.ProviderKeysJson = JsonSerializer.Serialize(bag, JsonOptions);
+        user.UpdatedAt = DateTime.UtcNow;
+        await _repository.SaveUserAsync(user, ct);
+
+        var policyDirty = false;
+        if (!string.IsNullOrWhiteSpace(user.EncryptedApiKey)
+            && (request.UseForLibrary == true || policy.ActiveLibrarianUserId is null))
+        {
+            policy.ActiveLibrarianUserId = actorId;
+            policyDirty = true;
+        }
+
+        if (policy.ActiveLibrarianUserId == actorId
+            && !string.Equals(previousEmbedding, user.EmbeddingModel, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(previousEmbedding))
+        {
+            policyDirty = true;
+        }
+
+        if (policyDirty)
+        {
+            policy.UpdatedBy = actorId;
+            policy.UpdatedAt = DateTime.UtcNow;
+            await _repository.SaveAsync(policy, ct);
+        }
+
+        return Result<AiSettingsStatusDto>.Success(await GetStatusAsync(role, actorId, ct));
+    }
+
+    public async Task<Result<AiSettingsStatusDto>> UseMyConfigForLibraryAsync(
+        string role,
+        Guid actorId,
+        CancellationToken ct = default)
+    {
+        if (!IsLibrarianOnly(role))
+            return Result<AiSettingsStatusDto>.Failure("Chỉ Thủ thư được chọn cấu hình dùng cho thư viện.");
+        if (actorId == Guid.Empty)
+            return Result<AiSettingsStatusDto>.Failure("Không xác định được tài khoản.");
+
+        var user = await _repository.GetUserAsync(actorId, ct);
+        if (user is null || string.IsNullOrWhiteSpace(user.EncryptedApiKey))
+            return Result<AiSettingsStatusDto>.Failure("Hãy lưu API Key trước khi dùng cấu hình này cho độc giả.");
+        if (!user.IsEnabled)
+            return Result<AiSettingsStatusDto>.Failure("Admin đã tắt quyền AI của tài khoản này.");
+        if (!SupportsEmbedding(user.Provider))
+            return Result<AiSettingsStatusDto>.Failure(
+                "Nhà cung cấp này không tạo embedding. Chọn Gemini hoặc OpenAI trước khi dùng cho thư viện.");
+
+        var policy = await _repository.GetOrCreateAsync(ct);
+        policy.ActiveLibrarianUserId = actorId;
+        policy.UpdatedBy = actorId;
+        policy.UpdatedAt = DateTime.UtcNow;
+        await _repository.SaveAsync(policy, ct);
+        return Result<AiSettingsStatusDto>.Success(await GetStatusAsync(role, actorId, ct));
+    }
+
+    public async Task<Result<AiSettingsStatusDto>> SetLibrarianAccountEnabledAsync(
+        Guid targetUserId,
+        bool enabled,
+        string role,
+        Guid actorId,
+        CancellationToken ct = default)
+    {
+        if (!IsAdmin(role))
+            return Result<AiSettingsStatusDto>.Failure("Chỉ Admin được bật hoặc tắt quyền AI của thủ thư.");
+        if (targetUserId == Guid.Empty)
+            return Result<AiSettingsStatusDto>.Failure("Thiếu tài khoản thủ thư.");
+
+        var user = await _repository.GetOrCreateUserAsync(targetUserId, ct);
+        user.IsEnabled = enabled;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _repository.SaveUserAsync(user, ct);
+
+        var policy = await _repository.GetOrCreateAsync(ct);
+        if (!enabled && policy.ActiveLibrarianUserId == targetUserId)
+        {
+            policy.ActiveLibrarianUserId = null;
+            policy.UpdatedBy = actorId;
+            policy.UpdatedAt = DateTime.UtcNow;
+            await _repository.SaveAsync(policy, ct);
+        }
+
+        return Result<AiSettingsStatusDto>.Success(await GetStatusAsync(role, actorId, ct));
+    }
+
+    public async Task<Result<AiSettingsStatusDto>> SaveLibrarianAsync(
+        SaveLibrarianAiSettingsRequest request,
+        string role,
+        Guid actorId,
+        CancellationToken ct = default)
+    {
+        if (!IsStaff(role))
+            return Result<AiSettingsStatusDto>.Failure("Chỉ Thủ thư hoặc Admin được đổi cấu hình AI của thủ thư.");
+
+        var settings = await _repository.GetOrCreateAsync(ct);
+        if (IsAdmin(role))
+        {
+            settings.LibrarianAiEnabled = request.LibrarianAiEnabled;
+        }
+        else if (request.LibrarianAiEnabled != settings.LibrarianAiEnabled)
+        {
+            return Result<AiSettingsStatusDto>.Failure(
+                "Chỉ Admin được bật hoặc tắt gợi ý nhập sách. Thủ thư chỉ chỉnh tiêu chí.");
+        }
+
+        var flags = ReadCriteria(settings);
+        if (request.UseMajor.HasValue) flags.UseMajor = request.UseMajor.Value;
+        if (request.UseCategory.HasValue) flags.UseCategory = request.UseCategory.Value;
+        if (request.UseHistory.HasValue) flags.UseHistory = request.UseHistory.Value;
+        if (request.UseReviews.HasValue) flags.UseReviews = request.UseReviews.Value;
+        if (request.UseGoals.HasValue) flags.UseGoals = request.UseGoals.Value;
+        settings.LibrarianCriteriaJson = JsonSerializer.Serialize(flags, JsonOptions);
+        settings.UpdatedBy = actorId;
+        settings.UpdatedAt = DateTime.UtcNow;
+        await _repository.SaveAsync(settings, ct);
+        return Result<AiSettingsStatusDto>.Success(await GetStatusAsync(role, actorId, ct));
+    }
+
+    public async Task<Result<AiConnectionTestDto>> TestConnectionAsync(
+        string role,
+        Guid actorId = default,
+        string? provider = null,
+        CancellationToken ct = default)
+    {
+        if (IsAdmin(role))
+            return await TestLibraryAsync(provider, ct);
+        if (!IsLibrarianOnly(role))
+            return Result<AiConnectionTestDto>.Failure("Chỉ Thủ thư được kiểm tra API Key của mình.");
+        if (actorId == Guid.Empty)
+            return Result<AiConnectionTestDto>.Failure("Không xác định được tài khoản.");
+
+        var user = await _repository.GetUserAsync(actorId, ct);
+        if (user is null || string.IsNullOrWhiteSpace(user.EncryptedApiKey))
+            return Result<AiConnectionTestDto>.Failure("Chưa cấu hình API Key.");
+        if (!user.IsEnabled)
+            return Result<AiConnectionTestDto>.Failure("Admin đã tắt quyền AI của tài khoản này.");
+
+        var bag = ReadBag(user);
+        var target = string.IsNullOrWhiteSpace(provider)
+            ? NormalizeProvider(user.Provider)
+            : NormalizeProvider(provider);
+        if (!TryUnlockProvider(user, bag, target, out var apiKey, out var chatModel, out var baseUrl))
+            return Result<AiConnectionTestDto>.Failure("Chưa lưu API Key cho nhà cung cấp này.");
+
+        var state = GetOrCreateState(bag, target);
+        var embeddingModel = string.IsNullOrWhiteSpace(state.EmbeddingModel)
+            ? user.EmbeddingModel
+            : state.EmbeddingModel;
+        var result = await RunTestAsync(
+            target,
+            apiKey,
+            chatModel,
+            embeddingModel,
+            baseUrl,
+            async (testedAt, ok, message) =>
+            {
+                WriteTestResult(user, bag, state, target, testedAt, ok, message);
+                await _repository.SaveUserAsync(user, ct);
+            },
+            ct);
+        if (!result.IsSuccess)
+            await NotifyCredentialAsync(actorId, result.Error, ct);
+        return result;
+    }
+
+    public async Task<Result<AiRuntimeCredential>> ResolveLibraryAsync(CancellationToken ct = default)
+    {
+        var policy = await _repository.GetOrCreateAsync(ct);
+        var libraryUser = await LoadLibraryUserAsync(policy, ct);
+        if (libraryUser is not null && libraryUser.IsEnabled)
+        {
+            var key = Unlock(libraryUser);
+            if (!string.IsNullOrWhiteSpace(key))
+                return Result<AiRuntimeCredential>.Success(ToCredential(libraryUser, key));
+        }
+
+        var legacy = UnlockApiKey(policy);
+        if (!string.IsNullOrWhiteSpace(legacy))
+        {
+            return Result<AiRuntimeCredential>.Success(new AiRuntimeCredential
+            {
+                ApiKey = legacy,
+                Provider = policy.Provider,
+                ChatModel = policy.ChatModel,
+                EmbeddingModel = policy.EmbeddingModel,
+                BaseUrl = policy.BaseUrl
+            });
+        }
+
+        return Result<AiRuntimeCredential>.Failure("Chưa cấu hình API Key.");
+    }
+
+    public async Task<Result<AiRuntimeCredential>> ResolveForAskAsync(
+        string role,
+        Guid? userId,
+        CancellationToken ct = default)
+    {
+        var policy = await _repository.GetOrCreateAsync(ct);
+        var blocked = GateAsk(policy, role);
+        if (blocked is not null)
+            return Result<AiRuntimeCredential>.Failure(blocked);
+
+        if (IsLibrarianOnly(role) && userId is Guid id && id != Guid.Empty)
+        {
+            var user = await _repository.GetUserAsync(id, ct);
+            if (user is not null && !user.IsEnabled)
+                return Result<AiRuntimeCredential>.Failure("Admin đã tắt quyền AI của tài khoản này.");
+            var key = user is null ? null : Unlock(user);
+            if (string.IsNullOrWhiteSpace(key))
+                return Result<AiRuntimeCredential>.Failure("Chưa cấu hình API Key.");
+
+            return Result<AiRuntimeCredential>.Success(ToCredential(user!, key));
+        }
+
+        return await ResolveLibraryAsync(ct);
+    }
+
+    public async Task<AiSetting> GetEntityAsync(CancellationToken ct = default)
+        => await _repository.GetOrCreateAsync(ct);
+
+    public async Task UpdateSyncStatsAsync(
+        DateTime syncedAt,
+        int documentCount,
+        string? embeddingModel = null,
+        CancellationToken ct = default)
+    {
+        var settings = await _repository.GetOrCreateAsync(ct);
+        settings.DocumentsSyncedAt = syncedAt;
+        settings.DocumentCount = documentCount;
+        if (!string.IsNullOrWhiteSpace(embeddingModel))
+            settings.IndexEmbeddingModel = embeddingModel;
+        settings.UpdatedAt = DateTime.UtcNow;
+        await _repository.SaveAsync(settings, ct);
+    }
+
+    public string? UnlockApiKey(AiSetting settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.EncryptedApiKey))
+            return null;
+        return _protector.Unprotect(settings.EncryptedApiKey);
+    }
+
+    public static string? GateAsk(AiSetting settings, string role)
+    {
+        if (!settings.IsEnabled)
+            return "Hệ thống AI đang tắt.";
+        if (!IsStaff(role) && !settings.ReaderAiEnabled)
+            return "Trợ lý AI dành cho độc giả đang tắt.";
+        if (string.Equals(role, LibrarianRole, StringComparison.OrdinalIgnoreCase)
+            && !settings.LibrarianAiEnabled
+            && !settings.ReaderAiEnabled)
+            return "AI cho thủ thư đang tắt.";
+        return null;
+    }
+
+    public static bool IsAdmin(string? role)
+        => string.Equals(role, AdminRole, StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsStaff(string? role)
+        => IsAdmin(role) || string.Equals(role, LibrarianRole, StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsLibrarianOnly(string? role)
+        => string.Equals(role, LibrarianRole, StringComparison.OrdinalIgnoreCase);
+
+    private async Task<Result<AiConnectionTestDto>> TestLibraryAsync(string? provider, CancellationToken ct)
+    {
+        var resolved = await ResolveLibraryAsync(ct);
+        if (!resolved.IsSuccess)
+            return Result<AiConnectionTestDto>.Failure(resolved.Error ?? "Chưa cấu hình API Key.");
+
+        var cred = resolved.Data!;
+        var target = string.IsNullOrWhiteSpace(provider) ? cred.Provider : NormalizeProvider(provider);
+        if (!string.Equals(target, cred.Provider, StringComparison.OrdinalIgnoreCase))
+            return Result<AiConnectionTestDto>.Failure("Admin chỉ kiểm tra nhà cung cấp đang dùng cho thư viện, không đọc khóa cá nhân.");
+
+        var result = await RunTestAsync(
+            cred.Provider,
+            cred.ApiKey,
+            cred.ChatModel,
+            cred.EmbeddingModel,
+            cred.BaseUrl,
+            (_, _, _) => Task.CompletedTask,
+            ct);
+        if (!result.IsSuccess)
+            await NotifyCredentialAsync(cred.OwnerUserId, result.Error, ct);
+        return result;
+    }
+
+    private async Task<Result<AiConnectionTestDto>> RunTestAsync(
+        string provider,
+        string apiKey,
+        string chatModel,
+        string embeddingModel,
+        string? baseUrl,
+        Func<DateTime, bool, string, Task> persist,
+        CancellationToken ct)
+    {
+        var testedAt = DateTime.UtcNow;
+        try
+        {
+            var reply = await _gemini.GenerateAsync(
+                provider, apiKey, chatModel, "Reply with exactly: OK", baseUrl, ct);
+            var ok = !string.IsNullOrWhiteSpace(reply);
+            var message = ok
+                ? $"{DisplayName(provider)} phản hồi chat thành công."
+                : $"{DisplayName(provider)} không trả về nội dung.";
+
+            if (ok && SupportsEmbedding(provider))
+            {
+                var vector = await _gemini.EmbedAsync(
+                    provider, apiKey, embeddingModel, "SmartLibrary connection test", baseUrl, ct);
+                if (vector.Length == 0)
+                {
+                    ok = false;
+                    message = $"{DisplayName(provider)} chat được nhưng embedding trống.";
+                }
+                else
+                    message = $"{DisplayName(provider)} chat và embedding phản hồi thành công.";
+            }
+            else if (ok)
+            {
+                message = $"{DisplayName(provider)} chat thành công. Nhà này không hỗ trợ embedding RAG.";
+            }
+
+            await persist(testedAt, ok, message);
+            return Result<AiConnectionTestDto>.Success(new AiConnectionTestDto
+            {
+                Ok = ok,
+                Message = message,
+                TestedAt = testedAt,
+                Provider = provider
+            });
+        }
+        catch (Exception ex)
+        {
+            var message = TrimError(ex.Message);
+            await persist(testedAt, false, message);
+            return Result<AiConnectionTestDto>.Failure(message);
+        }
+    }
+
+    private Task<UserAiSetting?> LoadLibraryUserAsync(AiSetting policy, CancellationToken ct)
+        => policy.ActiveLibrarianUserId is Guid id
+            ? _repository.GetUserAsync(id, ct)
+            : Task.FromResult<UserAiSetting?>(null);
+
+    private async Task NotifyCredentialAsync(Guid? ownerId, string? detail, CancellationToken ct)
+    {
+        if (_inbox is null || ownerId is not Guid id || id == Guid.Empty || string.IsNullOrWhiteSpace(detail))
+            return;
+        try
+        {
+            await _inbox.NotifyAiCredentialAsync(id, detail, ct);
+        }
+        catch (Exception)
+        {
+            // Connection test result still returns to the caller.
+        }
+    }
+
+    private string? Unlock(UserAiSetting settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.EncryptedApiKey))
+            return null;
+        try
+        {
+            return _protector.Unprotect(settings.EncryptedApiKey);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static AiRuntimeCredential ToCredential(UserAiSetting user, string apiKey) => new()
+    {
+        OwnerUserId = user.UserId,
+        ApiKey = apiKey,
+        Provider = user.Provider,
+        ChatModel = user.ChatModel,
+        EmbeddingModel = user.EmbeddingModel,
+        BaseUrl = user.BaseUrl
+    };
+
+    private static void ClearProvider(
+        UserAiSetting settings,
+        Dictionary<string, StoredProviderState> bag,
+        string? providerId)
+    {
+        var provider = NormalizeProvider(string.IsNullOrWhiteSpace(providerId) ? settings.Provider : providerId);
+        bag.Remove(provider);
+        if (!string.Equals(settings.Provider, provider, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var fallback = bag.FirstOrDefault(item => !string.IsNullOrWhiteSpace(item.Value.EncryptedApiKey));
+        if (!string.IsNullOrWhiteSpace(fallback.Key))
+        {
+            ApplyState(settings, fallback.Key, fallback.Value);
+            return;
+        }
+
+        settings.EncryptedApiKey = null;
+        settings.ApiKeyLast4 = null;
+    }
+
+    private string? ApplyProvider(
+        UserAiSetting settings,
+        Dictionary<string, StoredProviderState> bag,
+        string provider,
+        SaveAiSettingsRequest request)
+    {
+        var state = GetOrCreateState(bag, provider);
+        var keyError = TryApplyApiKey(state, request.ApiKey);
+        if (keyError is not null)
+            return keyError;
+
+        if (string.IsNullOrWhiteSpace(state.EncryptedApiKey))
+            return "Chưa có API Key cho nhà cung cấp này.";
+
+        if (provider == "other")
+        {
+            var baseUrl = string.IsNullOrWhiteSpace(request.BaseUrl) ? state.BaseUrl : request.BaseUrl.Trim();
+            if (string.IsNullOrWhiteSpace(baseUrl))
+                return "Nhà cung cấp khác cần Base URL.";
+            state.BaseUrl = baseUrl;
+        }
+        else if (!string.IsNullOrWhiteSpace(request.BaseUrl))
+        {
+            state.BaseUrl = request.BaseUrl.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ChatModel))
+            state.ChatModel = request.ChatModel.Trim();
+        if (!string.IsNullOrWhiteSpace(request.EmbeddingModel))
+            state.EmbeddingModel = request.EmbeddingModel.Trim();
+
+        ApplyState(settings, provider, state);
+        return null;
+    }
+
+    private static void ApplyState(UserAiSetting settings, string provider, StoredProviderState state)
+    {
+        settings.Provider = provider;
+        settings.EncryptedApiKey = state.EncryptedApiKey;
+        settings.ApiKeyLast4 = state.ApiKeyLast4;
+        settings.ChatModel = string.IsNullOrWhiteSpace(state.ChatModel) ? settings.ChatModel : state.ChatModel;
+        if (!string.IsNullOrWhiteSpace(state.EmbeddingModel))
+            settings.EmbeddingModel = state.EmbeddingModel;
+        settings.BaseUrl = state.BaseUrl;
+    }
+
+    private string? TryApplyApiKey(UserAiSetting settings, string? apiKey)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey) || IsMaskedKey(apiKey))
+            return null;
+
+        var trimmed = apiKey.Trim();
+        if (trimmed.Length < 20)
+            return "API Key không hợp lệ.";
+
+        settings.EncryptedApiKey = _protector.Protect(trimmed);
+        settings.ApiKeyLast4 = trimmed[^4..];
+        return null;
+    }
+
+    private string? TryApplyApiKey(StoredProviderState state, string? apiKey)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey) || IsMaskedKey(apiKey))
+            return null;
+
+        var trimmed = apiKey.Trim();
+        if (trimmed.Length < 20)
+            return "API Key không hợp lệ.";
+
+        state.EncryptedApiKey = _protector.Protect(trimmed);
+        state.ApiKeyLast4 = trimmed[^4..];
+        return null;
+    }
+
+    private bool TryUnlockProvider(
+        UserAiSetting settings,
+        Dictionary<string, StoredProviderState> bag,
+        string provider,
+        out string apiKey,
+        out string chatModel,
+        out string? baseUrl)
+    {
+        apiKey = string.Empty;
+        chatModel = settings.ChatModel;
+        baseUrl = settings.BaseUrl;
+
+        if (bag.TryGetValue(provider, out var state) && !string.IsNullOrWhiteSpace(state.EncryptedApiKey))
+        {
+            apiKey = _protector.Unprotect(state.EncryptedApiKey);
+            chatModel = string.IsNullOrWhiteSpace(state.ChatModel) ? settings.ChatModel : state.ChatModel;
+            baseUrl = string.IsNullOrWhiteSpace(state.BaseUrl) ? settings.BaseUrl : state.BaseUrl;
+            return !string.IsNullOrWhiteSpace(apiKey);
+        }
+
+        if (string.Equals(settings.Provider, provider, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(settings.EncryptedApiKey))
+        {
+            apiKey = _protector.Unprotect(settings.EncryptedApiKey);
+            return !string.IsNullOrWhiteSpace(apiKey);
+        }
+
+        return false;
+    }
+
+    private static void WriteTestResult(
+        UserAiSetting settings,
+        Dictionary<string, StoredProviderState> bag,
+        StoredProviderState state,
+        string provider,
+        DateTime testedAt,
+        bool ok,
+        string message)
+    {
+        state.LastTestedAt = testedAt;
+        state.LastTestOk = ok;
+        state.LastTestMessage = message;
+        settings.ProviderKeysJson = JsonSerializer.Serialize(bag, JsonOptions);
+        if (string.Equals(settings.Provider, provider, StringComparison.OrdinalIgnoreCase))
+        {
+            settings.LastTestedAt = testedAt;
+            settings.LastTestOk = ok;
+            settings.LastTestMessage = message;
+        }
+        settings.UpdatedAt = testedAt;
+    }
+
+    private static void SyncActiveIntoBag(UserAiSetting settings, Dictionary<string, StoredProviderState> bag)
+    {
+        var state = GetOrCreateState(bag, NormalizeProvider(settings.Provider));
+        state.EncryptedApiKey = settings.EncryptedApiKey;
+        state.ApiKeyLast4 = settings.ApiKeyLast4;
+        state.ChatModel = settings.ChatModel;
+        state.EmbeddingModel = settings.EmbeddingModel;
+        state.BaseUrl = settings.BaseUrl;
+        state.LastTestedAt = settings.LastTestedAt;
+        state.LastTestOk = settings.LastTestOk;
+        state.LastTestMessage = settings.LastTestMessage;
+    }
+
+    private static Dictionary<string, StoredProviderState> ReadBag(UserAiSetting settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.ProviderKeysJson))
+        {
+            var empty = new Dictionary<string, StoredProviderState>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(settings.EncryptedApiKey))
+                SyncActiveIntoBag(settings, empty);
+            return empty;
+        }
+
+        try
+        {
+            var bag = JsonSerializer.Deserialize<Dictionary<string, StoredProviderState>>(settings.ProviderKeysJson, JsonOptions)
+                      ?? new Dictionary<string, StoredProviderState>(StringComparer.OrdinalIgnoreCase);
+            return new Dictionary<string, StoredProviderState>(bag, StringComparer.OrdinalIgnoreCase);
+        }
+        catch (JsonException)
+        {
+            return new Dictionary<string, StoredProviderState>(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    private static StoredProviderState GetOrCreateState(Dictionary<string, StoredProviderState> bag, string provider)
+    {
+        if (bag.TryGetValue(provider, out var state))
+            return state;
+        state = new StoredProviderState();
+        bag[provider] = state;
+        return state;
+    }
+
+    private static bool IsMaskedKey(string apiKey)
+        => apiKey.All(ch => ch is '*' or '•' or '·' or ' ');
+
+    private static AiSettingsStatusDto MapAdmin(
+        AiSetting policy,
+        UserAiSetting? libraryUser,
+        IReadOnlyList<LibrarianAiAccountRow> accounts)
+    {
+        var flags = ReadCriteria(policy);
+        var hasLibraryKey = !string.IsNullOrWhiteSpace(libraryUser?.EncryptedApiKey)
+                            || !string.IsNullOrWhiteSpace(policy.EncryptedApiKey);
+        var provider = libraryUser?.Provider ?? policy.Provider;
+        var chat = libraryUser?.ChatModel ?? policy.ChatModel;
+        var embed = libraryUser?.EmbeddingModel ?? policy.EmbeddingModel;
+        var activeName = accounts.FirstOrDefault(item => item.UserId == policy.ActiveLibrarianUserId)?.FullName;
+        return new AiSettingsStatusDto
+        {
+            HasApiKey = hasLibraryKey,
+            ApiKeyLast4 = null,
+            Provider = NormalizeProvider(provider),
+            ChatModel = chat,
+            EmbeddingModel = embed,
+            BaseUrl = null,
+            IsEnabled = policy.IsEnabled,
+            ReaderAiEnabled = policy.ReaderAiEnabled,
+            LibrarianAiEnabled = policy.LibrarianAiEnabled,
+            UseMajor = flags.UseMajor,
+            UseCategory = flags.UseCategory,
+            UseHistory = flags.UseHistory,
+            UseReviews = flags.UseReviews,
+            UseGoals = flags.UseGoals,
+            RecommendEnabled = policy.RecommendEnabled,
+            TrendsEnabled = policy.TrendsEnabled,
+            OverduePredictEnabled = policy.OverduePredictEnabled,
+            LastTestedAt = libraryUser?.LastTestedAt ?? policy.LastTestedAt,
+            LastTestOk = libraryUser?.LastTestOk ?? policy.LastTestOk,
+            LastTestMessage = libraryUser?.LastTestMessage ?? policy.LastTestMessage,
+            DocumentsSyncedAt = policy.DocumentsSyncedAt,
+            DocumentCount = policy.DocumentCount,
+            CanEditApiKey = false,
+            AccountEnabled = true,
+            UseForLibrary = policy.ActiveLibrarianUserId is not null,
+            NeedsReindex = NeedsReindex(policy, libraryUser),
+            ActiveLibrarianUserId = policy.ActiveLibrarianUserId,
+            LibraryLibrarianName = activeName,
+            Providers = [],
+            LibrarianAccounts = accounts.Select(item => new LibrarianAiAccountDto
+            {
+                UserId = item.UserId,
+                FullName = item.FullName,
+                Email = item.Email,
+                HasApiKey = item.HasApiKey,
+                IsEnabled = item.IsEnabled,
+                IsLibraryActive = item.UserId == policy.ActiveLibrarianUserId,
+                Provider = item.Provider,
+                ChatModel = item.ChatModel,
+                EmbeddingModel = item.EmbeddingModel,
+                LastTestedAt = item.LastTestedAt,
+                LastTestOk = item.LastTestOk,
+                LastTestMessage = item.LastTestMessage,
+                LastUsedAt = item.LastUsedAt
+            }).ToList()
+        };
+    }
+
+    private static AiSettingsStatusDto MapLibrarian(
+        AiSetting policy,
+        UserAiSetting? mine,
+        UserAiSetting? libraryUser,
+        Guid actorId)
+    {
+        var flags = ReadCriteria(policy);
+        var bag = mine is null
+            ? new Dictionary<string, StoredProviderState>(StringComparer.OrdinalIgnoreCase)
+            : ReadBag(mine);
+        var active = NormalizeProvider(mine?.Provider ?? "gemini");
+        var canShowKeyMeta = mine is not null;
+        var providers = KnownProviders.Select(id =>
+        {
+            bag.TryGetValue(id, out var state);
+            var hasKey = !string.IsNullOrWhiteSpace(state?.EncryptedApiKey)
+                         || (id == active && !string.IsNullOrWhiteSpace(mine?.EncryptedApiKey));
+            return new AiProviderStatusDto
+            {
+                Id = id,
+                HasApiKey = hasKey,
+                ApiKeyLast4 = canShowKeyMeta ? state?.ApiKeyLast4 ?? (id == active ? mine?.ApiKeyLast4 : null) : null,
+                ChatModel = state?.ChatModel ?? (id == active ? mine?.ChatModel : null),
+                EmbeddingModel = state?.EmbeddingModel ?? (id == active ? mine?.EmbeddingModel : null),
+                BaseUrl = canShowKeyMeta ? state?.BaseUrl ?? (id == active ? mine?.BaseUrl : null) : null,
+                LastTestedAt = state?.LastTestedAt ?? (id == active ? mine?.LastTestedAt : null),
+                LastTestOk = state?.LastTestOk ?? (id == active ? mine?.LastTestOk : null),
+                LastTestMessage = state?.LastTestMessage ?? (id == active ? mine?.LastTestMessage : null),
+                IsActive = id == active
+            };
+        }).ToList();
+
+        return new AiSettingsStatusDto
+        {
+            HasApiKey = !string.IsNullOrWhiteSpace(mine?.EncryptedApiKey),
+            ApiKeyLast4 = mine?.ApiKeyLast4,
+            Provider = active,
+            ChatModel = mine?.ChatModel ?? "gemini-3.8-flash",
+            EmbeddingModel = mine?.EmbeddingModel ?? "gemini-embedding-001",
+            BaseUrl = mine?.BaseUrl,
+            IsEnabled = policy.IsEnabled,
+            ReaderAiEnabled = policy.ReaderAiEnabled,
+            LibrarianAiEnabled = policy.LibrarianAiEnabled,
+            UseMajor = flags.UseMajor,
+            UseCategory = flags.UseCategory,
+            UseHistory = flags.UseHistory,
+            UseReviews = flags.UseReviews,
+            UseGoals = flags.UseGoals,
+            RecommendEnabled = policy.RecommendEnabled,
+            TrendsEnabled = policy.TrendsEnabled,
+            OverduePredictEnabled = policy.OverduePredictEnabled,
+            LastTestedAt = mine?.LastTestedAt,
+            LastTestOk = mine?.LastTestOk,
+            LastTestMessage = mine?.LastTestMessage,
+            DocumentsSyncedAt = policy.DocumentsSyncedAt,
+            DocumentCount = policy.DocumentCount,
+            CanEditApiKey = true,
+            AccountEnabled = mine?.IsEnabled ?? true,
+            UseForLibrary = policy.ActiveLibrarianUserId == actorId && actorId != Guid.Empty,
+            NeedsReindex = policy.ActiveLibrarianUserId == actorId && NeedsReindex(policy, mine ?? libraryUser),
+            ActiveLibrarianUserId = policy.ActiveLibrarianUserId,
+            Providers = providers
+        };
+    }
+
+    private static bool NeedsReindex(AiSetting policy, UserAiSetting? libraryUser)
+    {
+        if (libraryUser is null || string.IsNullOrWhiteSpace(libraryUser.EmbeddingModel))
+            return false;
+        if (string.IsNullOrWhiteSpace(policy.IndexEmbeddingModel))
+            return policy.DocumentCount > 0;
+        return !string.Equals(policy.IndexEmbeddingModel, libraryUser.EmbeddingModel, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static LibrarianCriteriaFlags ReadCriteria(AiSetting settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.LibrarianCriteriaJson))
+            return new LibrarianCriteriaFlags();
+
+        try
+        {
+            return JsonSerializer.Deserialize<LibrarianCriteriaFlags>(settings.LibrarianCriteriaJson, JsonOptions)
+                   ?? new LibrarianCriteriaFlags();
+        }
+        catch (JsonException)
+        {
+            return new LibrarianCriteriaFlags();
+        }
+    }
+
+    public static bool SupportsEmbedding(string? provider)
+    {
+        var id = NormalizeProvider(provider);
+        return id is "gemini" or "openai" or "openrouter" or "other";
+    }
+
+    public static string NormalizeProvider(string? provider)
+    {
+        var value = string.IsNullOrWhiteSpace(provider) ? "gemini" : provider.Trim().ToLowerInvariant();
+        return KnownProviders.Contains(value) ? value : "other";
+    }
+
+    public static string DisplayName(string provider) => provider switch
+    {
+        "openai" => "OpenAI",
+        "anthropic" => "Anthropic Claude",
+        "deepseek" => "DeepSeek",
+        "openrouter" => "OpenRouter",
+        "huggingface" => "Hugging Face",
+        "other" => "Nhà cung cấp khác",
+        _ => "Google Gemini"
+    };
+
+    private static string TrimError(string message)
+    {
+        var text = message.Replace("apiKey=", "apiKey=***", StringComparison.OrdinalIgnoreCase);
+        if (text.Contains("no longer available", StringComparison.OrdinalIgnoreCase)
+            || (text.Contains("gemini", StringComparison.OrdinalIgnoreCase)
+                && text.Contains("notfound", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "Model chat Gemini hiện không dùng được. Chọn gemini-3.8-flash rồi lưu cấu hình.";
+        }
+
+        if (text.Contains("no longer available", StringComparison.OrdinalIgnoreCase)
+            || (text.Contains("gemini", StringComparison.OrdinalIgnoreCase)
+                && text.Contains("notfound", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "Model chat Gemini hiện không dùng được. Chọn gemini-3.8-flash rồi lưu cấu hình.";
+        }
+
+        return text.Length <= 280 ? text : text[..280];
+    }
+}

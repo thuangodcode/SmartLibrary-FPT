@@ -94,6 +94,7 @@ export function useHomeBooks(categoryId: string, search: string, page: number) {
       };
     },
     staleTime: 60_000,
+    placeholderData: (previous) => previous,
   });
 }
 

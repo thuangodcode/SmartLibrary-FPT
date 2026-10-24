@@ -1,12 +1,18 @@
 import { useEffect } from 'react';
 import { AlertCircle, CheckCircle, Info, LoaderCircle, TriangleAlert, X } from 'lucide-react';
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface ToastMessage {
   id: string;
   type: 'success' | 'error' | 'warning' | 'info' | 'loading';
   title: string;
   message: string;
   duration?: number;
+  action?: ToastAction;
 }
 
 interface ToastProps {

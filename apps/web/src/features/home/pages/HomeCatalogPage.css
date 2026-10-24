@@ -218,6 +218,21 @@
   cursor: pointer;
 }
 
+.catalog-personalized {
+  margin-bottom: 22px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0e4dc;
+}
+
+.catalog-personalized .catalog-message {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid #edd9cc;
+  border-radius: 12px;
+  background: #fff8f4;
+  color: #6b4a36;
+}
+
 .catalog-book-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
