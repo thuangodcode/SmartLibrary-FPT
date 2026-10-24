@@ -132,6 +132,7 @@ export const DEFAULT_PARAMS: Record<PolicyType, PolicyParameter[]> = {
     { key: 'max_books', value: '10', label: 'Hạn mức chung (fallback)' },
     { key: 'max_books_student', value: '10', label: 'Hạn mức sinh viên (tham khảo, có thể cấu hình)' },
     { key: 'max_books_lecturer', value: '20', label: 'Hạn mức cán bộ/giảng viên (tham khảo, có thể cấu hình)' },
+    { key: 'block_if_overdue', value: 'true', label: 'Chặn mượn khi còn sách quá hạn' },
     { key: 'exception_note', value: '', label: 'Lưu ý / ngoại lệ' },
   ],
   BorrowDuration: [
@@ -153,6 +154,7 @@ export const DEFAULT_PARAMS: Record<PolicyType, PolicyParameter[]> = {
     { key: 'allow_reservation', value: 'true', label: 'Cho phép đặt trước' },
     { key: 'hold_hours', value: '48', label: 'Thời gian giữ sách (giờ)' },
     { key: 'pickup_deadline_hours', value: '24', label: 'Hạn nhận sách (giờ)' },
+    { key: 'pickup_capacity_per_slot', value: '5', label: 'Số lượt nhận tối đa mỗi khung giờ' },
   ],
   FineFee: [
     { key: 'overdue_fee_per_day', value: '5000', label: 'Phạt quá hạn mỗi ngày (VND, có thể cấu hình)' },
@@ -186,9 +188,14 @@ export function formFromDetail(data: PolicyDetail): FormState {
     status: data.status,
     priority: data.priority,
     overridesGeneral: data.overridesGeneral,
-    parameters: data.parameters.length
-      ? data.parameters.map((p) => ({ key: p.key, value: p.value, label: p.label ?? undefined }))
-      : DEFAULT_PARAMS[data.policyType].map((p) => ({ ...p })),
+    parameters: DEFAULT_PARAMS[data.policyType].map((defaultParameter) => {
+      const configured = data.parameters.find((parameter) => parameter.key === defaultParameter.key);
+      return configured
+        ? { ...defaultParameter, value: configured.value, label: configured.label ?? defaultParameter.label }
+        : { ...defaultParameter };
+    }).concat(data.parameters
+      .filter((parameter) => !DEFAULT_PARAMS[data.policyType].some((defaultParameter) => defaultParameter.key === parameter.key))
+      .map((parameter) => ({ key: parameter.key, value: parameter.value, label: parameter.label ?? undefined }))),
     targets: data.targets.length
       ? data.targets.map((t) => ({ ...t }))
       : [{ targetType: 'Role', targetValue: 'Reader', targetLabel: 'Độc giả' }],

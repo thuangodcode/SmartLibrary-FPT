@@ -11,6 +11,8 @@ public class BorrowRecord : AuditableEntity, ISoftDeletable
     public BorrowStatus Status { get; set; } = BorrowStatus.Pending;
     public DateTime? BorrowDate { get; set; }
     public DateTime? DueDate { get; set; }
+    public DateTime? PickupAt { get; set; }
+    public DateTime? AcceptedAt { get; set; }
     public DateTime? ReturnDate { get; set; }
     public BookCondition? ReturnCondition { get; set; }
     public int RenewalCount { get; set; }

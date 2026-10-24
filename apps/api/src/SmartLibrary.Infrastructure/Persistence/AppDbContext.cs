@@ -101,15 +101,34 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<BorrowRecord>(entity =>
         {
             entity.ToTable("borrow_records");
+            entity.HasIndex(x => new { x.Status, x.BorrowDate })
+                .HasDatabaseName("idx_borrow_records_status_borrow_date")
+                .HasFilter("is_deleted = FALSE");
+            entity.HasIndex(x => new { x.Status, x.DueDate })
+                .HasDatabaseName("idx_borrow_records_status_due_date")
+                .HasFilter("is_deleted = FALSE");
+            entity.HasIndex(x => new { x.ReaderId, x.BorrowDate })
+                .HasDatabaseName("idx_borrow_records_reader_borrow_date")
+                .HasFilter("is_deleted = FALSE");
             entity.Property(b => b.Status).HasConversion(
                 v => v.ToString().ToLower(),
                 v => Enum.Parse<BorrowStatus>(v, true)
+            );
+            entity.Property(b => b.ReturnCondition).HasConversion(
+                v => v.HasValue ? v.Value.ToString().ToLower() : null,
+                v => v == null ? null : Enum.Parse<BookCondition>(v, true)
             );
         });
 
         modelBuilder.Entity<Fine>(entity =>
         {
             entity.ToTable("fines");
+            entity.HasIndex(x => new { x.Status, x.CreatedAt })
+                .HasDatabaseName("idx_fines_status_created_at")
+                .HasFilter("is_deleted = FALSE");
+            entity.HasIndex(x => new { x.ReaderId, x.CreatedAt })
+                .HasDatabaseName("idx_fines_reader_created_at")
+                .HasFilter("is_deleted = FALSE");
             entity.Property(f => f.Status).HasConversion(
                 v => v.ToString().ToLower(),
                 v => Enum.Parse<FineStatus>(v, true)

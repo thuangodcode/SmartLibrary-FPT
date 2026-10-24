@@ -126,6 +126,7 @@ public sealed class SupportController(
             return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
         var loans = await db.BorrowRecords.AsNoTracking()
             .Include(x => x.BookCopy).ThenInclude(x => x.Book)
+            .Include(x => x.Librarian)
             .Where(x => x.ReaderId == readerId)
             .OrderByDescending(x => x.BorrowDate ?? x.CreatedAt)
             .Take(200)
@@ -137,6 +138,9 @@ public sealed class SupportController(
                 status = x.Status.ToString(),
                 borrowDate = x.BorrowDate,
                 dueDate = x.DueDate,
+                pickupAt = x.PickupAt,
+                acceptedAt = x.AcceptedAt,
+                librarianName = x.Librarian == null ? null : x.Librarian.FullName,
                 returnDate = x.ReturnDate,
                 renewalCount = x.RenewalCount
             })

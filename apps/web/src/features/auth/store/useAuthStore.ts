@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { API_BASE_URL } from '../../../config';
+import { parseApiResponse } from '../../../lib/api';
+
+let hydrationPromise: Promise<void> | null = null;
 
 export interface User {
   id: string;
@@ -23,6 +26,11 @@ interface AuthState {
   hydrate: () => Promise<void>;
 }
 
+interface AuthApiResponse<T> {
+  success?: boolean;
+  data?: T;
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   accessToken: null,
@@ -34,6 +42,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem('sl_user', JSON.stringify(user));
     localStorage.setItem('sl_token', token);
     localStorage.setItem('sl_perms', JSON.stringify(permissions));
+    localStorage.setItem('sl_refresh_cookie', '1');
     set({
       user,
       accessToken: token,
@@ -55,6 +64,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem('sl_user');
     localStorage.removeItem('sl_token');
     localStorage.removeItem('sl_perms');
+    localStorage.removeItem('sl_refresh_cookie');
     set({
       user: null,
       accessToken: null,
@@ -64,49 +74,93 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
   },
 
-  hydrate: async () => {
-    const token = localStorage.getItem('sl_token');
-    if (!token) {
-      localStorage.removeItem('sl_user');
-      localStorage.removeItem('sl_perms');
-      set({ user: null, accessToken: null, permissions: [], isAuthenticated: false, isLoading: false });
-      return;
-    }
+  hydrate: () => {
+    if (hydrationPromise) return hydrationPromise;
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await response.json() as {
-        success?: boolean;
-        data?: { user?: User & { permissions?: string[] } };
-      };
-      const user = result.data?.user;
-      if (
-        !response.ok ||
-        !result.success ||
-        !user?.id ||
-        user.status !== 'Active' ||
-        !['Admin', 'Librarian', 'Reader'].includes(user.role)
-      ) {
-        throw new Error('The saved session is no longer valid.');
+    const hydration = (async () => {
+      let token = localStorage.getItem('sl_token');
+      if (!token) {
+        localStorage.removeItem('sl_user');
+        localStorage.removeItem('sl_perms');
+        localStorage.removeItem('sl_refresh_cookie');
+        set({ user: null, accessToken: null, permissions: [], isAuthenticated: false, isLoading: false });
+        return;
       }
 
-      const { permissions = [], ...verifiedUser } = user;
-      localStorage.setItem('sl_user', JSON.stringify(verifiedUser));
-      localStorage.setItem('sl_perms', JSON.stringify(permissions));
-      set({
-        user: verifiedUser,
-        accessToken: token,
-        permissions,
-        isAuthenticated: true,
-        isLoading: false,
-      });
-    } catch {
-      localStorage.removeItem('sl_user');
-      localStorage.removeItem('sl_token');
-      localStorage.removeItem('sl_perms');
-      set({ user: null, accessToken: null, permissions: [], isAuthenticated: false, isLoading: false });
-    }
+      const refreshAccessToken = async (): Promise<string | null> => {
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        const result = await parseApiResponse<AuthApiResponse<{ accessToken?: string }>>(response);
+        const refreshedToken = result?.data?.accessToken;
+        if (!response.ok || !result?.success || !refreshedToken) return null;
+
+        localStorage.setItem('sl_token', refreshedToken);
+        localStorage.setItem('sl_refresh_cookie', '1');
+        return refreshedToken;
+      };
+
+      try {
+        if (localStorage.getItem('sl_refresh_cookie') === '1') {
+          token = (await refreshAccessToken()) ?? token;
+        }
+
+        let response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+          credentials: 'include',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (response.status === 401) {
+          const refreshedToken = await refreshAccessToken();
+          if (refreshedToken) {
+            token = refreshedToken;
+            response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+              credentials: 'include',
+              headers: { Authorization: `Bearer ${token}` },
+            });
+          }
+        }
+
+        const result = await parseApiResponse<AuthApiResponse<{
+          user?: User & { permissions?: string[] };
+        }>>(response);
+        const user = result?.data?.user;
+        if (
+          !response.ok ||
+          !result?.success ||
+          !user?.id ||
+          user.status !== 'Active' ||
+          !['Admin', 'Librarian', 'Reader'].includes(user.role)
+        ) {
+          throw new Error('The saved session is no longer valid.');
+        }
+
+        const { permissions = [], ...verifiedUser } = user;
+        localStorage.setItem('sl_user', JSON.stringify(verifiedUser));
+        localStorage.setItem('sl_perms', JSON.stringify(permissions));
+        set({
+          user: verifiedUser,
+          accessToken: token,
+          permissions,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+      } catch {
+        localStorage.removeItem('sl_user');
+        localStorage.removeItem('sl_token');
+        localStorage.removeItem('sl_perms');
+        localStorage.removeItem('sl_refresh_cookie');
+        set({ user: null, accessToken: null, permissions: [], isAuthenticated: false, isLoading: false });
+      }
+    })();
+
+    hydrationPromise = hydration;
+    void hydration.finally(() => {
+      if (hydrationPromise === hydration) hydrationPromise = null;
+    });
+    return hydration;
   },
 }));

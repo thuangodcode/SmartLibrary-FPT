@@ -18,6 +18,11 @@
 .book-detail-copy-status > span { display: flex; min-height: 42px; align-items: center; gap: 8px; border-radius: 9px; background: #f1f5f2; padding: 10px 13px; color: #5f6d64; font-size: 12px; line-height: 1.45; }
 .book-detail-copy-status .is-available { background: #eef8f1; color: #277144; }
 .book-detail-copy-status .is-unavailable { background: #fff3ed; color: #9d512e; }
+.book-detail-pickup-label { display: block; margin: 15px 0 7px; color: #516057; font-size: 12px; font-weight: 700; }
+.book-detail-pickup-select { width: 100%; min-height: 44px; border: 1px solid #dce5de; border-radius: 9px; background: #fff; padding: 0 12px; color: #34443a; font: inherit; font-size: 12px; }
+.book-detail-pickup-select:focus { border-color: #679176; outline: 2px solid rgb(103 145 118 / 16%); }
+.book-detail-pickup-error { margin: 7px 0 0; color: #a44f36; font-size: 11px; }
+.book-detail-pickup-note { margin: 8px 0 0; color: #78857c; font-size: 10px; line-height: 1.5; }
 .annual-book-detail-page .book-detail-borrow { display: inline-flex; width: 100%; min-height: 50px; align-items: center; justify-content: center; margin-top: 12px; border: 0; border-radius: 10px; background: #244d39; color: #fff; font-size: 14px; font-weight: 750; cursor: pointer; transition: background 160ms ease, transform 160ms ease; }
 .book-detail-borrow:not(:disabled):hover { transform: translateY(-1px); background: #1b3d2c; }
 .book-detail-borrow:disabled { background: #bac5bd; cursor: not-allowed; }

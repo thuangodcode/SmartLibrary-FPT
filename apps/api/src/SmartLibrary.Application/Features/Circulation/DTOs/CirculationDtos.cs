@@ -20,6 +20,8 @@ public record CirculationLoanDto
     public string Code { get; init; } = string.Empty;
     public DateTime? BorrowDate { get; init; }
     public DateTime? DueDate { get; init; }
+    public DateTime? PickupAt { get; init; }
+    public DateTime? AcceptedAt { get; init; }
     public DateTime? ReturnDate { get; init; }
     public DateTime CreatedAt { get; init; }
     public string Status { get; init; } = string.Empty;
@@ -29,6 +31,7 @@ public record CirculationLoanDto
     public string ReaderName { get; init; } = string.Empty;
     public string? ReaderEmail { get; init; }
     public string? StudentId { get; init; }
+    public string? LibrarianName { get; init; }
     public Guid BookCopyId { get; init; }
     public string Barcode { get; init; } = string.Empty;
     public string BookTitle { get; init; } = string.Empty;
@@ -65,7 +68,13 @@ public record CirculationSettings
     public bool AllowReservation { get; init; } = true;
     public int? HoldHours { get; init; }
     public int PickupDeadlineHours { get; init; } = 24;
+    public int PickupSlotMinutes { get; init; } = 30;
+    public int PickupCapacityPerSlot { get; init; } = 5;
+    public int PickupDaysAhead { get; init; } = 14;
+    public bool BlockBorrowIfOverdue { get; init; } = true;
 }
+
+public record PickupSlotDto(DateTimeOffset PickupAt, int RemainingCapacity, int Capacity);
 
 public class CirculationCopyIssueDto
 {
@@ -197,10 +206,11 @@ public class CreateReservationRequest
 public class BorrowRequest
 {
     public string Barcode { get; set; } = string.Empty;
+    public DateTimeOffset PickupAt { get; set; }
 }
 
 /// <summary>Request to borrow an available copy of a book.</summary>
-public sealed record RequestBookBorrowRequest(Guid BookId);
+public sealed record RequestBookBorrowRequest(Guid BookId, DateTimeOffset PickupAt);
 
 public class ReportIncidentRequest
 {

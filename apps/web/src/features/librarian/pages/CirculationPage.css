@@ -594,3 +594,561 @@
   .circ-tabs { width: 100%; overflow-x: auto; }
   .circ-hero h1 { font-size: 22px; }
 }
+
+.circ-page--loans {
+  gap: 12px;
+  color: #17212b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.circ-page--loans .circ-crumb {
+  font-size: 13px;
+}
+
+.circ-page--loans .circ-hero {
+  gap: 16px;
+}
+
+.circ-page--loans .circ-hero-icon {
+  display: none;
+}
+
+.circ-page--loans .circ-hero h1 {
+  font-size: 25px;
+  line-height: 1.2;
+  letter-spacing: -.035em;
+}
+
+.circ-page--loans .circ-hero p {
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.circ-page--loans .circ-stats {
+  gap: 10px;
+}
+
+.circ-page--loans .circ-stat {
+  min-height: 66px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.circ-page--loans .circ-stat > span {
+  display: none;
+}
+
+.circ-page--loans .circ-stat small {
+  font-size: 12px;
+}
+
+.circ-page--loans .circ-stat strong {
+  margin: 0;
+  font-size: 21px;
+}
+
+.circ-page--loans .circ-stat em {
+  display: none;
+}
+
+.circ-page--loans .circ-tab {
+  min-height: 40px;
+  padding: 9px 17px;
+  font-size: 14px;
+}
+
+.circ-page--loans .circ-layout {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.circ-page--loans .circ-main,
+.circ-page--loans .circ-side {
+  gap: 10px;
+}
+
+.circ-page--loans .circ-card {
+  padding: 14px 16px;
+  border-color: #e8edf2;
+  border-radius: 13px;
+  box-shadow: 0 3px 12px rgb(15 23 42 / 3%);
+}
+
+.circ-page--loans .circ-card h2 {
+  font-size: 17px;
+  line-height: 1.35;
+  letter-spacing: -.01em;
+}
+
+.circ-page--loans .circ-card-head {
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.circ-page--loans .circ-card-subtitle {
+  margin: 2px 0 0;
+  color: #718096;
+  font-size: 13px;
+}
+
+.circ-page--loans .circ-count {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff4e8;
+  font-size: 13px;
+}
+
+.circ-page--loans .circ-checkout-card {
+  padding: 13px 16px;
+}
+
+.circ-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 10px;
+}
+
+.circ-section-heading h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.circ-section-heading p {
+  margin: 2px 0 0;
+  color: #718096;
+  font-size: 13px;
+}
+
+.circ-page--loans .circ-checkout {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 14px;
+}
+
+.circ-page--loans .circ-field {
+  gap: 7px;
+  color: #344256;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.circ-page--loans .circ-field input {
+  min-height: 44px;
+  border-radius: 11px;
+  font-size: 14px;
+}
+
+.circ-page--loans .circ-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.circ-page--loans .circ-btn--primary {
+  color: #fff;
+}
+
+.circ-page--loans .circ-btn--primary:hover {
+  color: #fff;
+}
+
+.circ-page--loans .circ-checkout .circ-btn {
+  min-height: 40px;
+  padding-inline: 18px;
+}
+
+.circ-checkout-hint {
+  display: none;
+  color: #718096;
+  font-size: 12px;
+}
+
+.circ-page--loans .circ-toolbar {
+  gap: 8px;
+}
+
+.circ-page--loans .circ-toolbar input,
+.circ-page--loans .circ-toolbar select {
+  min-height: 40px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.circ-page--loans .circ-toolbar input {
+  max-width: 300px;
+}
+
+.circ-page--loans .circ-table {
+  font-size: 14px;
+}
+
+.circ-page--loans .circ-table th,
+.circ-page--loans .circ-table td {
+  padding: 9px 10px;
+}
+
+.circ-page--loans .circ-table th {
+  font-size: 12px;
+  letter-spacing: .025em;
+}
+
+.circ-page--loans .circ-table td small {
+  display: block;
+  margin-top: 4px;
+  color: #718096;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.circ-page--loans .circ-badge {
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+.circ-page--loans .circ-avatar {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.circ-request-table {
+  min-width: 910px;
+  table-layout: fixed;
+}
+
+.circ-request-table th:nth-child(1) { width: 19%; }
+.circ-request-table th:nth-child(2) { width: 21%; }
+.circ-request-table th:nth-child(3) { width: 17%; }
+.circ-request-table th:nth-child(4) { width: 17%; }
+.circ-request-table th:nth-child(5) { width: 11%; }
+.circ-request-table th:nth-child(6) { width: 15%; }
+
+.circ-request-table th,
+.circ-request-table td {
+  padding: 7px 9px;
+  vertical-align: middle;
+}
+
+.circ-request-table td {
+  white-space: normal;
+  line-height: 1.3;
+}
+
+.circ-request-table tbody tr:hover {
+  background: #fffaf5;
+}
+
+.circ-request-reader-info,
+.circ-request-accepted-info {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.circ-request-reader-info strong,
+.circ-request-book-cell strong,
+.circ-request-accepted-info strong {
+  overflow: hidden;
+  color: #263445;
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+}
+
+.circ-request-reader-info small,
+.circ-request-book-cell small,
+.circ-request-accepted-info small {
+  overflow: hidden;
+  color: #748194;
+  font-size: 11px;
+  text-overflow: ellipsis;
+}
+
+.circ-request-pending-info {
+  color: #8a6470;
+  font-size: 11px;
+}
+
+.circ-request-actions {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.circ-page--loans .circ-request-actions .circ-btn {
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.circ-request-actions .circ-btn--quiet {
+  border-color: transparent;
+  color: #64748b;
+  background: transparent;
+}
+
+.circ-request-actions .circ-btn--quiet:hover {
+  color: #b42318;
+  background: #fff1f0;
+}
+
+.circ-pending-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.circ-date-filters {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  margin: 0 0 9px;
+}
+
+.circ-date-filters label,
+.circ-date-filter {
+  display: grid;
+  gap: 3px;
+  color: #718096;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.circ-date-filters input,
+.circ-date-filter input {
+  width: 132px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: 12px;
+}
+
+.circ-page--loans .circ-toolbar {
+  align-items: end;
+}
+
+.circ-page--loans .circ-toolbar .circ-date-filter input {
+  width: 132px;
+  min-height: 40px;
+  max-width: none;
+}
+
+.circ-layout--loans .circ-main {
+  width: 100%;
+}
+
+.circ-page--direct-checkout {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.circ-direct-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.circ-direct-heading h1 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 25px;
+  letter-spacing: -.025em;
+}
+
+.circ-direct-heading p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.circ-direct-form {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+}
+
+.circ-direct-form .circ-field input {
+  min-height: 44px;
+}
+
+.circ-direct-form .circ-checkout-hint {
+  display: block;
+  margin: -5px 0 0;
+}
+
+.circ-direct-form > button {
+  justify-self: start;
+}
+
+.circ-page--direct-checkout .circ-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.circ-page--direct-checkout .circ-banner p {
+  margin: 0;
+}
+
+.circ-page--loans .circ-quick a,
+.circ-page--loans .circ-note li {
+  min-height: 44px;
+  font-size: 13px;
+}
+
+.circ-page--loans .circ-fine-row {
+  font-size: 13px;
+}
+
+.circ-page--loans .circ-fine-row small,
+.circ-page--loans .circ-note {
+  font-size: 12px;
+}
+
+.circ-page--loans .circ-empty {
+  padding: 32px 12px;
+  font-size: 14px;
+}
+
+.circ-page--loans :is(button, a, input, select, summary):focus-visible {
+  outline: 3px solid rgb(234 88 12 / 35%);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1100px) {
+  .circ-page--loans .circ-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .circ-page--loans .circ-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .circ-page--loans {
+    gap: 14px;
+  }
+
+  .circ-page--loans .circ-hero h1 {
+    font-size: 25px;
+  }
+
+  .circ-page--loans .circ-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .circ-page--loans .circ-stat {
+    min-height: 58px;
+    padding: 8px 10px;
+  }
+
+  .circ-page--loans .circ-stat strong {
+    font-size: 19px;
+  }
+
+  .circ-page--loans .circ-tab {
+    padding-inline: 13px;
+    white-space: nowrap;
+  }
+
+  .circ-page--loans .circ-card,
+  .circ-page--loans .circ-checkout-card {
+    padding: 16px;
+  }
+
+  .circ-page--loans .circ-checkout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .circ-page--loans .circ-card-head {
+    align-items: flex-start;
+  }
+
+  .circ-page--loans .circ-card-head h2 {
+    flex-basis: auto;
+  }
+
+  .circ-page--loans .circ-toolbar {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(2, auto);
+  }
+
+  .circ-page--loans .circ-toolbar input {
+    min-width: 0;
+    max-width: none;
+  }
+
+  .circ-page--loans .circ-toolbar select {
+    width: auto;
+    max-width: 170px;
+  }
+
+  .circ-page--loans .circ-toolbar .circ-date-filter input {
+    width: 130px;
+  }
+
+  .circ-pending-tools {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .circ-direct-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .circ-page--direct-checkout .circ-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .circ-page--loans .circ-pager {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 440px) {
+  .circ-page--loans .circ-card-head {
+    flex-direction: column;
+  }
+
+  .circ-page--loans .circ-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .circ-page--loans .circ-toolbar select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .circ-page--loans .circ-toolbar .circ-date-filter input {
+    width: 100%;
+  }
+
+  .circ-date-filters {
+    flex-wrap: wrap;
+  }
+
+  .circ-date-filters input {
+    width: 126px;
+  }
+}

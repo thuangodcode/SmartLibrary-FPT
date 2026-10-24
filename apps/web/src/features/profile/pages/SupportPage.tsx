@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
+import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
 import { AlertCircle, Camera, Check, CircleHelp, LoaderCircle, MessageCircle, Send, UserRound } from 'lucide-react';
 import HomeNavbar from '../../home/components/HomeNavbar';
 import { API_BASE_URL } from '../../../config';
@@ -175,24 +175,31 @@ const SupportPage = () => {
       }
     };
     void load();
-    void hub.start()
-      .then(() => {
-        if (!active) return;
+    const startHub = async () => {
+      try {
+        await hub.start();
+        if (!active) {
+          await hub.stop();
+          return;
+        }
         setConnection(hub);
         setRealtimeStatus('connected');
-      })
-      .catch((caught: unknown) => {
+      } catch (caught: unknown) {
         if (active) {
           setRealtimeStatus('disconnected');
           setError(caught instanceof Error ? `Không thể kết nối chat realtime: ${caught.message}` : 'Không thể kết nối chat realtime.');
         }
-      });
+      }
+    };
+    void startHub();
 
     return () => {
       active = false;
       setRealtimeStatus('disconnected');
       setConnection(null);
-      void hub.stop();
+      if (hub.state === HubConnectionState.Connected || hub.state === HubConnectionState.Reconnecting) {
+        void hub.stop();
+      }
     };
   }, [token]);
 

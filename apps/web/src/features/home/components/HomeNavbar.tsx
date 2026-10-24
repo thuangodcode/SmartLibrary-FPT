@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
 import { BookOpen, ChevronDown, CircleHelp, History, LogOut, Menu, Search, ShieldCheck, UserRound, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import smartLibraryLogo from '../../../assets/figma/smartlibrary-logo.png';
 import { useToast } from '../../../components/ui/useToast';
+import { API_BASE_URL } from '../../../config';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useHomeCategories } from '../hooks/useHomeData';
 import './HomeNavbar.css';
@@ -16,6 +18,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
   const userMenuRef = useRef<HTMLDivElement>(null);
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const accessToken = useAuthStore((state) => state.accessToken);
   const logout = useAuthStore((state) => state.logout);
   const categoriesQuery = useHomeCategories();
   const { showToast } = useToast();
@@ -29,6 +32,78 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
     document.addEventListener('pointerdown', closeUserMenu);
     return () => document.removeEventListener('pointerdown', closeUserMenu);
   }, []);
+
+  useEffect(() => {
+    if (user?.role !== 'Reader' || !accessToken) return undefined;
+    let active = true;
+    const hub = new HubConnectionBuilder()
+      .withUrl(`${API_BASE_URL}/hubs/support-chat`, {
+        accessTokenFactory: () => accessToken,
+      })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Warning)
+      .build();
+    hub.on('BorrowStatusUpdated', (payload: {
+      status?: string;
+      bookTitle?: string;
+      barcode?: string;
+      pickupAt?: string;
+      acceptedAt?: string;
+      librarianName?: string;
+      borrowDate?: string;
+      dueDate?: string;
+      message?: string;
+    }) => {
+      if (!active) return;
+      window.dispatchEvent(new Event('reader-circulation-updated'));
+      if (payload.message) {
+        showToast({ type: 'error', title: 'Yêu cầu mượn sách', message: payload.message });
+        return;
+      }
+      const dateTime = (value?: string) => value
+        ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })
+        : '';
+      if (payload.status === 'Approved') {
+        showToast({
+          type: 'success',
+          title: 'Thủ thư đã tiếp nhận yêu cầu',
+          message: `${payload.librarianName || 'Thủ thư'} tiếp nhận lúc ${dateTime(payload.acceptedAt)}. Lịch nhận: ${dateTime(payload.pickupAt)}.`,
+        });
+      } else if (payload.status === 'Borrowed') {
+        showToast({
+          type: 'success',
+          title: 'Đã hoàn tất mượn sách',
+          message: `“${payload.bookTitle || 'Sách'}” · ${payload.barcode || ''}. Bắt đầu: ${dateTime(payload.borrowDate)}. Hạn trả: ${dateTime(payload.dueDate)}.`,
+        });
+      } else if (payload.status === 'Rejected') {
+        showToast({ type: 'error', title: 'Yêu cầu mượn đã bị hủy', message: 'Bản sao đã được trả về kho.' });
+      }
+    });
+    const startHub = async () => {
+      try {
+        await hub.start();
+        if (!active) {
+          await hub.stop();
+          return;
+        }
+      } catch (caught: unknown) {
+        if (active) {
+          showToast({
+            type: 'error',
+            title: 'Không kết nối được thông báo mượn sách',
+            message: caught instanceof Error ? caught.message : 'Vui lòng tải lại trang để kết nối lại.',
+          });
+        }
+      }
+    };
+    void startHub();
+    return () => {
+      active = false;
+      if (hub.state === HubConnectionState.Connected || hub.state === HubConnectionState.Reconnecting) {
+        void hub.stop();
+      }
+    };
+  }, [accessToken, showToast, user?.role]);
 
   const closeMenu = () => {
     setIsMenuOpen(false);
@@ -91,7 +166,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
                 {user.role === 'Reader' && (
                   <>
                     <Link to="/support" role="menuitem" onClick={closeMenu}><CircleHelp size={16} /> Hỗ trợ</Link>
-                    <Link to="/history" role="menuitem" onClick={closeMenu}><History size={16} /> Lịch sử</Link>
+                    <Link to="/history" role="menuitem" onClick={closeMenu}><History size={16} /> Mượn & trả của tôi</Link>
                   </>
                 )}
                 <button type="button" role="menuitem" onClick={handleLogout}><LogOut size={16} /> Đăng xuất</button>
