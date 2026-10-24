@@ -108,7 +108,7 @@
 .book-card--reserved_only .book-card__availability { color: #a34d17; }
 .book-card--maintenance .book-card__availability { color: #59655e; }
 
-.book-card__action {
+.annual-home .book-card__action {
   display: inline-flex;
   min-height: 42px;
   align-items: center;
@@ -125,10 +125,10 @@
   transition: background 180ms ease, transform 180ms ease;
 }
 
-.book-card__action svg { width: 16px; height: 16px; transition: transform 180ms ease; }
-.book-card__action:hover { background: var(--book-card-accent); transform: translateY(-2px); }
-.book-card__action:hover svg { transform: translate(2px, -2px); }
-.book-card__action:focus-visible { outline: 3px solid rgb(243 111 33 / 35%); outline-offset: 3px; }
+.annual-home .book-card__action svg { width: 16px; height: 16px; transition: transform 180ms ease; }
+.annual-home .book-card__action:hover { background: var(--book-card-accent); color: #fff; transform: translateY(-2px); }
+.annual-home .book-card__action:hover svg { transform: translate(2px, -2px); }
+.annual-home .book-card__action:focus-visible { outline: 3px solid rgb(243 111 33 / 35%); outline-offset: 3px; }
 
 @media (max-width: 540px) {
   .book-card__media { min-height: 220px; padding: 18px 10px; }
@@ -138,7 +138,7 @@
   .book-card__footer { grid-template-columns: 1fr; gap: 12px; }
   .book-card__availability { justify-content: space-between; }
   .book-card__availability span { margin-right: auto; }
-  .book-card__action { width: 100%; }
+  .annual-home .book-card__action { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
