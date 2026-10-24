@@ -1,0 +1,44 @@
+.marquee-viewport {
+  --marquee-gap: 16px;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 4px 0 18px;
+  touch-action: pan-y;
+}
+
+.marquee-viewport.is-vertical {
+  height: 100%;
+  overflow: hidden;
+  touch-action: pan-x;
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  gap: var(--marquee-gap);
+  will-change: transform;
+}
+
+.marquee-viewport.is-vertical .marquee-track,
+.marquee-viewport.is-vertical .marquee-group {
+  flex-direction: column;
+}
+
+.marquee-group {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--marquee-gap);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-viewport:not(.is-vertical) {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .marquee-track {
+    will-change: auto;
+    transform: none !important;
+  }
+}

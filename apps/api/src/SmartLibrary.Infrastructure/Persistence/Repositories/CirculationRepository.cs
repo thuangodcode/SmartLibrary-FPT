@@ -545,7 +545,7 @@ public class CirculationRepository : ICirculationRepository
     public async Task<CirculationSettings> GetSettingsAsync(CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var requiredTypes = new[]
+        var requiredTypes = new List<PolicyRuleType>
         {
             PolicyRuleType.BorrowLimit,
             PolicyRuleType.BorrowDuration,

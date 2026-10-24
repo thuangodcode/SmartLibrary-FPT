@@ -7,6 +7,8 @@
   --green: #244d39;
   --sage: #b9c8b6;
   overflow-x: clip;
+  width: 100%;
+  min-width: 0;
   background: var(--paper);
   color: var(--ink);
   font-family: "Be Vietnam Pro", Inter, Arial, sans-serif;
@@ -16,7 +18,8 @@
 .annual-home a { color: inherit; text-decoration: none; }
 .annual-home button, .annual-home input { font: inherit; }
 .annual-home button { color: inherit; }
-.annual-frame { width: min(calc(100% - 64px), 1376px); margin-inline: auto; }
+.annual-frame { width: min(calc(100% - 64px), 1376px); min-width: 0; margin-inline: auto; }
+.annual-home > main, .annual-section { width: 100%; min-width: 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 
 .annual-header { position: sticky; top: 0; z-index: 50; background: var(--paper); }
@@ -532,4 +535,31 @@
   .annual-live-book-card .group > div:last-child button { gap: 0; font-size: 0; }
   .annual-live-books-heading h2 { font-size: 10vw; }
   .annual-live-section-heading > p { font-size: 14px; }
+}
+
+/* Book discovery rail: a tactile, swipeable shelf shared with the catalog cards. */
+.annual-books { overflow: hidden; }
+.annual-books .annual-live-book-marquee {
+  --marquee-gap: 16px;
+  width: 100%;
+  margin: 0;
+  padding: 4px 0 18px;
+}
+.annual-books .marquee-group > .book-card {
+  width: clamp(252px, 22vw, 304px);
+  min-width: 0;
+  flex: 0 0 clamp(252px, 22vw, 304px);
+}
+.annual-books .annual-live-book-marquee:focus-visible {
+  outline: 3px solid rgb(243 111 33 / 28%);
+  outline-offset: 4px;
+}
+
+@media (max-width: 540px) {
+  .annual-frame { width: calc(100% - 40px); }
+  .annual-books .annual-live-book-marquee { --marquee-gap: 12px; }
+  .annual-books .marquee-group > .book-card {
+    width: min(82vw, 308px);
+    flex-basis: min(82vw, 308px);
+  }
 }

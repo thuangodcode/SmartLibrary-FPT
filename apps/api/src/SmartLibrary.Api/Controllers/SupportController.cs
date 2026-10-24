@@ -279,46 +279,56 @@ public sealed class SupportController(
         if (message.Length is < 1 or > 3000)
             return BadRequest(ApiResponse<object>.Fail("Phản hồi phải có từ 1 đến 3000 ký tự."));
 
-        var complaint = await db.SupportComplaints
-            .Include(x => x.Reader)
-            .Include(x => x.RequestType)
-            .Include(x => x.Replies).ThenInclude(x => x.Sender).ThenInclude(x => x.Role)
-            .FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (complaint is null)
+        var readerId = await db.SupportComplaints.AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => (Guid?)x.ReaderId)
+            .FirstOrDefaultAsync(ct);
+        if (readerId is null)
             return NotFound(ApiResponse<object>.Fail("Không tìm thấy đơn hỗ trợ."));
-        if (complaint.AcceptedById is not null &&
-            complaint.AcceptedById != senderId &&
-            !User.IsInRole("Admin"))
-            return Conflict(ApiResponse<object>.Fail("Đơn này đã được tiếp nhận bởi thủ thư khác."));
 
+        var isAdmin = User.IsInRole("Admin");
         var respondedAt = DateTime.UtcNow;
-        var reply = new SupportComplaintReply
+        var replyId = Guid.NewGuid();
+        await using (var transaction = await db.Database.BeginTransactionAsync(ct))
         {
-            ComplaintId = complaint.Id,
-            SenderId = senderId,
-            Message = message,
-            CreatedAt = respondedAt
-        };
-        complaint.Replies.Add(reply);
-        complaint.AcceptedById ??= senderId;
-        complaint.AcceptedAt ??= respondedAt;
-        complaint.FirstRespondedAt ??= respondedAt;
-        if (complaint.Status == "Pending")
-            complaint.Status = "InProgress";
-        await db.SaveChangesAsync(ct);
+            var complaintQuery = db.SupportComplaints.Where(x => x.Id == id);
+            if (!isAdmin)
+                complaintQuery = complaintQuery.Where(x => x.AcceptedById == null || x.AcceptedById == senderId);
+
+            var updatedCount = await complaintQuery.ExecuteUpdateAsync(update => update
+                .SetProperty(x => x.AcceptedById, x => x.AcceptedById ?? senderId)
+                .SetProperty(x => x.AcceptedAt, x => x.AcceptedAt ?? respondedAt)
+                .SetProperty(x => x.FirstRespondedAt, x => x.FirstRespondedAt ?? respondedAt)
+                .SetProperty(x => x.Status, x => x.Status == "Pending" ? "InProgress" : x.Status)
+                .SetProperty(x => x.UpdatedAt, respondedAt), ct);
+            if (updatedCount == 0)
+            {
+                var exists = await db.SupportComplaints.AnyAsync(x => x.Id == id, ct);
+                if (!exists)
+                    return NotFound(ApiResponse<object>.Fail("Không tìm thấy đơn hỗ trợ."));
+                return Conflict(ApiResponse<object>.Fail("Đơn này đã được tiếp nhận bởi thủ thư khác."));
+            }
+
+            var reply = new SupportComplaintReply
+            {
+                Id = replyId,
+                ComplaintId = id,
+                SenderId = senderId,
+                Message = message,
+                CreatedAt = respondedAt
+            };
+            db.SupportComplaintReplies.Add(reply);
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
 
         var saved = await db.SupportComplaintReplies.AsNoTracking()
             .Include(x => x.Sender).ThenInclude(x => x.Role)
-            .FirstAsync(x => x.Id == reply.Id, ct);
+            .FirstAsync(x => x.Id == replyId, ct);
         var dto = MapReply(saved);
-        var updated = await db.SupportComplaints.AsNoTracking()
-            .Include(x => x.Reader)
-            .Include(x => x.RequestType)
-            .Include(x => x.AcceptedBy)
-            .Include(x => x.Replies).ThenInclude(x => x.Sender).ThenInclude(x => x.Role)
-            .FirstAsync(x => x.Id == complaint.Id, ct);
+        var updated = await GetComplaintForDtoAsync(id, ct);
         var updatedComplaint = MapComplaint(updated);
-        await chatHub.Clients.Group(SupportChatHub.ReaderGroup(complaint.ReaderId))
+        await chatHub.Clients.Group(SupportChatHub.ReaderGroup(readerId.Value))
             .SendAsync("ComplaintReplied", updatedComplaint, ct);
         await chatHub.Clients.Group(SupportChatHub.LibrarianGroup)
             .SendAsync("ComplaintUpdated", updatedComplaint, ct);

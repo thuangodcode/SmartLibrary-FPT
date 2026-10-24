@@ -1,7 +1,8 @@
 import React from 'react';
-import { Star, CheckCircle, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
+import { ArrowUpRight, BookOpen, Check, Clock3, Star } from 'lucide-react';
 import type { Book } from '../types';
 import { BookCover } from './BookCover';
+import './BookCard.css';
 
 interface BookCardProps {
   book: Book;
@@ -9,21 +10,19 @@ interface BookCardProps {
 }
 
 export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
+  const displayTitle = book.title.length > 44 ? `${book.title.slice(0, 43).trimEnd()}…` : book.title;
   const statusBadges = {
     available: {
       text: 'Còn sách',
-      color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
-      icon: CheckCircle,
+      icon: Check,
     },
     reserved_only: {
       text: 'Đặt trước',
-      color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border-amber-200 dark:border-amber-800',
-      icon: Clock,
+      icon: Clock3,
     },
     maintenance: {
       text: 'Bảo trì',
-      color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-300 dark:border-slate-700',
-      icon: AlertTriangle,
+      icon: BookOpen,
     },
   };
 
@@ -31,75 +30,77 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
   const StatusIcon = currentStatus.icon;
 
   return (
-    <div className="group relative bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
+    <article className={`book-card book-card--${book.status}`} data-ui="book-card">
       {/* AI Match Badge (if present) */}
       {book.matchScore && (
-        <div className="absolute top-3 right-3 z-20 px-2.5 py-1 rounded-full bg-ai-gradient text-white text-xs font-semibold shadow-md flex items-center gap-1">
+        <div className="book-card__match">
           <span>{book.matchScore}% Match</span>
         </div>
       )}
 
       {/* Book Cover Container */}
-      <div className="flex justify-center mb-4 pt-2">
+      <button
+        type="button"
+        className="book-card__media"
+        onClick={() => onSelect?.(book)}
+        aria-label={`Mở sách ${book.title}`}
+      >
         <BookCover
           title={book.title}
           author={book.author}
           category={book.category}
           coverImageUrl={book.coverImageUrl}
           coverGradient={book.coverGradient}
+          className="book-card__cover"
           size="md"
         />
-      </div>
+      </button>
 
       {/* Book Info */}
-      <div className="space-y-2 flex-grow flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
-            <span className="font-medium truncate max-w-[60%]">{book.category}</span>
-            <div className="flex items-center gap-1 text-amber-500 font-semibold">
-              <Star className="w-3.5 h-3.5 fill-amber-400" />
-              <span>{book.rating}</span>
-              <span className="text-slate-400 font-normal">({book.reviewCount})</span>
+      <div className="book-card__body">
+        <div className="book-card__copy">
+          <div className="book-card__meta">
+            <span className="book-card__category">{book.category}</span>
+            <div className="book-card__rating" aria-label={`${book.rating} trên 5 sao, ${book.reviewCount} đánh giá`}>
+              <Star aria-hidden="true" />
+              <span>{book.rating.toFixed(1)}</span>
+              <small>{book.reviewCount ? `${book.reviewCount} đánh giá` : 'Chưa có đánh giá'}</small>
             </div>
           </div>
 
-          <h3 className="font-serif font-bold text-base text-slate-900 dark:text-white line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-            {book.title}
+          <h3 className="book-card__title" aria-label={book.title} title={book.title}>
+            {displayTitle}
           </h3>
 
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">
-            Tác giả: {book.author}
-          </p>
+          <p className="book-card__author">{book.author}</p>
         </div>
 
         {/* AI Recommendation Reason */}
         {book.recommendReason && (
-          <div className="p-2.5 rounded-xl bg-ai-subtle border border-indigo-100 dark:border-indigo-900/50 text-xs text-indigo-900 dark:text-indigo-200">
-            <p className="line-clamp-2 leading-relaxed font-medium">
-              💡 {book.recommendReason}
-            </p>
+          <div className="book-card__reason">
+            <p>{book.recommendReason}</p>
           </div>
         )}
 
         {/* Footer: Availability & CTA */}
-        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between mt-2">
-          <span
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${currentStatus.color}`}
-          >
-            <StatusIcon className="w-3 h-3" />
-            {currentStatus.text} ({book.availableCopies}/{book.totalCopies})
+        <div className="book-card__footer">
+          <span className="book-card__availability">
+            <StatusIcon aria-hidden="true" />
+            <span>{currentStatus.text}</span>
+            <small>{book.availableCopies}/{book.totalCopies}</small>
           </span>
 
           <button
             onClick={() => onSelect?.(book)}
-            className="p-2 rounded-xl text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 text-xs font-semibold"
+            type="button"
+            className="book-card__action"
             aria-label={`Xem chi tiết ${book.title}`}
           >
             <span>Chi tiết</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <ArrowUpRight aria-hidden="true" />
           </button>
         </div>
       </div>
-    </div>
+    </article>
   );
 };

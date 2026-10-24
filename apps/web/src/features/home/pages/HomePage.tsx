@@ -5,6 +5,7 @@ import libraryPhoto from '../../../assets/figma/home-library.png';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { BookCard } from '../components/BookCard';
 import HomeNavbar from '../components/HomeNavbar';
+import Marquee from '../components/Marquee';
 import { useHomeBooks, useHomeCategories } from '../hooks/useHomeData';
 import { toBookCardData } from '../utils/toBookCardData';
 import './HomePage.css';
@@ -99,7 +100,6 @@ export const HomePage = () => {
           <div className="annual-frame">
             <div className="annual-live-section-heading annual-live-books-heading">
               <div>
-                <span className="annual-live-eyebrow">Thư viện thông minh</span>
                 <h2>{activeCategoryName || 'Gợi ý dành cho bạn'}</h2>
                 <p className="annual-live-books-subtitle">
                   {activeCategoryName
@@ -117,9 +117,21 @@ export const HomePage = () => {
               <div className="annual-live-error" role="alert">Không thể tải đầu sách. {booksQuery.error.message}</div>
             ) : books.length ? (
               <>
-                <div className="annual-live-book-grid" aria-label="Danh sách đầu sách">
-                  {books.map((book) => <BookCard key={book.id} book={toBookCardData(book)} onSelect={() => navigate(`/books/${book.id}`)} />)}
-                </div>
+                <Marquee
+                  className="annual-live-book-marquee"
+                  aria-label="Gợi ý sách dành cho bạn"
+                  pauseOnHover
+                  repeat={3}
+                  speed={28}
+                >
+                  {books.map((book) => (
+                    <BookCard
+                      key={book.id}
+                      book={toBookCardData(book)}
+                      onSelect={() => navigate(`/books/${book.id}`)}
+                    />
+                  ))}
+                </Marquee>
                 {booksQuery.data && booksQuery.data.totalPages > 1 && (
                   <div className="annual-live-pagination" aria-label="Phân trang đầu sách">
                     <button type="button" disabled={page <= 1 || booksQuery.isFetching} onClick={() => setPage(page - 1)}>Trang trước</button>
