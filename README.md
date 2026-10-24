@@ -170,6 +170,14 @@ Lệnh trên chỉ thay token `NULL` bằng chuỗi rỗng (trạng thái không
 | **Librarian** | Thủ thư – quản lý sách, xử lý mượn/trả, phạt |
 | **Admin** | Quản trị – quản lý hệ thống, thống kê, cấu hình |
 
+### Hồ sơ, lịch sử và hỗ trợ độc giả
+
+Menu tài khoản ở góc trên bên phải hiển thị ảnh đại diện và liên kết đến **Hồ sơ cá nhân**, **Hỗ trợ**, **Lịch sử** và **Đăng xuất**. Độc giả xem lịch sử mượn/trả, số lần gia hạn, hạn trả và các khoản phí tại `/history`.
+
+Trang `/support` gồm chat trực tiếp với thủ thư và biểu mẫu gửi đơn hỗ trợ. Có thể đính kèm ảnh JPG, PNG hoặc WebP tối đa 10 MB; ảnh được lưu qua Cloudinary, nên cần cấu hình `Cloudinary__CloudName`, `Cloudinary__ApiKey` và `Cloudinary__ApiSecret`. Các loại đơn ban đầu được tạo bởi migration và có thể chỉnh sửa tại trang thủ thư.
+
+Thủ thư mở **Hỗ trợ độc giả → Đơn tiếp nhận** để xem đơn và cấu hình loại đơn; **Hỗ trợ độc giả → Phản hồi đơn** để tiếp nhận, đặt hạn xử lý, phản hồi và chat realtime. Mỗi đơn ghi nhận thủ thư tiếp nhận, thời điểm tiếp nhận, hạn xử lý và thời điểm phản hồi đầu tiên. Độc giả theo dõi các mốc này trực tiếp trên đơn; số đơn đang chờ và cần xử lý được cập nhật realtime. Chat và cập nhật đơn dùng SignalR tại `/hubs/support-chat`; tin nhắn được lưu vào PostgreSQL trước khi phát sự kiện realtime. Khi deploy sau khi thêm tính năng, cần áp dụng migration `20261024100000_AddReaderSupport` và `20261024140000_AddSupportComplaintHandling`; reverse proxy cần cho phép WebSocket đến API để dùng kết nối realtime.
+
 ## 📐 Quy ước đặt tên
 
 | Ngôn ngữ | Convention | Ví dụ |

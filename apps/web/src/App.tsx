@@ -24,7 +24,7 @@ import LibrarianCategoriesPage from './features/librarian/pages/LibrarianCategor
 import LibrarianCreateCategoryPage from './features/librarian/pages/LibrarianCreateCategoryPage';
 import LibrarianCategoryBooksPage from './features/librarian/pages/LibrarianCategoryBooksPage';
 import LibrarianBookDetailPage from './features/librarian/pages/LibrarianBookDetailPage';
-import CirculationPage from './features/librarian/pages/CirculationPage';
+import CirculationPage, { DirectCheckoutPage } from './features/librarian/pages/CirculationPage';
 import { AdminLayout } from './features/admin/components/AdminLayout';
 import AdminOverviewPage from './features/admin/pages/AdminOverviewPage';
 import AdminSectionPage from './features/admin/pages/AdminSectionPage';
@@ -39,6 +39,9 @@ import AdminReportTemplatesPage from './features/admin/pages/AdminReportTemplate
 import AdminReportTemplateDetailPage from './features/admin/pages/AdminReportTemplateDetailPage';
 import AdminRegulationsPage from './features/admin/pages/AdminRegulationsPage';
 import ProfilePage from './features/profile/pages/ProfilePage';
+import HistoryPage from './features/profile/pages/HistoryPage';
+import SupportPage from './features/profile/pages/SupportPage';
+import LibrarianSupportPage from './features/librarian/pages/LibrarianSupportPage';
 import { useAuthStore } from './features/auth/store/useAuthStore';
 
 function ProfileEntry() {
@@ -75,6 +78,16 @@ function App() {
           <ProfileEntry />
         </RoleGuard>
       } />
+      <Route path="/history" element={
+        <RoleGuard allowedRoles={['Reader']}>
+          <HistoryPage />
+        </RoleGuard>
+      } />
+      <Route path="/support" element={
+        <RoleGuard allowedRoles={['Reader']}>
+          <SupportPage />
+        </RoleGuard>
+      } />
 
       {/* Librarian Routes */}
       <Route path="/librarian" element={
@@ -96,11 +109,14 @@ function App() {
         <Route path="ai-settings" element={<LibrarianAiPage />} />
         <Route path="ai-recommendations" element={<Navigate to="/librarian/ai-settings" replace />} />
         <Route path="circulation" element={<Navigate to="/librarian/circulation/loans" replace />} />
+        <Route path="circulation/direct-borrow" element={<DirectCheckoutPage />} />
         <Route path="circulation/:tab" element={<CirculationPage />} />
         <Route path="reports" element={<LibrarianReportsPage />} />
         <Route path="reports/new" element={<LibrarianReportsPage />} />
         <Route path="reports/:id" element={<LibrarianReportDetailPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="support/requests" element={<LibrarianSupportPage view="requests" />} />
+        <Route path="support/replies" element={<LibrarianSupportPage view="replies" />} />
       </Route>
 
       {/* Admin Routes */}

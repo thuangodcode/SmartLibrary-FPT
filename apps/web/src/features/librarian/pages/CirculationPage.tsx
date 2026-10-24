@@ -1,20 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, Navigate, NavLink, useParams, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import {
-  AlertCircle,
-  ArrowRight,
   BookOpen,
-  ChevronRight,
   Clock3,
   Eye,
   LoaderCircle,
-  MoreHorizontal,
   RefreshCw,
   RotateCcw,
   Wallet,
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
+import { useToast } from '../../../components/ui/useToast';
+import { useAuthStore } from '../../auth/store/useAuthStore';
 import {
   STATUS_LABELS,
   TABS,
@@ -86,6 +85,20 @@ function DebouncedSearchInput({
   );
 }
 
+function dateInVietnam(value?: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
 function Chrome({ tab, stats, loading }: { tab: CirculationTab; stats: CirculationStats | null; loading?: boolean }) {
   const current = TABS.find((item) => item.id === tab)!;
   const HeroIcon = TAB_ICONS[tab];
@@ -99,7 +112,7 @@ function Chrome({ tab, stats, loading }: { tab: CirculationTab; stats: Circulati
         <strong>{current.crumb}</strong>
       </nav>
       <header className="circ-hero">
-        <span className="circ-hero-icon"><HeroIcon size={22} /></span>
+        <span className="circ-hero-icon"><HeroIcon size={20} /></span>
         <div>
           <h1>{current.label}</h1>
           <p>{current.description}</p>
@@ -139,37 +152,28 @@ function Chrome({ tab, stats, loading }: { tab: CirculationTab; stats: Circulati
           </div>
         </article>
       </section>
-      <nav className="circ-tabs" aria-label="Chức năng mượn trả">
-        {TABS.map((item) => {
-          const Icon = TAB_ICONS[item.id];
-          return (
-            <NavLink key={item.id} to={item.to} className={`circ-tab${tab === item.id ? ' is-active' : ''}`}>
-              <Icon size={15} />
-              {item.label}
-            </NavLink>
-          );
-        })}
-      </nav>
     </>
   );
 }
 
 function LoansView() {
   const headers = useCirculationAuth();
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const { showToast } = useToast();
   const [params, setParams] = useSearchParams();
   const [stats, setStats] = useState<CirculationStats | null>(null);
   const [list, setList] = useState<LoanList | null>(null);
-  const [fines, setFines] = useState<CirculationFine[]>([]);
   const [pending, setPending] = useState<CirculationLoan[]>([]);
-  const [readerKey, setReaderKey] = useState('');
-  const [borrowBarcode, setBorrowBarcode] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<CirculationLoan | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const search = params.get('q') ?? '';
-  const status = params.get('status') ?? 'All';
+  const borrowedFrom = params.get('borrowedFrom') ?? '';
+  const borrowedTo = params.get('borrowedTo') ?? '';
+  const pickupFrom = params.get('pickupFrom') ?? '';
+  const pickupTo = params.get('pickupTo') ?? '';
   const page = Number(params.get('page') ?? '1') || 1;
   const setFilter = useCallback((key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -181,33 +185,84 @@ function LoansView() {
 
   const load = useCallback(async () => {
     try {
-      const query = new URLSearchParams({ page: String(page), pageSize: '8' });
+      const query = new URLSearchParams({ page: String(page), pageSize: '20', status: 'Borrowed' });
       if (search.trim()) query.set('search', search.trim());
-      if (status !== 'All') query.set('status', status);
-      const [statsRes, listRes, fineRes, pendingRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
-        fetch(`${API_BASE_URL}/api/v1/circulation/loans?${query}`, { headers }),
-        fetch(`${API_BASE_URL}/api/v1/circulation/fines?status=Pending`, { headers }),
-        fetch(`${API_BASE_URL}/api/v1/circulation/pending`, { headers }),
-      ]);
-      const statsJson = await parseApiResponse<ApiResult<CirculationStats>>(statsRes);
+      if (borrowedFrom) query.set('borrowedFrom', borrowedFrom);
+      if (borrowedTo) query.set('borrowedTo', borrowedTo);
+      const listRes = await fetch(`${API_BASE_URL}/api/v1/circulation/loans?${query}`, { headers });
       const listJson = await parseApiResponse<ApiResult<LoanList>>(listRes);
-      const fineJson = await parseApiResponse<ApiResult<CirculationFine[]>>(fineRes);
-      const pendingJson = await parseApiResponse<ApiResult<CirculationLoan[]>>(pendingRes);
       if (!listRes.ok || !listJson?.success || !listJson.data) throw new Error(listJson?.error || 'Không tải được danh sách mượn.');
       setError(null);
-      setStats(statsJson?.data ?? null);
       setList(listJson.data);
-      setFines(fineJson?.data ?? []);
-      setPending(pendingJson?.data ?? []);
     } catch (err) {
-      setError(errorMessage(err, 'Lỗi tải dữ liệu.'));
+      const message = errorMessage(err, 'Lỗi tải dữ liệu.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được danh sách mượn', message });
     } finally {
       setLoading(false);
     }
-  }, [headers, page, search, status]);
+  }, [borrowedFrom, borrowedTo, headers, page, search, showToast]);
+
+  const loadDashboard = useCallback(async () => {
+    try {
+      const [statsRes, pendingRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/circulation/pending`, { headers }),
+      ]);
+      const [statsJson, pendingJson] = await Promise.all([
+        parseApiResponse<ApiResult<CirculationStats>>(statsRes),
+        parseApiResponse<ApiResult<CirculationLoan[]>>(pendingRes),
+      ]);
+      if (statsRes.ok && statsJson?.success) setStats(statsJson.data ?? null);
+      if (pendingRes.ok && pendingJson?.success) setPending(pendingJson.data ?? []);
+    } catch (err) {
+      const message = errorMessage(err, 'Không tải được thông tin tổng quan.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được thông tin tổng quan', message });
+    }
+  }, [headers, showToast]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
+
+  useEffect(() => { void Promise.resolve().then(loadDashboard); }, [loadDashboard]);
+
+  const refreshRef = useRef(() => {
+    void load();
+    void loadDashboard();
+  });
+  useEffect(() => {
+    refreshRef.current = () => {
+      void load();
+      void loadDashboard();
+    };
+  }, [load, loadDashboard]);
+
+  useEffect(() => {
+    if (!accessToken) return undefined;
+    let active = true;
+    const hub = new HubConnectionBuilder()
+      .withUrl(`${API_BASE_URL}/hubs/support-chat`, { accessTokenFactory: () => accessToken })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Warning)
+      .build();
+    hub.on('BorrowRequestUpdated', () => {
+      if (active) refreshRef.current();
+    });
+    hub.onreconnected(() => {
+      if (active) refreshRef.current();
+    });
+    void hub.start().catch((caught: unknown) => {
+      if (active) {
+        const message = errorMessage(caught, 'Không kết nối được cập nhật mượn sách thời gian thực.');
+        setError(message);
+        showToast({ type: 'error', title: 'Lỗi kết nối realtime', message });
+      }
+    });
+    return () => {
+      active = false;
+      void hub.stop();
+    };
+  }, [accessToken, showToast]);
 
   const post = async (url: string, body?: object) => {
     setBusy(true);
@@ -221,59 +276,141 @@ function LoansView() {
       });
       const json = await parseApiResponse<ApiResult<unknown>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Thao tác thất bại.');
-      setMessage(json.meta?.message || 'Đã cập nhật.');
-      setBorrowBarcode('');
+      const message = json.meta?.message || 'Đã cập nhật.';
+      setMessage(message);
+      showToast({ type: 'success', title: 'Thao tác thành công', message });
       await load();
+      await loadDashboard();
     } catch (err) {
-      setError(errorMessage(err, 'Thao tác thất bại.'));
+      const message = errorMessage(err, 'Thao tác thất bại.');
+      setError(message);
+      showToast({ type: 'error', title: 'Thao tác thất bại', message });
     } finally {
       setBusy(false);
     }
   };
 
+  const filteredPending = pending.filter((item) => {
+    const pickupDate = dateInVietnam(item.pickupAt);
+    return (!pickupFrom || pickupDate >= pickupFrom) && (!pickupTo || pickupDate <= pickupTo);
+  });
+
   return (
-    <section className="circ-page">
+    <section className="circ-page circ-page--loans">
       <Chrome tab="loans" stats={stats} loading={loading} />
       {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
 
-      <form
-        className="circ-card"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void post('/api/v1/circulation/checkout', { readerKey, barcode: borrowBarcode });
-        }}
-      >
-        <h2>Mượn sách tại quầy</h2>
-        <div className="circ-checkout">
-          <label className="circ-field">
-            Mã thẻ hoặc tên độc giả
-            <input value={readerKey} onChange={(e) => setReaderKey(e.target.value)} placeholder="Nhập mã thẻ, email hoặc mã sinh viên" />
-          </label>
-          <label className="circ-field">
-            Mã vạch sách
-            <input value={borrowBarcode} onChange={(e) => setBorrowBarcode(e.target.value)} placeholder="Quét hoặc nhập mã bản sao, ví dụ py01-01" />
-          </label>
-          <button type="submit" className="circ-btn circ-btn--primary" disabled={busy}>
-            Xác nhận mượn <ArrowRight size={14} />
-          </button>
+      <section className="circ-card circ-pending-card">
+        <div className="circ-card-head">
+          <div>
+            <h2>Yêu cầu chờ xử lý</h2>
+            <p className="circ-card-subtitle">Tiếp nhận yêu cầu và xác nhận giao sách tại quầy.</p>
+          </div>
+          <div className="circ-pending-tools">
+            <span className="circ-count">{filteredPending.length} / {pending.length} yêu cầu</span>
+            <Link className="circ-btn circ-btn--primary" to="/librarian/circulation/direct-borrow">Mượn tại quầy</Link>
+          </div>
         </div>
-      </form>
+        <div className="circ-date-filters" aria-label="Lọc lịch nhận">
+          <label>Từ ngày
+            <input type="date" value={pickupFrom} max={pickupTo || undefined}
+              onChange={(event) => setFilter('pickupFrom', event.target.value)} />
+          </label>
+          <label>Đến ngày
+            <input type="date" value={pickupTo} min={pickupFrom || undefined}
+              onChange={(event) => setFilter('pickupTo', event.target.value)} />
+          </label>
+          {(pickupFrom || pickupTo) && (
+            <button type="button" className="circ-btn circ-btn--quiet" onClick={() => {
+              const next = new URLSearchParams(params);
+              next.delete('pickupFrom');
+              next.delete('pickupTo');
+              next.delete('page');
+              setParams(next);
+            }}>Xóa lọc</button>
+          )}
+        </div>
+        {loading && !pending.length ? (
+          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải yêu cầu...</p>
+        ) : !filteredPending.length ? (
+          <p className="circ-empty">Không có yêu cầu trong khoảng ngày đã chọn.</p>
+        ) : (
+          <div className="circ-table-wrap circ-request-table-wrap">
+            <table className="circ-table circ-request-table">
+              <thead>
+                <tr>
+                  <th>Độc giả</th>
+                  <th>Sách / bản sao</th>
+                  <th>Lịch nhận</th>
+                  <th>Tiếp nhận</th>
+                  <th>Trạng thái</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPending.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <span className="circ-reader">
+                        <span className="circ-avatar">{initials(item.readerName)}</span>
+                        <span className="circ-request-reader-info">
+                          <strong>{item.readerName}</strong>
+                          <small>{item.studentId || item.readerEmail || 'Chưa có mã độc giả'}</small>
+                        </span>
+                      </span>
+                    </td>
+                    <td className="circ-request-book-cell">
+                      <strong>{item.bookTitle}</strong>
+                      <small>Mã bản sao: {item.barcode}</small>
+                    </td>
+                    <td>{formatDateTime(item.pickupAt)}</td>
+                    <td>
+                      {item.status === 'Approved' ? (
+                        <span className="circ-request-accepted-info">
+                          <strong>{item.librarianName || 'Thủ thư'}</strong>
+                          <small>{formatDateTime(item.acceptedAt)}</small>
+                        </span>
+                      ) : <span className="circ-request-pending-info">Chưa tiếp nhận</span>}
+                    </td>
+                    <td>
+                      <span className={`circ-badge is-${item.status.toLowerCase()}`}>
+                        {STATUS_LABELS[item.status] ?? item.status}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="circ-request-actions">
+                        {item.status === 'Pending' ? (
+                          <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${item.id}/approve`)}>Tiếp nhận</button>
+                        ) : (
+                          <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${item.id}/checkout`)}>Giao sách</button>
+                        )}
+                        <button type="button" className="circ-btn circ-btn--quiet" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${item.id}/reject`)}>Từ chối</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
-      <div className="circ-layout">
+      <div className="circ-layout circ-layout--loans">
         <div className="circ-main">
           <div className="circ-card">
             <div className="circ-card-head">
               <h2>Danh sách mượn sách</h2>
               <div className="circ-toolbar">
                 <DebouncedSearchInput key={search} value={search} onSearch={(value) => setFilter('q', value)} />
-                <select value={status} onChange={(e) => setFilter('status', e.target.value)}>
-                  <option value="All">Tất cả trạng thái</option>
-                  <option value="Borrowed">Đang mượn</option>
-                  <option value="Returned">Đã trả</option>
-                  <option value="Overdue">Quá hạn</option>
-                  <option value="Pending">Chờ xác nhận</option>
-                </select>
+                <label className="circ-date-filter">Từ ngày
+                  <input type="date" value={borrowedFrom} max={borrowedTo || undefined}
+                    onChange={(event) => setFilter('borrowedFrom', event.target.value)} />
+                </label>
+                <label className="circ-date-filter">Đến ngày
+                  <input type="date" value={borrowedTo} min={borrowedFrom || undefined}
+                    onChange={(event) => setFilter('borrowedTo', event.target.value)} />
+                </label>
               </div>
             </div>
             {loading && !list ? (
@@ -309,21 +446,6 @@ function LoansView() {
                         <td>
                           <div className="circ-actions">
                             <button type="button" className="circ-btn" onClick={() => setDetail(loan)}><Eye size={14} /> Xem</button>
-                            <details className="circ-more">
-                              <summary aria-label="Thao tác khác"><MoreHorizontal size={16} /></summary>
-                              <div>
-                                {loan.displayStatus !== 'Returned' && (
-                                  <Link to={`${tabPath('return')}?barcode=${encodeURIComponent(loan.barcode)}`}>Trả sách</Link>
-                                )}
-                                {loan.canRenew && loan.displayStatus !== 'Returned' && (
-                                  <button type="button" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${loan.id}/renew`)}>
-                                    Gia hạn{loan.renewalCount ? ` (${loan.renewalCount})` : ''}
-                                  </button>
-                                )}
-                                {loan.displayStatus === 'Overdue' && <Link to={tabPath('overdue')}>Xem quá hạn</Link>}
-                                <button type="button" onClick={() => setDetail(loan)}>Chi tiết phiếu</button>
-                              </div>
-                            </details>
                           </div>
                         </td>
                       </tr>
@@ -349,88 +471,7 @@ function LoansView() {
             )}
           </div>
 
-          <div className="circ-card">
-            <div className="circ-card-head">
-              <h2>Yêu cầu mượn chờ xác nhận</h2>
-              <small className="circ-count">{pending.length} yêu cầu</small>
-            </div>
-            {loading && !pending.length ? (
-              <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải...</p>
-            ) : !pending.length ? (
-              <p className="circ-empty">Không có yêu cầu chờ duyệt.</p>
-            ) : (
-              <div className="circ-table-wrap">
-                <table className="circ-table">
-                  <thead><tr><th>Độc giả</th><th>Sách</th><th>Ngày gửi</th><th>Thao tác</th></tr></thead>
-                  <tbody>
-                    {pending.map((item) => (
-                      <tr key={item.id}>
-                        <td>{item.readerName}</td>
-                        <td>{item.bookTitle}</td>
-                        <td>{formatDateTime(item.createdAt || item.borrowDate)}</td>
-                        <td className="circ-actions">
-                          <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${item.id}/approve`)}>Xác nhận</button>
-                          <button type="button" className="circ-btn" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${item.id}/reject`)}>Từ chối</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
         </div>
-
-        <aside className="circ-side">
-          <div className="circ-card">
-            <h2>Thông tin nhanh</h2>
-            <div className="circ-quick">
-              <Link to={`${tabPath('loans')}?status=Borrowed`}>
-                <span><BookOpen size={15} /> Sách đang mượn</span>
-                <strong>{stats?.borrowed ?? 0} <ChevronRight size={14} /></strong>
-              </Link>
-              <Link to={tabPath('overdue')}>
-                <span><Clock3 size={15} /> Sắp đến hạn</span>
-                <strong>{stats?.dueSoon ?? 0} <ChevronRight size={14} /></strong>
-              </Link>
-              <Link to={tabPath('overdue')}>
-                <span><AlertCircle size={15} /> Quá hạn</span>
-                <strong>{stats?.overdue ?? 0} <ChevronRight size={14} /></strong>
-              </Link>
-              <Link to={tabPath('fines')}>
-                <span><Wallet size={15} /> Tổng phí phạt</span>
-                <strong>{formatMoney(stats?.unpaidFines)} <ChevronRight size={14} /></strong>
-              </Link>
-            </div>
-          </div>
-          <div className="circ-card">
-            <div className="circ-card-head">
-              <h2>Phí phạt gần đây</h2>
-              <Link to={tabPath('fines')}>Xem tất cả</Link>
-            </div>
-            {fines.slice(0, 4).map((fine) => (
-              <div className="circ-fine-row" key={fine.id}>
-                <div>
-                  <b>{fine.readerName}</b>
-                  <small>{fine.code} · {formatDate(fine.createdAt)}</small>
-                </div>
-                <div className="circ-fine-amt">
-                  <strong>{formatMoney(fine.amount)}</strong>
-                  <em>Chưa thanh toán</em>
-                </div>
-              </div>
-            ))}
-            {fines.length === 0 && <p className="circ-empty">Chưa có khoản phạt chờ thu.</p>}
-          </div>
-          <div className="circ-card">
-            <h2>Lưu ý</h2>
-            <ul className="circ-note">
-              <li>Trả sách đúng hạn để tránh phát sinh phí phạt.</li>
-              <li>Quá hạn sẽ tính theo hạn trả và trạng thái phiếu thực tế.</li>
-              <li>Vui lòng kiểm tra email nhắc hạn nếu độc giả chưa trả.</li>
-            </ul>
-          </div>
-        </aside>
       </div>
 
       {detail && (
@@ -458,9 +499,90 @@ function LoansView() {
   );
 }
 
+export function DirectCheckoutPage() {
+  const headers = useCirculationAuth();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+  const [readerKey, setReaderKey] = useState('');
+  const [barcode, setBarcode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/circulation/checkout`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ readerKey, barcode }),
+      });
+      const result = await parseApiResponse<ApiResult<unknown>>(response);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || 'Không thể hoàn tất mượn sách.');
+      }
+      const message = result.meta?.message || 'Đã lập phiếu mượn.';
+      setMessage(message);
+      showToast({ type: 'success', title: 'Mượn sách thành công', message });
+      setReaderKey('');
+      setBarcode('');
+    } catch (caught) {
+      const message = errorMessage(caught, 'Không thể hoàn tất mượn sách.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không thể mượn sách', message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="circ-page circ-page--direct-checkout">
+      <nav className="circ-crumb" aria-label="Breadcrumb">
+        <Link to="/librarian/circulation/loans">Mượn sách</Link>
+        <span>/</span>
+        <strong>Mượn tại quầy</strong>
+      </nav>
+      <header className="circ-direct-heading">
+        <div>
+          <h1>Mượn sách tại quầy</h1>
+          <p>Lập phiếu mượn trực tiếp sau khi xác minh độc giả và bản sao sách.</p>
+        </div>
+        <Link className="circ-btn" to="/librarian/circulation/loans">Quay lại danh sách</Link>
+      </header>
+      {message && (
+        <div className="circ-banner is-ok">
+          <p>{message}</p>
+          <button type="button" className="circ-btn" onClick={() => navigate('/librarian/circulation/loans')}>Xem danh sách mượn</button>
+        </div>
+      )}
+      {error && <p className="circ-banner is-err">{error}</p>}
+      <form className="circ-card circ-direct-form" onSubmit={(event) => void submit(event)}>
+        <label className="circ-field">
+          Mã thẻ hoặc thông tin độc giả
+          <input required value={readerKey} onChange={(event) => setReaderKey(event.target.value)}
+            placeholder="Mã thẻ, email hoặc mã sinh viên" />
+        </label>
+        <label className="circ-field">
+          Mã vạch bản sao sách
+          <input required value={barcode} onChange={(event) => setBarcode(event.target.value)}
+            placeholder="Quét hoặc nhập mã bản sao" />
+        </label>
+        <p className="circ-checkout-hint">Hệ thống kiểm tra chính sách mượn và tình trạng bản sao trước khi tạo phiếu.</p>
+        <button type="submit" className="circ-btn circ-btn--primary" disabled={busy}>
+          {busy ? 'Đang xử lý...' : 'Xác nhận mượn sách'}
+        </button>
+      </form>
+    </section>
+  );
+}
+
 function ReturnView() {
   const headers = useCirculationAuth();
   const [params] = useSearchParams();
+  const { showToast } = useToast();
   const [stats, setStats] = useState<CirculationStats | null>(null);
   const [reservations, setReservations] = useState<CirculationReservation[]>([]);
   const [activity, setActivity] = useState<CirculationActivity[]>([]);
@@ -474,6 +596,7 @@ function ReturnView() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const [statsRes, reservationRes, activityRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
@@ -489,11 +612,13 @@ function ReturnView() {
       setActivity(activityJson?.data ?? []);
       setError(null);
     } catch (err) {
-      setError(errorMessage(err, 'Không tải được dữ liệu trả sách.'));
+      const message = errorMessage(err, 'Không tải được dữ liệu trả sách.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được dữ liệu trả sách', message });
     } finally {
       setLoading(false);
     }
-  }, [headers]);
+  }, [headers, showToast]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
@@ -509,10 +634,14 @@ function ReturnView() {
       });
       const json = await parseApiResponse<ApiResult<unknown>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Thao tác thất bại.');
-      setMessage(json.meta?.message || 'Đã cập nhật.');
+      const message = json.meta?.message || 'Đã cập nhật.';
+      setMessage(message);
+      showToast({ type: 'success', title: 'Cập nhật thành công', message });
       await load();
     } catch (err) {
-      setError(errorMessage(err, 'Thao tác thất bại.'));
+      const message = errorMessage(err, 'Thao tác thất bại.');
+      setError(message);
+      showToast({ type: 'error', title: 'Thao tác thất bại', message });
     } finally {
       setBusy(false);
     }
@@ -524,7 +653,8 @@ function ReturnView() {
       <div className="circ-toolbar-end">
         <span />
         <button type="button" className="circ-btn" disabled={loading || busy} onClick={() => void load()}>
-          <RefreshCw size={14} /> Làm mới
+          {loading ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />}
+          {loading ? 'Đang tải...' : 'Làm mới'}
         </button>
       </div>
       {message && <p className="circ-banner is-ok">{message}</p>}
@@ -552,7 +682,10 @@ function ReturnView() {
             </select>
           </label>
           <p className="circ-hint">Hư hỏng hoặc thất lạc chỉ lập hồ sơ chờ xác minh. Thủ thư xác nhận ở mục Quá hạn rồi mới tính bồi thường.</p>
-          <button type="submit" className="circ-btn circ-btn--primary" disabled={busy}>Ghi nhận trả sách</button>
+          <button type="submit" className="circ-btn circ-btn--primary" disabled={loading || busy}>
+            {busy ? <LoaderCircle className="spin" size={14} /> : null}
+            {busy ? 'Đang ghi nhận...' : 'Ghi nhận trả sách'}
+          </button>
         </form>
         <div className="circ-card">
           <h2>Đặt chỗ</h2>
@@ -572,10 +705,13 @@ function ReturnView() {
               Mã vạch sách cần đặt chỗ
               <input value={reserveBarcode} onChange={(e) => setReserveBarcode(e.target.value)} placeholder="Mã bản sao cần đặt chỗ, ví dụ py01-01" />
             </label>
-            <button type="submit" className="circ-btn circ-btn--primary" disabled={busy} style={{ marginTop: 8 }}>Tạo đặt chỗ</button>
+            <button type="submit" className="circ-btn circ-btn--primary" disabled={loading || busy} style={{ marginTop: 8 }}>
+              {busy ? <LoaderCircle className="spin" size={14} /> : null}
+              {busy ? 'Đang xử lý...' : 'Tạo đặt chỗ'}
+            </button>
             <p className="circ-hint">Không giữ một bản sao cụ thể cho đến khi sách sẵn sàng.</p>
           </form>
-          {loading && !reservations.length ? (
+          {loading ? (
             <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải...</p>
           ) : !reservations.length ? (
             <p className="circ-empty">Không có đặt chỗ đang mở.</p>
@@ -593,7 +729,9 @@ function ReturnView() {
       </div>
       <div className="circ-card">
         <h2>Giao dịch gần đây</h2>
-        {!activity.length ? <p className="circ-empty">Chưa có giao dịch gần đây.</p> : (
+        {loading ? (
+          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải giao dịch...</p>
+        ) : !activity.length ? <p className="circ-empty">Chưa có giao dịch gần đây.</p> : (
           <div className="circ-table-wrap">
             <table className="circ-table">
               <thead><tr><th>Thời gian</th><th>Loại</th><th>Mã vạch</th><th>Độc giả</th></tr></thead>
@@ -621,6 +759,7 @@ function ReturnView() {
 
 function OverdueView() {
   const headers = useCirculationAuth();
+  const { showToast } = useToast();
   const [stats, setStats] = useState<CirculationStats | null>(null);
   const [items, setItems] = useState<CirculationLoan[]>([]);
   const [incidents, setIncidents] = useState<CirculationIncident[]>([]);
@@ -631,6 +770,7 @@ function OverdueView() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const [statsRes, overdueRes, incidentRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
@@ -646,11 +786,13 @@ function OverdueView() {
       setItems(overdueJson.data ?? []);
       setIncidents(incidentJson?.data ?? []);
     } catch (err) {
-      setError(errorMessage(err, 'Lỗi tải dữ liệu.'));
+      const message = errorMessage(err, 'Lỗi tải dữ liệu.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được dữ liệu quá hạn', message });
     } finally {
       setLoading(false);
     }
-  }, [headers]);
+  }, [headers, showToast]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
@@ -679,10 +821,14 @@ function OverdueView() {
       });
       const json = await parseApiResponse<ApiResult<unknown>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Không ghi nhận được phạt.');
-      setMessage(json.meta?.message || 'Đã ghi nhận phạt.');
+      const message = json.meta?.message || 'Đã ghi nhận phạt.';
+      setMessage(message);
+      showToast({ type: 'success', title: 'Đã ghi nhận phí phạt', message });
       await load();
     } catch (err) {
-      setError(errorMessage(err, 'Không ghi nhận được phạt.'));
+      const message = errorMessage(err, 'Không ghi nhận được phạt.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không ghi nhận được phí phạt', message });
     } finally {
       setBusy(false);
     }
@@ -692,7 +838,9 @@ function OverdueView() {
     const draft = draftOf(item);
     const amount = Number(draft.amount);
     if (!amount || amount <= 0) {
-      setError('Nhập số tiền sau khi đã đối chiếu bản sao và phiếu mượn. Hệ thống không tự lấy giá sách.');
+      const message = 'Nhập số tiền sau khi đã đối chiếu bản sao và phiếu mượn. Hệ thống không tự lấy giá sách.';
+      setError(message);
+      showToast({ type: 'error', title: 'Thông tin chưa hợp lệ', message });
       return;
     }
     setBusy(true);
@@ -713,10 +861,14 @@ function OverdueView() {
       });
       const json = await parseApiResponse<ApiResult<CirculationIncident>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Không xác nhận được hồ sơ.');
-      setMessage(json.meta?.message || 'Đã xác nhận bồi thường.');
+      const message = json.meta?.message || 'Đã xác nhận bồi thường.';
+      setMessage(message);
+      showToast({ type: 'success', title: 'Đã xác nhận hồ sơ', message });
       await load();
     } catch (err) {
-      setError(errorMessage(err, 'Không xác nhận được hồ sơ.'));
+      const message = errorMessage(err, 'Không xác nhận được hồ sơ.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không xác nhận được hồ sơ', message });
     } finally {
       setBusy(false);
     }
@@ -734,10 +886,14 @@ function OverdueView() {
       });
       const json = await parseApiResponse<ApiResult<unknown>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Không từ chối được hồ sơ.');
-      setMessage(json.meta?.message || 'Đã từ chối hồ sơ.');
+      const message = json.meta?.message || 'Đã từ chối hồ sơ.';
+      setMessage(message);
+      showToast({ type: 'success', title: 'Đã xử lý hồ sơ', message });
       await load();
     } catch (err) {
-      setError(errorMessage(err, 'Không từ chối được hồ sơ.'));
+      const message = errorMessage(err, 'Không từ chối được hồ sơ.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không từ chối được hồ sơ', message });
     } finally {
       setBusy(false);
     }
@@ -748,13 +904,18 @@ function OverdueView() {
       <Chrome tab="overdue" stats={stats} loading={loading} />
       <div className="circ-toolbar-end">
         <span />
-        <button type="button" className="circ-btn" onClick={() => void load()}><RefreshCw size={14} /> Làm mới</button>
+        <button type="button" className="circ-btn" disabled={loading || busy} onClick={() => void load()}>
+          {loading ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />}
+          {loading ? 'Đang tải...' : 'Làm mới'}
+        </button>
       </div>
       {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
       <div className="circ-card">
         <h2>Sách quá hạn</h2>
-        {!items.length ? <p className="circ-empty">Không có sách quá hạn.</p> : (
+        {loading ? (
+          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải danh sách quá hạn...</p>
+        ) : !items.length ? <p className="circ-empty">Không có sách quá hạn.</p> : (
           <div className="circ-table-wrap">
             <table className="circ-table">
               <thead>
@@ -796,7 +957,9 @@ function OverdueView() {
       <div className="circ-card">
         <h2>Hư hỏng & thất lạc</h2>
         <p className="circ-hint">Không ghi nhận mất sách hay bồi thường khi độc giả tự báo. Thủ thư đối chiếu bản sao, phiếu mượn rồi xác nhận. Hư hỏng nhẹ tính phí theo mức độ; hư hỏng nặng hoặc mất sách mới mua đền. Không tự khóa tài khoản.</p>
-        {!incidents.length ? <p className="circ-empty">Chưa có hồ sơ mất sách hoặc hư hỏng.</p> : incidents.map((item) => {
+        {loading ? (
+          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải hồ sơ sự cố...</p>
+        ) : !incidents.length ? <p className="circ-empty">Chưa có hồ sơ mất sách hoặc hư hỏng.</p> : incidents.map((item) => {
           const draft = draftOf(item);
           const amount = Number(draft.amount) || 0;
           const overdue = draft.applyOverdue ? (item.suggestedOverdueFine ?? 0) : 0;
@@ -863,6 +1026,7 @@ function OverdueView() {
 
 function FinesView() {
   const headers = useCirculationAuth();
+  const { showToast } = useToast();
   const [stats, setStats] = useState<CirculationStats | null>(null);
   const [items, setItems] = useState<CirculationFine[]>([]);
   const [status, setStatus] = useState('All');
@@ -879,28 +1043,41 @@ function FinesView() {
   }, [searchInput]);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const query = new URLSearchParams();
       if (search.trim()) query.set('search', search.trim());
       if (status !== 'All') query.set('status', status);
-      const [statsRes, fineRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
-        fetch(`${API_BASE_URL}/api/v1/circulation/fines?${query}`, { headers }),
-      ]);
-      const statsJson = await parseApiResponse<ApiResult<CirculationStats>>(statsRes);
+      const fineRes = await fetch(`${API_BASE_URL}/api/v1/circulation/fines?${query}`, { headers });
       const fineJson = await parseApiResponse<ApiResult<CirculationFine[]>>(fineRes);
       if (!fineRes.ok || !fineJson?.success) throw new Error(fineJson?.error || 'Không tải được phí phạt.');
       setError(null);
-      setStats(statsJson?.data ?? null);
       setItems(fineJson.data ?? []);
     } catch (err) {
-      setError(errorMessage(err, 'Lỗi tải dữ liệu.'));
+      const message = errorMessage(err, 'Lỗi tải dữ liệu.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được danh sách phí phạt', message });
     } finally {
       setLoading(false);
     }
-  }, [headers, search, status]);
+  }, [headers, search, showToast, status]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers });
+      const result = await parseApiResponse<ApiResult<CirculationStats>>(response);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không tải được thống kê.');
+      setStats(result.data ?? null);
+    } catch (err) {
+      const message = errorMessage(err, 'Không tải được thống kê.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được thống kê', message });
+    }
+  }, [headers, showToast]);
+
+  useEffect(() => { void Promise.resolve().then(loadStats); }, [loadStats]);
 
   const pay = async (id: string) => {
     if (!window.confirm('Xác nhận đã thu tiền phạt này? Hệ thống không tự đánh dấu đã thanh toán.')) return;
@@ -910,10 +1087,14 @@ function FinesView() {
       const res = await fetch(`${API_BASE_URL}/api/v1/circulation/fines/${id}/pay`, { method: 'POST', headers });
       const json = await parseApiResponse<ApiResult<unknown>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Không ghi nhận thanh toán.');
-      setMessage(json.meta?.message || 'Đã ghi nhận thanh toán.');
-      await load();
+      const message = json.meta?.message || 'Đã ghi nhận thanh toán.';
+      setMessage(message);
+      showToast({ type: 'success', title: 'Đã ghi nhận thanh toán', message });
+      await Promise.all([load(), loadStats()]);
     } catch (err) {
-      setError(errorMessage(err, 'Không ghi nhận thanh toán.'));
+      const message = errorMessage(err, 'Không ghi nhận thanh toán.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không ghi nhận thanh toán', message });
     } finally {
       setBusy(false);
     }
@@ -934,9 +1115,20 @@ function FinesView() {
               <option value="Pending">Chưa thanh toán</option>
               <option value="Paid">Đã thanh toán</option>
             </select>
+            <button
+              type="button"
+              className="circ-btn"
+              disabled={loading || busy}
+              onClick={() => void Promise.all([load(), loadStats()])}
+            >
+              {loading ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />}
+              {loading ? 'Đang tải...' : 'Làm mới'}
+            </button>
           </div>
         </div>
-        {!items.length ? <p className="circ-empty">Chưa có khoản phạt.</p> : (
+        {loading ? (
+          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải danh sách phí phạt...</p>
+        ) : !items.length ? <p className="circ-empty">Chưa có khoản phạt.</p> : (
           <div className="circ-table-wrap">
             <table className="circ-table">
               <thead>

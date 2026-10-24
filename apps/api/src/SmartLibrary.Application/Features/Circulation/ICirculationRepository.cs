@@ -9,14 +9,24 @@ public interface ICirculationRepository
     Task MarkOverdueAsync(CancellationToken ct);
     Task<CirculationStatsDto> GetStatsAsync(int finePerDay, CancellationToken ct);
     Task<(IReadOnlyList<CirculationLoanDto> Items, int Total)> GetLoansAsync(
-        string? search, string? status, int page, int pageSize, int finePerDay, CancellationToken ct);
+        string? search, string? status, DateTime? borrowedFromUtc, DateTime? borrowedBeforeUtc,
+        int page, int pageSize, int finePerDay, CancellationToken ct);
     Task<CirculationLoanDto?> GetLoanAsync(Guid id, int finePerDay, CancellationToken ct);
     Task<UserProfile?> FindReaderAsync(string key, CancellationToken ct);
     Task<BookCopy?> FindCopyByBarcodeAsync(string barcode, CancellationToken ct);
     Task<BookCopy?> FindAvailableCopyForBookAsync(Guid bookId, CancellationToken ct);
     Task<bool> HasActiveLoanAsync(Guid copyId, Guid? exceptLoanId, CancellationToken ct);
-    Task<int> CountActiveLoansAsync(Guid readerId, CancellationToken ct);
+    Task<int> CountActiveLoansAsync(Guid readerId, Guid? exceptLoanId, CancellationToken ct);
+    Task<bool> HasOverdueLoansAsync(Guid readerId, DateTime asOfUtc, CancellationToken ct);
     Task<bool> HasUnpaidFinesAsync(Guid readerId, CancellationToken ct);
+    Task<int> CountPickupRequestsAsync(DateTime pickupAt, CancellationToken ct);
+    Task<IReadOnlyDictionary<DateTime, int>> GetPickupRequestCountsAsync(IReadOnlyList<DateTime> pickupTimes, CancellationToken ct);
+    Task LockBorrowReaderAsync(Guid readerId, CancellationToken ct);
+    Task LockPickupSlotAsync(DateTime pickupAt, CancellationToken ct);
+    Task<bool> HasOtherBorrowRequestAsync(Guid copyId, Guid exceptLoanId, CancellationToken ct);
+    Task<IReadOnlyList<Guid>> GetExpiredPickupRequestIdsAsync(DateTime expiredBeforeUtc, int limit, CancellationToken ct);
+    Task LockBorrowRequestAsync(Guid loanId, CancellationToken ct);
+    Task ReloadTrackedLoanAsync(Guid loanId, CancellationToken ct);
     Task AddLoanAsync(BorrowRecord loan, CancellationToken ct);
     Task<BorrowRecord?> GetTrackedLoanAsync(Guid id, CancellationToken ct);
     Task<BorrowRecord?> FindActiveLoanByBarcodeAsync(string barcode, CancellationToken ct);

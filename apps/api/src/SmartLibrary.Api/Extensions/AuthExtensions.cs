@@ -23,12 +23,24 @@ public static class AuthExtensions
 
                 options.Events = new JwtBearerEvents
                 {
+                    OnMessageReceived = context =>
+                    {
+                        if (context.HttpContext.Request.Path.StartsWithSegments("/hubs/support-chat"))
+                        {
+                            var accessToken = context.Request.Query["access_token"];
+                            if (!string.IsNullOrEmpty(accessToken))
+                                context.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    },
                     OnTokenValidated = async context =>
                     {
                         var authorizationHeader = context.HttpContext.Request.Headers.Authorization.ToString();
                         var rawToken = authorizationHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
                             ? authorizationHeader["Bearer ".Length..].Trim()
-                            : null;
+                            : context.HttpContext.Request.Path.StartsWithSegments("/hubs/support-chat")
+                                ? context.Request.Query["access_token"].ToString()
+                                : null;
                         var identity = context.Principal?.Identity as ClaimsIdentity;
                         if (string.IsNullOrWhiteSpace(rawToken) || identity is null)
                         {

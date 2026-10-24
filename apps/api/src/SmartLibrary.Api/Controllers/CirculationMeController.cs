@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Circulation;
 using SmartLibrary.Application.Features.Circulation.DTOs;
+using SmartLibrary.Api.Hubs;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -12,10 +14,12 @@ namespace SmartLibrary.Api.Controllers;
 public class CirculationMeController : ControllerBase
 {
     private readonly CirculationService _circulation;
+    private readonly IHubContext<SupportChatHub> _hub;
 
-    public CirculationMeController(CirculationService circulation)
+    public CirculationMeController(CirculationService circulation, IHubContext<SupportChatHub> hub)
     {
         _circulation = circulation;
+        _hub = hub;
     }
 
     [HttpGet("loans")]
@@ -39,22 +43,30 @@ public class CirculationMeController : ControllerBase
     [HttpPost("loans")]
     public async Task<IActionResult> RequestBorrow([FromBody] BorrowRequest request, CancellationToken ct)
     {
-        var result = await _circulation.RequestBorrowAsync(CirculationService.ReadUserId(User), request, ct);
-        return result.IsSuccess
-            ? Ok(ApiResponse<CirculationLoanDto>.Ok(result.Data!, new { message = "Đã gửi yêu cầu mượn. Chờ thủ thư xác nhận." }))
-            : BadRequest(ApiResponse<object>.Fail(result.Error!));
+        var readerId = CirculationService.ReadUserId(User);
+        var result = await _circulation.RequestBorrowAsync(readerId, request, ct);
+        if (!result.IsSuccess)
+            return BadRequest(ApiResponse<object>.Fail(result.Error!));
+        await BroadcastBorrowUpdateAsync(result.Data!, ct);
+        return Ok(ApiResponse<CirculationLoanDto>.Ok(result.Data!, new { message = "Đã gửi yêu cầu mượn và giữ bản sao. Chờ thủ thư tiếp nhận." }));
     }
+
+    [HttpGet("pickup-slots")]
+    [Authorize(Roles = "Reader")]
+    public async Task<IActionResult> PickupSlots(CancellationToken ct)
+        => Ok(ApiResponse<IReadOnlyList<PickupSlotDto>>.Ok(await _circulation.GetPickupSlotsAsync(ct)));
 
     /// <summary>Request to borrow a currently available copy by book ID.</summary>
     [HttpPost("book-requests")]
     [Authorize(Roles = "Reader")]
     public async Task<IActionResult> RequestBorrowBook([FromBody] RequestBookBorrowRequest request, CancellationToken ct)
     {
-        var result = await _circulation.RequestBorrowBookAsync(
-            CirculationService.ReadUserId(User), request.BookId, ct);
-        return result.IsSuccess
-            ? Ok(ApiResponse<CirculationLoanDto>.Ok(result.Data!, new { message = "Đã gửi yêu cầu mượn. Chờ thủ thư xác nhận." }))
-            : BadRequest(ApiResponse<object>.Fail(result.Error!));
+        var readerId = CirculationService.ReadUserId(User);
+        var result = await _circulation.RequestBorrowBookAsync(readerId, request.BookId, request.PickupAt, ct);
+        if (!result.IsSuccess)
+            return BadRequest(ApiResponse<object>.Fail(result.Error!));
+        await BroadcastBorrowUpdateAsync(result.Data!, ct);
+        return Ok(ApiResponse<CirculationLoanDto>.Ok(result.Data!, new { message = "Đã gửi yêu cầu mượn và giữ bản sao. Chờ thủ thư tiếp nhận." }));
     }
 
     [HttpPost("loans/{id:guid}/renew")]
@@ -103,5 +115,13 @@ public class CirculationMeController : ControllerBase
         return result.IsSuccess
             ? Ok(ApiResponse<bool>.Ok(true, new { message = "Đã hủy đặt trước." }))
             : BadRequest(ApiResponse<object>.Fail(result.Error!));
+    }
+
+    private async Task BroadcastBorrowUpdateAsync(CirculationLoanDto loan, CancellationToken ct)
+    {
+        await _hub.Clients.Group(SupportChatHub.ReaderGroup(loan.ReaderId))
+            .SendAsync("BorrowStatusUpdated", loan, ct);
+        await _hub.Clients.Group(SupportChatHub.LibrarianGroup)
+            .SendAsync("BorrowRequestUpdated", loan, ct);
     }
 }

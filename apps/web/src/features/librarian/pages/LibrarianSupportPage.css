@@ -1,0 +1,837 @@
+.librarian-support {
+  display: grid;
+  gap: 18px;
+  color: #263247;
+}
+
+.librarian-support-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.librarian-support-heading p {
+  margin: 0 0 7px;
+  color: #dc6b34;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.librarian-support-heading h1 {
+  margin: 0;
+  color: #273548;
+  font-size: 25px;
+}
+
+.librarian-support-heading > div > span {
+  display: block;
+  margin-top: 6px;
+  color: #8992a1;
+  font-size: 12px;
+}
+
+.librarian-support-heading nav {
+  display: flex;
+  gap: 7px;
+}
+
+.librarian-support-heading nav a {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #e0e5ec;
+  background: #fff;
+  padding: 0 11px;
+  color: #677286;
+  font-size: 11px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.librarian-support-heading nav a.is-active {
+  border-color: #d7e7d9;
+  background: #eff6ef;
+  color: #2e6740;
+}
+
+.librarian-support-alert {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.librarian-support-alert--error {
+  border: 1px solid #efc7b8;
+  background: #fff6f1;
+  color: #a5462a;
+}
+
+.librarian-support-alert--success {
+  border: 1px solid #cce0ce;
+  background: #f1f8f1;
+  color: #347246;
+}
+
+.librarian-support-types,
+.librarian-support-ticket-list,
+.librarian-support-ticket-detail,
+.librarian-support-chat {
+  border: 1px solid #e6eaf0;
+  background: #fff;
+}
+
+.librarian-support-types {
+  padding: 16px 18px;
+}
+
+.librarian-support-section-heading,
+.librarian-support-section-heading > div {
+  display: flex;
+  align-items: center;
+}
+
+.librarian-support-section-heading {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.librarian-support-section-heading > div {
+  gap: 10px;
+  color: #3a7047;
+}
+
+.librarian-support-section-heading > div > div {
+  display: grid;
+  gap: 4px;
+}
+
+.librarian-support-section-heading strong {
+  color: #344158;
+  font-size: 12px;
+}
+
+.librarian-support-section-heading span {
+  color: #8b94a2;
+  font-size: 10px;
+}
+
+.librarian-support-section-heading > button,
+.librarian-support-reply-form button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  background: #244d39;
+  padding: 0 11px;
+  color: #fff;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.librarian-support-section-heading > button:disabled,
+.librarian-support-reply-form button:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
+.librarian-support-type-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.librarian-support-type-chip {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #dfe9df;
+  background: #f5f9f5;
+  padding: 0 7px 0 10px;
+  color: #48634c;
+  font-size: 10px;
+}
+
+.librarian-support-type-chip button {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #8b6158;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.librarian-support-type-editor form {
+  display: inline-flex;
+  height: 32px;
+  border: 1px solid #e1e6ed;
+}
+
+.librarian-support-type-editor input {
+  width: 150px;
+  border: 0;
+  outline: none;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 10px;
+}
+
+.librarian-support-type-editor form button {
+  display: grid;
+  width: 31px;
+  place-items: center;
+  border: 0;
+  background: #f6f8fa;
+  color: #546173;
+  cursor: pointer;
+}
+
+.librarian-support-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.librarian-support-list-heading h2 {
+  margin: 0;
+  color: #344158;
+  font-size: 14px;
+}
+
+.librarian-support-list-heading span {
+  color: #8c95a3;
+  font-size: 11px;
+}
+
+.librarian-support-queue {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #f0d8c8;
+  background: #fff9f4;
+  padding: 10px 16px;
+}
+
+.librarian-support-queue > div {
+  display: grid;
+  gap: 4px;
+}
+
+.librarian-support-queue strong {
+  color: #74482f;
+  font-size: 12px;
+}
+
+.librarian-support-queue > div span {
+  color: #8d8178;
+  font-size: 10px;
+}
+
+.librarian-support-queue > span {
+  border-radius: 99px;
+  background: #f1eee9;
+  padding: 6px 10px;
+  color: #77756f;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.librarian-support-queue > span.has-pending {
+  background: #ffeadb;
+  color: #a44f20;
+}
+
+.librarian-support-response-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #e5e9ef;
+}
+
+.librarian-support-response-tabs button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 0 12px;
+  color: #7b8595;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.librarian-support-response-tabs button.is-active {
+  border-bottom-color: #4f8b5c;
+  color: #2e6740;
+}
+
+.librarian-support-ticket-layout {
+  display: grid;
+  min-height: 420px;
+  grid-template-columns: minmax(240px, .85fr) minmax(0, 1.35fr);
+  gap: 12px;
+}
+
+.librarian-support-ticket-list {
+  display: grid;
+  align-content: start;
+  gap: 0;
+  max-height: 680px;
+  overflow: auto;
+}
+
+.librarian-support-ticket-item {
+  display: grid;
+  gap: 6px;
+  border: 0;
+  border-bottom: 1px solid #edf0f4;
+  border-left: 3px solid transparent;
+  background: #fff;
+  padding: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.librarian-support-ticket-item:hover,
+.librarian-support-ticket-item.is-selected {
+  border-left-color: #4f8b5c;
+  background: #f8fbf8;
+}
+
+.librarian-support-ticket-item > strong {
+  color: #364358;
+  font-size: 11px;
+}
+
+.librarian-support-ticket-item > span:not(.librarian-support-status) {
+  overflow: hidden;
+  color: #818b9a;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.librarian-support-ticket-item > p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: #5f6979;
+  font-size: 10px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.librarian-support-ticket-item time {
+  color: #9aa2af;
+  font-size: 9px;
+}
+
+.librarian-support-status {
+  width: fit-content;
+  border-radius: 99px;
+  background: #fff0e4;
+  padding: 4px 8px;
+  color: #a85426;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.librarian-support-status--inprogress,
+.librarian-support-status--resolved {
+  background: #eaf4ec;
+  color: #347246;
+}
+
+.librarian-support-ticket-detail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 15px;
+}
+
+.librarian-support-ticket-detail > header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-bottom: 1px solid #edf0f4;
+  padding-bottom: 12px;
+}
+
+.librarian-support-ticket-detail > header > div:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 4px;
+}
+
+.librarian-support-ticket-detail > header > div:nth-child(2) strong {
+  color: #344158;
+  font-size: 11px;
+}
+
+.librarian-support-ticket-detail > header > div:nth-child(2) span {
+  color: #8992a1;
+  font-size: 9px;
+}
+
+.librarian-support-reader-avatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #edf3ed;
+  color: #3b6a46;
+}
+
+.librarian-support-reader-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.librarian-support-ticket-content {
+  border-bottom: 1px solid #edf0f4;
+  padding: 13px 0;
+}
+
+.librarian-support-ticket-content > span {
+  color: #818b9a;
+  font-size: 9px;
+}
+
+.librarian-support-ticket-content > p {
+  margin: 8px 0;
+  color: #414c5e;
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.librarian-support-ticket-content > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #367346;
+  font-size: 10px;
+}
+
+.librarian-support-workflow {
+  display: grid;
+  gap: 10px;
+  border-bottom: 1px solid #edf0f4;
+  padding: 12px 0;
+}
+
+.librarian-support-workflow-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.librarian-support-workflow-summary > strong {
+  color: #475367;
+  font-size: 10px;
+}
+
+.librarian-support-workflow-summary > span {
+  color: #667366;
+  font-size: 10px;
+}
+
+.librarian-support-workflow-summary button,
+.librarian-support-schedule > div button {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid #d5e5d8;
+  background: #eff7f0;
+  padding: 0 9px;
+  color: #326b40;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.librarian-support-workflow-summary button:disabled,
+.librarian-support-schedule button:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
+.librarian-support-schedule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.librarian-support-schedule label {
+  display: grid;
+  min-width: 200px;
+  flex: 1;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 6px;
+  color: #6e7887;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.librarian-support-schedule input {
+  min-height: 31px;
+  grid-column: 1 / -1;
+  border: 1px solid #e1e6ed;
+  padding: 4px 7px;
+  color: #4b5668;
+  font: inherit;
+  font-size: 10px;
+}
+
+.librarian-support-schedule > div {
+  display: flex;
+  gap: 6px;
+}
+
+.librarian-support-schedule > div button:last-child {
+  border-color: #e5e7eb;
+  background: #fff;
+  color: #7a8391;
+}
+
+.librarian-support-workflow-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: #788394;
+  font-size: 9px;
+}
+
+.librarian-support-workflow-note {
+  color: #8b6b3e;
+  font-size: 9px;
+}
+
+.librarian-support-ticket-replies {
+  display: grid;
+  gap: 8px;
+  flex: 1;
+  align-content: start;
+  overflow: auto;
+  padding: 12px 0;
+}
+
+.librarian-support-ticket-replies article {
+  border-left: 2px solid #73a27a;
+  background: #f5f9f5;
+  padding: 8px 10px;
+}
+
+.librarian-support-ticket-replies strong {
+  color: #416b48;
+  font-size: 9px;
+}
+
+.librarian-support-ticket-replies p {
+  margin: 5px 0 0;
+  color: #4c5767;
+  font-size: 10px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.librarian-support-ticket-replies time {
+  display: block;
+  margin-top: 5px;
+  color: #929baa;
+  font-size: 8px;
+}
+
+.librarian-support-reply-form {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.librarian-support-reply-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e1e6ed;
+  outline: none;
+  padding: 9px;
+  font: inherit;
+  font-size: 10px;
+  resize: vertical;
+}
+
+.librarian-support-chat {
+  display: grid;
+  min-height: 520px;
+  grid-template-columns: minmax(240px, .75fr) minmax(0, 1.5fr);
+}
+
+.librarian-support-conversations {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border-right: 1px solid #e8ebf0;
+}
+
+.librarian-support-conversations > header {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #edf0f4;
+  padding: 0 13px;
+}
+
+.librarian-support-conversations > header strong {
+  color: #364358;
+  font-size: 11px;
+}
+
+.librarian-support-conversations > header span {
+  color: #a07a50;
+  font-size: 9px;
+}
+
+.librarian-support-conversations > header span.is-online {
+  color: #387347;
+}
+
+.librarian-support-conversation {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-bottom: 1px solid #f0f2f5;
+  background: #fff;
+  padding: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.librarian-support-conversation:hover,
+.librarian-support-conversation.is-selected {
+  background: #f2f7f2;
+}
+
+.librarian-support-conversation > div:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 4px;
+}
+
+.librarian-support-conversation strong {
+  overflow: hidden;
+  color: #364358;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.librarian-support-conversation > div:nth-child(2) span {
+  overflow: hidden;
+  color: #838d9c;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.librarian-support-conversation time {
+  align-self: flex-start;
+  color: #9aa2af;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.librarian-support-chat-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.librarian-support-chat-messages {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 16px;
+  background: #fafbfc;
+}
+
+.librarian-support-chat-message {
+  display: flex;
+  max-width: 80%;
+  align-self: flex-start;
+}
+
+.librarian-support-chat-message.is-mine {
+  align-self: flex-end;
+}
+
+.librarian-support-chat-bubble {
+  border: 1px solid #e7ebf0;
+  background: #fff;
+  padding: 9px 11px;
+}
+
+.librarian-support-chat-message.is-mine .librarian-support-chat-bubble {
+  border-color: #d5e5d8;
+  background: #eef6ef;
+}
+
+.librarian-support-chat-bubble strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #66806a;
+  font-size: 9px;
+}
+
+.librarian-support-chat-bubble p {
+  margin: 0;
+  color: #414c5e;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.librarian-support-chat-bubble time {
+  display: block;
+  margin-top: 5px;
+  color: #949dab;
+  font-size: 8px;
+}
+
+.librarian-support-chat-composer {
+  display: flex;
+  min-height: 57px;
+  gap: 8px;
+  border-top: 1px solid #e9edf1;
+  padding: 9px;
+}
+
+.librarian-support-chat-composer input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid #e1e6ed;
+  outline: none;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 11px;
+}
+
+.librarian-support-chat-composer input:focus {
+  border-color: #73a27a;
+}
+
+.librarian-support-chat-composer button {
+  display: grid;
+  width: 38px;
+  place-items: center;
+  border: 0;
+  background: #244d39;
+  color: #fff;
+  cursor: pointer;
+}
+
+.librarian-support-chat-composer button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.librarian-support-empty {
+  display: flex;
+  min-height: 140px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: #8992a1;
+  font-size: 11px;
+  text-align: center;
+}
+
+.librarian-support-spinner {
+  animation: librarian-support-spin 1s linear infinite;
+}
+
+@keyframes librarian-support-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 900px) {
+  .librarian-support-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .librarian-support-ticket-layout {
+    grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .librarian-support-heading nav {
+    width: 100%;
+  }
+
+  .librarian-support-heading nav a {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .librarian-support-ticket-layout,
+  .librarian-support-chat {
+    grid-template-columns: 1fr;
+  }
+
+  .librarian-support-ticket-list {
+    max-height: 260px;
+  }
+
+  .librarian-support-conversations {
+    max-height: 240px;
+    border-right: 0;
+    border-bottom: 1px solid #e8ebf0;
+    overflow: auto;
+  }
+
+  .librarian-support-chat-panel {
+    min-height: 340px;
+  }
+}

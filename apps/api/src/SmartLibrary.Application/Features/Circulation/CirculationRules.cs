@@ -33,6 +33,12 @@ public static class CirculationRules
         return TimeZoneInfo.ConvertTimeToUtc(localMidnight, LibraryTimeZone());
     }
 
+    public static DateTime StartOfLibraryDateUtc(DateOnly date)
+    {
+        var localMidnight = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.MinValue), DateTimeKind.Unspecified);
+        return TimeZoneInfo.ConvertTimeToUtc(localMidnight, LibraryTimeZone());
+    }
+
     public static bool IsPastDueOnLibraryCalendar(DateTime? dueUtc, DateTime nowUtc)
         => CalendarOverdueDays(dueUtc, nowUtc) > 0;
 
@@ -44,7 +50,7 @@ public static class CirculationRules
     }
 
     public static bool OccupiesCopy(BorrowStatus status)
-        => status is BorrowStatus.Approved or BorrowStatus.Borrowed or BorrowStatus.Overdue;
+        => status is BorrowStatus.Pending or BorrowStatus.Approved or BorrowStatus.Borrowed or BorrowStatus.Overdue;
 
     public static bool IsUnexpiredReadyHold(string? status, DateTime? expiresAt, DateTime nowUtc)
         => status == ReservationReady && (expiresAt == null || expiresAt >= nowUtc);
@@ -86,6 +92,35 @@ public static class CirculationRules
         => settings.PickupDeadlineHours > 0
             ? settings.PickupDeadlineHours
             : settings.HoldHours is > 0 ? settings.HoldHours.Value : 24;
+
+    public static IReadOnlyList<PickupSlotDto> PickupSlots(CirculationSettings settings, DateTimeOffset now)
+    {
+        var zone = LibraryTimeZone();
+        var today = TimeZoneInfo.ConvertTime(now, zone).Date;
+        var slotMinutes = Math.Max(1, settings.PickupSlotMinutes);
+        var capacity = Math.Max(1, settings.PickupCapacityPerSlot);
+        var slots = new List<DateTimeOffset>();
+
+        for (var offset = 0; offset < Math.Max(1, settings.PickupDaysAhead); offset++)
+        {
+            var date = today.AddDays(offset);
+            if (date.DayOfWeek == DayOfWeek.Sunday) continue;
+            var start = date.AddHours(9);
+            var end = date.AddHours(date.DayOfWeek == DayOfWeek.Saturday ? 15 : 17);
+            for (var local = start; local.AddMinutes(slotMinutes) <= end; local = local.AddMinutes(slotMinutes))
+            {
+                var localTime = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+                var pickupAt = new DateTimeOffset(localTime, zone.GetUtcOffset(localTime));
+                if (pickupAt <= now) continue;
+                slots.Add(pickupAt);
+            }
+        }
+
+        return slots.Select(pickupAt => new PickupSlotDto(pickupAt, capacity, capacity)).ToList();
+    }
+
+    public static bool IsPickupSlot(CirculationSettings settings, DateTimeOffset pickupAt, DateTimeOffset now)
+        => PickupSlots(settings, now).Any(slot => slot.PickupAt == pickupAt);
 
     public static bool IsOpenReservation(string? status)
         => status is ReservationPending or ReservationReady;

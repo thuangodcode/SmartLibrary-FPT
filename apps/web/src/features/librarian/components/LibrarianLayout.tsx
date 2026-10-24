@@ -19,6 +19,8 @@ import {
   Wallet,
   X,
   Check,
+  CircleHelp,
+  MessagesSquare,
 } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import smartLibraryLogo from '../../../assets/figma/auth-logo-fpt.png';
@@ -36,6 +38,11 @@ const circulationChildren = [
   { label: 'Phí phạt', to: '/librarian/circulation/fines', icon: Wallet, end: false },
 ];
 
+const supportChildren = [
+  { label: 'Đơn tiếp nhận', to: '/librarian/support/requests', icon: CircleHelp, end: true },
+  { label: 'Phản hồi đơn', to: '/librarian/support/replies', icon: MessagesSquare, end: true },
+];
+
 const navigation = [
   { label: 'Tổng quan', to: '/librarian', icon: LayoutDashboard, end: true },
   { label: 'Sách & Biên mục', to: '/librarian/books', icon: BookOpen, end: false },
@@ -44,6 +51,7 @@ const navigation = [
   { label: 'Độc giả', to: '/librarian/readers', icon: Users, end: false },
   { label: 'Thiết lập AI nghiệp vụ', to: '/librarian/ai-settings', icon: Sparkles, end: false },
   { label: 'Thống kê & báo cáo', to: '/librarian/reports', icon: ChartNoAxesCombined, end: false },
+  { label: 'Hỗ trợ độc giả', to: '/librarian/support', icon: CircleHelp, end: false, children: supportChildren },
 ];
 
 const EXPAND_DELAY_MS = 140;
@@ -64,11 +72,13 @@ interface ReportDecisionNotice {
 }
 
 export const LibrarianLayout: React.FC = () => {
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [railExpanded, setRailExpanded] = useState(false);
   const [hoverCapable, setHoverCapable] = useState(true);
   const [headerSearch, setHeaderSearch] = useState('');
   const [circulationOpen, setCirculationOpen] = useState(true);
+  const [supportOpen, setSupportOpen] = useState(() => location.pathname.startsWith('/librarian/support'));
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const [decisionNotices, setDecisionNotices] = useState<ReportDecisionNotice[]>([]);
   const [inboxNotices, setInboxNotices] = useState<InboxNotice[]>([]);
@@ -79,7 +89,6 @@ export const LibrarianLayout: React.FC = () => {
   const accessToken = useAuthStore((state) => state.accessToken);
   const logout = useAuthStore((state) => state.logout);
   const { showToast } = useToast();
-  const location = useLocation();
   const navigate = useNavigate();
   const hiddenModuleLabels: Record<string, string> = {
     '/librarian/loans': 'Mượn – Trả',
@@ -116,6 +125,7 @@ export const LibrarianLayout: React.FC = () => {
     ? 'Hồ sơ cá nhân'
     : hiddenModuleLabels[location.pathname]
       ?? circulationChildren.find((item) => location.pathname.startsWith(item.to))?.label
+      ?? supportChildren.find((item) => location.pathname.startsWith(item.to))?.label
       ?? navigation.find((item) =>
         item.end ? location.pathname === item.to
           : location.pathname.startsWith(item.to) && item.to !== '/librarian/circulation',
@@ -286,22 +296,27 @@ export const LibrarianLayout: React.FC = () => {
 
         <div className="lib-nav-caption">MENU CHÍNH</div>
         <nav className="lib-navigation" aria-label="Điều hướng thủ thư">
-          {navigation.map(({ label, to, icon: Icon, end, children }) => (
-            children ? (
+          {navigation.map((item) => {
+            const { label, to, icon: Icon, end, children } = item;
+            const isSupportGroup = to === '/librarian/support';
+            const groupOpen = isSupportGroup ? supportOpen : circulationOpen;
+            const setGroupOpen = isSupportGroup ? setSupportOpen : setCirculationOpen;
+            const groupActive = location.pathname.startsWith(to);
+            return children ? (
               <div className="lib-nav-group" key={to}>
                 <button
                   type="button"
                   title={showTooltips ? label : undefined}
                   data-tooltip={label}
-                  aria-expanded={circulationOpen}
-                  className={`lib-nav-link lib-nav-parent${location.pathname.startsWith('/librarian/circulation') ? ' lib-nav-link-active' : ''}`}
-                  onClick={() => setCirculationOpen((open) => !open)}
+                  aria-expanded={groupOpen}
+                  className={`lib-nav-link lib-nav-parent${groupActive ? ' lib-nav-link-active' : ''}`}
+                  onClick={() => setGroupOpen((open) => !open)}
                 >
                   <Icon size={20} strokeWidth={1.9} className="lib-nav-icon" />
                   <span className="lib-nav-label">{label}</span>
-                  <ChevronDown size={16} className={`lib-nav-chevron${circulationOpen ? ' lib-nav-chevron-open' : ''}`} />
+                  <ChevronDown size={16} className={`lib-nav-chevron${groupOpen ? ' lib-nav-chevron-open' : ''}`} />
                 </button>
-                <div className={`lib-subnavigation${circulationOpen ? ' lib-subnavigation-open' : ''}`}>
+                <div className={`lib-subnavigation${groupOpen ? ' lib-subnavigation-open' : ''}`}>
                   {children.map((child) => (
                     <NavLink
                       key={child.to}
@@ -331,8 +346,8 @@ export const LibrarianLayout: React.FC = () => {
                 <Icon size={20} strokeWidth={1.9} className="lib-nav-icon" />
                 <span className="lib-nav-label">{label}</span>
               </NavLink>
-            )
-          ))}
+            );
+          })}
         </nav>
 
         <div className="lib-sidebar-bottom">

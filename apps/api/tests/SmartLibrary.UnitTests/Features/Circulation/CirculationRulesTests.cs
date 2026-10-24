@@ -62,14 +62,40 @@ public class CirculationRulesTests
     }
 
     [Fact]
+    public void StartOfLibraryDateUtc_ForSelectedDateUsesVietnamMidnight()
+    {
+        CirculationRules.StartOfLibraryDateUtc(new DateOnly(2026, 10, 24))
+            .Should().Be(new DateTime(2026, 10, 23, 17, 0, 0, DateTimeKind.Utc));
+    }
+
+    [Fact]
     public void OccupiesCopy_ExcludesPendingRequests()
     {
-        CirculationRules.OccupiesCopy(BorrowStatus.Pending).Should().BeFalse();
+        CirculationRules.OccupiesCopy(BorrowStatus.Pending).Should().BeTrue();
         CirculationRules.OccupiesCopy(BorrowStatus.Rejected).Should().BeFalse();
         CirculationRules.OccupiesCopy(BorrowStatus.Returned).Should().BeFalse();
         CirculationRules.OccupiesCopy(BorrowStatus.Borrowed).Should().BeTrue();
         CirculationRules.OccupiesCopy(BorrowStatus.Overdue).Should().BeTrue();
         CirculationRules.OccupiesCopy(BorrowStatus.Approved).Should().BeTrue();
+    }
+
+    [Fact]
+    public void PickupSlots_UsesLibraryHoursAndExcludesSunday()
+    {
+        var slots = CirculationRules.PickupSlots(
+            new CirculationSettings { PickupSlotMinutes = 30, PickupDaysAhead = 14, PickupCapacityPerSlot = 3 },
+            DateTimeOffset.UtcNow);
+        var localSlots = slots.Select(slot => TimeZoneInfo.ConvertTime(slot.PickupAt, TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time")))
+            .ToList();
+
+        localSlots.Should().NotBeEmpty();
+        localSlots.Should().OnlyContain(slot => slot.DayOfWeek != DayOfWeek.Sunday);
+        localSlots.Should().OnlyContain(slot => (slot.Minute == 0 || slot.Minute == 30) && slot.Second == 0);
+        localSlots.Where(slot => slot.DayOfWeek == DayOfWeek.Saturday)
+            .Should().OnlyContain(slot => slot.Hour >= 9 && (slot.Hour < 15));
+        localSlots.Where(slot => slot.DayOfWeek is not DayOfWeek.Saturday)
+            .Should().OnlyContain(slot => slot.Hour >= 9 && slot.Hour < 17);
+        slots.Should().OnlyContain(slot => slot.Capacity == 3 && slot.RemainingCapacity == 3);
     }
 
     [Fact]

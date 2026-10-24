@@ -21,6 +21,8 @@ export interface CirculationLoan {
   code: string;
   borrowDate?: string | null;
   dueDate?: string | null;
+  pickupAt?: string | null;
+  acceptedAt?: string | null;
   returnDate?: string | null;
   createdAt?: string | null;
   status: string;
@@ -30,6 +32,7 @@ export interface CirculationLoan {
   readerName: string;
   readerEmail?: string | null;
   studentId?: string | null;
+  librarianName?: string | null;
   bookCopyId: string;
   barcode: string;
   bookTitle: string;
@@ -108,7 +111,7 @@ export interface ApiResult<T> {
 
 export const STATUS_LABELS: Record<string, string> = {
   Pending: 'Chờ xác nhận',
-  Approved: 'Đã duyệt',
+  Approved: 'Đã tiếp nhận',
   Borrowed: 'Đang mượn',
   Returned: 'Đã trả',
   Overdue: 'Quá hạn',
@@ -174,7 +177,7 @@ export function formatDateTime(value?: string | null) {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('vi-VN');
+  return date.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 }
 
 export function formatMoney(value?: number | null) {
