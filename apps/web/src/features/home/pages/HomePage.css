@@ -23,14 +23,14 @@
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 
 .annual-header { position: sticky; top: 0; z-index: 50; background: var(--paper); }
-.annual-header-inner { display: flex; width: min(calc(100% - 40px), 1600px); min-height: 104px; align-items: center; gap: 28px; }
+.annual-header-inner { display: flex; min-height: 104px; align-items: center; gap: 28px; }
 .annual-brand { display: inline-flex; flex: 0 0 auto; align-items: center; }
 .annual-brand img { display: block; width: 92px; height: 92px; object-fit: contain; object-position: left center; }
 .annual-nav, .annual-auth, .annual-account { display: flex; align-items: center; }
 .annual-header-search { display: block; flex: 0 1 560px; width: min(100%, 560px); min-width: 280px; margin-left: auto; }
 .annual-header-actions { flex: 0 0 auto; }
 .annual-nav-row { border-top: 1px solid rgb(23 26 24 / 8%); }
-.annual-nav { min-height: 58px; justify-content: space-between; gap: clamp(16px, 2vw, 32px); font-size: 14px; font-weight: 550; }
+.annual-nav { min-height: 58px; justify-content: space-between; gap: clamp(16px, 2vw, 32px); padding-inline: clamp(8px, 1.5vw, 22px); font-size: 14px; font-weight: 550; }
 .annual-nav > a, .annual-nav-dropdown > button, .annual-auth > a, .annual-account > a { position: relative; }
 .annual-nav > a::after, .annual-nav-dropdown > button::after, .annual-auth > a:not(.annual-action)::after { position: absolute; right: 0; bottom: -7px; left: 0; height: 2px; background: var(--orange); content: ""; transform: scaleX(0); transform-origin: right; transition: transform 180ms ease; }
 .annual-nav > a:hover::after, .annual-nav-dropdown > button:hover::after, .annual-auth > a:hover::after { transform: scaleX(1); transform-origin: left; }
