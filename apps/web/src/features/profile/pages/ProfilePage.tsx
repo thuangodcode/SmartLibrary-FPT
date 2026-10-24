@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
+import HomeNavbar from '../../home/components/HomeNavbar';
 import './ProfilePage.css';
 
 interface ApiResult<T> {
@@ -215,7 +216,7 @@ const ProfilePage: React.FC = () => {
   const visibleAvatar = avatarPreviewUrl || (!clearAvatar ? profile?.avatarUrl : null);
   const visibleError = error || (!accessToken ? 'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.' : null);
 
-  return (
+  const profileContent = (
     <div className={`profile-page${embeddedInShell ? ' profile-page--embedded' : ''}`}>
       <header className="profile-page-heading">
         <div>
@@ -384,6 +385,15 @@ const ProfilePage: React.FC = () => {
           </footer>
         </form>
       ) : null}
+    </div>
+  );
+
+  if (embeddedInShell) return profileContent;
+
+  return (
+    <div className="annual-home profile-home">
+      <HomeNavbar />
+      <main className="profile-main">{profileContent}</main>
     </div>
   );
 };

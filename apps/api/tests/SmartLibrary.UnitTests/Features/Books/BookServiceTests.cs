@@ -1,5 +1,6 @@
 using AutoMapper;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Books;
@@ -25,7 +26,9 @@ public class BookServiceTests
         _bookRepositoryMock = new Mock<IBookRepository>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
 
-        var mapperConfig = new MapperConfiguration(cfg => cfg.AddProfile<MappingProfile>());
+        var mapperConfig = new MapperConfiguration(
+            cfg => cfg.AddMaps(typeof(MappingProfile).Assembly),
+            NullLoggerFactory.Instance);
         _mapper = mapperConfig.CreateMapper();
 
         _sut = new BookService(_bookRepositoryMock.Object, _unitOfWorkMock.Object, _mapper);

@@ -37,6 +37,9 @@ import AdminReportTemplatesPage from './features/admin/pages/AdminReportTemplate
 import AdminReportTemplateDetailPage from './features/admin/pages/AdminReportTemplateDetailPage';
 import AdminRegulationsPage from './features/admin/pages/AdminRegulationsPage';
 import ProfilePage from './features/profile/pages/ProfilePage';
+import HistoryPage from './features/profile/pages/HistoryPage';
+import SupportPage from './features/profile/pages/SupportPage';
+import LibrarianSupportPage from './features/librarian/pages/LibrarianSupportPage';
 import { useAuthStore } from './features/auth/store/useAuthStore';
 
 function ProfileEntry() {
@@ -73,6 +76,16 @@ function App() {
           <ProfileEntry />
         </RoleGuard>
       } />
+      <Route path="/history" element={
+        <RoleGuard allowedRoles={['Reader']}>
+          <HistoryPage />
+        </RoleGuard>
+      } />
+      <Route path="/support" element={
+        <RoleGuard allowedRoles={['Reader']}>
+          <SupportPage />
+        </RoleGuard>
+      } />
 
       {/* Librarian Routes */}
       <Route path="/librarian" element={
@@ -98,6 +111,8 @@ function App() {
         <Route path="reports/new" element={<LibrarianReportsPage />} />
         <Route path="reports/:id" element={<LibrarianReportDetailPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="support/requests" element={<LibrarianSupportPage view="requests" />} />
+        <Route path="support/replies" element={<LibrarianSupportPage view="replies" />} />
       </Route>
 
       {/* Admin Routes */}

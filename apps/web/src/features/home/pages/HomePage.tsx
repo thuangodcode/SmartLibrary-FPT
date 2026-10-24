@@ -3,7 +3,6 @@ import { Clock3, MapPin } from 'lucide-react';
 import campusPhoto from '../../../assets/figma/HCM-Campus.jpg';
 import libraryPhoto from '../../../assets/figma/home-library.png';
 import { useAuthStore } from '../../auth/store/useAuthStore';
-import { useToast } from '../../../components/ui/useToast';
 import { BookCard } from '../components/BookCard';
 import HomeNavbar from '../components/HomeNavbar';
 import { useHomeBooks, useHomeCategories } from '../hooks/useHomeData';
@@ -22,14 +21,7 @@ export const HomePage = () => {
   const books = booksQuery.data?.books ?? [];
   const activeCategoryName = categories.find((category) => category.id === activeCategory)?.name;
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const logout = useAuthStore((state) => state.logout);
-  const { showToast } = useToast();
-
-  const handleLogout = () => {
-    logout();
-    showToast({ type: 'success', title: 'Đăng xuất thành công', message: 'Bạn đã đăng xuất khỏi SmartLibrary.' });
-  };
-
+  const userRole = useAuthStore((state) => state.user?.role);
   const selectCategory = (categoryId: string) => {
     const nextParams = new URLSearchParams(searchParams);
     if (categoryId) nextParams.set('category', categoryId);
@@ -177,7 +169,12 @@ export const HomePage = () => {
           <div><strong>Ghé thư viện</strong><p>Tòa Alpha, Khu Công nghệ cao, TP. Thủ Đức, TP. Hồ Chí Minh</p></div>
           <div><strong>Khám phá</strong><Link to="/books">Danh mục & đầu sách</Link><Link to="/services">Dịch vụ</Link><Link to="/news">Tin tức</Link><Link to="/policies">Chính sách</Link></div>
           <div className="annual-footer-hours"><strong>Thời gian</strong><p><span>Thứ Hai – Thứ Sáu</span><span>07:00 – 19:00</span></p><p><span>Thứ Bảy</span><span>07:00 – 17:00</span></p><p><span>Chủ Nhật</span><span>Không phục vụ</span></p></div>
-          <div><strong>Tài khoản</strong>{isAuthenticated ? <button type="button" onClick={handleLogout}>Đăng xuất</button> : <><Link to="/login">Đăng nhập</Link><Link to="/register">Đăng ký</Link></>}</div>
+          <div>
+            <strong>Tài khoản</strong>
+            {isAuthenticated
+              ? <><Link to="/profile">Hồ sơ cá nhân</Link>{userRole === 'Reader' && <><Link to="/support">Hỗ trợ</Link><Link to="/history">Lịch sử</Link></>}</>
+              : <><Link to="/login">Đăng nhập</Link><Link to="/register">Đăng ký</Link></>}
+          </div>
         </div>
         <div className="annual-frame annual-footer-legal">
           <span>© 2026 FPT University HCMC</span>
