@@ -40,7 +40,7 @@ const reportNavigation = [
   { label: 'Theo dõi giao việc', to: '/admin/reports/assignments', icon: ClipboardList },
   { label: 'Hoạt động thư viện', to: '/admin/reports/activity', icon: BookOpenCheck },
   { label: 'Tài chính', to: '/admin/reports/finance', icon: CircleDollarSign },
-  { label: 'Kho sách', to: '/admin/reports/collection', icon: Boxes },
+  { label: 'Kho sách', to: '/admin/collection', icon: Boxes },
   { label: 'Báo cáo định kỳ', to: '/admin/reports/periodic', icon: CalendarDays },
   { label: 'Thư viện báo cáo', to: '/admin/reports/library', icon: FileText },
   { label: 'Quản lý mẫu báo cáo', to: '/admin/reports/templates', icon: FileText },
@@ -54,6 +54,7 @@ export const AdminLayout: React.FC = () => {
   const [hoverCapable, setHoverCapable] = useState(true);
   const [reportsMenuOpen, setReportsMenuOpen] = useState(false);
   const expandTimerRef = useRef<number | null>(null);
+  const profileMenuRef = useRef<HTMLDetailsElement>(null);
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const { showToast } = useToast();
@@ -220,16 +221,6 @@ export const AdminLayout: React.FC = () => {
               <p>Quản lý thư viện trong một không gian thống nhất.</p>
             </div>
           </div>
-          <button
-            type="button"
-            className="admin-logout-button"
-            onClick={handleLogout}
-            title={showTooltips ? 'Đăng xuất' : undefined}
-            data-tooltip="Đăng xuất"
-          >
-            <LogOut size={18} className="admin-nav-icon" />
-            <span className="admin-nav-label">Đăng xuất</span>
-          </button>
         </div>
       </aside>
 
@@ -254,7 +245,8 @@ export const AdminLayout: React.FC = () => {
               <Bell size={19} />
             </button>
             <span className="admin-topbar-divider" />
-            <Link className="admin-profile" to="/admin/profile" aria-label="Mở hồ sơ cá nhân">
+            <details className="admin-profile-menu" ref={profileMenuRef}>
+              <summary className="admin-profile" aria-label="Mở menu tài khoản">
               {user?.avatarUrl
                 ? <img className="admin-avatar admin-avatar-image" src={user.avatarUrl} alt="" />
                 : <div className="admin-avatar">{user?.fullName?.trim().charAt(0).toUpperCase() || 'A'}</div>}
@@ -263,7 +255,16 @@ export const AdminLayout: React.FC = () => {
                 <span>Quản trị viên</span>
               </div>
               <ChevronDown size={16} className="admin-profile-chevron" />
-            </Link>
+              </summary>
+              <div className="admin-profile-dropdown">
+                <Link to="/admin/profile" onClick={() => { if (profileMenuRef.current) profileMenuRef.current.open = false; }}>
+                  <UsersRound size={16} /> Hồ sơ cá nhân
+                </Link>
+                <button type="button" onClick={handleLogout}>
+                  <LogOut size={16} /> Đăng xuất
+                </button>
+              </div>
+            </details>
           </div>
         </header>
 

@@ -515,13 +515,46 @@
   gap: 14px;
 }
 
+.lib-cat-initial-loading {
+  display: grid;
+  min-height: min(62vh, 520px);
+  place-items: center;
+  color: #64748b;
+}
+
+.lib-cat-initial-loading > div {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+
+.lib-cat-initial-loading p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.lib-cat-initial-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #64748b;
+  border-radius: 50%;
+  animation: lib-cat-spin 0.7s linear infinite;
+}
+
 .lib-cat-books-spinner {
   width: 36px;
   height: 36px;
   border: 3px solid #ffedd5;
   border-top-color: #ea580c;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: lib-cat-spin 0.8s linear infinite;
+}
+
+@keyframes lib-cat-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .lib-cat-books-empty h3 {
@@ -725,6 +758,17 @@
   border-color: #ea580c;
   box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15);
 }
+
+.lib-cat-book-code-status {
+  min-height: 16px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.lib-cat-book-code-status.is-checking { color: #64748b; }
+.lib-cat-book-code-status.is-available { color: #047857; }
+.lib-cat-book-code-status.is-taken,
+.lib-cat-book-code-status.is-invalid,
+.lib-cat-book-code-status.is-error { color: #b91c1c; }
 
 .lib-cat-edit-image-row {
   display: flex;

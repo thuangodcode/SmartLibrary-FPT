@@ -22,7 +22,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         // AutoMapper
-        services.AddAutoMapper(typeof(MappingProfile).Assembly);
+        services.AddAutoMapper(cfg => cfg.AddProfile<MappingProfile>());
 
         // FluentValidation
         services.AddValidatorsFromAssemblyContaining<MappingProfile>();
@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
 
         // Business services
         services.AddScoped<BookService>();
+        services.AddScoped<IBookReviewService, BookReviewService>();
         services.AddScoped<CategoryService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<ReaderService>();

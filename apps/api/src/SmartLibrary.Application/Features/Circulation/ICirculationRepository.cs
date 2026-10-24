@@ -13,6 +13,7 @@ public interface ICirculationRepository
     Task<CirculationLoanDto?> GetLoanAsync(Guid id, int finePerDay, CancellationToken ct);
     Task<UserProfile?> FindReaderAsync(string key, CancellationToken ct);
     Task<BookCopy?> FindCopyByBarcodeAsync(string barcode, CancellationToken ct);
+    Task<BookCopy?> FindAvailableCopyForBookAsync(Guid bookId, CancellationToken ct);
     Task<bool> HasActiveLoanAsync(Guid copyId, Guid? exceptLoanId, CancellationToken ct);
     Task<int> CountActiveLoansAsync(Guid readerId, CancellationToken ct);
     Task<bool> HasUnpaidFinesAsync(Guid readerId, CancellationToken ct);

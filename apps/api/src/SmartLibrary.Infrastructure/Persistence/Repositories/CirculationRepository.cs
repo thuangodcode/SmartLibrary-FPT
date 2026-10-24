@@ -107,6 +107,23 @@ public class CirculationRepository : ICirculationRepository
             .Include(x => x.Book).ThenInclude(x => x.Categories)
             .FirstOrDefaultAsync(x => x.Barcode == barcode, ct);
 
+    public Task<BookCopy?> FindAvailableCopyForBookAsync(Guid bookId, CancellationToken ct)
+        => _db.BookCopies
+            .Include(copy => copy.Book).ThenInclude(book => book.Categories)
+            .Where(copy => copy.BookId == bookId
+                && copy.Book != null
+                && !copy.Book.IsDeleted
+                && copy.IsAvailable
+                && copy.Condition != BookCondition.Damaged
+                && copy.Condition != BookCondition.Lost
+                && !_db.BorrowRecords.Any(loan =>
+                    loan.BookCopyId == copy.Id
+                    && (loan.Status == BorrowStatus.Approved
+                        || loan.Status == BorrowStatus.Borrowed
+                        || loan.Status == BorrowStatus.Overdue)))
+            .OrderBy(copy => copy.Barcode)
+            .FirstOrDefaultAsync(ct);
+
     public Task<bool> HasActiveLoanAsync(Guid copyId, Guid? exceptLoanId, CancellationToken ct)
     {
         var query = _db.BorrowRecords.Where(x =>

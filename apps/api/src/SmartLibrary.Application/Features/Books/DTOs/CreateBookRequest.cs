@@ -5,6 +5,7 @@ namespace SmartLibrary.Application.Features.Books.DTOs;
 /// </summary>
 public class CreateBookRequest
 {
+    public string Code { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string? Isbn { get; set; }
     public string? Description { get; set; }

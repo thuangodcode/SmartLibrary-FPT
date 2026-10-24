@@ -15,6 +15,7 @@ public class BookConfiguration : IEntityTypeConfiguration<Book>
 
         builder.HasKey(b => b.Id);
         builder.Property(b => b.Id).HasColumnName("id");
+        builder.Property(b => b.Code).HasColumnName("code").HasMaxLength(32).IsRequired();
         builder.Property(b => b.Title).HasColumnName("title").HasMaxLength(500).IsRequired();
         builder.Property(b => b.Isbn).HasColumnName("isbn").HasMaxLength(20);
         builder.Property(b => b.Description).HasColumnName("description");
@@ -79,6 +80,7 @@ public class BookConfiguration : IEntityTypeConfiguration<Book>
 
         // Indexes
         builder.HasIndex(b => b.Isbn).IsUnique();
+        builder.HasIndex(b => b.Code).IsUnique();
         builder.HasIndex(b => b.IsDeleted);
     }
 }

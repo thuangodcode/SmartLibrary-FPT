@@ -1,0 +1,132 @@
+.annual-user-menu {
+  position: relative;
+}
+
+.annual-user-trigger {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 4px 8px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.annual-user-trigger:hover,
+.annual-user-menu.is-open .annual-user-trigger {
+  background: rgb(36 77 57 / 8%);
+}
+
+.annual-user-avatar {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgb(36 77 57 / 20%);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.annual-user-avatar--fallback {
+  color: #244d39;
+  background: #eaf0e9;
+}
+
+.annual-user-trigger > svg {
+  flex: 0 0 auto;
+  transition: transform 160ms ease;
+}
+
+.annual-user-menu.is-open .annual-user-trigger > svg {
+  transform: rotate(180deg);
+}
+
+.annual-user-name {
+  max-width: 150px;
+}
+
+.annual-user-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 60;
+  display: grid;
+  min-width: 238px;
+  gap: 3px;
+  border: 1px solid rgb(23 26 24 / 10%);
+  background: #fff;
+  padding: 7px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-5px);
+  transition: opacity 150ms ease, transform 150ms ease;
+  box-shadow: 0 16px 36px rgb(23 26 24 / 15%);
+}
+
+.annual-user-menu:hover .annual-user-popover,
+.annual-user-menu.is-open .annual-user-popover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.annual-user-popover a,
+.annual-user-popover button {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  padding: 0 11px;
+  color: #303831;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.annual-user-popover a:hover,
+.annual-user-popover button:hover,
+.annual-user-popover a:focus-visible,
+.annual-user-popover button:focus-visible {
+  outline: none;
+  background: #f2f1ec;
+  color: #244d39;
+}
+
+.annual-user-popover button {
+  border-top: 1px solid rgb(23 26 24 / 8%);
+  margin-top: 3px;
+  color: #a53e2b;
+}
+
+@media (max-width: 760px) {
+  .annual-user-menu {
+    width: 100%;
+  }
+
+  .annual-user-trigger {
+    width: 100%;
+    justify-content: flex-start;
+    border-radius: 4px;
+    padding-inline: 0;
+  }
+
+  .annual-user-name {
+    display: inline;
+    max-width: min(48vw, 220px);
+  }
+
+  .annual-user-popover {
+    top: 100%;
+    right: auto;
+    left: 0;
+  }
+}

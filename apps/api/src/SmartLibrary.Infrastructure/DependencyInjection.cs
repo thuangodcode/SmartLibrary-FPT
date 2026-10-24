@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddHttpClient<IIdentityProvider, SupabaseAuthService>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IBookRepository, BookRepository>();
+        services.AddScoped<IBookReviewRepository, BookReviewRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IDashboardRepository, DashboardRepository>();
         services.AddScoped<IReaderRepository, ReaderRepository>();

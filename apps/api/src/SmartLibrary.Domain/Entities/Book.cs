@@ -8,6 +8,7 @@ namespace SmartLibrary.Domain.Entities;
 /// </summary>
 public class Book : AuditableEntity, ISoftDeletable
 {
+    public string Code { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string? Isbn { get; set; }
     public string? Description { get; set; }

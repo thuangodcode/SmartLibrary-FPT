@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Books;
 using SmartLibrary.Application.Features.Books.DTOs;
@@ -43,6 +45,17 @@ public class BooksController : ControllerBase
         }));
     }
 
+    [HttpGet("code-availability")]
+    [Authorize(Policy = "LibrarianOnly")]
+    public async Task<IActionResult> CheckCodeAvailability([FromQuery] string? code, CancellationToken ct = default)
+    {
+        var available = await _bookService.IsBookCodeAvailableAsync(code, ct);
+        var message = available
+            ? "Mã sách có thể sử dụng."
+            : "Mã sách không hợp lệ hoặc đã được sử dụng.";
+        return Ok(ApiResponse<object>.Ok(new { available, message }));
+    }
+
     /// <summary>
     /// Get a book by its ID.
     /// </summary>
@@ -57,13 +70,33 @@ public class BooksController : ControllerBase
     }
 
     /// <summary>
+    /// Get current copy availability for a book, excluding unavailable or actively loaned copies.
+    /// </summary>
+    [HttpGet("{id:guid}/availability")]
+    public async Task<IActionResult> GetAvailability(Guid id, CancellationToken ct = default)
+    {
+        var result = await _bookService.GetAvailabilityAsync(id, ct);
+        return result.IsSuccess
+            ? Ok(ApiResponse<BookAvailabilityDto>.Ok(result.Data!))
+            : NotFound(ApiResponse<object>.Fail(result.Error!));
+    }
+
+    /// <summary>
     /// Create a new book (Librarian/Admin only).
     /// </summary>
     [HttpPost]
     [Authorize(Policy = "LibrarianOnly")]
     public async Task<IActionResult> Create([FromBody] CreateBookRequest request, CancellationToken ct = default)
     {
-        var result = await _bookService.CreateAsync(request, ct);
+        Result<BookDto> result;
+        try
+        {
+            result = await _bookService.CreateAsync(request, ct);
+        }
+        catch (DbUpdateException exception) when (IsBookCodeConflict(exception))
+        {
+            return Conflict(ApiResponse<object>.Fail("Mã sách đã được sử dụng. Vui lòng nhập mã khác."));
+        }
         if (!result.IsSuccess)
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
 
@@ -79,7 +112,15 @@ public class BooksController : ControllerBase
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> CreateFromForm([FromForm] CreateBookForm form, CancellationToken ct = default)
     {
-        var result = await _bookService.CreateFromFormAsync(form, ct);
+        Result<BookDto> result;
+        try
+        {
+            result = await _bookService.CreateFromFormAsync(form, ct);
+        }
+        catch (DbUpdateException exception) when (IsBookCodeConflict(exception))
+        {
+            return Conflict(ApiResponse<object>.Fail("Mã sách đã được sử dụng. Vui lòng nhập mã khác."));
+        }
         if (!result.IsSuccess)
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
 
@@ -129,4 +170,11 @@ public class BooksController : ControllerBase
 
         return Ok(ApiResponse<bool>.Ok(true));
     }
+
+    private static bool IsBookCodeConflict(DbUpdateException exception)
+        => exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "ix_books_code" or "ux_books_code_case_insensitive"
+        };
 }

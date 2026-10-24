@@ -5,9 +5,65 @@
 @templateId = 00000000-0000-0000-0000-000000000002
 @requestId = 00000000-0000-0000-0000-000000000003
 @reportId = 00000000-0000-0000-0000-000000000004
+@bookId = 00000000-0000-0000-0000-000000000005
+@reviewId = 00000000-0000-0000-0000-000000000006
+@readerToken = replace-with-reader-access-token
 
 GET {{SmartLibrary.Api_HostAddress}}/weatherforecast/
 Accept: application/json
+
+###
+
+# Public: check current book-copy availability before enabling the borrow action.
+GET {{SmartLibrary.Api_HostAddress}}/api/v1/books/{{bookId}}/availability
+Accept: application/json
+
+###
+
+# Public: list book ratings and comments.
+GET {{SmartLibrary.Api_HostAddress}}/api/v1/books/{{bookId}}/reviews
+Accept: application/json
+
+###
+
+# Reader: create a rating and optional comment.
+POST {{SmartLibrary.Api_HostAddress}}/api/v1/books/{{bookId}}/reviews
+Authorization: Bearer {{readerToken}}
+Content-Type: application/json
+
+{
+  "rating": 5,
+  "comment": "A clear and useful introduction."
+}
+
+###
+
+# Reader: update their own review.
+PUT {{SmartLibrary.Api_HostAddress}}/api/v1/books/{{bookId}}/reviews/{{reviewId}}
+Authorization: Bearer {{readerToken}}
+Content-Type: application/json
+
+{
+  "rating": 4,
+  "comment": "Helpful explanations and examples."
+}
+
+###
+
+# Reader: soft-delete their own review.
+DELETE {{SmartLibrary.Api_HostAddress}}/api/v1/books/{{bookId}}/reviews/{{reviewId}}
+Authorization: Bearer {{readerToken}}
+
+###
+
+# Reader: request a currently available copy of a book.
+POST {{SmartLibrary.Api_HostAddress}}/api/v1/me/circulation/book-requests
+Authorization: Bearer {{readerToken}}
+Content-Type: application/json
+
+{
+  "bookId": "{{bookId}}"
+}
 
 ###
 

@@ -5,6 +5,7 @@ using SmartLibrary.Api.Middlewares;
 using SmartLibrary.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using SmartLibrary.Infrastructure.Persistence;
+using SmartLibrary.Api.Hubs;
 
 // Load .env before configuration binds (repo root or API project folder)
 static void LoadDotEnv()
@@ -54,6 +55,7 @@ builder.Services.AddControllers(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddMemoryCache();
+builder.Services.AddSignalR();
 
 // Application services (AutoMapper, FluentValidation, business services)
 builder.Services.AddApplicationServices();
@@ -116,8 +118,8 @@ app.UseCors(CorsExtensions.PolicyName);
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<SupportChatHub>("/hubs/support-chat");
 app.MapHealthChecks("/api/health-check");
 app.MapGet("/", () => Results.Redirect("/swagger"));
 
 app.Run();
-

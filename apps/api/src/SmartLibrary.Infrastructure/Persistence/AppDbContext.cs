@@ -39,6 +39,10 @@ public class AppDbContext : DbContext
     public DbSet<ReportReview> ReportReviews => Set<ReportReview>();
     public DbSet<ReportRequest> ReportRequests => Set<ReportRequest>();
     public DbSet<BookIncident> BookIncidents => Set<BookIncident>();
+    public DbSet<SupportRequestType> SupportRequestTypes => Set<SupportRequestType>();
+    public DbSet<SupportComplaint> SupportComplaints => Set<SupportComplaint>();
+    public DbSet<SupportComplaintReply> SupportComplaintReplies => Set<SupportComplaintReply>();
+    public DbSet<SupportChatMessage> SupportChatMessages => Set<SupportChatMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -120,10 +124,27 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<BookCopy>(entity =>
         {
             entity.ToTable("book_copies");
+            entity.Property(bc => bc.Barcode)
+                .HasMaxLength(100)
+                .IsRequired();
+            entity.HasIndex(bc => bc.Barcode).IsUnique();
             entity.Property(bc => bc.Condition).HasConversion(
                 v => v.ToString().ToLower(),
                 v => Enum.Parse<BookCondition>(v, true)
             );
+        });
+
+        modelBuilder.Entity<Review>(entity =>
+        {
+            entity.ToTable("reviews");
+            entity.HasKey(review => review.Id);
+            entity.Property(review => review.Rating).IsRequired();
+            entity.Property(review => review.Comment).HasMaxLength(2000);
+            entity.Property(review => review.IsDeleted).HasDefaultValue(false);
+            entity.HasIndex(review => new { review.BookId, review.ReaderId }).IsUnique();
+            entity.HasIndex(review => new { review.BookId, review.CreatedAt });
+            entity.HasOne(review => review.Book).WithMany(book => book.Reviews).HasForeignKey(review => review.BookId);
+            entity.HasOne(review => review.Reader).WithMany().HasForeignKey(review => review.ReaderId);
         });
 
         modelBuilder.Entity<PolicyRule>(entity =>
@@ -223,6 +244,43 @@ public class AppDbContext : DbContext
             entity.HasIndex(x => new { x.ReportId, x.CreatedAt });
             entity.HasOne(x => x.Report).WithMany(x => x.Reviews).HasForeignKey(x => x.ReportId);
             entity.HasOne(x => x.Reviewer).WithMany().HasForeignKey(x => x.ReviewerId);
+        });
+
+        modelBuilder.Entity<SupportRequestType>(entity =>
+        {
+            entity.ToTable("support_request_types");
+            entity.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            entity.HasIndex(x => x.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<SupportComplaint>(entity =>
+        {
+            entity.ToTable("support_complaints");
+            entity.Property(x => x.Content).HasMaxLength(5000).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            entity.HasIndex(x => new { x.Status, x.CreatedAt });
+            entity.HasIndex(x => new { x.ReaderId, x.CreatedAt });
+            entity.HasOne(x => x.Reader).WithMany().HasForeignKey(x => x.ReaderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.AcceptedBy).WithMany().HasForeignKey(x => x.AcceptedById).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.RequestType).WithMany().HasForeignKey(x => x.RequestTypeId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(x => x.Replies).WithOne(x => x.Complaint).HasForeignKey(x => x.ComplaintId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SupportComplaintReply>(entity =>
+        {
+            entity.ToTable("support_complaint_replies");
+            entity.Property(x => x.Message).HasMaxLength(3000).IsRequired();
+            entity.HasIndex(x => new { x.ComplaintId, x.CreatedAt });
+            entity.HasOne(x => x.Sender).WithMany().HasForeignKey(x => x.SenderId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SupportChatMessage>(entity =>
+        {
+            entity.ToTable("support_chat_messages");
+            entity.Property(x => x.Message).HasMaxLength(2000).IsRequired();
+            entity.HasIndex(x => new { x.ReaderId, x.CreatedAt });
+            entity.HasOne(x => x.Reader).WithMany().HasForeignKey(x => x.ReaderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Sender).WithMany().HasForeignKey(x => x.SenderId).OnDelete(DeleteBehavior.Restrict);
         });
 
         // Global query filter for soft delete

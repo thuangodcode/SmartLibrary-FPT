@@ -45,6 +45,18 @@ public class CirculationMeController : ControllerBase
             : BadRequest(ApiResponse<object>.Fail(result.Error!));
     }
 
+    /// <summary>Request to borrow a currently available copy by book ID.</summary>
+    [HttpPost("book-requests")]
+    [Authorize(Roles = "Reader")]
+    public async Task<IActionResult> RequestBorrowBook([FromBody] RequestBookBorrowRequest request, CancellationToken ct)
+    {
+        var result = await _circulation.RequestBorrowBookAsync(
+            CirculationService.ReadUserId(User), request.BookId, ct);
+        return result.IsSuccess
+            ? Ok(ApiResponse<CirculationLoanDto>.Ok(result.Data!, new { message = "Đã gửi yêu cầu mượn. Chờ thủ thư xác nhận." }))
+            : BadRequest(ApiResponse<object>.Fail(result.Error!));
+    }
+
     [HttpPost("loans/{id:guid}/renew")]
     public async Task<IActionResult> Renew(Guid id, CancellationToken ct)
     {

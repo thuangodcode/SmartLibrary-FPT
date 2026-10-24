@@ -3,6 +3,7 @@ using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Books.DTOs;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Domain.Entities;
+using SmartLibrary.Domain.Enums;
 using SmartLibrary.Domain.Exceptions;
 
 namespace SmartLibrary.Application.Features.Books;
@@ -45,13 +46,39 @@ public class BookService
         return Result<BookDto>.Success(_mapper.Map<BookDto>(book));
     }
 
+    public async Task<Result<BookAvailabilityDto>> GetAvailabilityAsync(Guid id, CancellationToken ct = default)
+    {
+        if (await _bookRepository.GetByIdAsync(id, ct) is null)
+            return Result<BookAvailabilityDto>.Failure(Errors.NotFound);
+
+        var (total, available) = await _bookRepository.GetCopyAvailabilityAsync(id, ct);
+        return Result<BookAvailabilityDto>.Success(new BookAvailabilityDto(total, available, available > 0));
+    }
+
     public async Task<Result<BookDto>> CreateAsync(CreateBookRequest request, CancellationToken ct = default)
     {
+        var code = NormalizeBookCode(request.Code);
+        if (code is null)
+        {
+            return Result<BookDto>.Failure("Mã sách chỉ được gồm 1–32 chữ cái hoặc chữ số.");
+        }
+        if (await _bookRepository.IsCodeTakenAsync(code, ct))
+        {
+            return Result<BookDto>.Failure("Mã sách đã được sử dụng. Vui lòng nhập mã khác.");
+        }
+
         var book = _mapper.Map<Book>(request);
+        book.Code = code;
         await _bookRepository.AddAsync(book, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
         return Result<BookDto>.Success(_mapper.Map<BookDto>(book));
+    }
+
+    public async Task<bool> IsBookCodeAvailableAsync(string? code, CancellationToken ct = default)
+    {
+        var normalizedCode = NormalizeBookCode(code);
+        return normalizedCode is not null && !await _bookRepository.IsCodeTakenAsync(normalizedCode, ct);
     }
 
     public async Task<Result<BookDto>> CreateFromFormAsync(CreateBookForm form, CancellationToken ct = default)
@@ -60,6 +87,28 @@ public class BookService
         if (string.IsNullOrWhiteSpace(trimmedTitle))
         {
             return Result<BookDto>.Failure("Tiêu đề sách không được để trống.");
+        }
+
+        var code = NormalizeBookCode(form.Code);
+        if (code is null)
+        {
+            return Result<BookDto>.Failure("Mã sách chỉ được gồm 1–32 chữ cái hoặc chữ số.");
+        }
+        if (await _bookRepository.IsCodeTakenAsync(code, ct))
+        {
+            return Result<BookDto>.Failure("Mã sách đã được sử dụng. Vui lòng nhập mã khác.");
+        }
+
+        if (form.TotalCopies is < 1 or > 500)
+        {
+            return Result<BookDto>.Failure("Số lượng bản sao phải từ 1 đến 500.");
+        }
+
+        var copies = form.TotalCopies;
+        var location = string.IsNullOrWhiteSpace(form.Location) ? null : form.Location.Trim();
+        if (location?.Length > 255)
+        {
+            return Result<BookDto>.Failure("Vị trí lưu trữ không được vượt quá 255 ký tự.");
         }
 
         string? coverUrl = null;
@@ -71,10 +120,10 @@ public class BookService
             coverUrl = await _storageService.UploadFileAsync(stream, safeName, "books", ct);
         }
 
-        var copies = Math.Max(1, form.TotalCopies);
         var book = new Book
         {
             Id = Guid.NewGuid(),
+            Code = code,
             Title = trimmedTitle,
             Isbn = string.IsNullOrWhiteSpace(form.Isbn) ? null : form.Isbn.Trim(),
             Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
@@ -121,8 +170,9 @@ public class BookService
             {
                 Id = Guid.NewGuid(),
                 BookId = book.Id,
-                Barcode = $"BC-{book.Id.ToString()[..8].ToUpper()}-{i:D3}",
+                Barcode = $"{code}-{i:D2}",
                 Condition = SmartLibrary.Domain.Enums.BookCondition.New,
+                Location = location,
                 IsAvailable = true,
                 IsDeleted = false
             };
@@ -155,12 +205,77 @@ public class BookService
         if (book is null)
             return Result<BookDto>.Failure(Errors.NotFound);
 
+        if (form.Location?.Trim().Length > 255)
+        {
+            return Result<BookDto>.Failure("Vị trí lưu trữ không được vượt quá 255 ký tự.");
+        }
+        var requestedTotalCopies = form.TotalCopies ?? book.TotalCopies;
+        if (requestedTotalCopies is < 1 or > 500)
+        {
+            return Result<BookDto>.Failure("Số lượng bản sao phải từ 1 đến 500.");
+        }
+
+        var activeCopies = book.Copies.Where(copy => !copy.IsDeleted).ToList();
+        var copyCountDifference = requestedTotalCopies - activeCopies.Count;
+        if (copyCountDifference < 0)
+        {
+            var removableCopies = activeCopies
+                .Where(copy => copy.IsAvailable)
+                .OrderByDescending(copy => copy.CreatedAt)
+                .Take(-copyCountDifference)
+                .ToList();
+            if (removableCopies.Count != -copyCountDifference)
+            {
+                return Result<BookDto>.Failure(
+                    "Không thể giảm số lượng xuống dưới số bản sao hiện có thể thu hồi. Kiểm tra các bản sao đang mượn hoặc không khả dụng.");
+            }
+
+            foreach (var copy in removableCopies)
+            {
+                copy.IsDeleted = true;
+            }
+        }
+        else if (copyCountDifference > 0)
+        {
+            var nextCopyNumber = await _bookRepository.GetNextCopyNumberAsync(id, book.Code, ct);
+            var locationForNewCopies = form.Location is null
+                ? activeCopies.Select(copy => copy.Location).FirstOrDefault()
+                : string.IsNullOrWhiteSpace(form.Location) ? null : form.Location.Trim();
+
+            for (var index = 0; index < copyCountDifference; index++)
+            {
+                var copy = new BookCopy
+                {
+                    Id = Guid.NewGuid(),
+                    BookId = book.Id,
+                    Barcode = $"{book.Code}-{nextCopyNumber + index:D2}",
+                    Condition = BookCondition.New,
+                    Location = locationForNewCopies,
+                    IsAvailable = true,
+                    IsDeleted = false
+                };
+                book.Copies.Add(copy);
+                activeCopies.Add(copy);
+            }
+        }
+
+        book.TotalCopies = requestedTotalCopies;
+        book.AvailableCopies = activeCopies.Count(copy => !copy.IsDeleted && copy.IsAvailable);
+
         book.Title = form.Title.Trim();
         book.Isbn = string.IsNullOrWhiteSpace(form.Isbn) ? null : form.Isbn.Trim();
         book.Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim();
         book.PublishedYear = form.PublishedYear;
         book.Language = string.IsNullOrWhiteSpace(form.Language) ? "vi" : form.Language.Trim();
         book.PageCount = form.PageCount;
+        if (form.Location is not null)
+        {
+            var location = string.IsNullOrWhiteSpace(form.Location) ? null : form.Location.Trim();
+            foreach (var copy in book.Copies.Where(copy => !copy.IsDeleted))
+            {
+                copy.Location = location;
+            }
+        }
 
         if (form.RemoveCoverImage)
         {
@@ -168,6 +283,11 @@ public class BookService
         }
         else if (form.CoverImage != null && form.CoverImage.Length > 0)
         {
+            if (_storageService is null)
+            {
+                return Result<BookDto>.Failure("Dịch vụ lưu trữ ảnh chưa được cấu hình.");
+            }
+
             await using var stream = form.CoverImage.OpenReadStream();
             var ext = Path.GetExtension(form.CoverImage.FileName);
             if (string.IsNullOrWhiteSpace(ext)) ext = ".jpg";
@@ -209,6 +329,19 @@ public class BookService
 
         var updatedBook = await _bookRepository.GetWithDetailsAsync(id, ct);
         return Result<BookDto>.Success(_mapper.Map<BookDto>(updatedBook ?? book));
+    }
+
+    private static string? NormalizeBookCode(string? code)
+    {
+        var normalizedCode = code?.Trim();
+        if (string.IsNullOrEmpty(normalizedCode) ||
+            normalizedCode.Length > 32 ||
+            !normalizedCode.All(char.IsAsciiLetterOrDigit))
+        {
+            return null;
+        }
+
+        return normalizedCode;
     }
 
     public async Task<Result<bool>> DeleteAsync(Guid id, CancellationToken ct = default)
