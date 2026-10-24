@@ -9,13 +9,10 @@
   background: var(--catalog-ground);
 }
 
-.catalog-main { width: min(calc(100% - 64px), 1376px); margin: 0 auto; padding: 56px 0 112px; }
-.catalog-hero { display: grid; min-height: 230px; grid-template-columns: minmax(0, 1.4fr) minmax(280px, .6fr); align-items: end; gap: 48px; background: var(--catalog-green); padding: clamp(32px, 4vw, 56px); color: #fff; }
-.catalog-hero h1 { max-width: 760px; margin: 0; font-family: Newsreader, Georgia, serif; font-size: clamp(64px, 7vw, 96px); font-weight: 650; letter-spacing: -.055em; line-height: .88; }
-.catalog-hero p { justify-self: end; margin: 0; color: #dce6dd; font-family: Newsreader, Georgia, serif; font-size: clamp(24px, 2.3vw, 34px); font-weight: 560; letter-spacing: -.025em; line-height: 1.08; }
+.catalog-main { width: min(calc(100% - 64px), 1376px); margin: 0 auto; padding: 72px 0 112px; }
 .catalog-mobile-categories { display: none; }
 
-.catalog-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: clamp(28px, 4vw, 56px); padding-top: 88px; scroll-margin-top: 160px; }
+.catalog-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: clamp(28px, 4vw, 56px); scroll-margin-top: 160px; }
 .catalog-sidebar { position: sticky; top: 184px; min-width: 0; }
 .catalog-sidebar-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
 .catalog-sidebar-heading > span:first-child { color: var(--catalog-ink); font-family: Newsreader, Georgia, serif; font-size: 30px; font-weight: 680; letter-spacing: -.03em; }
@@ -67,10 +64,7 @@
 
 @media (max-width: 760px) {
   .catalog-main { width: min(calc(100% - 32px), 620px); padding: 28px 0 80px; }
-  .catalog-hero { min-height: 210px; grid-template-columns: 1fr; align-content: end; gap: 24px; padding: 32px 24px; }
-  .catalog-hero h1 { font-size: clamp(54px, 15vw, 72px); }
-  .catalog-hero p { justify-self: start; font-size: 22px; }
-  .catalog-mobile-categories { display: block; padding: 64px 0 0; }
+  .catalog-mobile-categories { display: block; }
   .catalog-mobile-categories__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
   .catalog-mobile-categories h2 { margin: 0; font-family: Newsreader, Georgia, serif; font-size: 30px; }
   .catalog-mobile-categories__heading span { color: var(--catalog-soft); font-size: 13px; }

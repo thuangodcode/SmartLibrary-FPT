@@ -42,11 +42,6 @@ const HomeCatalogPage = () => {
     <div className="annual-home annual-catalog-page">
       <HomeNavbar activeSection="catalog" />
       <main className="catalog-main">
-        <header className="catalog-hero">
-          <h1>Khám phá sách</h1>
-          <p>Đọc rộng hơn.<br />Nghĩ xa hơn.</p>
-        </header>
-
         <section className="catalog-mobile-categories" aria-label="Danh mục sách nổi bật">
           <div className="catalog-mobile-categories__heading">
             <h2>Duyệt theo danh mục</h2>
