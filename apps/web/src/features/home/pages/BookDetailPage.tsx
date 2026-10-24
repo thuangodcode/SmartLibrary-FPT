@@ -171,7 +171,6 @@ const BookDetailPage = () => {
               author={book.authorNames.join(', ') || 'Chưa cập nhật tác giả'}
               category={book.categoryNames.join(' · ') || 'Chưa phân loại'}
               coverImageUrl={book.coverImageUrl}
-              coverGradient="from-emerald-800 to-slate-950"
               size="lg"
               className="book-detail-cover"
             />
@@ -179,8 +178,8 @@ const BookDetailPage = () => {
           </div>
 
           <div className="book-detail-information">
-            <div className="book-detail-category">{book.categoryNames.join(' · ') || 'Tài liệu thư viện'}</div>
             <h1>{book.title}</h1>
+            <div className="book-detail-category">{book.categoryNames.join(' · ') || 'Tài liệu thư viện'}</div>
             <p className="book-detail-author"><UserRound size={17} /> {book.authorNames.join(', ') || 'Chưa cập nhật tác giả'}</p>
             <div className="book-detail-rating-summary">
               <span className="book-detail-stars" aria-label={`Đánh giá trung bình ${averageRating.toFixed(1)} trên 5`}>
@@ -231,15 +230,22 @@ const BookDetailPage = () => {
         </section>
 
         <section className="book-detail-description">
-          <div className="book-detail-section-kicker">GIỚI THIỆU</div>
-          <h2>Mô tả sách</h2>
-          <p>{book.description?.trim() || 'Chưa có phần mô tả cho đầu sách này.'}</p>
+          <div className="book-detail-description-title">
+            <h2>Về cuốn sách</h2>
+            <span aria-hidden="true">“</span>
+          </div>
+          <div className="book-detail-description-copy">
+            <p>{book.description?.trim() || 'Chưa có phần mô tả cho đầu sách này.'}</p>
+            <div className="book-detail-description-meta">
+              <span>Tác giả <strong>{book.authorNames.join(', ') || 'Chưa cập nhật'}</strong></span>
+              <span>Danh mục <strong>{book.categoryNames.join(' · ') || 'Tài liệu thư viện'}</strong></span>
+            </div>
+          </div>
         </section>
 
         <section className="book-reviews-section" aria-labelledby="book-reviews-heading">
           <div className="book-reviews-heading">
             <div>
-              <span className="book-detail-section-kicker">CỘNG ĐỒNG ĐỌC</span>
               <h2 id="book-reviews-heading">Đánh giá từ độc giả</h2>
               <p>Chia sẻ cảm nhận để giúp cộng đồng tìm thấy tài liệu phù hợp.</p>
             </div>
