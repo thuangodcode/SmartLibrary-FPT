@@ -10,6 +10,7 @@ interface BookCardProps {
 }
 
 export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
+  const displayTitle = book.title.length > 44 ? `${book.title.slice(0, 43).trimEnd()}…` : book.title;
   const statusBadges = {
     available: {
       text: 'Còn sách',
@@ -29,7 +30,7 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
   const StatusIcon = currentStatus.icon;
 
   return (
-    <article className={`book-card book-card--${book.status}`}>
+    <article className={`book-card book-card--${book.status}`} data-ui="book-card">
       {/* AI Match Badge (if present) */}
       {book.matchScore && (
         <div className="book-card__match">
@@ -67,8 +68,8 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
             </div>
           </div>
 
-          <h3 className="book-card__title">
-            {book.title}
+          <h3 className="book-card__title" aria-label={book.title} title={book.title}>
+            {displayTitle}
           </h3>
 
           <p className="book-card__author">{book.author}</p>

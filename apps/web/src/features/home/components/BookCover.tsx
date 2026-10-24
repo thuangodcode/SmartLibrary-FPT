@@ -17,7 +17,6 @@ export const BookCover: React.FC<BookCoverProps> = ({
   author,
   category,
   coverImageUrl,
-  coverGradient = 'from-indigo-700 to-slate-900',
   className = '',
   size = 'md',
 }) => {
@@ -29,7 +28,7 @@ export const BookCover: React.FC<BookCoverProps> = ({
 
   return (
     <div
-      className={`book-cover ${coverImageUrl ? 'book-cover--image' : 'book-cover--generated'} ${coverGradient} ${sizeClasses[size]} ${className}`}
+      className={`book-cover ${coverImageUrl ? 'book-cover--image' : 'book-cover--generated'} ${sizeClasses[size]} ${className}`}
     >
       {coverImageUrl ? (
         <img

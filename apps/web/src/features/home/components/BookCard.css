@@ -32,7 +32,6 @@
   width: 158px !important;
   height: 226px !important;
   border-radius: 2px !important;
-  box-shadow: none !important;
   transition: transform 260ms cubic-bezier(.2, .8, .2, 1) !important;
 }
 
@@ -48,7 +47,7 @@
   background: var(--book-card-accent);
   padding: 7px 9px;
   color: #fff;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 750;
 }
 
@@ -107,7 +106,7 @@
 
 .book-card__availability { display: inline-flex; min-width: 0; align-items: center; gap: 7px; color: #13764d; font-size: 13px; font-weight: 750; white-space: nowrap; }
 .book-card__availability svg { width: 16px; height: 16px; flex: 0 0 auto; stroke-width: 2.2; }
-.book-card__availability small { color: var(--book-card-soft); font-size: 12px; font-weight: 600; }
+.book-card__availability small { color: var(--book-card-soft); font-size: 13px; font-weight: 600; }
 .book-card--reserved_only .book-card__availability { color: #a34d17; }
 .book-card--maintenance .book-card__availability { color: #59655e; }
 

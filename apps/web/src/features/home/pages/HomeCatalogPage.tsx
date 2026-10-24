@@ -49,7 +49,7 @@ const HomeCatalogPage = () => {
             <h1>Khám phá sách</h1>
             <p>Tìm cuốn sách tiếp theo cho môn học, dự án hoặc một ý tưởng bạn đang theo đuổi.</p>
           </div>
-          <dl className="catalog-hero__facts" aria-label="Tổng quan bộ sưu tập">
+          <dl className="catalog-hero__facts" aria-label="Tổng quan bộ sưu tập" data-ui="catalog-facts">
             <div>
               <dt>Đầu sách</dt>
               <dd>{totalBooks.toLocaleString('vi-VN')}</dd>
