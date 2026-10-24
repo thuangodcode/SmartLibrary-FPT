@@ -1,5 +1,5 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, LibraryBig, Search, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, LibraryBig, X } from 'lucide-react';
 import { BookCard } from '../components/BookCard';
 import HomeNavbar from '../components/HomeNavbar';
 import { useHomeBooks, useHomeCategories } from '../hooks/useHomeData';
@@ -19,8 +19,6 @@ const HomeCatalogPage = () => {
   const categories = categoriesQuery.data ?? [];
   const categoryName = categories.find((category) => category.id === activeCategory)?.name;
   const books = booksQuery.data?.books ?? [];
-  const totalBooks = booksQuery.data?.totalCount ?? categories.reduce((count, category) => count + category.bookCount, 0);
-  const availableBooks = books.reduce((count, book) => count + (book.availableCopies > 0 ? 1 : 0), 0);
 
   const selectCategory = (categoryId: string) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -45,34 +43,14 @@ const HomeCatalogPage = () => {
       <HomeNavbar activeSection="catalog" />
       <main className="catalog-main">
         <header className="catalog-hero">
-          <div className="catalog-hero__copy">
-            <h1>Khám phá sách</h1>
-            <p>Tìm cuốn sách tiếp theo cho môn học, dự án hoặc một ý tưởng bạn đang theo đuổi.</p>
-          </div>
-          <dl className="catalog-hero__facts" aria-label="Tổng quan bộ sưu tập" data-ui="catalog-facts">
-            <div>
-              <dt>Đầu sách</dt>
-              <dd>{totalBooks.toLocaleString('vi-VN')}</dd>
-            </div>
-            <div>
-              <dt>Danh mục</dt>
-              <dd>{categories.length}</dd>
-            </div>
-            <div>
-              <dt>Có thể mượn</dt>
-              <dd>{booksQuery.data ? `${availableBooks}/${books.length}` : '—'}</dd>
-            </div>
-          </dl>
-          <a className="catalog-hero__search" href="#catalog-collection">
-            <Search aria-hidden="true" />
-            <span>Tìm trong bộ sưu tập</span>
-          </a>
+          <h1>Khám phá sách</h1>
+          <p>Đọc rộng hơn.<br />Nghĩ xa hơn.</p>
         </header>
 
         <section className="catalog-mobile-categories" aria-label="Danh mục sách nổi bật">
           <div className="catalog-mobile-categories__heading">
             <h2>Duyệt theo danh mục</h2>
-            <span>Vuốt để xem thêm</span>
+            <span>{categories.length} nhóm</span>
           </div>
           <div className="catalog-mobile-categories__rail">
             <button type="button" className={!activeCategory ? 'is-active' : ''} onClick={() => selectCategory('')}>Tất cả</button>
