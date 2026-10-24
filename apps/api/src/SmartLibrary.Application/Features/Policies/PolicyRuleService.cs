@@ -1,6 +1,7 @@
 using System.Text.Json;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Policies.DTOs;
+using SmartLibrary.Application.Features.Rag;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Domain.Entities;
 using SmartLibrary.Domain.Enums;
@@ -13,11 +14,16 @@ public class PolicyRuleService
 
     private readonly IPolicyRuleRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRagIndexer? _ragIndexer;
 
-    public PolicyRuleService(IPolicyRuleRepository repository, IUnitOfWork unitOfWork)
+    public PolicyRuleService(
+        IPolicyRuleRepository repository,
+        IUnitOfWork unitOfWork,
+        IRagIndexer? ragIndexer = null)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
+        _ragIndexer = ragIndexer;
     }
 
     public Task<PolicyRuleListResultDto> GetPagedAsync(
@@ -131,6 +137,7 @@ public class PolicyRuleService
         }, ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagPolicyAsync(entity.Id, entity.Status, deleted: false, ct);
 
         var created = await _repository.GetByIdWithDetailsAsync(entity.Id, ct);
         return Result<PolicyRuleDetailDto>.Success(MapDetail(created!));
@@ -221,6 +228,7 @@ public class PolicyRuleService
         }, ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagPolicyAsync(id.Value, status, deleted: false, ct);
 
         var updated = await _repository.GetByIdWithDetailsAsync(id.Value, ct);
         return Result<PolicyRuleDetailDto>.Success(MapDetail(updated!));
@@ -270,6 +278,7 @@ public class PolicyRuleService
         }, ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagPolicyAsync(entity.Id, newStatus, deleted: false, ct);
 
         var updated = await _repository.GetByIdWithDetailsAsync(entity.Id, ct);
         return Result<PolicyRuleDetailDto>.Success(MapDetail(updated!));
@@ -310,7 +319,26 @@ public class PolicyRuleService
         }, ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagPolicyAsync(entity.Id, entity.Status, deleted: true, ct);
         return Result<bool>.Success(true);
+    }
+
+    private async Task SyncRagPolicyAsync(Guid policyId, PolicyRuleStatus status, bool deleted, CancellationToken ct)
+    {
+        if (_ragIndexer is null)
+            return;
+
+        try
+        {
+            if (deleted || status != PolicyRuleStatus.Active)
+                await _ragIndexer.DeleteAsync("policy", policyId, ct);
+            else
+                await _ragIndexer.UpsertPolicyAsync(policyId, ct);
+        }
+        catch
+        {
+            // Không chặn lưu chính sách nếu Gemini/RAG lỗi.
+        }
     }
 
     private async Task<Result<string>> ResolveCodeAsync(

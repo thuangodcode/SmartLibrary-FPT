@@ -1,10 +1,10 @@
 using AutoMapper;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Books.DTOs;
+using SmartLibrary.Application.Features.Rag;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Domain.Entities;
 using SmartLibrary.Domain.Enums;
-using SmartLibrary.Domain.Exceptions;
 
 namespace SmartLibrary.Application.Features.Books;
 
@@ -17,17 +17,23 @@ public class BookService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
     private readonly IStorageService? _storageService;
+    private readonly IRagIndexer? _ragIndexer;
+    private readonly IBookCatalogCache? _catalogCache;
 
     public BookService(
         IBookRepository bookRepository,
         IUnitOfWork unitOfWork,
         IMapper mapper,
-        IStorageService? storageService = null)
+        IStorageService? storageService = null,
+        IRagIndexer? ragIndexer = null,
+        IBookCatalogCache? catalogCache = null)
     {
         _bookRepository = bookRepository;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
         _storageService = storageService;
+        _ragIndexer = ragIndexer;
+        _catalogCache = catalogCache;
     }
 
     public async Task<PagedResult<BookDto>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, CancellationToken ct = default)
@@ -181,6 +187,7 @@ public class BookService
 
         await _bookRepository.AddAsync(book, ct);
         await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagBookAsync(book.Id, deleted: false, ct);
 
         var createdBook = await _bookRepository.GetWithDetailsAsync(book.Id, ct);
         return Result<BookDto>.Success(_mapper.Map<BookDto>(createdBook ?? book));
@@ -195,6 +202,7 @@ public class BookService
         _mapper.Map(request, book);
         await _bookRepository.UpdateAsync(book, ct);
         await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagBookAsync(book.Id, deleted: false, ct);
 
         return Result<BookDto>.Success(_mapper.Map<BookDto>(book));
     }
@@ -326,6 +334,7 @@ public class BookService
 
         await _bookRepository.UpdateAsync(book, ct);
         await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagBookAsync(book.Id, deleted: false, ct);
 
         var updatedBook = await _bookRepository.GetWithDetailsAsync(id, ct);
         return Result<BookDto>.Success(_mapper.Map<BookDto>(updatedBook ?? book));
@@ -353,7 +362,27 @@ public class BookService
         book.IsDeleted = true;
         await _bookRepository.UpdateAsync(book, ct);
         await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagBookAsync(book.Id, deleted: true, ct);
 
         return Result<bool>.Success(true);
+    }
+
+    private async Task SyncRagBookAsync(Guid bookId, bool deleted, CancellationToken ct)
+    {
+        _catalogCache?.Invalidate();
+        if (_ragIndexer is null)
+            return;
+
+        try
+        {
+            if (deleted)
+                await _ragIndexer.DeleteAsync("book", bookId, ct);
+            else
+                await _ragIndexer.UpsertBookAsync(bookId, ct);
+        }
+        catch
+        {
+            // Không chặn lưu sách nếu Gemini/RAG lỗi.
+        }
     }
 }

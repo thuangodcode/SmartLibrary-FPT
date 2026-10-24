@@ -16,6 +16,7 @@ export interface Book {
   status: 'available' | 'reserved_only' | 'maintenance';
   description: string;
   matchScore?: number;
+  matchLabel?: string;
   recommendReason?: string;
   isNewArrival?: boolean;
   borrowCount?: number;

@@ -12,6 +12,7 @@ import {
   Menu,
   PanelLeft,
   Sparkles,
+  KeyRound,
   RotateCcw,
   Search,
   Users,
@@ -27,6 +28,7 @@ import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
+import { listInboxNotices, markInboxNoticeRead, type InboxNotice } from '../notificationsApi';
 import './LibrarianLayout.css';
 
 const circulationChildren = [
@@ -47,7 +49,7 @@ const navigation = [
   { label: 'Quản lý dịch vụ', to: '/librarian/circulation', icon: RotateCcw, end: false, children: circulationChildren },
   { label: 'Duyệt người đọc', to: '/librarian/registrations', icon: FileCheck, end: false },
   { label: 'Độc giả', to: '/librarian/readers', icon: Users, end: false },
-  { label: 'Gợi ý nhập sách AI', to: '/librarian/ai-recommendations', icon: Sparkles, end: false },
+  { label: 'Thiết lập AI nghiệp vụ', to: '/librarian/ai-settings', icon: Sparkles, end: false },
   { label: 'Thống kê & báo cáo', to: '/librarian/reports', icon: ChartNoAxesCombined, end: false },
   { label: 'Hỗ trợ độc giả', to: '/librarian/support', icon: CircleHelp, end: false, children: supportChildren },
 ];
@@ -79,6 +81,7 @@ export const LibrarianLayout: React.FC = () => {
   const [supportOpen, setSupportOpen] = useState(() => location.pathname.startsWith('/librarian/support'));
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const [decisionNotices, setDecisionNotices] = useState<ReportDecisionNotice[]>([]);
+  const [inboxNotices, setInboxNotices] = useState<InboxNotice[]>([]);
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const [dismissedNoticeIds, setDismissedNoticeIds] = useState<string[]>([]);
   const profileMenuRef = useRef<HTMLDetailsElement>(null);
@@ -188,6 +191,12 @@ export const LibrarianLayout: React.FC = () => {
       } catch (caught) {
         if (!cancelled) setNotificationError(caught instanceof Error ? caught.message : 'Không thể tải thông báo báo cáo.');
       }
+      try {
+        const inbox = await listInboxNotices(accessToken);
+        if (!cancelled) setInboxNotices(inbox);
+      } catch {
+        if (!cancelled) setInboxNotices([]);
+      }
     };
     void fetchDecisions();
     const timer = window.setInterval(() => void fetchDecisions(), 30000);
@@ -207,6 +216,20 @@ export const LibrarianLayout: React.FC = () => {
     }
   };
   const unreadDecisionCount = decisionNotices.filter((notice) => !dismissedNoticeIds.includes(notice.id)).length;
+  const unreadInboxCount = inboxNotices.filter((notice) => !notice.isRead).length;
+  const unreadCount = unreadDecisionCount + unreadInboxCount;
+
+  const dismissInbox = async (noticeId: string) => {
+    if (!accessToken) return;
+    try {
+      await markInboxNoticeRead(accessToken, noticeId);
+      setInboxNotices((current) => current.map((item) => (
+        item.id === noticeId ? { ...item, isRead: true } : item
+      )));
+    } catch (caught) {
+      setNotificationError(caught instanceof Error ? caught.message : 'Không đánh dấu được thông báo.');
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -369,13 +392,28 @@ export const LibrarianLayout: React.FC = () => {
           </form>
           <div className="lib-topbar-actions">
             <details className="lib-notification-menu">
-              <summary className="lib-icon-button" aria-label={`Thông báo${unreadDecisionCount ? `, ${unreadDecisionCount} thông báo chưa xem` : ''}`}>
+              <summary className="lib-icon-button" aria-label={`Thông báo${unreadCount ? `, ${unreadCount} thông báo chưa xem` : ''}`}>
                 <Bell size={19} />
-                {unreadDecisionCount > 0 && <span className="lib-notification-count">{unreadDecisionCount > 9 ? '9+' : unreadDecisionCount}</span>}
+                {unreadCount > 0 && <span className="lib-notification-count">{unreadCount > 9 ? '9+' : unreadCount}</span>}
               </summary>
-              <section className="lib-notification-popover" aria-label="Thông báo báo cáo">
-                <header><strong>Thông báo báo cáo</strong><span>{unreadDecisionCount} chưa xem</span></header>
+              <section className="lib-notification-popover" aria-label="Thông báo">
+                <header><strong>Thông báo</strong><span>{unreadCount} chưa xem</span></header>
                 {notificationError && <p className="lib-notification-error">{notificationError}</p>}
+                {inboxNotices.filter((notice) => notice.type === 'ai-key' || notice.type === 'ai-quota').slice(0, 6).map((notice) => (
+                  <article className={notice.isRead ? 'is-read' : ''} key={notice.id}>
+                    <div className="lib-notification-mark is-ai"><KeyRound size={15} /></div>
+                    <div className="lib-notification-copy">
+                      <strong>{notice.title}</strong>
+                      <span>{notice.message}</span>
+                      <Link to={notice.href || '/librarian/ai-settings'} onClick={() => { if (!notice.isRead) void dismissInbox(notice.id); }}>
+                        Cập nhật API Key
+                      </Link>
+                    </div>
+                    {!notice.isRead && (
+                      <button type="button" onClick={() => void dismissInbox(notice.id)} aria-label="Đánh dấu đã xem"><Check size={15} /></button>
+                    )}
+                  </article>
+                ))}
                 {decisionNotices.length ? decisionNotices.slice(0, 8).map((notice) => (
                   <article className={dismissedNoticeIds.includes(notice.id) ? 'is-read' : ''} key={notice.id}>
                     <div className={`lib-notification-mark ${notice.lastReportStatus === 'Approved' ? 'is-approved' : 'is-rejected'}`}>
@@ -391,8 +429,8 @@ export const LibrarianLayout: React.FC = () => {
                       <button type="button" onClick={() => dismissDecision(notice.id)} aria-label="Đánh dấu đã xem"><Check size={15}/></button>
                     )}
                   </article>
-                )) : !notificationError ? (
-                  <p className="lib-notification-empty">Chưa có thông báo duyệt báo cáo.</p>
+                )) : !notificationError && inboxNotices.length === 0 ? (
+                  <p className="lib-notification-empty">Chưa có thông báo.</p>
                 ) : null}
               </section>
             </details>

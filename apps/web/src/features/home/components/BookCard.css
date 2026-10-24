@@ -10,6 +10,7 @@
   background: #fff;
   color: var(--book-card-ink);
   isolation: isolate;
+  position: relative;
 }
 
 .book-card__media {

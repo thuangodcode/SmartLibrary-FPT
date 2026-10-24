@@ -9,6 +9,9 @@ using SmartLibrary.Application.Features.Circulation;
 using SmartLibrary.Application.Features.Reports;
 using SmartLibrary.Application.Features.Regulations;
 using SmartLibrary.Application.Features.Users;
+using SmartLibrary.Application.Features.Ai;
+using SmartLibrary.Application.Features.Notifications;
+using SmartLibrary.Application.Features.Rag;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Application.Mapping;
 
@@ -38,6 +41,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ReportService>();
         services.AddScoped<RegulationService>();
         services.AddScoped<CirculationService>();
+        services.AddScoped<AiSettingsService>();
+        services.AddScoped<AiInsightsService>();
+        services.AddScoped<RagService>();
+        services.AddScoped<INotificationInbox, NotificationInbox>();
         services.AddScoped<IRegistrationService, RegistrationService>();
         services.AddScoped<IAuthOtpService, AuthOtpService>();
 

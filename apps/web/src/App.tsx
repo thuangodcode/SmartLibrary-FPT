@@ -18,6 +18,8 @@ import ReadersManagementPage from './features/librarian/pages/ReadersManagementP
 import LibrarianReportsPage from './features/librarian/pages/LibrarianReportsPage';
 import LibrarianReportDetailPage from './features/librarian/pages/LibrarianReportDetailPage';
 import LibrarianModulePage from './features/librarian/pages/LibrarianModulePage';
+import LibrarianAiPage from './features/librarian/pages/LibrarianAiPage';
+import AdminAiSettingsPage from './features/admin/pages/AdminAiSettingsPage';
 import LibrarianCategoriesPage from './features/librarian/pages/LibrarianCategoriesPage';
 import LibrarianCreateCategoryPage from './features/librarian/pages/LibrarianCreateCategoryPage';
 import LibrarianCategoryBooksPage from './features/librarian/pages/LibrarianCategoryBooksPage';
@@ -104,7 +106,8 @@ function App() {
         <Route path="copies" element={<Navigate to="/librarian/books?view=copies" replace />} />
         <Route path="loans" element={<LibrarianModulePage />} />
         <Route path="fines" element={<LibrarianModulePage />} />
-        <Route path="ai-recommendations" element={<LibrarianModulePage />} />
+        <Route path="ai-settings" element={<LibrarianAiPage />} />
+        <Route path="ai-recommendations" element={<Navigate to="/librarian/ai-settings" replace />} />
         <Route path="circulation" element={<Navigate to="/librarian/circulation/loans" replace />} />
         <Route path="circulation/direct-borrow" element={<DirectCheckoutPage />} />
         <Route path="circulation/:tab" element={<CirculationPage />} />
@@ -137,7 +140,7 @@ function App() {
         <Route path="regulations/create" element={<AdminRegulationsPage mode="create" />} />
         <Route path="regulations/:regulationId/edit" element={<AdminRegulationsPage mode="edit" />} />
         <Route path="regulations/:regulationId" element={<AdminRegulationsPage mode="view" />} />
-        <Route path="ai-settings" element={<AdminSectionPage title="Cấu hình AI" />} />
+        <Route path="ai-settings" element={<AdminAiSettingsPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
         <Route path="reports/assignments" element={<AdminReportsPage />} />
         <Route path="reports/activity" element={<AdminReportsPage />} />

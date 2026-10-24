@@ -32,3 +32,9 @@ enable_confirmations = false
 [storage]
 enabled = true
 file_size_limit = "50MiB"
+
+[functions.ai-settings]
+verify_jwt = true
+
+[functions.rag-ask]
+verify_jwt = true

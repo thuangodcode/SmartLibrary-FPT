@@ -39,6 +39,9 @@ public class AppDbContext : DbContext
     public DbSet<ReportReview> ReportReviews => Set<ReportReview>();
     public DbSet<ReportRequest> ReportRequests => Set<ReportRequest>();
     public DbSet<BookIncident> BookIncidents => Set<BookIncident>();
+    public DbSet<AiSetting> AiSettings => Set<AiSetting>();
+    public DbSet<UserAiSetting> UserAiSettings => Set<UserAiSetting>();
+    public DbSet<RagDocument> RagDocuments => Set<RagDocument>();
     public DbSet<SupportRequestType> SupportRequestTypes => Set<SupportRequestType>();
     public DbSet<SupportComplaint> SupportComplaints => Set<SupportComplaint>();
     public DbSet<SupportComplaintReply> SupportComplaintReplies => Set<SupportComplaintReply>();
@@ -251,6 +254,48 @@ public class AppDbContext : DbContext
             entity.HasOne(x => x.Reader).WithMany().HasForeignKey(x => x.ReaderId);
             entity.HasOne(x => x.CompensationFine).WithMany().HasForeignKey(x => x.CompensationFineId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(x => x.OverdueFine).WithMany().HasForeignKey(x => x.OverdueFineId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<AiSetting>(entity =>
+        {
+            entity.ToTable("ai_settings");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.EncryptedApiKey).HasColumnName("encrypted_api_key");
+            entity.Property(x => x.ApiKeyLast4).HasMaxLength(8);
+            entity.Property(x => x.Provider).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.ChatModel).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.EmbeddingModel).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.BaseUrl).HasMaxLength(500);
+            entity.Property(x => x.ProviderKeysJson).HasColumnName("provider_keys_json");
+            entity.Property(x => x.LibrarianCriteriaJson).HasColumnName("librarian_criteria_json");
+            entity.Property(x => x.IndexEmbeddingModel).HasMaxLength(100);
+            entity.Property(x => x.LastTestMessage).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<UserAiSetting>(entity =>
+        {
+            entity.ToTable("user_ai_settings");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.UserId).IsUnique();
+            entity.Property(x => x.EncryptedApiKey).HasColumnName("encrypted_api_key");
+            entity.Property(x => x.ApiKeyLast4).HasMaxLength(8);
+            entity.Property(x => x.Provider).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.ChatModel).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.EmbeddingModel).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.BaseUrl).HasMaxLength(500);
+            entity.Property(x => x.ProviderKeysJson).HasColumnName("provider_keys_json");
+            entity.Property(x => x.LastTestMessage).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<RagDocument>(entity =>
+        {
+            entity.ToTable("rag_documents");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SourceType).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Title).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Content).IsRequired();
+            entity.Property(x => x.ContentHash).HasMaxLength(64).IsRequired();
+            entity.HasIndex(x => new { x.SourceType, x.SourceId }).IsUnique();
         });
 
         modelBuilder.Entity<ReportReview>(entity =>

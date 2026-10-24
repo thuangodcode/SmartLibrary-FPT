@@ -100,7 +100,8 @@ export const HomePage = () => {
           <div className="annual-frame">
             <div className="annual-live-section-heading annual-live-books-heading">
               <div>
-                <h2>{activeCategoryName || 'Gợi ý dành cho bạn'}</h2>
+                <span className="annual-live-eyebrow">Thư viện thông minh</span>
+                <h2>{activeCategoryName || 'Bộ sưu tập đang có'}</h2>
                 <p className="annual-live-books-subtitle">
                   {activeCategoryName
                     ? `Tuyển chọn đầu sách thuộc lĩnh vực ${activeCategoryName}.`

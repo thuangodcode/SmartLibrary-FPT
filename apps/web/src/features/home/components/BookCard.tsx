@@ -31,10 +31,9 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
 
   return (
     <article className={`book-card book-card--${book.status}`} data-ui="book-card">
-      {/* AI Match Badge (if present) */}
-      {book.matchScore && (
+      {book.matchLabel && (
         <div className="book-card__match">
-          <span>{book.matchScore}% Match</span>
+          <span>{book.matchLabel}</span>
         </div>
       )}
 
