@@ -1,4 +1,5 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, LibraryBig, Search, X } from 'lucide-react';
 import { BookCard } from '../components/BookCard';
 import HomeNavbar from '../components/HomeNavbar';
 import { useHomeBooks, useHomeCategories } from '../hooks/useHomeData';
@@ -18,6 +19,8 @@ const HomeCatalogPage = () => {
   const categories = categoriesQuery.data ?? [];
   const categoryName = categories.find((category) => category.id === activeCategory)?.name;
   const books = booksQuery.data?.books ?? [];
+  const totalBooks = booksQuery.data?.totalCount ?? categories.reduce((count, category) => count + category.bookCount, 0);
+  const availableBooks = books.reduce((count, book) => count + (book.availableCopies > 0 ? 1 : 0), 0);
 
   const selectCategory = (categoryId: string) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -41,19 +44,51 @@ const HomeCatalogPage = () => {
     <div className="annual-home annual-catalog-page">
       <HomeNavbar activeSection="catalog" />
       <main className="catalog-main">
-        <header className="catalog-heading">
-          <div>
-            <span className="catalog-eyebrow">SMARTLIBRARY · FPT UNIVERSITY</span>
-            <h1>Khám phá tri thức</h1>
-            <p>Tìm kiếm sách và tài liệu trong bộ sưu tập của thư viện.</p>
+        <header className="catalog-hero">
+          <div className="catalog-hero__copy">
+            <h1>Khám phá sách</h1>
+            <p>Tìm cuốn sách tiếp theo cho môn học, dự án hoặc một ý tưởng bạn đang theo đuổi.</p>
           </div>
+          <dl className="catalog-hero__facts" aria-label="Tổng quan bộ sưu tập">
+            <div>
+              <dt>Đầu sách</dt>
+              <dd>{totalBooks.toLocaleString('vi-VN')}</dd>
+            </div>
+            <div>
+              <dt>Danh mục</dt>
+              <dd>{categories.length}</dd>
+            </div>
+            <div>
+              <dt>Có thể mượn</dt>
+              <dd>{booksQuery.data ? `${availableBooks}/${books.length}` : '—'}</dd>
+            </div>
+          </dl>
+          <a className="catalog-hero__search" href="#catalog-collection">
+            <Search aria-hidden="true" />
+            <span>Tìm trong bộ sưu tập</span>
+          </a>
         </header>
 
-        <div className="catalog-layout">
+        <section className="catalog-mobile-categories" aria-label="Danh mục sách nổi bật">
+          <div className="catalog-mobile-categories__heading">
+            <h2>Duyệt theo danh mục</h2>
+            <span>Vuốt để xem thêm</span>
+          </div>
+          <div className="catalog-mobile-categories__rail">
+            <button type="button" className={!activeCategory ? 'is-active' : ''} onClick={() => selectCategory('')}>Tất cả</button>
+            {categories.map((category) => (
+              <button type="button" key={category.id} className={activeCategory === category.id ? 'is-active' : ''} onClick={() => selectCategory(category.id)}>
+                {category.name}<small>{category.bookCount}</small>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <div className="catalog-layout" id="catalog-collection">
           <aside className="catalog-sidebar" aria-label="Lọc theo danh mục">
             <div className="catalog-sidebar-heading">
-              <span>Danh mục sách</span>
-              <span>{categories.length}</span>
+              <span>Danh mục</span>
+              <span>{categories.length} nhóm</span>
             </div>
             {categoriesQuery.isPending ? (
               <div className="catalog-category-skeletons" aria-label="Đang tải danh mục">
@@ -92,7 +127,6 @@ const HomeCatalogPage = () => {
           <section className="catalog-results" aria-label="Danh sách đầu sách">
             <div className="catalog-results-heading">
               <div>
-                <span className="catalog-results-eyebrow">{search ? 'KẾT QUẢ TÌM KIẾM' : 'BỘ SƯU TẬP'}</span>
                 <h2>{categoryName || (search ? 'Sách phù hợp với bạn' : 'Tất cả đầu sách')}</h2>
                 <p>
                   {search
@@ -103,6 +137,7 @@ const HomeCatalogPage = () => {
                 </p>
               </div>
               <div className="catalog-result-count" aria-live="polite">
+                <LibraryBig aria-hidden="true" />
                 {booksQuery.data ? `${booksQuery.data.totalCount.toLocaleString('vi-VN')} đầu sách` : 'Đang cập nhật…'}
               </div>
             </div>
@@ -111,7 +146,7 @@ const HomeCatalogPage = () => {
               <div className="catalog-active-filters">
                 {categoryName && <span>{categoryName}</span>}
                 {search && <span>Từ khóa: {search}</span>}
-                <button type="button" onClick={clearFilters}>Xóa bộ lọc</button>
+                <button type="button" onClick={clearFilters}><X aria-hidden="true" /> Xóa bộ lọc</button>
               </div>
             )}
 
@@ -133,7 +168,7 @@ const HomeCatalogPage = () => {
                 {booksQuery.data && booksQuery.data.totalPages > 1 && (
                   <div className="catalog-pagination" aria-label="Phân trang đầu sách">
                     <button type="button" disabled={page <= 1 || booksQuery.isFetching} onClick={() => setPage(page - 1)}>
-                      Trang trước
+                      <ArrowLeft aria-hidden="true" /> Trang trước
                     </button>
                     <span>Trang {page} / {booksQuery.data.totalPages}</span>
                     <button
@@ -141,7 +176,7 @@ const HomeCatalogPage = () => {
                       disabled={page >= booksQuery.data.totalPages || booksQuery.isFetching}
                       onClick={() => setPage(page + 1)}
                     >
-                      Trang sau
+                      Trang sau <ArrowRight aria-hidden="true" />
                     </button>
                   </div>
                 )}
