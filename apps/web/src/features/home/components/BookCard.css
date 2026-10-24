@@ -19,7 +19,9 @@
   place-items: center;
   overflow: hidden;
   background: var(--book-card-ground);
+  border: 0;
   padding: 24px 18px;
+  cursor: pointer;
 }
 
 .book-card:nth-child(4n + 2) .book-card__media { --book-card-ground: #e5ece7; }
@@ -36,6 +38,7 @@
 
 .book-card:hover .book-card__cover,
 .book-card:focus-within .book-card__cover { transform: translateY(-6px) rotate(-1deg); }
+.book-card__media:focus-visible { outline: 4px solid var(--book-card-accent); outline-offset: -4px; }
 
 .book-card__match {
   position: absolute;

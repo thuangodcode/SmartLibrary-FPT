@@ -38,7 +38,12 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
       )}
 
       {/* Book Cover Container */}
-      <div className="book-card__media">
+      <button
+        type="button"
+        className="book-card__media"
+        onClick={() => onSelect?.(book)}
+        aria-label={`Mở sách ${book.title}`}
+      >
         <BookCover
           title={book.title}
           author={book.author}
@@ -48,7 +53,7 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
           className="book-card__cover"
           size="md"
         />
-      </div>
+      </button>
 
       {/* Book Info */}
       <div className="book-card__body">
