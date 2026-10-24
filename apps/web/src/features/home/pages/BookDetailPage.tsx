@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BookOpen, CalendarDays, CheckCircle2, Globe2, MapPin, MessageSquareText, Star, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, CheckCircle2, Globe2, MapPin, MessageSquareText, Star, UserRound, X } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useToast } from '../../../components/ui/useToast';
@@ -43,6 +43,7 @@ const BookDetailPage = () => {
   const [draft, setDraft] = useState<ReviewDraft>({ reviewId: '', rating: 5, comment: '' });
   const [pickupSlots, setPickupSlots] = useState<PickupSlot[]>([]);
   const [selectedPickupAt, setSelectedPickupAt] = useState('');
+  const [borrowSuccessOpen, setBorrowSuccessOpen] = useState(false);
   const [pickupSlotsError, setPickupSlotsError] = useState<string | null>(null);
   const [loadingPickupSlots, setLoadingPickupSlots] = useState(false);
   const book = bookQuery.data;
@@ -95,6 +96,20 @@ const BookDetailPage = () => {
     ]);
   };
 
+  useEffect(() => {
+    if (!borrowSuccessOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setBorrowSuccessOpen(false);
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [borrowSuccessOpen]);
+
   const borrowMutation = useMutation({
     mutationFn: async (pickupAt: string) => {
       if (!accessToken) throw new Error('Vui lòng đăng nhập bằng tài khoản độc giả để mượn sách.');
@@ -109,7 +124,7 @@ const BookDetailPage = () => {
       }
     },
     onSuccess: async (_data, pickupAt) => {
-      showToast({ type: 'success', title: 'Đã gửi yêu cầu mượn', message: 'Bản sao đã được giữ cho bạn. Thủ thư sẽ tiếp nhận yêu cầu.' });
+      setBorrowSuccessOpen(true);
       await queryClient.invalidateQueries({ queryKey: ['public-book-availability', bookId] });
       setPickupSlots((slots) => slots
         .map((slot) => slot.pickupAt === pickupAt ? { ...slot, remainingCapacity: slot.remainingCapacity - 1 } : slot)
@@ -394,6 +409,24 @@ const BookDetailPage = () => {
           )}
         </section>
       </main>
+      {borrowSuccessOpen && (
+        <div className="book-borrow-success-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setBorrowSuccessOpen(false);
+        }}>
+          <section className="book-borrow-success" role="dialog" aria-modal="true" aria-labelledby="borrow-success-title" aria-describedby="borrow-success-description" data-ui="dialog">
+            <button type="button" className="book-borrow-success-close" onClick={() => setBorrowSuccessOpen(false)} aria-label="Đóng thông báo">
+              <X size={19} />
+            </button>
+            <div className="book-borrow-success-mark" aria-hidden="true"><CheckCircle2 size={34} /></div>
+            <h2 id="borrow-success-title">Sách đang được giữ cho bạn</h2>
+            <p id="borrow-success-description">Thủ thư sẽ tiếp nhận yêu cầu. Hãy đến thư viện đúng khung giờ bạn đã chọn để nhận sách.</p>
+            <div className="book-borrow-success-actions">
+              <button type="button" onClick={() => setBorrowSuccessOpen(false)}>Ở lại trang này</button>
+              <button type="button" autoFocus onClick={() => navigate('/books')}>Tiếp tục khám phá sách <ArrowRight size={17} /></button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 };
