@@ -144,9 +144,10 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
     }
     const ragOn = status.isEnabled
       && (status.readerAiEnabled || status.recommendEnabled || status.librarianAiEnabled);
-    const embeddingKeyAvailable = embeddingProvider === providerId
+    const embeddingKeyAvailable = embeddingProvider === 'local'
+      || (embeddingProvider === providerId
       ? Boolean(apiKey.trim() || tabHasKey)
-      : Boolean(savedEmbedding?.hasApiKey);
+      : Boolean(savedEmbedding?.hasApiKey));
     if (ragOn && status.useForLibrary && !embeddingKeyAvailable) {
       setKeyError(`Hãy lưu API Key ${embeddingProviderDef.name} trước khi dùng cho RAG.`);
       return;
@@ -223,13 +224,13 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
         API Key thuộc tài khoản thủ thư này và được mã hóa khi lưu.
         Token đang lưu được điền vào ô và mặc định được ẩn. Hãy lưu mọi thay đổi trước khi kiểm tra kết nối. Admin không đọc được khóa.
       </p>
-      <p>Nhà cung cấp đang chọn xử lý hội thoại; RAG dùng nhà cung cấp embedding riêng.</p>
+      <p>Nhà cung cấp đang chọn xử lý hội thoại; RAG dùng nhà cung cấp embedding riêng. ONNX cục bộ tải model khoảng 118 MB lần đầu và dùng RAM/CPU của máy chủ.</p>
       {status.accountEnabled === false && (
         <p className="ai-cfg-warn">Admin đã tắt quyền AI của tài khoản này. Lưu khóa được nhưng không gọi được AI.</p>
       )}
 
       <div className="ai-cfg-tabs" role="tablist" aria-label="Nhà cung cấp AI">
-        {AI_PROVIDERS.map((item) => (
+        {AI_PROVIDERS.filter((item) => item.id !== 'local').map((item) => (
           <button
             key={item.id}
             type="button"

@@ -109,7 +109,7 @@ public class RagService
             await _settings.UpdateSyncStatsAsync(
                 result.SyncedAt,
                 result.DocumentCount,
-                $"{credential.Data!.EmbeddingProvider}:{credential.Data.EmbeddingModel}",
+                $"v2:{credential.Data!.EmbeddingProvider}:{credential.Data.EmbeddingModel}",
                 ct);
             return Result<RagReindexResultDto>.Success(result);
         }
@@ -186,11 +186,14 @@ public class RagService
         {
             try
             {
+                var embeddingText = EmbedText(query, readerBookSearch);
+                if (cred.EmbeddingProvider == "local")
+                    embeddingText = $"query: {embeddingText}";
                 var embedding = await _gemini.EmbedAsync(
                     cred.EmbeddingProvider,
                     cred.EmbeddingApiKey,
                     cred.EmbeddingModel,
-                    EmbedText(query, readerBookSearch),
+                    embeddingText,
                     cred.EmbeddingBaseUrl,
                     ct);
                 semantic.AddRange((await _documents.SearchAsync(embedding, 8, ct))

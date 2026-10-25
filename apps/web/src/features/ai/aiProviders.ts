@@ -5,7 +5,8 @@ export type AiProviderId =
   | 'deepseek'
   | 'openrouter'
   | 'huggingface'
-  | 'other';
+  | 'other'
+  | 'local';
 
 export interface AiModelOption {
   id: string;
@@ -110,6 +111,17 @@ export const AI_PROVIDERS: AiProviderDef[] = [
     chatModels: [],
     embeddingModels: [],
   },
+  {
+    id: 'local',
+    name: 'ONNX cục bộ',
+    hint: 'multilingual-e5-small int8 chạy trên máy chủ, không gửi embedding tới API ngoài.',
+    keyPlaceholder: '',
+    needsBaseUrl: false,
+    chatModels: [],
+    embeddingModels: [
+      { id: 'multilingual-e5-small-int8-v1', label: 'multilingual-e5-small (ONNX int8, 384 chiều)' },
+    ],
+  },
 ];
 
 export function isProviderId(id: string | null | undefined): id is AiProviderId {
@@ -121,7 +133,7 @@ export function findProvider(id: string): AiProviderDef {
 }
 
 export function supportsEmbedding(id: string): boolean {
-  return id === 'gemini' || id === 'openai' || id === 'openrouter' || id === 'other';
+  return id === 'gemini' || id === 'openai' || id === 'openrouter' || id === 'other' || id === 'local';
 }
 
 export function formatAiTime(value: string | null | undefined): string {

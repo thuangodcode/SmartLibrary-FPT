@@ -129,6 +129,8 @@ public class AiRecommendationService : IAiRecommendationService
                 ? "Sách phù hợp với lịch sử đọc của độc giả FPT HCMC"
                 : "Sách phù hợp độc giả FPT HCMC, thể loại: " + string.Join(", ", names);
             var cred = credential.Data;
+            if (cred.EmbeddingProvider == "local")
+                prompt = $"query: {prompt}";
             var embedding = await _gemini.EmbedAsync(
                 cred.EmbeddingProvider,
                 cred.EmbeddingApiKey,

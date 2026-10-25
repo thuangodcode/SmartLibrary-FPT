@@ -3,6 +3,8 @@ namespace SmartLibrary.Application.Features.Ai;
 /// <summary>Server-only credential. Never serialize this type to HTTP responses.</summary>
 public sealed class AiRuntimeCredential
 {
+    public const string LocalEmbeddingModelId = "multilingual-e5-small-int8-v1";
+
     public Guid? OwnerUserId { get; init; }
     public required string ApiKey { get; init; }
     public required string Provider { get; init; }

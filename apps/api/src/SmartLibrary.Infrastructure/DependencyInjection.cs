@@ -56,6 +56,11 @@ public static class DependencyInjection
         services.AddSingleton<ISecretProtector, SecretProtector>();
         services.AddMemoryCache();
         services.AddScoped<IBookCatalogCache, BookCatalogCache>();
+        services.AddHttpClient("LocalAiModel", client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(5);
+        });
+        services.AddSingleton<ILocalEmbeddingClient, LocalE5EmbeddingClient>();
         services.AddHttpClient<IGeminiClient, GeminiClient>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(60);

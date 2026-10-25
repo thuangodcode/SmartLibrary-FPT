@@ -112,21 +112,22 @@ public class RagIndexer : IRagIndexer
 
         var title = payload.Value.Title;
         var content = payload.Value.Content;
-        var hash = Sha256(content);
+        var credential = await _settings.ResolveLibraryAsync(ct);
+        if (!credential.IsSuccess || credential.Data is null)
+            throw new InvalidOperationException("Chưa cấu hình nhà cung cấp embedding nên không thể tạo embedding.");
+
+        var cred = credential.Data;
+        var hash = Sha256($"v2:{cred.EmbeddingProvider}:{cred.EmbeddingModel}\n{content}");
         var existing = await _documents.FindBySourceAsync(sourceType, sourceId, ct);
         if (existing is not null && existing.ContentHash == hash)
             return "skipped";
 
-        var credential = await _settings.ResolveLibraryAsync(ct);
-        if (!credential.IsSuccess || credential.Data is null)
-            throw new InvalidOperationException("Chưa cấu hình API Key nên không tạo được embedding.");
-
-        var cred = credential.Data;
+        var embeddingContent = cred.EmbeddingProvider == "local" ? $"passage: {content}" : content;
         var embedding = await _gemini.EmbedAsync(
             cred.EmbeddingProvider,
             cred.EmbeddingApiKey,
             cred.EmbeddingModel,
-            content,
+            embeddingContent,
             cred.EmbeddingBaseUrl,
             ct);
         await _documents.UpsertAsync(new RagDocument

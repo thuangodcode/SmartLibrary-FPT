@@ -188,6 +188,30 @@ public class AiSettingsServiceTests
     }
 
     [Fact]
+    public async Task SaveMyProviderAsync_AllowsOnnxEmbeddingWithoutAnEmbeddingApiKey()
+    {
+        var librarianId = Guid.NewGuid();
+
+        var saved = await _sut.SaveMyProviderAsync(
+            new SaveAiSettingsRequest
+            {
+                Provider = "deepseek",
+                ApiKey = "sk-deepseek-chat-key-for-unit-tests",
+                ChatModel = "deepseek-flash",
+                EmbeddingProvider = "local",
+                EmbeddingModel = AiRuntimeCredential.LocalEmbeddingModelId
+            },
+            "Librarian",
+            librarianId);
+
+        saved.IsSuccess.Should().BeTrue();
+        saved.Data!.Provider.Should().Be("deepseek");
+        saved.Data.EmbeddingProvider.Should().Be("local");
+        saved.Data.EmbeddingModel.Should().Be(AiRuntimeCredential.LocalEmbeddingModelId);
+        saved.Data.Providers.Should().Contain(item => item.Id == "local" && !item.HasApiKey);
+    }
+
+    [Fact]
     public async Task SaveMyProviderAsync_WhenAdmin_ReturnsForbidden()
     {
         var result = await _sut.SaveMyProviderAsync(
@@ -287,6 +311,52 @@ public class AiSettingsServiceTests
         result.Data!.Ok.Should().BeTrue();
         result.Data.Provider.Should().Be("gemini");
         _users[librarianId].LastTestOk.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task TestConnectionAsync_UsesLocalEmbeddingAlongsideDeepSeekChat()
+    {
+        var librarianId = Guid.NewGuid();
+        await _sut.SaveMyProviderAsync(
+            new SaveAiSettingsRequest
+            {
+                Provider = "deepseek",
+                ApiKey = "sk-deepseek-chat-key-for-unit-tests",
+                ChatModel = "deepseek-flash",
+                EmbeddingProvider = "local",
+                EmbeddingModel = AiRuntimeCredential.LocalEmbeddingModelId
+            },
+            "Librarian",
+            librarianId);
+        _gemini.Setup(item => item.GenerateAsync(
+                "deepseek",
+                "sk-deepseek-chat-key-for-unit-tests",
+                "deepseek-flash",
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("OK");
+        _gemini.Setup(item => item.EmbedAsync(
+                "local",
+                string.Empty,
+                AiRuntimeCredential.LocalEmbeddingModelId,
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new float[] { 0.1f, 0.2f });
+
+        var result = await _sut.TestConnectionAsync("Librarian", librarianId);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.Ok.Should().BeTrue();
+        result.Data.Message.Should().Contain("embedding Embedding ONNX cục bộ");
+        _gemini.Verify(item => item.EmbedAsync(
+            "local",
+            string.Empty,
+            AiRuntimeCredential.LocalEmbeddingModelId,
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -488,7 +558,7 @@ public class AiSettingsServiceTests
     }
 
     [Fact]
-    public async Task SaveMyProviderAsync_WhenClaudeForLibrary_ReturnsFailure()
+    public async Task SaveMyProviderAsync_WhenClaudeForLibrary_UsesLocalEmbedding()
     {
         _policy.IsEnabled = true;
         _policy.ReaderAiEnabled = true;
@@ -503,8 +573,8 @@ public class AiSettingsServiceTests
             "Librarian",
             Guid.NewGuid());
 
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("embedding");
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.EmbeddingProvider.Should().Be("local");
     }
 
     private static void JsonFreeOfSecrets(AiSettingsStatusDto status)

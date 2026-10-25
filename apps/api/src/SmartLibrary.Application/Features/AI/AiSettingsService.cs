@@ -22,7 +22,7 @@ public class AiSettingsService
 
     private static readonly string[] KnownProviders =
     [
-        "gemini", "openai", "anthropic", "deepseek", "openrouter", "huggingface", "other"
+        "gemini", "openai", "anthropic", "deepseek", "openrouter", "huggingface", "other", "local"
     ];
 
     private readonly IAiSettingsRepository _repository;
@@ -91,8 +91,7 @@ public class AiSettingsService
         var provider = libraryUser?.Provider ?? settings.Provider;
         var embeddingProvider = libraryUser is null ? provider : SelectedEmbeddingProvider(libraryUser, ReadBag(libraryUser));
         if (ragOn && libraryUser is not null
-            && (!SupportsEmbedding(embeddingProvider)
-                || !HasStoredProviderKey(libraryUser, ReadBag(libraryUser), embeddingProvider)))
+            && !HasEmbeddingConfiguration(libraryUser, ReadBag(libraryUser), embeddingProvider))
             return Result<AiSettingsStatusDto>.Failure(
                 "Cấu hình thư viện chưa có nhà cung cấp embedding Gemini hoặc OpenAI với API Key đã lưu.");
 
@@ -155,8 +154,7 @@ public class AiSettingsService
         var ragOn = policy.IsEnabled
             && (policy.ReaderAiEnabled || policy.RecommendEnabled || policy.LibrarianAiEnabled);
         var selectedEmbeddingProvider = SelectedEmbeddingProvider(user, bag);
-        var hasEmbeddingCredential = SupportsEmbedding(selectedEmbeddingProvider)
-            && HasStoredProviderKey(user, bag, selectedEmbeddingProvider);
+        var hasEmbeddingCredential = HasEmbeddingConfiguration(user, bag, selectedEmbeddingProvider);
         var isAlreadyLibrary = policy.ActiveLibrarianUserId == actorId;
         if (ragOn && (request.UseForLibrary == true || isAlreadyLibrary) && !hasEmbeddingCredential)
             return Result<AiSettingsStatusDto>.Failure(
@@ -209,7 +207,7 @@ public class AiSettingsService
             return Result<AiSettingsStatusDto>.Failure("Admin đã tắt quyền AI của tài khoản này.");
         var bag = ReadBag(user);
         var embeddingProvider = SelectedEmbeddingProvider(user, bag);
-        if (!SupportsEmbedding(embeddingProvider) || !HasStoredProviderKey(user, bag, embeddingProvider))
+        if (!HasEmbeddingConfiguration(user, bag, embeddingProvider))
             return Result<AiSettingsStatusDto>.Failure(
                 "Cần lưu API Key của Gemini hoặc OpenAI làm nhà cung cấp embedding trước khi dùng cấu hình cho độc giả.");
 
@@ -313,15 +311,25 @@ public class AiSettingsService
                     : "Chưa lưu API Key cho nhà cung cấp này.");
 
         var state = GetOrCreateState(bag, target);
-        var embeddingModel = string.IsNullOrWhiteSpace(state.EmbeddingModel)
-            ? user.EmbeddingModel
-            : state.EmbeddingModel;
+        var embeddingProvider = SelectedEmbeddingProvider(user, bag);
+        var embeddingState = GetOrCreateState(bag, embeddingProvider);
+        var embeddingModel = string.IsNullOrWhiteSpace(embeddingState.EmbeddingModel)
+            ? embeddingProvider == "local" ? AiRuntimeCredential.LocalEmbeddingModelId : user.EmbeddingModel
+            : embeddingState.EmbeddingModel;
+        var embeddingKey = string.Empty;
+        string? embeddingBaseUrl = null;
+        var hasEmbeddingKey = embeddingProvider == "local"
+            || TryUnlockProvider(user, bag, embeddingProvider, out embeddingKey, out _, out embeddingBaseUrl);
         var result = await RunTestAsync(
             target,
             apiKey,
             chatModel,
+            embeddingProvider,
+            embeddingKey,
             embeddingModel,
             baseUrl,
+            embeddingBaseUrl,
+            hasEmbeddingKey,
             async (testedAt, ok, message) =>
             {
                 WriteTestResult(user, bag, state, target, testedAt, ok, message);
@@ -476,8 +484,12 @@ public class AiSettingsService
             cred.Provider,
             cred.ApiKey,
             cred.ChatModel,
+            cred.EmbeddingProvider,
+            cred.EmbeddingApiKey,
             cred.EmbeddingModel,
             cred.BaseUrl,
+            cred.EmbeddingBaseUrl,
+            true,
             (_, _, _) => Task.CompletedTask,
             ct);
         if (!result.IsSuccess)
@@ -489,8 +501,12 @@ public class AiSettingsService
         string provider,
         string apiKey,
         string chatModel,
+        string embeddingProvider,
+        string embeddingApiKey,
         string embeddingModel,
         string? baseUrl,
+        string? embeddingBaseUrl,
+        bool hasEmbeddingCredential,
         Func<DateTime, bool, string, Task> persist,
         CancellationToken ct)
     {
@@ -506,31 +522,40 @@ public class AiSettingsService
                 ? $"{DisplayName(provider)} phản hồi chat thành công."
                 : $"{DisplayName(provider)} không trả về nội dung.";
 
-            if (ok && SupportsEmbedding(provider))
+            if (ok && SupportsEmbedding(embeddingProvider) && hasEmbeddingCredential)
             {
                 try
                 {
                     using var embedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                    embedCts.CancelAfter(TimeSpan.FromSeconds(25));
+                    embedCts.CancelAfter(embeddingProvider == "local"
+                        ? TimeSpan.FromMinutes(3)
+                        : TimeSpan.FromSeconds(25));
                     var vector = await _gemini.EmbedAsync(
-                        provider, apiKey, embeddingModel, "SmartLibrary connection test", baseUrl, embedCts.Token);
+                        embeddingProvider,
+                        embeddingApiKey,
+                        embeddingModel,
+                        "SmartLibrary connection test",
+                        embeddingBaseUrl,
+                        embedCts.Token);
                     if (vector.Length == 0)
                     {
                         ok = false;
                         message = $"{DisplayName(provider)} chat được nhưng embedding trống.";
                     }
                     else
-                        message = $"{DisplayName(provider)} chat và embedding phản hồi thành công.";
+                        message = $"{DisplayName(provider)} chat và embedding {DisplayName(embeddingProvider)} phản hồi thành công.";
                 }
                 catch (OperationCanceledException) when (!ct.IsCancellationRequested)
                 {
                     ok = false;
-                    message = $"{DisplayName(provider)} chat thành công nhưng embedding quá thời gian chờ. Hãy thử lại hoặc kiểm tra kết nối mạng từ máy chủ.";
+                    message = $"{DisplayName(provider)} chat thành công nhưng embedding {DisplayName(embeddingProvider)} quá thời gian chờ.";
                 }
             }
             else if (ok)
             {
-                message = $"{DisplayName(provider)} chat thành công. Nhà này không hỗ trợ embedding RAG.";
+                message = hasEmbeddingCredential
+                    ? $"{DisplayName(provider)} chat thành công. Nhà cung cấp embedding chưa được hỗ trợ."
+                    : $"{DisplayName(provider)} chat thành công. Chưa cấu hình nhà cung cấp embedding.";
             }
 
             await persist(testedAt, ok, message);
@@ -593,17 +618,22 @@ public class AiSettingsService
     {
         var bag = ReadBag(user);
         var embeddingProvider = SelectedEmbeddingProvider(user, bag);
-        if (!SupportsEmbedding(embeddingProvider)
-            || !TryUnlockProvider(user, bag, embeddingProvider, out var embeddingKey, out _, out var embeddingBaseUrl))
+        var embeddingKey = string.Empty;
+        string? embeddingBaseUrl = null;
+        if (!HasEmbeddingConfiguration(user, bag, embeddingProvider)
+            || (embeddingProvider != "local"
+                && !TryUnlockProvider(user, bag, embeddingProvider, out embeddingKey, out _, out embeddingBaseUrl)))
         {
             return Result<AiRuntimeCredential>.Failure(
-                "Cấu hình chat đã lưu nhưng chưa có API Key cho embedding. Lưu Gemini hoặc OpenAI làm nhà cung cấp embedding.");
+                "Cấu hình chat đã lưu nhưng chưa có nhà cung cấp embedding. Chọn ONNX cục bộ hoặc lưu API Key Gemini/OpenAI.");
         }
 
         var embeddingModel = bag.TryGetValue(embeddingProvider, out var embeddingState)
             && !string.IsNullOrWhiteSpace(embeddingState.EmbeddingModel)
                 ? embeddingState.EmbeddingModel
-                : user.EmbeddingModel;
+                : embeddingProvider == "local"
+                    ? AiRuntimeCredential.LocalEmbeddingModelId
+                    : user.EmbeddingModel;
         return Result<AiRuntimeCredential>.Success(new AiRuntimeCredential
         {
             OwnerUserId = user.UserId,
@@ -683,7 +713,7 @@ public class AiSettingsService
             ? SelectedEmbeddingProvider(settings, bag)
             : NormalizeProvider(request.EmbeddingProvider);
         if (!SupportsEmbedding(selected))
-            return "Nhà cung cấp embedding phải là Gemini, OpenAI, OpenRouter hoặc nhà cung cấp OpenAI-compatible hỗ trợ embeddings.";
+            return "Nhà cung cấp embedding chưa được hỗ trợ.";
 
         foreach (var provider in KnownProviders)
         {
@@ -709,7 +739,7 @@ public class AiSettingsService
         if (SupportsEmbedding(settings.Provider))
             return NormalizeProvider(settings.Provider);
         return KnownProviders.FirstOrDefault(provider =>
-                   SupportsEmbedding(provider) && HasStoredProviderKey(settings, bag, provider))
+                   HasEmbeddingConfiguration(settings, bag, provider))
                ?? "gemini";
     }
 
@@ -718,8 +748,10 @@ public class AiSettingsService
         var provider = SelectedEmbeddingProvider(settings, bag);
         var model = bag.TryGetValue(provider, out var state) && !string.IsNullOrWhiteSpace(state.EmbeddingModel)
             ? state.EmbeddingModel
-            : settings.EmbeddingModel;
-        return $"{provider}:{model}";
+            : provider == "local"
+                ? AiRuntimeCredential.LocalEmbeddingModelId
+                : settings.EmbeddingModel;
+        return $"v2:{provider}:{model}";
     }
 
     private static void ApplyState(UserAiSetting settings, string provider, StoredProviderState state)
@@ -816,6 +848,13 @@ public class AiSettingsService
         => (bag.TryGetValue(provider, out var state) && !string.IsNullOrWhiteSpace(state.EncryptedApiKey))
            || (string.Equals(settings.Provider, provider, StringComparison.OrdinalIgnoreCase)
                && !string.IsNullOrWhiteSpace(settings.EncryptedApiKey));
+
+    private static bool HasEmbeddingConfiguration(
+        UserAiSetting settings,
+        Dictionary<string, StoredProviderState> bag,
+        string provider)
+        => string.Equals(provider, "local", StringComparison.OrdinalIgnoreCase)
+           || (SupportsEmbedding(provider) && HasStoredProviderKey(settings, bag, provider));
 
     private static void WriteTestResult(
         UserAiSetting settings,
@@ -1059,7 +1098,7 @@ public class AiSettingsService
     public static bool SupportsEmbedding(string? provider)
     {
         var id = NormalizeProvider(provider);
-        return id is "gemini" or "openai" or "openrouter" or "other";
+        return id is "gemini" or "openai" or "openrouter" or "other" or "local";
     }
 
     public static string NormalizeProvider(string? provider)
@@ -1075,6 +1114,7 @@ public class AiSettingsService
         "deepseek" => "DeepSeek",
         "openrouter" => "OpenRouter",
         "huggingface" => "Hugging Face",
+        "local" => "Embedding ONNX cục bộ",
         "other" => "Nhà cung cấp khác",
         _ => "Google Gemini"
     };

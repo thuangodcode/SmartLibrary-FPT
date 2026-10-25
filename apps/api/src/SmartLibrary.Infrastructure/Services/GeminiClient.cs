@@ -9,8 +9,13 @@ namespace SmartLibrary.Infrastructure.Services;
 public sealed class GeminiClient : IGeminiClient
 {
     private readonly HttpClient _http;
+    private readonly ILocalEmbeddingClient _localEmbedding;
 
-    public GeminiClient(HttpClient http) => _http = http;
+    public GeminiClient(HttpClient http, ILocalEmbeddingClient localEmbedding)
+    {
+        _http = http;
+        _localEmbedding = localEmbedding;
+    }
 
     public Task<string> GenerateAsync(string apiKey, string model, string prompt, CancellationToken ct = default)
         => GenerateAsync("gemini", apiKey, model, prompt, null, ct);
@@ -44,11 +49,18 @@ public sealed class GeminiClient : IGeminiClient
         CancellationToken ct = default)
     {
         var kind = Normalize(provider);
+        if (kind == "local")
+        {
+            if (!string.Equals(model, AiRuntimeCredential.LocalEmbeddingModelId, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Model embedding ONNX cục bộ không được hỗ trợ.");
+            return _localEmbedding.EmbedAsync(text, ct);
+        }
+
         return kind switch
         {
             "gemini" => GeminiEmbedAsync(apiKey, model, text, ct),
             "openai" or "openrouter" or "other" => OpenAiEmbedAsync(kind, apiKey, model, text, baseUrl, ct),
-            _ => throw new InvalidOperationException("Nhà cung cấp này không hỗ trợ embedding 768 chiều. Dùng Gemini hoặc OpenAI cho RAG.")
+            _ => throw new InvalidOperationException("Nhà cung cấp này không hỗ trợ embedding.")
         };
     }
 
@@ -260,7 +272,7 @@ public sealed class GeminiClient : IGeminiClient
         var value = string.IsNullOrWhiteSpace(provider) ? "gemini" : provider.Trim().ToLowerInvariant();
         return value switch
         {
-            "gemini" or "openai" or "anthropic" or "deepseek" or "openrouter" or "huggingface" or "other" => value,
+            "gemini" or "openai" or "anthropic" or "deepseek" or "openrouter" or "huggingface" or "other" or "local" => value,
             _ => "other"
         };
     }
@@ -338,7 +350,9 @@ public sealed class GeminiClient : IGeminiClient
            || message.Contains("UNAVAILABLE", StringComparison.OrdinalIgnoreCase)
            || message.Contains("high demand", StringComparison.OrdinalIgnoreCase)
            || message.Contains("overloaded", StringComparison.OrdinalIgnoreCase)
-           || message.Contains("capacity", StringComparison.OrdinalIgnoreCase);
+           || message.Contains("capacity", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("hết hạn mức", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("giới hạn tốc độ", StringComparison.OrdinalIgnoreCase);
 
     private static string Clip(string text)
         => text.Length > 8000 ? text[..8000] : text;

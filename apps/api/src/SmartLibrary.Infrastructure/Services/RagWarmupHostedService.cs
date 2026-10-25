@@ -45,7 +45,7 @@ public sealed class RagWarmupHostedService : BackgroundService
             await settingsService.UpdateSyncStatsAsync(
                 result.SyncedAt,
                 result.DocumentCount,
-                $"{credential.Data!.EmbeddingProvider}:{credential.Data.EmbeddingModel}",
+                $"v2:{credential.Data!.EmbeddingProvider}:{credential.Data.EmbeddingModel}",
                 stoppingToken);
             _logger.LogInformation(
                 "Đã đồng bộ RAG: {Books} sách, {Policies} chính sách, {Failed} lỗi, tổng {Count} tài liệu.",
