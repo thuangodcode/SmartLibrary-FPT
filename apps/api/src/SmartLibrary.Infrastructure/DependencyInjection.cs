@@ -26,11 +26,13 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         // Database
-        services.AddDbContext<AppDbContext>(options =>
+        services.AddScoped<NotificationDispatchInterceptor>();
+        services.AddDbContext<AppDbContext>((provider, options) =>
             options.UseNpgsql(
                 configuration.GetConnectionString("DefaultConnection"),
                 npgsqlOptions => npgsqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)
             ).UseSnakeCaseNamingConvention()
+             .AddInterceptors(provider.GetRequiredService<NotificationDispatchInterceptor>())
         );
 
         // Repositories

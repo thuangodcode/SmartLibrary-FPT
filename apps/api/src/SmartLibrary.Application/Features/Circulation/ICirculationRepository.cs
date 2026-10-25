@@ -6,7 +6,7 @@ namespace SmartLibrary.Application.Features.Circulation;
 
 public interface ICirculationRepository
 {
-    Task MarkOverdueAsync(CancellationToken ct);
+    Task<IReadOnlyList<CirculationReminderDto>> MarkOverdueAsync(CancellationToken ct);
     Task<CirculationStatsDto> GetStatsAsync(int finePerDay, CancellationToken ct);
     Task<(IReadOnlyList<CirculationLoanDto> Items, int Total)> GetLoansAsync(
         string? search, string? status, DateTime? borrowedFromUtc, DateTime? borrowedBeforeUtc,
@@ -61,7 +61,7 @@ public interface ICirculationRepository
     Task<bool> HasOtherReservationAsync(Guid bookId, Guid readerId, CancellationToken ct);
     Task<Reservation?> FindOpenReservationAsync(Guid readerId, Guid bookId, CancellationToken ct);
     Task AddReservationAsync(Reservation reservation, CancellationToken ct);
-    Task<IReadOnlyList<Guid>> ExpireReadyReservationsAsync(CancellationToken ct);
+    Task<IReadOnlyList<ExpiredReservationDto>> ExpireReadyReservationsAsync(CancellationToken ct);
     Task<Reservation?> ReadyNextReservationAsync(Guid bookId, int pickupHours, CancellationToken ct);
     Task<int> CountReadyReservationsAsync(Guid bookId, Guid exceptReaderId, CancellationToken ct);
     Task<int> CountAvailableCopiesAsync(Guid bookId, CancellationToken ct);

@@ -58,7 +58,7 @@ public class CirculationServiceTests
         _repo.Setup(x => x.AddFineAsync(It.IsAny<Fine>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         _repo.Setup(x => x.CountReadyReservationsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
         _repo.Setup(x => x.CountAvailableCopiesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        _repo.Setup(x => x.ExpireReadyReservationsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<Guid>());
+        _repo.Setup(x => x.ExpireReadyReservationsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<ExpiredReservationDto>());
         _repo.Setup(x => x.TryClaimIncidentAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         _repo.Setup(x => x.ReadyNextReservationAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -916,7 +916,7 @@ public class CirculationServiceTests
         _repo.Setup(x => x.HasActiveLoanAsync(copy.Id, null, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _repo.Setup(x => x.ExpireReadyReservationsAsync(It.IsAny<CancellationToken>()))
             .Callback(() => order.Add("expire"))
-            .ReturnsAsync(Array.Empty<Guid>());
+            .ReturnsAsync(Array.Empty<ExpiredReservationDto>());
         _repo.Setup(x => x.CountReadyReservationsAsync(copy.BookId, reader.Id, It.IsAny<CancellationToken>()))
             .Callback(() => order.Add("ready"))
             .ReturnsAsync(0);
@@ -1066,7 +1066,10 @@ public class CirculationServiceTests
     public async Task ExpireHold_WhenCopyUnusable_DoesNotReadyNextReader()
     {
         var bookId = Guid.NewGuid();
-        _repo.Setup(x => x.ExpireReadyReservationsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { bookId });
+        _repo.Setup(x => x.ExpireReadyReservationsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[]
+        {
+            new ExpiredReservationDto(Guid.NewGuid(), Guid.NewGuid(), bookId, "Expired book", DateTime.UtcNow.AddMinutes(-1))
+        });
         _repo.Setup(x => x.CountAvailableCopiesAsync(bookId, It.IsAny<CancellationToken>())).ReturnsAsync(0);
         _repo.Setup(x => x.GetReservationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<CirculationReservationDto>());
