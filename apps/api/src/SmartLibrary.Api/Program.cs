@@ -57,6 +57,8 @@ builder.Services.AddControllers(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddMemoryCache();
 builder.Services.AddSignalR();
+builder.Services.AddScoped<SmartLibrary.Application.Features.Notifications.INotificationRealtimePublisher,
+    SmartLibrary.Api.Services.SignalRNotificationPublisher>();
 builder.Services.AddHostedService<BorrowPickupExpirationWorker>();
 
 // Application services (AutoMapper, FluentValidation, business services)
@@ -162,6 +164,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<SupportChatHub>("/hubs/support-chat");
+app.MapHub<NotificationHub>("/hubs/notifications");
 app.MapHealthChecks("/api/health-check");
 app.MapGet("/", () => Results.Redirect("/swagger"));
 

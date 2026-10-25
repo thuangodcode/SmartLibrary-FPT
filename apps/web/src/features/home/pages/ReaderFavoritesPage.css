@@ -1,0 +1,32 @@
+.reader-favorites-heading {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 30px 0 28px;
+}
+
+.reader-favorites-heading__icon {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 16px;
+  background: #fff0f0;
+  color: #c53f48;
+}
+
+.reader-favorites-heading__icon svg { width: 25px; height: 25px; }
+.reader-favorites-heading h1 { margin: 3px 0 5px; color: #17231d; font-family: Newsreader, Georgia, serif; font-size: clamp(30px, 4vw, 42px); letter-spacing: -.035em; }
+.reader-favorites-heading p { margin: 0; color: #627067; font-size: 14px; }
+.reader-favorites-heading .catalog-result-count { margin-left: auto; }
+
+.reader-favorites-empty { display: grid; justify-items: center; gap: 10px; padding: 56px 20px; text-align: center; }
+.reader-favorites-empty > svg { width: 36px; height: 36px; color: #c53f48; }
+.reader-favorites-empty h2, .reader-favorites-empty p { margin: 0; }
+.reader-favorites-empty button { margin-top: 8px; }
+
+@media (max-width: 640px) {
+  .reader-favorites-heading { align-items: flex-start; flex-wrap: wrap; }
+  .reader-favorites-heading .catalog-result-count { width: 100%; margin-left: 72px; }
+}

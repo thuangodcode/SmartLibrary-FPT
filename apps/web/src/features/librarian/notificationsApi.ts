@@ -3,12 +3,22 @@ import { parseApiResponse } from '../../lib/api';
 
 export interface InboxNotice {
   id: string;
+  userId?: string;
   title: string;
   message: string;
   type: string;
   isRead: boolean;
   href?: string | null;
   createdAt: string;
+}
+
+export interface InboxNoticePage {
+  items: InboxNotice[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  unreadCount: number;
 }
 
 interface Envelope<T> {
@@ -35,5 +45,11 @@ async function callInbox<T>(token: string, path: string, method: string): Promis
 export const listInboxNotices = (token: string) =>
   callInbox<InboxNotice[]>(token, '/api/v1/notifications', 'GET');
 
+export const listInboxNoticePage = (token: string, page = 1, pageSize = 10) =>
+  callInbox<InboxNoticePage>(token, `/api/v1/notifications?page=${page}&pageSize=${pageSize}`, 'GET');
+
 export const markInboxNoticeRead = (token: string, id: string) =>
   callInbox<boolean>(token, `/api/v1/notifications/${id}/read`, 'POST');
+
+export const markAllInboxNoticesRead = (token: string) =>
+  callInbox<{ count: number }>(token, '/api/v1/notifications/read-all', 'POST');

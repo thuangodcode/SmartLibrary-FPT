@@ -34,4 +34,36 @@ public class NotificationInboxTests
 
         repo.Verify(item => item.AddAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Fact]
+    public void Map_UsesHrefStoredInMetadata()
+    {
+        var notification = new Notification
+        {
+            UserId = Guid.NewGuid(),
+            Type = "reservation",
+            Metadata = "{\"href\":\"/books/book-id\",\"entityId\":\"book-id\"}"
+        };
+
+        var result = NotificationInbox.Map(notification);
+
+        result.UserId.Should().Be(notification.UserId);
+        result.Href.Should().Be("/books/book-id");
+    }
+
+    [Theory]
+    [InlineData("renewal", "/history?tab=loans")]
+    [InlineData("fine_paid", "/history?tab=fines")]
+    [InlineData("membership_expiring", "/profile")]
+    public void Map_FallsBackToTypeRoute_WhenMetadataIsMissingOrInvalid(string type, string expectedHref)
+    {
+        var notification = new Notification
+        {
+            UserId = Guid.NewGuid(),
+            Type = type,
+            Metadata = "not-json"
+        };
+
+        NotificationInbox.Map(notification).Href.Should().Be(expectedHref);
+    }
 }

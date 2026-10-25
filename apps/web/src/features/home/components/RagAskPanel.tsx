@@ -36,6 +36,7 @@ const RagAskPanel = () => {
     if (!accessToken || !question.trim()) return;
     setLoading(true);
     setError(null);
+    setResult(null);
     try {
       setResult(await askRag(accessToken, question.trim()));
     } catch (askError) {
@@ -66,13 +67,13 @@ const RagAskPanel = () => {
 
   const bookSources = (result?.sources ?? []).filter((source) => source.sourceType === 'book');
   const policySources = (result?.sources ?? []).filter((source) => source.sourceType !== 'book');
-  const empty = Boolean(result && bookSources.length === 0 && !loading);
+  const empty = Boolean(result && result.sources.length === 0 && !loading);
 
   return (
     <section className="rag-ask" aria-label="Hỏi trợ lý thư viện">
       <div className="rag-ask-heading">
         <Sparkles size={16} />
-        <strong>Hỏi AI về sách và chính sách</strong>
+        <strong>Tìm sách & hỏi chính sách bằng AI</strong>
       </div>
       {!isAuthenticated || !accessToken ? (
         <p className="rag-ask-hint">
@@ -82,12 +83,13 @@ const RagAskPanel = () => {
       ) : (
         <form onSubmit={(event) => void submit(event)}>
           <p className="rag-ask-hint">
-            Viết thoải mái nhu cầu học, môn, kỳ, hoặc vì sao bạn cần sách. Không cần tóm tắt thành vài từ khóa.
+            Mô tả nhu cầu bằng câu tự nhiên. Khi tìm sách, kết quả chỉ lấy từ danh mục thư viện và có thống kê số lượng, tình trạng bản sách.
           </p>
           <textarea
             rows={6}
             value={question}
             maxLength={4000}
+            placeholder="Ví dụ: Bây giờ tôi muốn học về ngôn ngữ Anh. Hãy tìm sách phù hợp đang có trong thư viện."
             onChange={(event) => setQuestion(event.target.value)}
           />
           <div className="rag-ask-actions">
@@ -120,6 +122,20 @@ const RagAskPanel = () => {
       )}
       {result && bookSources.length > 0 && (
         <div className="rag-ask-result">
+          <div className="rag-ask-stats" aria-label="Thống kê sách tìm được">
+            <div>
+              <strong>{bookSources.length}</strong>
+              <span>đầu sách phù hợp</span>
+            </div>
+            <div>
+              <strong>{bookSources.filter((source) => (source.availableCopies ?? 0) > 0).length}</strong>
+              <span>đầu sách còn bản</span>
+            </div>
+            <div>
+              <strong>{bookSources.reduce((total, source) => total + (source.availableCopies ?? 0), 0)}</strong>
+              <span>bản có thể mượn</span>
+            </div>
+          </div>
           <p>{result.answer}</p>
           <div className="rag-ask-grid">
             {bookSources.map((source) => (
@@ -137,6 +153,16 @@ const RagAskPanel = () => {
               ))}
             </ul>
           )}
+        </div>
+      )}
+      {result && bookSources.length === 0 && policySources.length > 0 && (
+        <div className="rag-ask-result">
+          <p>{result.answer}</p>
+          <ul>
+            {policySources.map((source) => (
+              <li key={`${source.sourceType}-${source.sourceId}`}>Chính sách: {source.title}</li>
+            ))}
+          </ul>
         </div>
       )}
     </section>

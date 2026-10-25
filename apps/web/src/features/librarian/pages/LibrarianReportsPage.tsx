@@ -43,6 +43,7 @@ import {
 } from '../../reports/reportTemplateUtils';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import './LibrarianReportsPage.css';
+import './LibrarianReportStatus.css';
 
 interface ApiEnvelope<T> {
   success?: boolean;
@@ -608,9 +609,21 @@ export const LibrarianReportsPage: React.FC = () => {
                 {request.lastReviewComment && request.lastReportStatus === 'Rejected' && (
                   <p className="lib-request-feedback"><strong>Admin yêu cầu chỉnh sửa:</strong> {request.lastReviewComment}</p>
                 )}
-                <span className={`lib-request-status ${request.status === 'Submitted' ? 'is-submitted' : ''}`}>
-                  {request.lastReportStatus === 'Approved' ? 'Đã duyệt' : request.status === 'Submitted' ? 'Đã nộp · chờ duyệt' : request.lastReportStatus === 'Rejected' ? 'Cần nộp lại' : 'Chờ nộp'}
-                </span>
+                <div className="lib-request-statuses" aria-label="Trạng thái báo cáo">
+                  {request.lastReportStatus === 'Approved' ? (
+                    <span className="lib-request-status is-approved"><CheckCircle2 size={13}/>Đã duyệt</span>
+                  ) : request.status === 'Submitted' ? (
+                    <>
+                      <span className="lib-request-status is-submitted"><Send size={13}/>Đã gửi</span>
+                      <span className={`lib-request-status is-review${request.lastReportStatus === 'Rejected' ? ' is-rejected' : ''}`}>
+                        {request.lastReportStatus === 'Rejected' ? <AlertCircle size={13}/> : <Clock size={13}/>}
+                        {request.lastReportStatus === 'Rejected' ? 'Cần nộp lại' : 'Chờ duyệt'}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="lib-request-status is-waiting"><Clock size={13}/>{request.lastReportStatus === 'Rejected' ? 'Cần nộp lại' : 'Chờ gửi'}</span>
+                  )}
+                </div>
                 {request.status === 'Submitted'
                   ? request.reportId && <Link className="lib-request-action secondary" to={`/librarian/reports/${request.reportId}`}><Eye size={15}/> Xem báo cáo đã gửi</Link>
                   : <button type="button" className="lib-request-action" onClick={() => navigate(`/librarian/reports/new?requestId=${request.id}`)}><Send size={15}/>{request.lastReportStatus === 'Rejected' ? 'Chỉnh sửa & nộp lại' : 'Lập báo cáo'}</button>}

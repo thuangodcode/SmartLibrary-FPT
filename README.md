@@ -57,14 +57,14 @@ SmartLibrary-FPT/
 ### 1. Backend API
 
 ```bash
-cd apps/api
-dotnet restore
-dotnet build
-dotnet run --project src/SmartLibrary.Api
-# API chạy tại: https://localhost:5001
-# Swagger: https://localhost:5001/swagger
-# Health check: https://localhost:5001/health
+# Chạy từ thư mục gốc repository
+npm run dev:api
+# API chạy tại: http://localhost:5278
+# Swagger: http://localhost:5278/swagger
+# Health check: http://localhost:5278/api/health-check
 ```
+
+`npm run dev:api` kiểm tra health check trước khi khởi động. Nếu API đang chạy khỏe trên cổng `5278`, lệnh sẽ bám vào tiến trình hiện có; nhấn **Ctrl+C** trong terminal đó để dừng đúng API của repository. Có thể dừng API tường minh bằng `npm run dev:api:stop`. Nếu cổng đang bị dịch vụ khác chiếm, lệnh sẽ báo rõ để bạn xử lý xung đột.
 
 ### 2. Web App
 

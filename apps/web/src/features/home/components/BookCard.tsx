@@ -2,7 +2,9 @@ import React from 'react';
 import { ArrowUpRight, BookOpen, Check, Clock3, Star } from 'lucide-react';
 import type { Book } from '../types';
 import { BookCover } from './BookCover';
+import FavoriteBookButton from './FavoriteBookButton';
 import './BookCard.css';
+import './FavoriteBookButton.css';
 
 interface BookCardProps {
   book: Book;
@@ -31,6 +33,7 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
 
   return (
     <article className={`book-card book-card--${book.status}`} data-ui="book-card">
+      <FavoriteBookButton bookId={book.id} title={book.title} />
       {book.matchLabel && (
         <div className="book-card__match">
           <span>{book.matchLabel}</span>

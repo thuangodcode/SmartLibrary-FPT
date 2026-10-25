@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -262,6 +263,12 @@ public sealed class SupportController(
         }
 
         var complaint = await GetComplaintForDtoAsync(id, ct);
+        db.Notifications.Add(SupportNotification(
+            complaint.ReaderId,
+            "Đơn hỗ trợ đã được tiếp nhận",
+            $"{complaint.AcceptedBy?.FullName ?? "Thủ thư"} đang xử lý đơn “{complaint.RequestType.Name}”.",
+            complaint.Id));
+        await db.SaveChangesAsync(ct);
         var dto = MapComplaint(complaint);
         await BroadcastComplaintUpdateAsync(dto, complaint.ReaderId, ct);
         return Ok(ApiResponse<SupportComplaintDto>.Ok(dto));
@@ -286,6 +293,13 @@ public sealed class SupportController(
             return Forbid();
 
         complaint.DueAt = request.DueAt;
+        db.Notifications.Add(SupportNotification(
+            complaint.ReaderId,
+            "Đã cập nhật lịch xử lý hỗ trợ",
+            request.DueAt is null
+                ? "Thư viện đã bỏ hạn xử lý dự kiến của đơn hỗ trợ."
+                : $"Đơn hỗ trợ dự kiến được xử lý trước {request.DueAt.Value:dd/MM/yyyy HH:mm}.",
+            complaint.Id));
         await db.SaveChangesAsync(ct);
 
         var updated = await GetComplaintForDtoAsync(id, ct);
@@ -343,6 +357,11 @@ public sealed class SupportController(
                 CreatedAt = respondedAt
             };
             db.SupportComplaintReplies.Add(reply);
+            db.Notifications.Add(SupportNotification(
+                readerId.Value,
+                "Bạn có phản hồi hỗ trợ mới",
+                message.Length > 180 ? $"{message[..180]}…" : message,
+                id));
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
         }
@@ -375,6 +394,16 @@ public sealed class SupportController(
         await chatHub.Clients.Group(SupportChatHub.LibrarianGroup)
             .SendAsync("ComplaintUpdated", dto, ct);
     }
+
+    private static Notification SupportNotification(Guid readerId, string title, string message, Guid complaintId)
+        => new()
+        {
+            UserId = readerId,
+            Title = title,
+            Message = message,
+            Type = "support",
+            Metadata = JsonSerializer.Serialize(new { href = "/support", entityId = complaintId })
+        };
 
     [HttpGet("chat/conversations")]
     [Authorize(Roles = "Librarian,Admin")]

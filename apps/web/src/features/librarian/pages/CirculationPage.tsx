@@ -1,14 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import {
   BookOpen,
+  Bookmark,
+  Check,
   Clock3,
   Eye,
   LoaderCircle,
   RefreshCw,
   RotateCcw,
+  Search,
+  UserRound,
   Wallet,
+  X,
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
@@ -41,6 +46,7 @@ import './CirculationPage.css';
 const TAB_ICONS = {
   loans: BookOpen,
   return: RotateCcw,
+  reservations: Bookmark,
   overdue: Clock3,
   fines: Wallet,
 } as const;
@@ -55,9 +61,228 @@ interface LoanList {
 
 interface IncidentDraft {
   severity: string;
-  amount: string;
   applyOverdue: boolean;
   notes: string;
+}
+
+function policyIncidentFee(stats: CirculationStats | null, severity: string): number {
+  if (!stats) return 0;
+  return severity === 'Light' ? stats.damageFee || 0 : stats.lostFee || 0;
+}
+
+interface ReservationOption {
+  id: string;
+  label: string;
+  detail: string;
+}
+
+function ReservationAutocomplete({
+  label,
+  step,
+  value,
+  selected,
+  placeholder,
+  endpoint,
+  onChange,
+  onSelect,
+  onClear,
+}: {
+  label: string;
+  step: string;
+  value: string;
+  selected: ReservationOption | null;
+  placeholder: string;
+  endpoint: 'reader' | 'book';
+  onChange: (value: string) => void;
+  onSelect: (option: ReservationOption) => void;
+  onClear: () => void;
+}) {
+  const [result, setResult] = useState<{
+    query: string;
+    options: ReservationOption[];
+    error: string | null;
+  }>({ query: '', options: [], error: null });
+  const [focused, setFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listboxId = useId();
+  const headers = useCirculationAuth();
+  const query = value.trim();
+
+  useEffect(() => {
+    if (query.length < 2) return undefined;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const path = endpoint === 'reader'
+            ? '/api/v1/circulation/reservation-reader-options'
+            : '/api/v1/circulation/reservation-book-options';
+          const response = await fetch(`${API_BASE_URL}${path}?search=${encodeURIComponent(query)}`, {
+            headers,
+            signal: controller.signal,
+          });
+          if (response.status === 404) {
+            throw new Error('API gợi ý chưa có trên máy chủ. Hãy cập nhật và khởi động lại backend.');
+          }
+          const result = await parseApiResponse<ApiResult<Array<{
+            id: string;
+            fullName?: string;
+            studentId?: string | null;
+            email?: string;
+            title?: string;
+            code?: string;
+          }>>>(response);
+          if (!response.ok || !result?.success || !result.data) {
+            throw new Error(result?.error || 'Không tải được danh sách gợi ý.');
+          }
+          setResult({
+            query,
+            options: result.data.map((item) => endpoint === 'reader'
+              ? {
+                id: item.id,
+                label: item.fullName || '',
+                detail: [item.studentId, item.email].filter(Boolean).join(' · '),
+              }
+              : {
+                id: item.id,
+                label: item.title || '',
+                detail: item.code || '',
+              }),
+            error: null,
+          });
+        } catch (caught) {
+          if (controller.signal.aborted) return;
+          setResult({
+            query,
+            options: [],
+            error: errorMessage(caught, 'Không tải được danh sách gợi ý.'),
+          });
+        }
+      })();
+    }, 250);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [endpoint, headers, query]);
+
+  const isCurrentResult = result.query === query;
+  const suggestions = isCurrentResult ? result.options : [];
+  const isSearching = query.length >= 2 && !isCurrentResult;
+  const showFeedback = focused && query.length >= 2;
+  const FieldIcon = endpoint === 'reader' ? UserRound : BookOpen;
+
+  const selectOption = (option: ReservationOption) => {
+    onSelect(option);
+    setFocused(false);
+    setActiveIndex(-1);
+  };
+
+  return (
+    <div
+      className="circ-autocomplete"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
+      }}
+    >
+      {selected ? (
+        <div className="circ-selected-option">
+          <div className="circ-selected-option__icon"><Check size={18} /></div>
+          <div className="circ-selected-option__content">
+            <span>Đã chọn {label.toLowerCase()}</span>
+            <strong>{selected.label}</strong>
+            {selected.detail && <small>{selected.detail}</small>}
+          </div>
+          <button
+            type="button"
+            className="circ-selected-option__clear"
+            onClick={() => {
+              onClear();
+              window.requestAnimationFrame(() => inputRef.current?.focus());
+            }}
+          >
+            <X size={15} />
+            Đổi
+          </button>
+        </div>
+      ) : (
+        <>
+          <label className="circ-field" htmlFor={listboxId}>
+            <span className="circ-reservation-label">
+              <span className="circ-reservation-step">{step}</span>
+              {label}
+            </span>
+            <span className="circ-autocomplete-control">
+              <FieldIcon size={18} aria-hidden="true" />
+              <input
+                ref={inputRef}
+                id={listboxId}
+                value={value}
+                placeholder={placeholder}
+                autoComplete="off"
+                role="combobox"
+                aria-expanded={showFeedback && (suggestions.length > 0 || isSearching)}
+                aria-autocomplete="list"
+                aria-controls={`${listboxId}-options`}
+                aria-activedescendant={activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined}
+                onFocus={() => setFocused(true)}
+                onChange={(event) => {
+                  setActiveIndex(-1);
+                  onChange(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowDown' && suggestions.length) {
+                    event.preventDefault();
+                    setActiveIndex((index) => Math.min(index + 1, suggestions.length - 1));
+                  } else if (event.key === 'ArrowUp' && suggestions.length) {
+                    event.preventDefault();
+                    setActiveIndex((index) => Math.max(index - 1, 0));
+                  } else if (event.key === 'Enter' && activeIndex >= 0) {
+                    event.preventDefault();
+                    const option = suggestions[activeIndex];
+                    if (option) selectOption(option);
+                  } else if (event.key === 'Escape') {
+                    setFocused(false);
+                    setActiveIndex(-1);
+                  }
+                }}
+              />
+              {isSearching && <LoaderCircle className="spin" size={17} aria-label="Đang tìm" />}
+            </span>
+          </label>
+          {showFeedback && (
+            <div className="circ-autocomplete-options" role="listbox" id={`${listboxId}-options`}>
+              {isSearching ? (
+                <p className="circ-autocomplete-feedback">
+                  <LoaderCircle className="spin" size={16} /> Đang tìm trong thư viện...
+                </p>
+              ) : result.error ? (
+                <p className="circ-autocomplete-feedback is-error" role="alert">{result.error}</p>
+              ) : suggestions.length ? (
+                suggestions.map((option, index) => (
+                  <button
+                    type="button"
+                    role="option"
+                    id={`${listboxId}-option-${index}`}
+                    aria-selected={index === activeIndex}
+                    key={option.id}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectOption(option)}
+                  >
+                    <strong>{option.label}</strong>
+                    {option.detail && <small>{option.detail}</small>}
+                  </button>
+                ))
+              ) : (
+                <p className="circ-autocomplete-feedback">Không tìm thấy kết quả phù hợp.</p>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 function DebouncedSearchInput({
@@ -83,20 +308,6 @@ function DebouncedSearchInput({
       onChange={(event) => setInput(event.target.value)}
     />
   );
-}
-
-function dateInVietnam(value?: string | null) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
-  return `${part('year')}-${part('month')}-${part('day')}`;
 }
 
 function Chrome({ tab, stats, loading }: { tab: CirculationTab; stats: CirculationStats | null; loading?: boolean }) {
@@ -164,6 +375,7 @@ function LoansView() {
   const [stats, setStats] = useState<CirculationStats | null>(null);
   const [list, setList] = useState<LoanList | null>(null);
   const [pending, setPending] = useState<CirculationLoan[]>([]);
+  const [pendingSearch, setPendingSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<CirculationLoan | null>(null);
@@ -172,8 +384,6 @@ function LoansView() {
   const search = params.get('q') ?? '';
   const borrowedFrom = params.get('borrowedFrom') ?? '';
   const borrowedTo = params.get('borrowedTo') ?? '';
-  const pickupFrom = params.get('pickupFrom') ?? '';
-  const pickupTo = params.get('pickupTo') ?? '';
   const page = Number(params.get('page') ?? '1') || 1;
   const setFilter = useCallback((key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -241,7 +451,7 @@ function LoansView() {
     if (!accessToken) return undefined;
     let active = true;
     const hub = new HubConnectionBuilder()
-      .withUrl(`${API_BASE_URL}/hubs/support-chat`, { accessTokenFactory: () => accessToken })
+      .withUrl(`${API_BASE_URL}/hubs/notifications`, { accessTokenFactory: () => accessToken })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
       .build();
@@ -290,10 +500,15 @@ function LoansView() {
     }
   };
 
-  const filteredPending = pending.filter((item) => {
-    const pickupDate = dateInVietnam(item.pickupAt);
-    return (!pickupFrom || pickupDate >= pickupFrom) && (!pickupTo || pickupDate <= pickupTo);
-  });
+  const pendingTerm = pendingSearch.trim().toLocaleLowerCase('vi');
+  const filteredPending = pending.filter((item) => [
+    item.readerName,
+    item.readerEmail,
+    item.studentId,
+    item.bookTitle,
+    item.barcode,
+    item.code,
+  ].some((value) => value?.toLocaleLowerCase('vi').includes(pendingTerm)));
 
   return (
     <section className="circ-page circ-page--loans">
@@ -312,29 +527,16 @@ function LoansView() {
             <Link className="circ-btn circ-btn--primary" to="/librarian/circulation/direct-borrow">Mượn tại quầy</Link>
           </div>
         </div>
-        <div className="circ-date-filters" aria-label="Lọc lịch nhận">
-          <label>Từ ngày
-            <input type="date" value={pickupFrom} max={pickupTo || undefined}
-              onChange={(event) => setFilter('pickupFrom', event.target.value)} />
-          </label>
-          <label>Đến ngày
-            <input type="date" value={pickupTo} min={pickupFrom || undefined}
-              onChange={(event) => setFilter('pickupTo', event.target.value)} />
-          </label>
-          {(pickupFrom || pickupTo) && (
-            <button type="button" className="circ-btn circ-btn--quiet" onClick={() => {
-              const next = new URLSearchParams(params);
-              next.delete('pickupFrom');
-              next.delete('pickupTo');
-              next.delete('page');
-              setParams(next);
-            }}>Xóa lọc</button>
-          )}
+        <div className="circ-pending-search">
+          <DebouncedSearchInput
+            value={pendingSearch}
+            onSearch={setPendingSearch}
+          />
         </div>
         {loading && !pending.length ? (
           <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải yêu cầu...</p>
         ) : !filteredPending.length ? (
-          <p className="circ-empty">Không có yêu cầu trong khoảng ngày đã chọn.</p>
+          <p className="circ-empty">{pendingSearch.trim() ? 'Không tìm thấy yêu cầu phù hợp.' : 'Không có yêu cầu chờ xử lý.'}</p>
         ) : (
           <div className="circ-table-wrap circ-request-table-wrap">
             <table className="circ-table circ-request-table">
@@ -508,6 +710,21 @@ export function DirectCheckoutPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [borrowDays, setBorrowDays] = useState<number | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers });
+        const result = await parseApiResponse<ApiResult<CirculationStats>>(response);
+        if (response.ok && result?.success) {
+          setBorrowDays(result.data?.borrowDays ?? 0);
+        }
+      } catch {
+        setBorrowDays(null);
+      }
+    })();
+  }, [headers]);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -570,7 +787,11 @@ export function DirectCheckoutPage() {
           <input required value={barcode} onChange={(event) => setBarcode(event.target.value)}
             placeholder="Quét hoặc nhập mã bản sao" />
         </label>
-        <p className="circ-checkout-hint">Hệ thống kiểm tra chính sách mượn và tình trạng bản sao trước khi tạo phiếu.</p>
+        <p className="circ-checkout-hint">
+          {borrowDays && borrowDays > 0
+            ? `Thời hạn mượn theo chính sách Admin: ${borrowDays} ngày. Hệ thống tự tính ngày đến hạn khi xác nhận.`
+            : 'Thời hạn mượn và ngày đến hạn do Backend lấy từ chính sách Admin. Thủ thư không nhập số ngày riêng.'}
+        </p>
         <button type="submit" className="circ-btn circ-btn--primary" disabled={busy}>
           {busy ? 'Đang xử lý...' : 'Xác nhận mượn sách'}
         </button>
@@ -584,11 +805,8 @@ function ReturnView() {
   const [params] = useSearchParams();
   const { showToast } = useToast();
   const [stats, setStats] = useState<CirculationStats | null>(null);
-  const [reservations, setReservations] = useState<CirculationReservation[]>([]);
   const [activity, setActivity] = useState<CirculationActivity[]>([]);
-  const [readerKey, setReaderKey] = useState('');
   const [returnBarcode, setReturnBarcode] = useState(params.get('barcode') ?? '');
-  const [reserveBarcode, setReserveBarcode] = useState('');
   const [condition, setCondition] = useState('Good');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -598,17 +816,15 @@ function ReturnView() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [statsRes, reservationRes, activityRes] = await Promise.all([
+      const [statsRes, activityRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
-        fetch(`${API_BASE_URL}/api/v1/circulation/reservations`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/circulation/activity`, { headers }),
       ]);
       const statsJson = await parseApiResponse<ApiResult<CirculationStats>>(statsRes);
-      const reservationJson = await parseApiResponse<ApiResult<CirculationReservation[]>>(reservationRes);
       const activityJson = await parseApiResponse<ApiResult<CirculationActivity[]>>(activityRes);
-      if (!reservationRes.ok || !reservationJson?.success) throw new Error(reservationJson?.error || 'Không tải được đặt chỗ.');
+      if (!statsRes.ok || !statsJson?.success) throw new Error(statsJson?.error || 'Không tải được thống kê.');
+      if (!activityRes.ok || !activityJson?.success) throw new Error(activityJson?.error || 'Không tải được giao dịch.');
       setStats(statsJson?.data ?? null);
-      setReservations(reservationJson.data ?? []);
       setActivity(activityJson?.data ?? []);
       setError(null);
     } catch (err) {
@@ -687,45 +903,6 @@ function ReturnView() {
             {busy ? 'Đang ghi nhận...' : 'Ghi nhận trả sách'}
           </button>
         </form>
-        <div className="circ-card">
-          <h2>Đặt chỗ</h2>
-          <form
-            className="circ-field"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void post('/api/v1/circulation/reservations', { readerKey, barcode: reserveBarcode });
-            }}
-            style={{ marginBottom: 12 }}
-          >
-            <label className="circ-field">
-              Mã thẻ hoặc tên độc giả
-              <input value={readerKey} onChange={(e) => setReaderKey(e.target.value)} placeholder="Nhập mã thẻ, email hoặc mã sinh viên" />
-            </label>
-            <label className="circ-field">
-              Mã vạch sách cần đặt chỗ
-              <input value={reserveBarcode} onChange={(e) => setReserveBarcode(e.target.value)} placeholder="Mã bản sao cần đặt chỗ, ví dụ py01-01" />
-            </label>
-            <button type="submit" className="circ-btn circ-btn--primary" disabled={loading || busy} style={{ marginTop: 8 }}>
-              {busy ? <LoaderCircle className="spin" size={14} /> : null}
-              {busy ? 'Đang xử lý...' : 'Tạo đặt chỗ'}
-            </button>
-            <p className="circ-hint">Không giữ một bản sao cụ thể cho đến khi sách sẵn sàng.</p>
-          </form>
-          {loading ? (
-            <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải...</p>
-          ) : !reservations.length ? (
-            <p className="circ-empty">Không có đặt chỗ đang mở.</p>
-          ) : reservations.map((item) => (
-            <div className="circ-reserve-row" key={item.id}>
-              <div>
-                <b>{item.readerName}</b>
-                <small>{item.bookTitle}</small>
-              </div>
-              <span className={`circ-badge is-${item.status.toLowerCase()}`}>{reservationLabel(item.status)}</span>
-              <button type="button" className="circ-btn" disabled={busy} onClick={() => void post(`/api/v1/circulation/reservations/${item.id}/cancel`)}>Hủy đặt</button>
-            </div>
-          ))}
-        </div>
       </div>
       <div className="circ-card">
         <h2>Giao dịch gần đây</h2>
@@ -753,6 +930,225 @@ function ReturnView() {
           </div>
         )}
       </div>
+    </section>
+  );
+}
+
+function ReservationsView() {
+  const headers = useCirculationAuth();
+  const { showToast } = useToast();
+  const [stats, setStats] = useState<CirculationStats | null>(null);
+  const [reservations, setReservations] = useState<CirculationReservation[]>([]);
+  const [readerSearch, setReaderSearch] = useState('');
+  const [readerOption, setReaderOption] = useState<ReservationOption | null>(null);
+  const [bookSearch, setBookSearch] = useState('');
+  const [bookOption, setBookOption] = useState<ReservationOption | null>(null);
+  const [reservationSearch, setReservationSearch] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [statsRes, reservationRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/circulation/reservations`, { headers }),
+      ]);
+      const [statsJson, reservationJson] = await Promise.all([
+        parseApiResponse<ApiResult<CirculationStats>>(statsRes),
+        parseApiResponse<ApiResult<CirculationReservation[]>>(reservationRes),
+      ]);
+      if (!statsRes.ok || !statsJson?.success) throw new Error(statsJson?.error || 'Không tải được thống kê.');
+      if (!reservationRes.ok || !reservationJson?.success) throw new Error(reservationJson?.error || 'Không tải được đặt chỗ.');
+      setStats(statsJson.data ?? null);
+      setReservations(reservationJson.data ?? []);
+      setError(null);
+    } catch (caught) {
+      const message = errorMessage(caught, 'Không tải được dữ liệu đặt chỗ.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được dữ liệu đặt chỗ', message });
+    } finally {
+      setLoading(false);
+    }
+  }, [headers, showToast]);
+
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+
+  const filteredReservations = reservations.filter((item) => {
+    const query = reservationSearch.trim().toLocaleLowerCase();
+    return !query
+      || item.readerName.toLocaleLowerCase().includes(query)
+      || item.bookTitle.toLocaleLowerCase().includes(query);
+  });
+
+  const post = async (url: string, body?: object) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}${url}`, {
+        method: 'POST',
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const result = await parseApiResponse<ApiResult<unknown>>(response);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Thao tác thất bại.');
+      const successMessage = result.meta?.message || 'Đã cập nhật.';
+      setMessage(successMessage);
+      showToast({ type: 'success', title: 'Cập nhật thành công', message: successMessage });
+      await load();
+      return true;
+    } catch (caught) {
+      const message = errorMessage(caught, 'Thao tác thất bại.');
+      setError(message);
+      showToast({ type: 'error', title: 'Thao tác thất bại', message });
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="circ-page circ-page--reservations">
+      <Chrome tab="reservations" stats={stats} loading={loading} />
+      {message && <p className="circ-banner is-ok">{message}</p>}
+      {error && <p className="circ-banner is-err">{error}</p>}
+      <section className="circ-card circ-reservation-create">
+        <div className="circ-reservation-intro">
+          <span className="circ-reservation-intro__icon"><Bookmark size={21} /></span>
+          <div>
+            <span className="circ-reservation-eyebrow">QUẢN LÝ HÀNG ĐỢI</span>
+            <h2>Tạo đặt chỗ tại quầy</h2>
+            <p>Tìm đúng độc giả và đầu sách để thêm yêu cầu vào hàng đợi.</p>
+          </div>
+        </div>
+        <form
+          className="circ-reservation-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!readerOption || !bookOption) {
+              setError('Chọn độc giả và đầu sách từ danh sách gợi ý trước khi tạo đặt chỗ.');
+              return;
+            }
+            void post('/api/v1/circulation/reservations/by-book', {
+              readerId: readerOption.id,
+              bookId: bookOption.id,
+            }).then((created) => {
+              if (!created) return;
+              setReaderSearch('');
+              setReaderOption(null);
+              setBookSearch('');
+              setBookOption(null);
+            });
+          }}
+        >
+          <ReservationAutocomplete
+            step="01"
+            label="Tên độc giả hoặc mã sinh viên"
+            value={readerSearch}
+            selected={readerOption}
+            placeholder="Nhập tên hoặc mã sinh viên (ví dụ: SE1)"
+            endpoint="reader"
+            onChange={(value) => {
+              setReaderSearch(value);
+              setReaderOption(null);
+              setError(null);
+            }}
+            onSelect={(option) => {
+              setReaderOption(option);
+              setReaderSearch('');
+              setError(null);
+            }}
+            onClear={() => setReaderOption(null)}
+          />
+          <ReservationAutocomplete
+            step="02"
+            label="Tên đầu sách"
+            value={bookSearch}
+            selected={bookOption}
+            placeholder="Nhập tên đầu sách cần đặt trước"
+            endpoint="book"
+            onChange={(value) => {
+              setBookSearch(value);
+              setBookOption(null);
+              setError(null);
+            }}
+            onSelect={(option) => {
+              setBookOption(option);
+              setBookSearch('');
+              setError(null);
+            }}
+            onClear={() => setBookOption(null)}
+          />
+          <div className="circ-reservation-submit">
+            <p className="circ-hint">Chỉ đặt trước khi không còn bản sao có thể mượn. Độc giả được thông báo khi sách sẵn sàng.</p>
+            <button
+              type="submit"
+              className="circ-btn circ-btn--primary"
+              disabled={busy || !readerOption || !bookOption}
+            >
+              {busy ? <LoaderCircle className="spin" size={16} /> : <Bookmark size={16} />}
+              {busy ? 'Đang xử lý...' : 'Tạo đặt chỗ'}
+            </button>
+          </div>
+        </form>
+      </section>
+      <section className="circ-card circ-reservation-queue">
+        <div className="circ-card-head">
+          <div>
+            <h2>Danh sách đặt chỗ đang mở</h2>
+            <p>Quản lý các yêu cầu đang chờ và theo dõi trạng thái phục vụ.</p>
+          </div>
+          <button type="button" className="circ-btn" disabled={loading || busy} onClick={() => void load()}>
+            {loading ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />}
+            {loading ? 'Đang tải...' : 'Làm mới'}
+          </button>
+        </div>
+        <div className="circ-reservation-toolbar">
+          <label className="circ-reservation-search">
+            <Search size={17} aria-hidden="true" />
+            <input
+              value={reservationSearch}
+              onChange={(event) => setReservationSearch(event.target.value)}
+              placeholder="Tìm theo độc giả hoặc đầu sách..."
+              aria-label="Tìm đặt chỗ theo độc giả hoặc đầu sách"
+            />
+          </label>
+          <span>{filteredReservations.length} / {reservations.length} yêu cầu</span>
+        </div>
+        {loading ? (
+          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải đặt chỗ...</p>
+        ) : !reservations.length ? (
+          <p className="circ-empty">Không có đặt chỗ đang mở.</p>
+        ) : !filteredReservations.length ? (
+          <p className="circ-empty">Không có đặt chỗ nào khớp với từ khóa tìm kiếm.</p>
+        ) : (
+          <div className="circ-reservation-list">
+            {filteredReservations.map((item) => (
+              <div className="circ-reserve-row" key={item.id}>
+                <div className="circ-reserve-row__people">
+                  <b>{item.readerName}</b>
+                  <small>{item.bookTitle}</small>
+                </div>
+                <span className={`circ-badge is-${item.status.toLowerCase()}`}>{reservationLabel(item.status)}</span>
+                <small className="circ-reserve-expiry">
+                  {item.expiresAt ? `Hết hạn: ${formatDateTime(item.expiresAt)}` : `Đặt lúc: ${formatDateTime(item.reservedAt)}`}
+                </small>
+                <button
+                  type="button"
+                  className="circ-btn circ-reserve-cancel"
+                  disabled={busy}
+                  onClick={() => void post(`/api/v1/circulation/reservations/${item.id}/cancel`)}
+                >
+                  Hủy đặt
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </section>
   );
 }
@@ -798,7 +1194,6 @@ function OverdueView() {
 
   const draftOf = (item: CirculationIncident): IncidentDraft => drafts[item.id] ?? {
     severity: item.kind === 'Lost' ? 'Lost' : 'Light',
-    amount: '',
     applyOverdue: item.overdueDays > 0,
     notes: '',
   };
@@ -808,16 +1203,17 @@ function OverdueView() {
   };
 
   const recordFine = async (loan: CirculationLoan) => {
-    const suggested = loan.suggestedFine && loan.suggestedFine > 0 ? String(loan.suggestedFine) : '0';
-    const amount = Number(window.prompt('Nhập số tiền phạt (VND). Không tự tạo phạt nếu bạn hủy.', suggested) ?? '0');
-    if (!amount || amount <= 0) return;
+    const preview = loan.suggestedFine && loan.suggestedFine > 0
+      ? `Phí dự kiến theo chính sách: ${formatMoney(loan.suggestedFine)}. Backend sẽ tự tính lại khi ghi nhận.`
+      : 'Backend sẽ lấy phí quá hạn từ chính sách Admin. Thủ thư không nhập số tiền.';
+    if (!window.confirm(`${preview}\nTiếp tục ghi nhận phí quá hạn?`)) return;
     setBusy(true);
     setMessage(null);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/circulation/fines`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ borrowRecordId: loan.id, amount, reason: `Phạt quá hạn ${loan.overdueDays} ngày` }),
+        body: JSON.stringify({ borrowRecordId: loan.id }),
       });
       const json = await parseApiResponse<ApiResult<unknown>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Không ghi nhận được phạt.');
@@ -836,11 +1232,11 @@ function OverdueView() {
 
   const confirmIncident = async (item: CirculationIncident) => {
     const draft = draftOf(item);
-    const amount = Number(draft.amount);
-    if (!amount || amount <= 0) {
-      const message = 'Nhập số tiền sau khi đã đối chiếu bản sao và phiếu mượn. Hệ thống không tự lấy giá sách.';
+    const expectedFee = policyIncidentFee(stats, draft.severity);
+    if (!expectedFee || expectedFee <= 0) {
+      const message = 'Chưa có mức phí trong chính sách Admin. Không ghi nhận số tiền do Thủ thư nhập tay.';
       setError(message);
-      showToast({ type: 'error', title: 'Thông tin chưa hợp lệ', message });
+      showToast({ type: 'error', title: 'Thiếu chính sách phí', message });
       return;
     }
     setBusy(true);
@@ -851,8 +1247,6 @@ function OverdueView() {
         severity: draft.severity,
         applyOverdue: draft.applyOverdue,
         notes: draft.notes,
-        replacementValue: draft.severity === 'Light' ? null : amount,
-        assessedFee: draft.severity === 'Light' ? amount : null,
       };
       const res = await fetch(`${API_BASE_URL}/api/v1/circulation/incidents/${item.id}/confirm`, {
         method: 'POST',
@@ -956,12 +1350,12 @@ function OverdueView() {
       </div>
       <div className="circ-card">
         <h2>Hư hỏng & thất lạc</h2>
-        <p className="circ-hint">Không ghi nhận mất sách hay bồi thường khi độc giả tự báo. Thủ thư đối chiếu bản sao, phiếu mượn rồi xác nhận. Hư hỏng nhẹ tính phí theo mức độ; hư hỏng nặng hoặc mất sách mới mua đền. Không tự khóa tài khoản.</p>
+        <p className="circ-hint">Không ghi nhận mất sách hay bồi thường khi độc giả tự báo. Thủ thư đối chiếu bản sao, phiếu mượn rồi xác nhận. Phí sách hỏng và sách mất lấy từ chính sách Admin, không nhập tay. Không tự khóa tài khoản.</p>
         {loading ? (
           <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải hồ sơ sự cố...</p>
         ) : !incidents.length ? <p className="circ-empty">Chưa có hồ sơ mất sách hoặc hư hỏng.</p> : incidents.map((item) => {
           const draft = draftOf(item);
-          const amount = Number(draft.amount) || 0;
+          const amount = policyIncidentFee(stats, draft.severity);
           const overdue = draft.applyOverdue ? (item.suggestedOverdueFine ?? 0) : 0;
           const pending = item.status === 'PendingReview';
           return (
@@ -990,10 +1384,11 @@ function OverdueView() {
                       <option value="Lost">Mất sách, bồi thường giá trị tài liệu</option>
                     </select>
                   </label>
-                  <label className="circ-field">
-                    {draft.severity === 'Light' ? 'Mức phí theo độ hư hỏng (VND)' : 'Giá trị bồi thường / mua đền (VND)'}
-                    <input type="number" min={1} value={draft.amount} onChange={(e) => patchDraft(item.id, item, { amount: e.target.value })} placeholder="Thủ thư nhập sau khi xác minh" />
-                  </label>
+                  <p className="circ-hint">
+                    {amount > 0
+                      ? `Phí dự kiến theo chính sách Admin: ${formatMoney(amount)}${overdue ? ` + quá hạn ${formatMoney(overdue)} = ${formatMoney(amount + overdue)}` : ''}. Backend tự tính khi xác nhận.`
+                      : 'Chưa cấu hình phí sách hỏng/mất. Admin hãy vào Chính sách > Phí phạt.'}
+                  </p>
                   <label className="circ-check">
                     <input type="checkbox" checked={draft.applyOverdue} onChange={(e) => patchDraft(item.id, item, { applyOverdue: e.target.checked })} disabled={item.overdueDays <= 0} />
                     Cộng phạt quá hạn {item.suggestedOverdueFine ? formatMoney(item.suggestedOverdueFine) : '(chưa có mức trong chính sách)'}
@@ -1002,11 +1397,8 @@ function OverdueView() {
                     Biên bản / ghi chú xác minh
                     <input value={draft.notes} onChange={(e) => patchDraft(item.id, item, { notes: e.target.value })} placeholder="Đã đối chiếu bản sao và phiếu mượn" />
                   </label>
-                  {amount > 0 && (
-                    <p className="circ-hint">Tạm tính: {formatMoney(amount)}{overdue ? ` + ${formatMoney(overdue)} = ${formatMoney(amount + overdue)}` : ''}. Đây không phải mức cố định cho mọi trường hợp.</p>
-                  )}
                   <div className="circ-actions">
-                    <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void confirmIncident(item)}>Xác nhận bồi thường</button>
+                    <button type="button" className="circ-btn circ-btn--primary" disabled={busy || amount <= 0} onClick={() => void confirmIncident(item)}>Xác nhận bồi thường</button>
                     <button type="button" className="circ-btn" disabled={busy} onClick={() => void rejectIncident(item)}>Từ chối / tìm thấy sách</button>
                     <Link className="circ-btn" to={tabPath('fines')}>Xem phí</Link>
                   </div>
@@ -1169,6 +1561,7 @@ function FinesView() {
 const VIEWS = {
   loans: LoansView,
   return: ReturnView,
+  reservations: ReservationsView,
   overdue: OverdueView,
   fines: FinesView,
 };

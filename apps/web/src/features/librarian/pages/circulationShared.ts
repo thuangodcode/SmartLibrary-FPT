@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 
-export type CirculationTab = 'loans' | 'return' | 'overdue' | 'fines';
+export type CirculationTab = 'loans' | 'return' | 'reservations' | 'overdue' | 'fines';
 
 export interface CirculationStats {
   borrowed: number;
@@ -14,6 +14,9 @@ export interface CirculationStats {
   unpaidFinesDelta: number;
   dueSoon: number;
   suggestedFinePerDay: number;
+  borrowDays: number;
+  damageFee: number;
+  lostFee: number;
 }
 
 export interface CirculationLoan {
@@ -88,10 +91,12 @@ export interface CirculationFine {
 
 export interface CirculationReservation {
   id: string;
+  bookId: string;
   readerName: string;
   bookTitle: string;
   status: string;
   reservedAt: string;
+  expiresAt?: string | null;
 }
 
 export interface CirculationActivity {
@@ -140,7 +145,14 @@ export const TABS = [
     to: '/librarian/circulation/return',
     label: 'Trả sách',
     crumb: 'Trả sách',
-    description: 'Ghi nhận trả sách, tình trạng bản sao và đặt chỗ khi sách sẵn sàng.',
+    description: 'Ghi nhận trả sách và tình trạng của bản sao.',
+  },
+  {
+    id: 'reservations',
+    to: '/librarian/circulation/reservations',
+    label: 'Đặt chỗ',
+    crumb: 'Đặt chỗ',
+    description: 'Theo dõi hàng đợi đặt trước và thông báo độc giả khi sách sẵn sàng.',
   },
   {
     id: 'overdue',
@@ -163,7 +175,7 @@ export function tabPath(tab: CirculationTab) {
 }
 
 export function isCirculationTab(value?: string): value is CirculationTab {
-  return value === 'loans' || value === 'return' || value === 'overdue' || value === 'fines';
+  return value === 'loans' || value === 'return' || value === 'reservations' || value === 'overdue' || value === 'fines';
 }
 
 export function formatDate(value?: string | null) {

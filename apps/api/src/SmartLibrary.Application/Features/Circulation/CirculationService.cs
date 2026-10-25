@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Circulation.DTOs;
 using SmartLibrary.Application.Interfaces;
@@ -21,7 +22,36 @@ public class CirculationService
     public async Task<CirculationStatsDto> GetStatsAsync(CancellationToken ct = default)
     {
         var settings = await _repository.GetSettingsAsync(ct);
-        return await _repository.GetStatsAsync(settings.FinePerDay, ct);
+        var stats = await _repository.GetStatsAsync(settings.FinePerDay, ct);
+        stats.BorrowDays = CirculationRules.BorrowDays(settings, null);
+        stats.DamageFee = settings.DamageFee;
+        stats.LostFee = settings.LostFee;
+        return stats;
+    }
+
+    public async Task<int> GetBorrowableCopyCountAsync(Guid bookId, CancellationToken ct = default)
+    {
+        var available = await _repository.CountAvailableCopiesAsync(bookId, ct);
+        var held = await _repository.CountReadyReservationsAsync(bookId, Guid.Empty, ct);
+        return Math.Max(0, available - held);
+    }
+
+    public Task<IReadOnlyList<CirculationReaderOptionDto>> SearchReaderOptionsAsync(
+        string? search, CancellationToken ct = default)
+    {
+        var query = search?.Trim();
+        return string.IsNullOrWhiteSpace(query) || query.Length < 2
+            ? Task.FromResult<IReadOnlyList<CirculationReaderOptionDto>>([])
+            : _repository.SearchReaderOptionsAsync(query, 8, ct);
+    }
+
+    public Task<IReadOnlyList<CirculationBookOptionDto>> SearchBookOptionsAsync(
+        string? search, CancellationToken ct = default)
+    {
+        var query = search?.Trim();
+        return string.IsNullOrWhiteSpace(query) || query.Length < 2
+            ? Task.FromResult<IReadOnlyList<CirculationBookOptionDto>>([])
+            : _repository.SearchBookOptionsAsync(query, 8, ct);
     }
 
     public async Task<CirculationLoanListDto> GetLoansAsync(
@@ -66,7 +96,7 @@ public class CirculationService
         var settings = await _repository.GetSettingsAsync(ct);
         var safePage = page < 1 ? 1 : page;
         var safeSize = pageSize < 1 ? 8 : Math.Min(pageSize, 50);
-        var (items, total) = await _repository.GetLoansForReaderAsync(readerId, safePage, safeSize, settings.FinePerDay, ct);
+        var (items, total) = await _repository.GetLoansForReaderAsync(readerId, safePage, safeSize, settings, ct);
         return Result<CirculationLoanListDto>.Success(new CirculationLoanListDto
         {
             Items = items,
@@ -119,6 +149,10 @@ public class CirculationService
             var readerError = await CheckReaderAsync(currentReader, currentSettings, DateTime.UtcNow, ct);
             if (readerError is not null)
                 return Result<CirculationLoanDto>.Failure(readerError);
+            var borrowDays = CirculationRules.BorrowDays(currentSettings, copy.Book?.Language);
+            var missingDays = CirculationRules.MissingBorrowDays(borrowDays);
+            if (missingDays is not null)
+                return Result<CirculationLoanDto>.Failure(missingDays);
             if (!await _repository.TryClaimCopyAsync(copy.Id, ct))
                 return Result<CirculationLoanDto>.Failure("Bản sao vừa được người khác mượn. Thử lại với bản sao khác.");
 
@@ -131,7 +165,7 @@ public class CirculationService
                 LibrarianId = librarianId == Guid.Empty ? null : librarianId,
                 Status = BorrowStatus.Borrowed,
                 BorrowDate = now,
-                DueDate = now.AddDays(CirculationRules.BorrowDays(currentSettings, copy.Book?.Language)),
+                DueDate = now.AddDays(borrowDays),
                 Notes = "Thủ thư lập phiếu tại quầy."
             };
             await _repository.AddLoanAsync(loan, ct);
@@ -187,6 +221,8 @@ public class CirculationService
                     ? "Phiếu này đã được trả. Không xử lý lần thứ hai."
                     : "Phiếu này không thể trả.");
 
+            if (loan.BookCopy is not null)
+                await _repository.LockReservationBookAsync(loan.BookCopy.BookId, ct);
             var now = DateTime.UtcNow;
             var condition = ParseCondition(request.Condition);
             var overdueDays = CirculationRules.CalendarOverdueDays(loan.DueDate, now);
@@ -202,13 +238,17 @@ public class CirculationService
 
             var incidentOpened = false;
             decimal? createdFine = null;
+            Reservation? readyReservation = null;
             if (isLostOrDamaged)
                 incidentOpened = await OpenIncidentIfNeededAsync(loan, condition, librarianId, ct);
             else
                 createdFine = await AddOverdueFineIfNeededAsync(loan, overdueDays, settings.FinePerDay, ct);
 
             if (loan.BookCopy is { IsAvailable: true })
-                await ReadyNextReservationAsync(loan.BookCopy.BookId, settings, ct);
+            {
+                await _unitOfWork.SaveChangesAsync(ct);
+                readyReservation = await ReadyNextReservationAsync(loan.BookCopy.BookId, settings, ct);
+            }
 
             await NotifyAsync(loan.ReaderId,
                 incidentOpened ? "Hồ sơ mất/hỏng sách" : "Đã trả sách",
@@ -223,7 +263,10 @@ public class CirculationService
             {
                 CreatedFineAmount = createdFine,
                 OverdueDays = overdueDays,
-                IncidentOpened = incidentOpened
+                IncidentOpened = incidentOpened,
+                ReadyReservationReaderId = readyReservation?.ReaderId,
+                ReadyReservationBookId = readyReservation?.BookId,
+                ReadyReservationBookTitle = readyReservation?.Book.Title
             });
         }, ct);
     }
@@ -317,11 +360,15 @@ public class CirculationService
                 await _unitOfWork.SaveChangesAsync(ct);
                 return Result<CirculationLoanDto>.Failure(readerError);
             }
+            var borrowDays = CirculationRules.BorrowDays(settings, loan.BookCopy.Book.Language);
+            var missingDays = CirculationRules.MissingBorrowDays(borrowDays);
+            if (missingDays is not null)
+                return Result<CirculationLoanDto>.Failure(missingDays);
 
             loan.Status = BorrowStatus.Borrowed;
             loan.LibrarianId = librarianId == Guid.Empty ? loan.LibrarianId : librarianId;
             loan.BorrowDate = now;
-            loan.DueDate = now.AddDays(CirculationRules.BorrowDays(settings, loan.BookCopy.Book.Language));
+            loan.DueDate = now.AddDays(borrowDays);
             await CompleteReservationAsync(loan.ReaderId, loan.BookCopy.BookId, now, ct);
             var student = string.IsNullOrWhiteSpace(reader.StudentId) ? "Chưa có mã sinh viên" : reader.StudentId;
             await NotifyAsync(loan.ReaderId, "Đã hoàn tất mượn sách",
@@ -358,45 +405,84 @@ public class CirculationService
         Guid loanId, Guid actorId, bool byLibrarian, CancellationToken ct = default)
     {
         await ExpireAndReadyReservationsAsync(ct);
-        var settings = await _repository.GetSettingsAsync(ct);
-        var loan = await _repository.GetTrackedLoanAsync(loanId, ct);
-        if (loan is null)
-            return Result<CirculationLoanDto>.Failure("Không tìm thấy phiếu mượn.");
-        if (loan.Status is not (BorrowStatus.Borrowed or BorrowStatus.Overdue))
-            return Result<CirculationLoanDto>.Failure("Chỉ gia hạn phiếu đang mượn.");
-        if (!byLibrarian && actorId != loan.ReaderId)
-            return Result<CirculationLoanDto>.Failure("Bạn chỉ được gia hạn phiếu của mình.");
-        if (!byLibrarian && settings.RestrictIfUnpaid && await _repository.HasUnpaidFinesAsync(loan.ReaderId, ct))
-            return Result<CirculationLoanDto>.Failure("Còn phí chưa thanh toán nên chưa được tự gia hạn.");
+        return await _repository.InTransactionAsync(async () =>
+        {
+            await _repository.LockBorrowRequestAsync(loanId, ct);
+            var loan = await _repository.GetTrackedLoanAsync(loanId, ct);
+            if (loan is null)
+                return Result<CirculationLoanDto>.Failure("Không tìm thấy phiếu mượn.");
+            await _repository.ReloadTrackedLoanAsync(loanId, ct);
+            if (loan.Status is not (BorrowStatus.Borrowed or BorrowStatus.Overdue))
+                return Result<CirculationLoanDto>.Failure("Chỉ gia hạn phiếu đang mượn.");
+            if (!byLibrarian && actorId != loan.ReaderId)
+                return Result<CirculationLoanDto>.Failure("Bạn chỉ được gia hạn phiếu của mình.");
 
-        var now = DateTime.UtcNow;
-        var bookId = loan.BookCopy?.BookId ?? Guid.Empty;
-        var error = CirculationRules.ValidateRenewal(
-            settings,
-            loan.RenewalCount,
-            loan.DueDate,
-            now,
-            byLibrarian,
-            CirculationRules.CalendarOverdueDays(loan.DueDate, now) > 0,
-            bookId != Guid.Empty && await _repository.HasOtherReservationAsync(bookId, loan.ReaderId, ct),
-            CirculationRules.IsTextbook(loan.BookCopy?.Book?.Categories?.Select(x => x.Name)));
-        if (error is not null)
-            return Result<CirculationLoanDto>.Failure(error);
+            var settings = await _repository.GetSettingsAsync(ct);
+            var hasUnpaidFines = !byLibrarian && settings.RestrictIfUnpaid
+                && await _repository.HasUnpaidFinesAsync(loan.ReaderId, ct);
 
-        var days = CirculationRules.RenewalDays(settings, loan.BookCopy?.Book.Language);
-        var oldDue = loan.DueDate;
-        var baseDate = loan.DueDate.HasValue && loan.DueDate.Value > now ? loan.DueDate.Value : now;
-        loan.DueDate = baseDate.AddDays(days);
-        loan.RenewalCount += 1;
-        loan.Status = BorrowStatus.Borrowed;
-        loan.Notes = AppendNote(loan.Notes, byLibrarian
-            ? $"Thủ thư gia hạn lần {loan.RenewalCount}: {FormatDue(oldDue)} → {FormatDue(loan.DueDate)}, +{days} ngày."
-            : $"Tự gia hạn lần {loan.RenewalCount}: {FormatDue(oldDue)} → {FormatDue(loan.DueDate)}, +{days} ngày.");
-        if (byLibrarian && actorId != Guid.Empty)
-            loan.LibrarianId = actorId;
+            var now = DateTime.UtcNow;
+            var bookId = loan.BookCopy?.BookId ?? Guid.Empty;
+            if (bookId != Guid.Empty)
+                await _repository.LockReservationBookAsync(bookId, ct);
+            var hasOtherReservation = bookId != Guid.Empty
+                && await _repository.HasOtherReservationAsync(bookId, loan.ReaderId, ct);
+            var error = CirculationRules.ValidateRenewal(
+                settings,
+                loan.RenewalCount,
+                loan.DueDate,
+                now,
+                byLibrarian,
+                CirculationRules.CalendarOverdueDays(loan.DueDate, now) > 0,
+                hasOtherReservation,
+                CirculationRules.IsTextbook(loan.BookCopy?.Book?.Categories?.Select(x => x.Name)),
+                hasUnpaidFines);
+            if (error is not null)
+                return Result<CirculationLoanDto>.Failure(error);
 
-        await _unitOfWork.SaveChangesAsync(ct);
-        return Result<CirculationLoanDto>.Success((await _repository.GetLoanAsync(loan.Id, settings.FinePerDay, ct))!);
+            var days = CirculationRules.RenewalDays(settings, loan.BookCopy?.Book.Language);
+            var missingDays = CirculationRules.MissingRenewalDays(days);
+            if (missingDays is not null)
+                return Result<CirculationLoanDto>.Failure(missingDays);
+            var oldDue = loan.DueDate;
+            var baseDate = loan.DueDate.HasValue && loan.DueDate.Value > now ? loan.DueDate.Value : now;
+            loan.DueDate = baseDate.AddDays(days);
+            loan.RenewalCount += 1;
+            loan.Status = BorrowStatus.Borrowed;
+            loan.Notes = AppendNote(loan.Notes, byLibrarian
+                ? $"Thủ thư gia hạn lần {loan.RenewalCount}: {FormatDue(oldDue)} → {FormatDue(loan.DueDate)}, +{days} ngày."
+                : $"Tự gia hạn lần {loan.RenewalCount}: {FormatDue(oldDue)} → {FormatDue(loan.DueDate)}, +{days} ngày.");
+            if (byLibrarian && actorId != Guid.Empty)
+                loan.LibrarianId = actorId;
+
+            await NotifyAsync(loan.ReaderId, "Đã gia hạn sách",
+                $"“{loan.BookCopy?.Book?.Title}” đã được gia hạn đến {FormatDue(loan.DueDate)}.",
+                "renewal", ct, entityId: loan.Id);
+
+            await _unitOfWork.SaveChangesAsync(ct);
+            var updated = await _repository.GetLoanAsync(loan.Id, settings.FinePerDay, ct);
+            if (updated is null)
+                return Result<CirculationLoanDto>.Failure("Không đọc được phiếu sau khi gia hạn.");
+            if (byLibrarian)
+                return Result<CirculationLoanDto>.Success(updated);
+
+            var renewedAt = DateTime.UtcNow;
+            var unavailableReason = CirculationRules.ValidateRenewal(
+                settings,
+                loan.RenewalCount,
+                loan.DueDate,
+                renewedAt,
+                byLibrarian: false,
+                CirculationRules.CalendarOverdueDays(loan.DueDate, renewedAt) > 0,
+                hasOtherReservation,
+                updated.RequiresApproval,
+                hasUnpaidFines);
+            return Result<CirculationLoanDto>.Success(updated with
+            {
+                CanRenew = unavailableReason is null,
+                RenewalUnavailableReason = unavailableReason
+            });
+        }, ct);
     }
 
     public async Task<IReadOnlyList<CirculationLoanDto>> GetOverdueAsync(CancellationToken ct = default)
@@ -405,27 +491,44 @@ public class CirculationService
         return await _repository.GetOverdueAsync(settings.FinePerDay, ct);
     }
 
-    public Task MarkOverdueAsync(CancellationToken ct = default)
-        => _repository.MarkOverdueAsync(ct);
+    public async Task<IReadOnlyList<CirculationReminderDto>> MarkOverdueAsync(CancellationToken ct = default)
+    {
+        var newlyOverdue = await _repository.MarkOverdueAsync(ct);
+        foreach (var loan in newlyOverdue)
+        {
+            await NotifyAsync(loan.ReaderId, "Sách đã quá hạn",
+                $"“{loan.BookTitle}” đã quá hạn trả. Vui lòng hoàn trả sách sớm để tránh phát sinh thêm phí.",
+                "overdue", ct, entityId: loan.EntityId);
+        }
+        if (newlyOverdue.Count > 0)
+            await _unitOfWork.SaveChangesAsync(ct);
+        return newlyOverdue;
+    }
 
     public Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct = default)
         => _repository.GetFinesAsync(search, status, ct);
 
     public async Task<Result<CirculationFineDto>> RecordFineAsync(RecordFineRequest request, CancellationToken ct = default)
     {
-        if (request.Amount <= 0)
-            return Result<CirculationFineDto>.Failure("Số tiền phạt phải lớn hơn 0.");
-
         var loan = await _repository.GetTrackedLoanAsync(request.BorrowRecordId, ct);
         if (loan is null)
             return Result<CirculationFineDto>.Failure("Không tìm thấy phiếu mượn.");
 
-        var reason = string.IsNullOrWhiteSpace(request.Reason) ? CirculationRules.OverdueReasonPrefix : request.Reason.Trim();
+        var settings = await _repository.GetSettingsAsync(ct);
+        if (settings.FinePerDay <= 0)
+            return Result<CirculationFineDto>.Failure("Chưa cấu hình phí quá hạn. Admin hãy vào Chính sách > Phí phạt và đặt overdue_fee_per_day.");
+
+        var overdueDays = CirculationRules.CalendarOverdueDays(loan.DueDate, DateTime.UtcNow);
+        if (overdueDays <= 0)
+            return Result<CirculationFineDto>.Failure("Phiếu này chưa quá hạn nên không ghi nhận phí quá hạn.");
+
+        var reason = $"{CirculationRules.OverdueReasonPrefix} {overdueDays} ngày";
         var duplicate = await FineDuplicateErrorAsync(loan.Id, reason, ct);
         if (duplicate is not null)
             return Result<CirculationFineDto>.Failure(duplicate);
 
-        var fine = NewFine(loan.Id, loan.ReaderId, decimal.Round(request.Amount, 0), reason);
+        var amount = CirculationRules.OverdueFineAmount(overdueDays, settings.FinePerDay);
+        var fine = NewFine(loan.Id, loan.ReaderId, amount, reason);
         await _repository.AddFineAsync(fine, ct);
         await NotifyAsync(loan.ReaderId, "Khoản phí mới", $"Thư viện đã ghi nhận khoản phí {fine.Amount:0}đ. {fine.Reason}", "fine", ct);
         await _unitOfWork.SaveChangesAsync(ct);
@@ -445,6 +548,9 @@ public class CirculationService
         fine.Status = FineStatus.Paid;
         fine.PaidAt = DateTime.UtcNow;
         await TryResolveIncidentAfterPaymentAsync(fine.Id, ct);
+        await NotifyAsync(fine.ReaderId, "Đã thanh toán khoản phí",
+            $"Khoản phí {fine.Amount:0}đ đã được ghi nhận thanh toán.",
+            "fine_paid", ct, entityId: fine.Id);
         await _unitOfWork.SaveChangesAsync(ct);
         return Result<CirculationFineDto>.Success((await _repository.GetFineDtoAsync(id, ct))!);
     }
@@ -469,7 +575,7 @@ public class CirculationService
                 return Result<CirculationIncidentDto>.Failure("Không tìm thấy hồ sơ mất/hỏng sách.");
 
             var error = CirculationRules.ValidateIncidentConfirmation(
-                incident.Kind, incident.Status, severity, request.ReplacementValue, request.AssessedFee);
+                incident.Kind, incident.Status, severity, settings.DamageFee, settings.LostFee);
             if (error is not null)
                 return Result<CirculationIncidentDto>.Failure(error);
             if (await _repository.HasCompensationFineAsync(incident.BorrowRecordId, ct) || incident.CompensationFineId.HasValue)
@@ -481,7 +587,7 @@ public class CirculationService
                 incident.Kind = BookIncidentKind.Lost;
 
             var now = DateTime.UtcNow;
-            var compensation = CirculationRules.CompensationAmount(severity, request.ReplacementValue, request.AssessedFee);
+            var compensation = CirculationRules.PolicyFee(settings, severity);
             var compensationFine = NewFine(
                 incident.BorrowRecordId, incident.ReaderId, compensation,
                 CirculationRules.CompensationReason(severity), $"incident:{incident.Id}");
@@ -502,8 +608,8 @@ public class CirculationService
             }
 
             incident.Severity = severity;
-            incident.ReplacementValue = severity == BookIncidentSeverity.Light ? null : request.ReplacementValue;
-            incident.AssessedFee = severity == BookIncidentSeverity.Light ? request.AssessedFee : null;
+            incident.ReplacementValue = severity == BookIncidentSeverity.Light ? null : compensation;
+            incident.AssessedFee = severity == BookIncidentSeverity.Light ? compensation : null;
             incident.IncludeOverdue = overdueFine is not null;
             incident.CompensationFineId = compensationFine.Id;
             incident.OverdueFineId = overdueFine?.Id;
@@ -548,6 +654,10 @@ public class CirculationService
             : request.Notes.Trim());
         if (request.RestoreCopy && incident.BookCopy != null)
             SetCopyAvailability(incident.BookCopy, BookCondition.Good, true);
+
+        await NotifyAsync(incident.ReaderId, "Hồ sơ sự cố đã được từ chối",
+            $"Thư viện đã đối chiếu và từ chối trách nhiệm mất/hỏng đối với “{incident.BookCopy?.Book?.Title}”.",
+            "return", ct, entityId: incident.BorrowRecordId);
 
         await _unitOfWork.SaveChangesAsync(ct);
         var settings = await _repository.GetSettingsAsync(ct);
@@ -627,6 +737,119 @@ public class CirculationService
         Guid readerId, string? barcode, CancellationToken ct = default)
         => CreateReservationCoreAsync(readerId.ToString(), barcode, ct);
 
+    public async Task<Result<CirculationReservationDto>> CreateLibrarianReservationAsync(
+        CreateLibrarianReservationRequest request, CancellationToken ct = default)
+    {
+        if (request.ReaderId == Guid.Empty || request.BookId == Guid.Empty)
+            return Result<CirculationReservationDto>.Failure("Chọn độc giả và đầu sách hợp lệ.");
+
+        await ExpireAndReadyReservationsAsync(ct);
+        var settings = await _repository.GetSettingsAsync(ct);
+        if (!settings.AllowReservation)
+            return Result<CirculationReservationDto>.Failure("Chính sách hiện không cho đặt trước.");
+        var title = await _repository.GetBookTitleAsync(request.BookId, ct);
+        if (title is null)
+            return Result<CirculationReservationDto>.Failure("Không tìm thấy đầu sách.");
+
+        return await _repository.InTransactionAsync(async () =>
+        {
+            await _repository.LockReservationBookAsync(request.BookId, ct);
+            var reader = await _repository.FindReaderAccountAsync(request.ReaderId, ct);
+            if (reader is null)
+                return Result<CirculationReservationDto>.Failure("Không tìm thấy độc giả.");
+            var accountError = CirculationRules.ValidateBorrower(
+                reader.Status, reader.IsActive, reader.MembershipExpiresAt, DateTime.UtcNow);
+            if (accountError is not null)
+                return Result<CirculationReservationDto>.Failure(accountError);
+            if (await _repository.HasOpenReservationAsync(request.ReaderId, request.BookId, ct))
+                return Result<CirculationReservationDto>.Failure("Độc giả đã có yêu cầu đặt trước cho sách này.");
+            if (await _repository.HasActiveLoanForBookAsync(request.ReaderId, request.BookId, ct))
+                return Result<CirculationReservationDto>.Failure("Độc giả đã có phiếu mượn đang mở cho sách này.");
+
+            var available = await _repository.CountAvailableCopiesAsync(request.BookId, ct);
+            var held = await _repository.CountReadyReservationsAsync(request.BookId, Guid.Empty, ct);
+            if (available > held)
+                return Result<CirculationReservationDto>.Failure("Sách vẫn còn bản sao có thể mượn, không cần đặt trước.");
+
+            var reservation = new Reservation
+            {
+                ReaderId = request.ReaderId,
+                BookId = request.BookId,
+                Status = CirculationRules.ReservationPending,
+                ReservedAt = DateTime.UtcNow,
+                Notes = "Đặt trước khi không còn bản sao có thể mượn."
+            };
+            await _repository.AddReservationAsync(reservation, ct);
+            await NotifyAsync(request.ReaderId, "Đã đặt trước",
+                $"Đã ghi nhận đặt trước “{title}”. Bạn sẽ được thông báo khi sách sẵn sàng để gửi yêu cầu mượn.",
+                "reservation", ct);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            var saved = (await _repository.GetReservationsForReaderAsync(request.ReaderId, ct))
+                .FirstOrDefault(item => item.Id == reservation.Id);
+            return saved is null
+                ? Result<CirculationReservationDto>.Failure("Không đọc được đặt chỗ vừa tạo.")
+                : Result<CirculationReservationDto>.Success(saved);
+        }, ct);
+    }
+
+    public async Task<Result<CirculationReservationDto>> CreateMyReservationForBookAsync(
+        Guid readerId, Guid bookId, CancellationToken ct = default)
+    {
+        if (readerId == Guid.Empty || bookId == Guid.Empty)
+            return Result<CirculationReservationDto>.Failure("Không xác định được độc giả hoặc sách.");
+
+        await ExpireAndReadyReservationsAsync(ct);
+        var settings = await _repository.GetSettingsAsync(ct);
+        if (!settings.AllowReservation)
+            return Result<CirculationReservationDto>.Failure("Chính sách hiện không cho đặt trước.");
+
+        var title = await _repository.GetBookTitleAsync(bookId, ct);
+        if (title is null)
+            return Result<CirculationReservationDto>.Failure("Không tìm thấy đầu sách.");
+
+        return await _repository.InTransactionAsync(async () =>
+        {
+            await _repository.LockReservationBookAsync(bookId, ct);
+            var reader = await _repository.FindReaderAsync(readerId.ToString(), ct);
+            if (reader is null)
+                return Result<CirculationReservationDto>.Failure("Không tìm thấy độc giả.");
+            var accountError = CirculationRules.ValidateBorrower(
+                reader.Status, reader.IsActive, reader.MembershipExpiresAt, DateTime.UtcNow);
+            if (accountError is not null)
+                return Result<CirculationReservationDto>.Failure(accountError);
+            if (await _repository.HasOpenReservationAsync(readerId, bookId, ct))
+                return Result<CirculationReservationDto>.Failure("Bạn đã có yêu cầu đặt trước cho sách này.");
+            if (await _repository.HasActiveLoanForBookAsync(readerId, bookId, ct))
+                return Result<CirculationReservationDto>.Failure("Bạn đã có phiếu mượn đang mở cho sách này.");
+
+            var available = await _repository.CountAvailableCopiesAsync(bookId, ct);
+            var held = await _repository.CountReadyReservationsAsync(bookId, Guid.Empty, ct);
+            if (available > held)
+                return Result<CirculationReservationDto>.Failure("Sách vẫn còn bản sao có thể mượn. Hãy gửi yêu cầu mượn sách.");
+
+            var reservation = new Reservation
+            {
+                ReaderId = readerId,
+                BookId = bookId,
+                Status = CirculationRules.ReservationPending,
+                ReservedAt = DateTime.UtcNow,
+                Notes = "Độc giả đặt trước khi không còn bản sao có thể mượn."
+            };
+            await _repository.AddReservationAsync(reservation, ct);
+            await NotifyAsync(readerId, "Đã đặt trước",
+                $"Đã ghi nhận đặt trước “{title}”. Bạn sẽ được thông báo khi sách sẵn sàng để gửi yêu cầu mượn.",
+                "reservation", ct);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            var saved = (await _repository.GetReservationsForReaderAsync(readerId, ct))
+                .FirstOrDefault(item => item.Id == reservation.Id);
+            return saved is null
+                ? Result<CirculationReservationDto>.Failure("Không đọc được đặt trước vừa tạo.")
+                : Result<CirculationReservationDto>.Success(saved);
+        }, ct);
+    }
+
     public async Task<Result<bool>> CancelReservationAsync(Guid id, Guid actorId, bool byLibrarian, CancellationToken ct = default)
     {
         var reservation = await _repository.GetTrackedReservationAsync(id, ct);
@@ -640,6 +863,9 @@ public class CirculationService
         var bookId = reservation.BookId;
         var wasReady = reservation.Status == CirculationRules.ReservationReady;
         reservation.Status = CirculationRules.ReservationCancelled;
+        await NotifyAsync(reservation.ReaderId, "Đã hủy đặt trước",
+            $"Yêu cầu đặt trước “{reservation.Book?.Title}” đã được hủy.",
+            "reservation", ct, href: $"/books/{reservation.BookId}", entityId: reservation.Id);
         await _unitOfWork.SaveChangesAsync(ct);
         if (wasReady)
         {
@@ -796,40 +1022,14 @@ public class CirculationService
     private async Task<Result<CirculationReservationDto>> CreateReservationCoreAsync(
         string? readerKeyRaw, string? barcodeRaw, CancellationToken ct)
     {
-        await ExpireAndReadyReservationsAsync(ct);
-        var settings = await _repository.GetSettingsAsync(ct);
-        if (!settings.AllowReservation)
-            return Result<CirculationReservationDto>.Failure("Chính sách hiện không cho đặt trước.");
-
         var reader = await _repository.FindReaderAsync(readerKeyRaw?.Trim() ?? string.Empty, ct);
         if (reader is null)
             return Result<CirculationReservationDto>.Failure("Không tìm thấy độc giả.");
-        var accountError = CirculationRules.ValidateBorrower(reader.Status, reader.IsActive, reader.MembershipExpiresAt, DateTime.UtcNow);
-        if (accountError is not null)
-            return Result<CirculationReservationDto>.Failure(accountError);
-
         var copy = await _repository.FindCopyByBarcodeAsync(barcodeRaw?.Trim() ?? string.Empty, ct);
         if (copy is null)
             return Result<CirculationReservationDto>.Failure("Không tìm thấy sách theo mã vạch.");
-        if (await _repository.HasOpenReservationAsync(reader.Id, copy.BookId, ct))
-            return Result<CirculationReservationDto>.Failure("Độc giả đã có yêu cầu đặt trước cho sách này.");
-
-        var reservation = new Reservation
-        {
-            ReaderId = reader.Id,
-            BookId = copy.BookId,
-            Status = CirculationRules.ReservationPending,
-            ReservedAt = DateTime.UtcNow,
-            Notes = "Đặt trước theo sách, không giữ một bản sao cụ thể cho đến khi đến lượt nhận."
-        };
-        await _repository.AddReservationAsync(reservation, ct);
-        await NotifyAsync(reader.Id, "Đã đặt trước",
-            $"Đã ghi nhận đặt trước “{copy.Book.Title}”. Bạn sẽ được báo khi đến lượt nhận.", "reservation", ct);
-        await _unitOfWork.SaveChangesAsync(ct);
-        var saved = (await _repository.GetReservationsAsync(ct)).FirstOrDefault(x => x.Id == reservation.Id);
-        return saved is null
-            ? Result<CirculationReservationDto>.Failure("Không đọc được đặt trước vừa tạo.")
-            : Result<CirculationReservationDto>.Success(saved);
+        return await CreateLibrarianReservationAsync(
+            new CreateLibrarianReservationRequest(reader.Id, copy.BookId), ct);
     }
 
     private async Task<string?> CheckReaderAsync(
@@ -911,24 +1111,34 @@ public class CirculationService
     private async Task ExpireAndReadyReservationsAsync(CancellationToken ct)
     {
         var settings = await _repository.GetSettingsAsync(ct);
-        var expiredBooks = await _repository.ExpireReadyReservationsAsync(ct);
-        foreach (var bookId in expiredBooks)
+        var expiredReservations = await _repository.ExpireReadyReservationsAsync(ct);
+        foreach (var reservation in expiredReservations)
+        {
+            await NotifyAsync(reservation.ReaderId, "Đặt trước đã hết hạn",
+                $"Thời gian giữ “{reservation.BookTitle}” đã kết thúc. Bạn có thể đặt trước lại nếu vẫn cần sách.",
+                "reservation", ct, href: $"/books/{reservation.BookId}", entityId: reservation.Id);
+        }
+        foreach (var bookId in expiredReservations.Select(item => item.BookId).Distinct())
             await ReadyNextReservationAsync(bookId, settings, ct);
-        if (expiredBooks.Count > 0)
+        if (expiredReservations.Count > 0)
             await _unitOfWork.SaveChangesAsync(ct);
     }
 
-    private async Task ReadyNextReservationAsync(Guid bookId, CirculationSettings settings, CancellationToken ct)
+    public Task ProcessReservationExpirationsAsync(CancellationToken ct = default)
+        => ExpireAndReadyReservationsAsync(ct);
+
+    private async Task<Reservation?> ReadyNextReservationAsync(Guid bookId, CirculationSettings settings, CancellationToken ct)
     {
-        if (bookId == Guid.Empty) return;
+        if (bookId == Guid.Empty) return null;
         var available = await _repository.CountAvailableCopiesAsync(bookId, ct);
-        if (available <= 0) return;
+        if (available <= 0) return null;
         var ready = await _repository.CountReadyReservationsAsync(bookId, Guid.Empty, ct);
-        if (available <= ready) return;
+        if (available <= ready) return null;
         var next = await _repository.ReadyNextReservationAsync(bookId, CirculationRules.PickupHours(settings), ct);
-        if (next is null) return;
+        if (next is null) return null;
         await NotifyAsync(next.ReaderId, "Sách sẵn sàng nhận",
-            $"“{next.Book.Title}” đã sẵn sàng. Hãy nhận trước {next.ExpiresAt:dd/MM/yyyy HH:mm}.", "reservation", ct);
+            $"“{next.Book.Title}” đã sẵn sàng. Hãy gửi yêu cầu mượn trước {next.ExpiresAt:dd/MM/yyyy HH:mm}.", "reservation", ct);
+        return next;
     }
 
     private async Task CompleteReservationAsync(Guid readerId, Guid bookId, DateTime now, CancellationToken ct)
@@ -955,13 +1165,31 @@ public class CirculationService
         incident.Description = AppendNote(incident.Description, "Đã thanh toán bồi thường. Không tự mở khóa tài khoản nếu còn hạn chế khác.");
     }
 
-    private Task NotifyAsync(Guid userId, string title, string message, string type, CancellationToken ct)
+    private Task NotifyAsync(
+        Guid userId,
+        string title,
+        string message,
+        string type,
+        CancellationToken ct,
+        string? href = null,
+        Guid? entityId = null)
         => _repository.AddNotificationAsync(new Notification
         {
             UserId = userId,
             Title = title,
             Message = message,
-            Type = type
+            Type = type,
+            Metadata = JsonSerializer.Serialize(new
+            {
+                href = href ?? type switch
+                {
+                    "borrow" or "return" or "renewal" or "due_soon" or "overdue" => "/history?tab=loans",
+                    "fine" or "fine_paid" => "/history?tab=fines",
+                    "reservation" => "/books",
+                    _ => (string?)null
+                },
+                entityId
+            })
         }, ct);
 
     private static Fine NewFine(Guid loanId, Guid readerId, decimal amount, string reason, string? notes = null)

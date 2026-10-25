@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowDownToLine, BookOpen, CalendarDays, ChartNoAxesCombined, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardList, Eye, FileSpreadsheet, Filter, LoaderCircle, Plus, Search, Trash2, UsersRound, WalletCards, X } from 'lucide-react';
+import { AlertCircle, ArrowDownToLine, BadgeCheck, BookOpen, CalendarDays, ChartNoAxesCombined, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardList, Clock3, Eye, FileSpreadsheet, Filter, LoaderCircle, Plus, Search, Send, Trash2, UsersRound, WalletCards, X } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import './AdminReportsPage.css';
 import './AdminReportsExperience.css';
+import './AdminAssignments.css';
 
 interface ApiEnvelope<T> { success?: boolean; data?: T; error?: string }
 interface Summary { from: string; to: string; borrowed: number; returned: number; returnedOnTimeRate: number; borrowedChangePercent: number; returnedChangePercent: number; fineRevenue: number; fineTransactions: number; fineChangePercent: number; libraryVisits: number | null; libraryVisitsAvailable: boolean }
@@ -48,6 +49,7 @@ const AdminReportsPage: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [requests, setRequests] = useState<ReportRequest[]>([]);
+  const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'waiting' | 'review' | 'approved'>('all');
   const [librarians, setLibrarians] = useState<Librarian[]>([]);
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -205,6 +207,18 @@ const AdminReportsPage: React.FC = () => {
   };
 
   const selectedRequestTemplate = templates.find((template) => template.id === requestTemplateId);
+  const assignmentCounts = useMemo(() => ({
+    all: requests.length,
+    waiting: requests.filter((request) => request.status !== 'Submitted' || request.lastReportStatus === 'Rejected').length,
+    review: requests.filter((request) => request.status === 'Submitted' && !['Approved', 'Rejected'].includes(request.lastReportStatus ?? '')).length,
+    approved: requests.filter((request) => request.lastReportStatus === 'Approved').length,
+  }), [requests]);
+  const visibleRequests = useMemo(() => requests.filter((request) => {
+    if (assignmentFilter === 'waiting') return request.status !== 'Submitted' || request.lastReportStatus === 'Rejected';
+    if (assignmentFilter === 'review') return request.status === 'Submitted' && !['Approved', 'Rejected'].includes(request.lastReportStatus ?? '');
+    if (assignmentFilter === 'approved') return request.lastReportStatus === 'Approved';
+    return true;
+  }), [assignmentFilter, requests]);
 
   const exportCsv = async (reportId?: string) => {
     try {
@@ -264,9 +278,46 @@ const AdminReportsPage: React.FC = () => {
     { label: 'Đang chờ thu', value: money(pendingFineAmount), note: `${number(pendingFines.length)} khoản chưa thanh toán`, icon: WalletCards, tone: 'orange' },
   ] : [];
 
-  return <div className="reports-page">
-    <div className="reports-heading"><div><p className="reports-eyebrow">QUẢN TRỊ HỆ THỐNG</p><h1>{sectionDetails[activeSection].title}</h1><p>{sectionDetails[activeSection].description}</p></div><div className="reports-actions">{activeSection === 'assignments' && <button type="button" className="reports-button primary" onClick={() => setRequestFormOpen((open) => !open)}><Plus size={16}/> Giao báo cáo cho Thủ thư</button>}{['activity', 'finance'].includes(activeSection) && <button type="button" className="reports-button secondary" onClick={() => void exportCsv()}><FileSpreadsheet size={16}/> Xuất CSV</button>}</div></div>
+  return <div className={`reports-page${activeSection === 'assignments' ? ' reports-page-assignments' : ''}`}>
+    {activeSection === 'assignments' ? (
+      <header className="admin-assignments-hero">
+        <div className="admin-assignments-hero-copy">
+          <p className="reports-eyebrow">TRUNG TÂM ĐIỀU HÀNH · QUẢN TRỊ</p>
+          <h1>Điều phối báo cáo</h1>
+          <p>Giao đúng người, theo dõi tiến độ và kiểm soát các báo cáo cần duyệt trên một màn hình.</p>
+        </div>
+        <div className="admin-assignments-hero-aside">
+          <span><UsersRound size={17}/> Phạm vi quản lý</span>
+          <strong>Toàn bộ Thủ thư</strong>
+          <button type="button" className="reports-button primary" onClick={() => setRequestFormOpen((open) => !open)}><Plus size={16}/> Tạo yêu cầu báo cáo</button>
+        </div>
+      </header>
+    ) : (
+      <div className="reports-heading"><div><p className="reports-eyebrow">QUẢN TRỊ HỆ THỐNG</p><h1>{sectionDetails[activeSection].title}</h1><p>{sectionDetails[activeSection].description}</p></div><div className="reports-actions">{['activity', 'finance'].includes(activeSection) && <button type="button" className="reports-button secondary" onClick={() => void exportCsv()}><FileSpreadsheet size={16}/> Xuất CSV</button>}</div></div>
+    )}
     {error && <div className="reports-error" role="alert"><AlertCircle size={18}/><span>{error}</span><button onClick={() => void load()} type="button">Thử lại</button></div>}
+    {activeSection === 'assignments' && <section className="admin-assignment-overview" aria-label="Tổng quan tiến độ báo cáo">
+      <article className="admin-assignment-metric">
+        <span className="admin-assignment-metric-icon total"><ClipboardList size={18}/></span>
+        <div><strong>{assignmentCounts.all}</strong><span>Tổng yêu cầu</span></div>
+        <small>Tất cả kỳ báo cáo đã giao</small>
+      </article>
+      <article className="admin-assignment-metric">
+        <span className="admin-assignment-metric-icon waiting"><Clock3 size={18}/></span>
+        <div><strong>{assignmentCounts.waiting}</strong><span>Chờ Thủ thư gửi</span></div>
+        <small>Chưa có báo cáo nộp lên</small>
+      </article>
+      <article className="admin-assignment-metric">
+        <span className="admin-assignment-metric-icon review"><Eye size={18}/></span>
+        <div><strong>{assignmentCounts.review}</strong><span>Chờ Admin duyệt</span></div>
+        <small>Đã gửi, cần xem xét</small>
+      </article>
+      <article className="admin-assignment-metric">
+        <span className="admin-assignment-metric-icon approved"><BadgeCheck size={18}/></span>
+        <div><strong>{assignmentCounts.approved}</strong><span>Đã hoàn tất</span></div>
+        <small>Báo cáo đã được duyệt</small>
+      </article>
+    </section>}
     {activeSection === 'assignments' && requestFormOpen && <section className="reports-panel reports-assignment-form-panel">
       <div className="reports-panel-title"><div><span>GIAO VIỆC CHO THỦ THƯ</span><h2>Tạo yêu cầu nộp báo cáo</h2></div><button className="reports-icon-button" type="button" onClick={() => setRequestFormOpen(false)} aria-label="Đóng biểu mẫu"><X size={18}/></button></div>
       <p className="reports-assignment-help">Chọn một Thủ thư, mẫu/loại báo cáo và kỳ cần tổng hợp. Yêu cầu sẽ xuất hiện trong trang Quản lý báo cáo của Thủ thư được chỉ định.</p>
@@ -281,15 +332,37 @@ const AdminReportsPage: React.FC = () => {
       {(!librarians.length || !templates.length) && <p className="reports-assignment-empty-hint">{!librarians.length ? 'Không tìm thấy Thủ thư đang hoạt động để giao việc.' : 'Chưa có mẫu báo cáo đang bật để giao.'}</p>}
     </section>}
     {activeSection === 'assignments' && <section className="reports-panel reports-assignment-panel">
-      <div className="reports-panel-title"><div><span>THEO DÕI GIAO VIỆC</span><h2>Yêu cầu báo cáo từ Admin</h2></div><span className="reports-assignment-count"><ClipboardList size={15}/>{requests.filter((request) => request.status !== 'Submitted').length} đang chờ</span></div>
+      <div className="reports-panel-title admin-assignment-panel-heading"><div><span>GIÁM SÁT VÀ PHÊ DUYỆT</span><h2>Tiến độ các yêu cầu báo cáo</h2><p>Kiểm tra người phụ trách, kỳ báo cáo và trạng thái xử lý hiện tại.</p></div><span className="reports-assignment-count"><ClipboardList size={15}/>{assignmentCounts.waiting + assignmentCounts.review} cần xử lý</span></div>
+      <div className="admin-assignment-filters" role="group" aria-label="Lọc yêu cầu báo cáo">
+        {([
+          ['all', 'Tất cả', assignmentCounts.all],
+          ['waiting', 'Chờ gửi', assignmentCounts.waiting],
+          ['review', 'Chờ duyệt', assignmentCounts.review],
+          ['approved', 'Đã duyệt', assignmentCounts.approved],
+        ] as const).map(([filter, label, count]) => (
+          <button key={filter} type="button" className={assignmentFilter === filter ? 'active' : ''} aria-pressed={assignmentFilter === filter} onClick={() => setAssignmentFilter(filter)}>
+            {label}<span>{count}</span>
+          </button>
+        ))}
+      </div>
       {requestError ? <div className="reports-error" role="alert"><AlertCircle size={17}/><span>{requestError}</span><button type="button" onClick={() => void loadAssignmentData()}>Thử lại</button></div>
-        : requests.length ? <div className="reports-assignment-list">{requests.map((request) => <article key={request.id}>
-          <div className="reports-assignment-person"><strong>{request.librarianName}</strong><span>Thủ thư được chỉ định</span></div>
-          <div className="reports-assignment-summary"><strong>{request.name || request.templateName}</strong><span>{reportTypeLabel(request.reportType)} · {request.templateName}</span></div>
-          <div className="reports-assignment-period"><strong>{date(request.periodStart)} – {date(requestedEndDate(request.periodEnd))}</strong><span>Kỳ báo cáo</span></div>
-          <span className={`reports-assignment-status ${request.status === 'Submitted' ? 'is-submitted' : request.lastReportStatus === 'Rejected' ? 'is-rejected' : ''}`}>{request.lastReportStatus === 'Approved' ? 'Đã duyệt' : request.status === 'Submitted' ? 'Đã nộp · chờ duyệt' : request.lastReportStatus === 'Rejected' ? 'Cần Thủ thư nộp lại' : 'Chờ Thủ thư nộp'}</span>
-          {request.reportId ? <Link className="reports-assignment-link" to={`/admin/reports/${request.reportId}`}><Eye size={15}/> Xem báo cáo</Link> : <span className="reports-assignment-date">Giao {date(request.createdAt)}</span>}
-        </article>)}</div> : <div className="reports-assignment-empty"><ClipboardList size={22}/><strong>Chưa có yêu cầu báo cáo</strong><span>Dùng “Giao báo cáo cho Thủ thư” để chỉ định người phụ trách và loại báo cáo.</span></div>}
+        : visibleRequests.length ? <div className="reports-assignment-list">{visibleRequests.map((request) => {
+          const approved = request.lastReportStatus === 'Approved';
+          const submitted = request.status === 'Submitted';
+          const rejected = request.lastReportStatus === 'Rejected';
+          return <article key={request.id}>
+            <div className="reports-assignment-person"><span className="admin-assignment-avatar"><UsersRound size={17}/></span><div><strong>{request.librarianName}</strong><span>Thủ thư phụ trách</span></div></div>
+            <div className="reports-assignment-summary"><strong>{request.name || request.templateName}</strong><span>{reportTypeLabel(request.reportType)} · {request.templateName}</span></div>
+            <div className="reports-assignment-period"><strong><CalendarDays size={14}/>{date(request.periodStart)} – {date(requestedEndDate(request.periodEnd))}</strong><span>Kỳ báo cáo</span></div>
+            <div className="admin-assignment-statuses">
+              {approved ? <span className="reports-assignment-status is-approved"><BadgeCheck size={13}/>Đã duyệt</span>
+                : submitted ? <><span className="reports-assignment-status is-submitted"><Send size={13}/>Đã gửi</span><span className="reports-assignment-status is-review"><Clock3 size={13}/>{rejected ? 'Cần chỉnh sửa' : 'Chờ duyệt'}</span></>
+                  : <span className={`reports-assignment-status ${rejected ? 'is-rejected' : 'is-waiting'}`}><Clock3 size={13}/>{rejected ? 'Cần nộp lại' : 'Chờ gửi'}</span>}
+            </div>
+            <div className="admin-assignment-row-action">{request.reportId ? <Link className="reports-assignment-link" to={`/admin/reports/${request.reportId}`}><Eye size={15}/> Mở báo cáo</Link> : <span className="reports-assignment-date">Giao {date(request.createdAt)}</span>}</div>
+            {request.lastReviewComment && rejected && <p className="admin-assignment-feedback"><strong>Phản hồi gần nhất:</strong> {request.lastReviewComment}</p>}
+          </article>;
+        })}</div> : <div className="reports-assignment-empty"><ClipboardList size={22}/><strong>{requests.length ? 'Không có yêu cầu trong trạng thái này' : 'Chưa có yêu cầu báo cáo'}</strong><span>{requests.length ? 'Chọn một trạng thái khác để xem thêm yêu cầu.' : 'Tạo yêu cầu để giao báo cáo cho Thủ thư và theo dõi tiến độ tại đây.'}</span></div>}
     </section>}
     {sectionCards.length > 0 && <section className={`reports-kpis reports-kpis-section${activeSection === 'finance' ? ' reports-finance-kpis' : ''}`} aria-label="Chỉ số báo cáo">{loading && !summary ? Array.from({ length: 3 }, (_, i) => <div className="reports-card skeleton" key={i}/>) : (activeSection === 'finance' ? financeCards : sectionCards).map(({ label, value, note, icon: Icon, tone }) => <article className="reports-card" key={label}><span className={`reports-icon ${tone}`}><Icon size={19}/></span><div className="reports-card-value">{value}</div><h2>{label}</h2><p>{note}</p></article>)}</section>}
     {activeSection === 'finance' && <section className="reports-panel reports-finance-panel">
@@ -304,7 +377,7 @@ const AdminReportsPage: React.FC = () => {
     {activeSection === 'periodic' && <section className="reports-panel reports-tab-empty"><ChartNoAxesCombined size={22}/><h2>Chưa có dữ liệu báo cáo định kỳ</h2><p>Các báo cáo định kỳ sẽ hiển thị tại đây khi có dữ liệu.</p></section>}
     {activeSection === 'library' && <section className="reports-panel report-list-panel"><div className="reports-panel-title"><div><span>GỬI TỪ THỦ THƯ</span><h2>Danh sách báo cáo</h2></div></div><div className="reports-filters"><label className="reports-search"><Search size={17}/><input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Tìm tên hoặc mã báo cáo" aria-label="Tìm báo cáo"/></label><label className="reports-select"><CalendarDays size={15}/><input type="month" value={query.get('month') ?? ''} onChange={(event) => updateQuery('month', event.target.value)} aria-label="Lọc theo tháng"/></label><label className="reports-select"><Filter size={15}/><select value={query.get('status') ?? ''} onChange={(event) => updateQuery('status', event.target.value)} aria-label="Lọc trạng thái"><option value="">Tất cả trạng thái</option><option value="Ready">Sẵn sàng</option><option value="Processing">Đang xử lý</option><option value="Error">Lỗi</option></select></label><label className="reports-select"><FileSpreadsheet size={15}/><select value={query.get('format') ?? ''} onChange={(event) => updateQuery('format', event.target.value)} aria-label="Lọc định dạng"><option value="">Mọi định dạng</option><option value="CSV">CSV</option><option value="PDF">PDF</option></select></label></div>
       {selected.length > 0 && <div className="reports-bulk"><span>Đã chọn {selected.length} báo cáo</span><div><button type="button" onClick={() => void exportSelected()}><ArrowDownToLine size={15}/> Tải CSV</button><button type="button" onClick={() => setConfirmDelete(selected)}><Trash2 size={15}/> Xóa đã chọn</button></div></div>}
-      <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th><input type="checkbox" aria-label="Chọn tất cả báo cáo" checked={!!reports?.items.length && selected.length === reports.items.length} onChange={(event) => setSelected(event.target.checked ? reports?.items.map((x) => x.id) ?? [] : [])}/></th><th>Báo cáo</th><th>Ngày gửi</th><th>Định dạng</th><th>Trạng thái duyệt</th><th>Hành động</th></tr></thead><tbody>{loading && !reports ? <tr><td colSpan={6} className="reports-table-empty"><LoaderCircle className="reports-spin" size={20}/> Đang tải báo cáo…</td></tr> : reports?.items.length ? reports.items.map((item) => <tr key={item.id} className="report-row-clickable" onClick={() => navigate(`/admin/reports/${item.id}`)}><td onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label={`Chọn báo cáo ${item.code}`} checked={selected.includes(item.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))}/></td><td><Link to={`/admin/reports/${item.id}`} className="report-title-link"><strong>{item.name}</strong></Link><small>{item.code} · {item.submitter}</small></td><td>{date(item.createdAt)}</td><td><span className="format-pill">{item.format}</span></td><td><span className={`status-pill ${item.isApproved ? 'approved' : item.isRejected || item.status === 'Rejected' ? 'rejected' : 'unapproved'}`}>{item.isApproved ? 'Đã duyệt' : item.isRejected || item.status === 'Rejected' ? 'Yêu cầu chỉnh sửa' : 'Chưa duyệt'}</span><small>{item.isViewed ? 'Đã xem' : item.status === 'Ready' ? 'Chờ xem' : item.status}</small></td><td className="report-row-actions" onClick={(e) => e.stopPropagation()}><Link to={`/admin/reports/${item.id}`} aria-label={`Xem ${item.code}`} title="Xem chi tiết &amp; mẫu báo cáo"><Eye size={16}/></Link><button type="button" aria-label={`Tải ${item.code} dưới dạng CSV`} onClick={() => void exportCsv(item.id)}><ArrowDownToLine size={16}/></button><button type="button" aria-label={`Xóa ${item.code}`} onClick={() => setConfirmDelete([item.id])}><Trash2 size={16}/></button></td></tr>) : <tr><td colSpan={6} className="reports-table-empty">Chưa có báo cáo nào phù hợp với bộ lọc.</td></tr>}</tbody></table></div>
+      <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th><input type="checkbox" aria-label="Chọn tất cả báo cáo" checked={!!reports?.items.length && selected.length === reports.items.length} onChange={(event) => setSelected(event.target.checked ? reports?.items.map((x) => x.id) ?? [] : [])}/></th><th>Báo cáo</th><th>Ngày gửi</th><th>Định dạng</th><th>Trạng thái duyệt</th><th>Hành động</th></tr></thead><tbody>{loading && !reports ? <tr><td colSpan={6} className="reports-table-empty"><LoaderCircle className="reports-spin" size={20}/> Đang tải báo cáo…</td></tr> : reports?.items.length ? reports.items.map((item) => <tr key={item.id} className="report-row-clickable" onClick={() => navigate(`/admin/reports/${item.id}`)}><td onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label={`Chọn báo cáo ${item.code}`} checked={selected.includes(item.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))}/></td><td><Link to={`/admin/reports/${item.id}`} className="report-title-link"><strong>{item.name}</strong></Link><small>{item.code} · {item.submitter}</small></td><td>{date(item.createdAt)}</td><td><span className="format-pill">{item.format}</span></td><td><span className={`status-pill ${item.isApproved ? 'approved' : item.isRejected || item.status === 'Rejected' ? 'rejected' : 'unapproved'}`}>{item.isApproved ? 'Đã duyệt' : item.isRejected || item.status === 'Rejected' ? 'Yêu cầu chỉnh sửa' : 'Chờ duyệt'}</span><small className={!item.isApproved && !item.isRejected && item.status !== 'Rejected' ? 'report-delivery-note' : ''}>{item.isApproved ? 'Admin đã duyệt chính thức' : item.isRejected || item.status === 'Rejected' ? 'Cần Thủ thư cập nhật' : <><span>Đã gửi</span> · {item.isViewed ? 'Đã xem' : 'Chờ xem'}</>}</small></td><td className="report-row-actions" onClick={(e) => e.stopPropagation()}><Link to={`/admin/reports/${item.id}`} aria-label={`Xem ${item.code}`} title="Xem chi tiết &amp; mẫu báo cáo"><Eye size={16}/></Link><button type="button" aria-label={`Tải ${item.code} dưới dạng CSV`} onClick={() => void exportCsv(item.id)}><ArrowDownToLine size={16}/></button><button type="button" aria-label={`Xóa ${item.code}`} onClick={() => setConfirmDelete([item.id])}><Trash2 size={16}/></button></td></tr>) : <tr><td colSpan={6} className="reports-table-empty">Chưa có báo cáo nào phù hợp với bộ lọc.</td></tr>}</tbody></table></div>
       {selected.length > 0 && <div className="reports-bulk"><span>Đã chọn {selected.length} báo cáo</span><div><button type="button" onClick={() => void exportSelected()}><ArrowDownToLine size={15}/> Tải CSV</button><button type="button" onClick={() => setConfirmDelete(selected)}><Trash2 size={15}/> Xóa đã chọn</button></div></div>}
       <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th><input type="checkbox" aria-label="Chọn tất cả báo cáo" checked={!!reports?.items.length && selected.length === reports.items.length} onChange={(event) => setSelected(event.target.checked ? reports?.items.map((x) => x.id) ?? [] : [])}/></th><th>Báo cáo</th><th>Ngày gửi</th><th>Định dạng</th><th>Trạng thái duyệt</th><th>Hành động</th></tr></thead><tbody>{loading && !reports ? <tr><td colSpan={6} className="reports-table-empty"><LoaderCircle className="reports-spin" size={20}/> Đang tải báo cáo…</td></tr> : reports?.items.length ? reports.items.map((item) => <tr key={item.id} className="report-row-clickable" onClick={() => navigate(`/admin/reports/${item.id}`)}><td onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label={`Chọn báo cáo ${item.code}`} checked={selected.includes(item.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))}/></td><td><Link to={`/admin/reports/${item.id}`} className="report-title-link"><strong>{item.name}</strong></Link><small>{item.code} · {item.submitter}</small></td><td>{date(item.createdAt)}</td><td><span className="format-pill">{item.format}</span></td><td><span className={`status-pill ${item.isApproved ? 'approved' : item.isRejected || item.status === 'Rejected' ? 'rejected' : 'unapproved'}`}>{item.isApproved ? 'Đã duyệt' : item.isRejected || item.status === 'Rejected' ? 'Yêu cầu chỉnh sửa' : 'Chưa duyệt'}</span><small>{item.isViewed ? 'Đã xem' : item.status === 'Ready' ? 'Chờ xem' : item.status}</small></td><td className="report-row-actions" onClick={(e) => e.stopPropagation()}><Link to={`/admin/reports/${item.id}`} aria-label={`Xem ${item.code}`} title="Xem chi tiết &amp; mẫu báo cáo"><Eye size={16}/></Link><button type="button" aria-label={`Tải ${item.code} dưới dạng CSV`} onClick={() => void exportCsv(item.id)}><ArrowDownToLine size={16}/></button><button type="button" aria-label={`Xóa ${item.code}`} onClick={() => setConfirmDelete([item.id])}><Trash2 size={16}/></button></td></tr>) : <tr><td colSpan={6} className="reports-table-empty">Chưa có báo cáo nào phù hợp với bộ lọc.</td></tr>}</tbody></table></div>
       <div className="reports-pagination"><span>Hiển thị {reports?.totalCount ? (page - 1) * (reports?.pageSize ?? 8) + 1 : 0}-{Math.min(page * (reports?.pageSize ?? 8), reports?.totalCount ?? 0)} trong {number(reports?.totalCount ?? 0)} báo cáo</span><div><button type="button" aria-label="Trang trước" disabled={page <= 1} onClick={() => updateQuery('page', String(page - 1))}><ChevronLeft size={16}/></button><span>Trang {page} / {reports?.totalPages ?? 1}</span><button type="button" aria-label="Trang sau" disabled={page >= (reports?.totalPages ?? 1)} onClick={() => updateQuery('page', String(page + 1))}><ChevronRight size={16}/></button></div></div>

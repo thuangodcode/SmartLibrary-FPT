@@ -4,6 +4,7 @@ import { parseApiResponse } from '../../lib/api';
 export interface AiProviderStatus {
   id: string;
   hasApiKey: boolean;
+  apiKey?: string | null;
   apiKeyLast4: string | null;
   chatModel: string | null;
   embeddingModel: string | null;
@@ -16,6 +17,7 @@ export interface AiProviderStatus {
 
 export interface AiSettingsStatus {
   hasApiKey: boolean;
+  apiKey?: string | null;
   apiKeyLast4: string | null;
   provider: string;
   chatModel: string;
@@ -206,7 +208,7 @@ export const saveMyAiSettings = (token: string, payload: Record<string, unknown>
     body: JSON.stringify(payload),
   });
 
-export const useMyAiForLibrary = (token: string) =>
+export const markMyAiForLibrary = (token: string) =>
   callApi<AiSettingsStatus>(token, '/api/v1/ai/my-settings/use-for-library', { method: 'POST' });
 
 export const setLibrarianAiAccountEnabled = (token: string, userId: string, isEnabled: boolean) =>

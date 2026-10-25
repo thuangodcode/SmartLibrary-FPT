@@ -40,6 +40,7 @@ import AdminReportTemplateDetailPage from './features/admin/pages/AdminReportTem
 import AdminRegulationsPage from './features/admin/pages/AdminRegulationsPage';
 import ProfilePage from './features/profile/pages/ProfilePage';
 import HistoryPage from './features/profile/pages/HistoryPage';
+import ReaderFavoritesPage from './features/home/pages/ReaderFavoritesPage';
 import SupportPage from './features/profile/pages/SupportPage';
 import LibrarianSupportPage from './features/librarian/pages/LibrarianSupportPage';
 import { useAuthStore } from './features/auth/store/useAuthStore';
@@ -81,6 +82,11 @@ function App() {
       <Route path="/history" element={
         <RoleGuard allowedRoles={['Reader']}>
           <HistoryPage />
+        </RoleGuard>
+      } />
+      <Route path="/favorites" element={
+        <RoleGuard allowedRoles={['Reader']}>
+          <ReaderFavoritesPage />
         </RoleGuard>
       } />
       <Route path="/support" element={

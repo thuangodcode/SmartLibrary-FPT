@@ -129,45 +129,121 @@ export const CHIP_ORDER = ['All', ...Object.keys(TYPE_LABELS)];
 
 export const DEFAULT_PARAMS: Record<PolicyType, PolicyParameter[]> = {
   BorrowLimit: [
-    { key: 'max_books', value: '10', label: 'Hạn mức chung (fallback)' },
-    { key: 'max_books_student', value: '10', label: 'Hạn mức sinh viên (tham khảo, có thể cấu hình)' },
-    { key: 'max_books_lecturer', value: '20', label: 'Hạn mức cán bộ/giảng viên (tham khảo, có thể cấu hình)' },
+    { key: 'max_books', value: '', label: 'Hạn mức chung (cuốn)' },
+    { key: 'max_books_student', value: '', label: 'Hạn mức sinh viên (cuốn)' },
+    { key: 'max_books_lecturer', value: '', label: 'Hạn mức cán bộ/giảng viên (cuốn)' },
     { key: 'block_if_overdue', value: 'true', label: 'Chặn mượn khi còn sách quá hạn' },
     { key: 'exception_note', value: '', label: 'Lưu ý / ngoại lệ' },
   ],
   BorrowDuration: [
-    { key: 'max_days', value: '14', label: 'Số ngày mượn fallback' },
-    { key: 'max_days_vi', value: '7', label: 'Sách tiếng Việt (ngày, tham khảo)' },
-    { key: 'max_days_foreign', value: '14', label: 'Sách ngoại văn/song ngữ (ngày, tham khảo)' },
+    { key: 'max_days', value: '', label: 'Số ngày mượn theo chính sách' },
+    { key: 'max_days_vi', value: '', label: 'Sách tiếng Việt (chỉ dùng khi chưa đặt số ngày chung)' },
+    { key: 'max_days_foreign', value: '', label: 'Sách ngoại văn (chỉ dùng khi chưa đặt số ngày chung)' },
   ],
   Renewal: [
-    { key: 'max_renewals', value: '4', label: 'Số lần gia hạn tối đa (tham khảo, có thể cấu hình)' },
-    { key: 'renewal_days_vi', value: '7', label: 'Số ngày gia hạn sách tiếng Việt' },
-    { key: 'renewal_days_foreign', value: '14', label: 'Số ngày gia hạn sách ngoại văn' },
-    { key: 'self_renew_before_days', value: '1', label: 'Tự gia hạn trước hạn (ngày)' },
-    { key: 'self_renew_after_days', value: '1', label: 'Tự gia hạn sau hạn (ngày)' },
+    { key: 'max_renewals', value: '', label: 'Số lần gia hạn tối đa' },
+    { key: 'renewal_days', value: '', label: 'Số ngày mỗi lần gia hạn' },
+    { key: 'renewal_days_vi', value: '', label: 'Số ngày gia hạn sách tiếng Việt (tùy chọn)' },
+    { key: 'renewal_days_foreign', value: '', label: 'Số ngày gia hạn sách ngoại văn (tùy chọn)' },
+    { key: 'self_renew_before_days', value: '', label: 'Tự gia hạn trước hạn (ngày)' },
+    { key: 'self_renew_after_days', value: '', label: 'Tự gia hạn sau hạn (ngày)' },
     { key: 'block_if_overdue', value: 'true', label: 'Không gia hạn khi quá hạn' },
-    { key: 'block_if_reserved', value: 'false', label: 'Không gia hạn khi có đặt trước (chưa xác nhận FPT HCM)' },
+    { key: 'block_if_reserved', value: 'false', label: 'Không gia hạn khi có đặt trước' },
     { key: 'textbook_requires_approval', value: 'true', label: 'Giáo trình cần thủ thư duyệt gia hạn' },
   ],
   Reservation: [
     { key: 'allow_reservation', value: 'true', label: 'Cho phép đặt trước' },
-    { key: 'hold_hours', value: '48', label: 'Thời gian giữ sách (giờ)' },
-    { key: 'pickup_deadline_hours', value: '24', label: 'Hạn nhận sách (giờ)' },
-    { key: 'pickup_capacity_per_slot', value: '5', label: 'Số lượt nhận tối đa mỗi khung giờ' },
+    { key: 'hold_hours', value: '', label: 'Thời gian giữ sách (giờ)' },
+    { key: 'pickup_deadline_hours', value: '', label: 'Hạn nhận sách (giờ)' },
+    { key: 'pickup_capacity_per_slot', value: '', label: 'Số lượt nhận tối đa mỗi khung giờ' },
   ],
   FineFee: [
-    { key: 'overdue_fee_per_day', value: '5000', label: 'Phạt quá hạn mỗi ngày (VND, có thể cấu hình)' },
+    { key: 'overdue_fee_per_day', value: '', label: 'Phạt quá hạn mỗi ngày (VND)' },
+    { key: 'damage_fee', value: '', label: 'Phí phạt sách hỏng (VND)' },
+    { key: 'lost_book_fee', value: '', label: 'Phí phạt sách mất / hư nặng (VND)' },
     { key: 'restrict_if_unpaid', value: 'true', label: 'Hạn chế mượn khi còn phí chưa thanh toán' },
-    { key: 'lost_book_multiplier', value: '1.5', label: 'Hệ số bồi thường mất sách (không tự áp dụng)' },
   ],
   CategoryOverride: [
-    { key: 'max_books', value: '2', label: 'Số lượng sách tối đa' },
-    { key: 'max_days', value: '7', label: 'Số ngày mượn tối đa' },
+    { key: 'max_books', value: '', label: 'Số lượng sách tối đa' },
+    { key: 'max_days', value: '', label: 'Số ngày mượn tối đa' },
     { key: 'on_site_only', value: 'false', label: 'Chỉ đọc tại chỗ' },
   ],
   Other: [{ key: 'note', value: '', label: 'Lưu ý chính sách' }],
 };
+
+const DAY_KEYS = new Set([
+  'max_days', 'max_days_vi', 'max_days_foreign', 'max_days_en',
+  'renewal_days', 'renewal_days_vi', 'renewal_days_foreign', 'renewal_days_en',
+]);
+const WINDOW_DAY_KEYS = new Set(['self_renew_before_days', 'self_renew_after_days']);
+const HOUR_KEYS = new Set(['hold_hours', 'pickup_deadline_hours', 'pickup_slot_minutes']);
+const COUNT_KEYS = new Set([
+  'max_books', 'max_books_student', 'max_books_lecturer',
+  'max_renewals', 'pickup_capacity_per_slot', 'pickup_days_ahead',
+]);
+const FEE_KEYS = new Set([
+  'overdue_fee_per_day', 'damage_fee', 'damaged_book_fee', 'lost_book_fee', 'lost_fee',
+]);
+const FLAG_KEYS = new Set([
+  'block_if_overdue', 'block_if_reserved', 'restrict_if_unpaid',
+  'allow_reservation', 'textbook_requires_approval', 'on_site_only',
+]);
+
+export type PolicyParamKind = 'integer' | 'boolean' | 'text';
+
+export function paramKind(key: string): PolicyParamKind {
+  if (FLAG_KEYS.has(key) || key.startsWith('block_')) return 'boolean';
+  if (DAY_KEYS.has(key) || WINDOW_DAY_KEYS.has(key) || HOUR_KEYS.has(key) || COUNT_KEYS.has(key) || FEE_KEYS.has(key)) {
+    return 'integer';
+  }
+  return 'text';
+}
+
+export function paramLimits(key: string): { min: number; max: number } {
+  if (WINDOW_DAY_KEYS.has(key)) return { min: 0, max: 365 };
+  if (DAY_KEYS.has(key)) return { min: 1, max: 365 };
+  if (HOUR_KEYS.has(key)) return { min: 1, max: 720 };
+  if (COUNT_KEYS.has(key)) return { min: 1, max: 200 };
+  if (FEE_KEYS.has(key)) return { min: 1, max: 100_000_000 };
+  return { min: 1, max: 365 };
+}
+
+export function paramHint(key: string): string {
+  if (FEE_KEYS.has(key)) return 'Nhập số nguyên dương (VND). Xóa ô rồi gõ số mới nếu cần đổi.';
+  if (DAY_KEYS.has(key) || WINDOW_DAY_KEYS.has(key)) return 'Nhập số nguyên dương. Có thể xóa giá trị cũ rồi nhập số mới.';
+  if (HOUR_KEYS.has(key) || COUNT_KEYS.has(key)) return 'Nhập số nguyên dương hợp lệ.';
+  return '';
+}
+
+function isIntInRange(value: string, min: number, max: number): boolean {
+  if (!/^-?\d+$/.test(value)) return false;
+  const number = Number(value);
+  return Number.isInteger(number) && number >= min && number <= max;
+}
+
+export function validatePolicyForm(form: FormState): string | null {
+  if (!form.name.trim()) return 'Vui lòng nhập tên chính sách.';
+  let hasMaxDays = false;
+  for (const parameter of form.parameters) {
+    const value = parameter.value.trim();
+    if (!value) continue;
+    const kind = paramKind(parameter.key);
+    if (kind === 'integer') {
+      const { min, max } = paramLimits(parameter.key);
+      if (!isIntInRange(value, min, max)) {
+        return `${parameter.label || parameter.key}: nhập số nguyên từ ${min} đến ${max}.`;
+      }
+    }
+    if (kind === 'boolean' && !['true', 'false', '1', '0'].includes(value.toLowerCase())) {
+      return `${parameter.label || parameter.key}: chỉ nhận Có hoặc Không.`;
+    }
+    if (parameter.key === 'max_days') hasMaxDays = true;
+  }
+  if (form.status === 'Active' && form.policyType === 'BorrowDuration' && !hasMaxDays) {
+    return 'Vui lòng nhập số ngày mượn (số nguyên dương).';
+  }
+  return null;
+}
 
 export const emptyForm = (type: PolicyType = 'BorrowLimit'): FormState => ({
   name: '',
@@ -192,7 +268,7 @@ export function formFromDetail(data: PolicyDetail): FormState {
       const configured = data.parameters.find((parameter) => parameter.key === defaultParameter.key);
       return configured
         ? { ...defaultParameter, value: configured.value, label: configured.label ?? defaultParameter.label }
-        : { ...defaultParameter };
+        : { ...defaultParameter, value: '' };
     }).concat(data.parameters
       .filter((parameter) => !DEFAULT_PARAMS[data.policyType].some((defaultParameter) => defaultParameter.key === parameter.key))
       .map((parameter) => ({ key: parameter.key, value: parameter.value, label: parameter.label ?? undefined }))),
@@ -236,6 +312,8 @@ export function buildSummaryCards(parameters: PolicyParameter[]): SummaryCard[] 
   take('max_renewals', 'lần', 'Số lần gia hạn tối đa');
   take('renewal_days', 'ngày', 'Số ngày mỗi lần gia hạn');
   take('overdue_fee_per_day', 'đ/ngày', 'Phạt quá hạn', formatFee);
+  take('damage_fee', 'đ', 'Phí sách hỏng', formatFee);
+  take('lost_book_fee', 'đ', 'Phí sách mất', formatFee);
   take('hold_hours', 'giờ', 'Thời gian giữ sách');
   take('pickup_deadline_hours', 'giờ', 'Hạn nhận sách');
   return cards.slice(0, 3);

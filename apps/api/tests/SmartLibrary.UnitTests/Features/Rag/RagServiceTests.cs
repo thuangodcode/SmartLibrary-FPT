@@ -109,6 +109,197 @@ public class RagServiceTests
     }
 
     [Fact]
+    public async Task AskAsync_EnglishLanguageLearning_UsesSemanticSearchAndOnlyReturnsRelevantCatalogBooks()
+    {
+        EnableReaderAi();
+        _gemini.Setup(item => item.EmbedAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new float[] { 0.1f, 0.2f });
+        _documents.Setup(item => item.SearchCatalogAsync(
+                It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RagSearchHit>
+            {
+                new()
+                {
+                    SourceType = "book",
+                    SourceId = Guid.NewGuid(),
+                    Title = "English Grammar in Use",
+                    Content = "Giáo trình ngữ pháp tiếng Anh.",
+                    Language = "en",
+                    Categories = ["Ngoại ngữ"],
+                    Score = 0.78
+                },
+                new()
+                {
+                    SourceType = "book",
+                    SourceId = Guid.NewGuid(),
+                    Title = "Python nâng cao",
+                    Content = "Giáo trình lập trình Python.",
+                    Language = "en",
+                    Categories = ["Công nghệ thông tin"],
+                    Score = 0.78
+                }
+            });
+        _documents.Setup(item => item.SearchAsync(
+                It.IsAny<float[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RagSearchHit>
+            {
+                new()
+                {
+                    SourceType = "book",
+                    SourceId = Guid.NewGuid(),
+                    Title = "English Vocabulary Builder",
+                    Content = "Sách học từ vựng tiếng Anh.",
+                    Language = "en",
+                    Categories = ["Ngoại ngữ"],
+                    Score = 0.74
+                },
+                new()
+                {
+                    SourceType = "book",
+                    SourceId = Guid.NewGuid(),
+                    Title = "Python nâng cao",
+                    Content = "Giáo trình lập trình Python.",
+                    Language = "en",
+                    Categories = ["Công nghệ thông tin"],
+                    Score = 0.82
+                },
+                new()
+                {
+                    SourceType = "policy",
+                    SourceId = Guid.NewGuid(),
+                    Title = "Chính sách mượn sách",
+                    Content = "Thời hạn mượn sách.",
+                    Score = 0.91
+                }
+            });
+
+        var result = await _sut.AskAsync("Bây giờ tôi muốn học về ngôn ngữ Anh.", "Reader");
+
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.Sources.Select(source => source.Title).Should().BeEquivalentTo(
+            "English Grammar in Use",
+            "English Vocabulary Builder");
+        result.Data.Answer.Should().Contain("Tìm thấy 2 đầu sách");
+        result.Data.Answer.Should().NotContain("Python");
+        result.Data.Sources.Should().OnlyContain(source => source.SourceType == "book");
+        _gemini.Verify(item => item.EmbedAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.Is<string>(text => text.Contains("Tìm sách trong thư viện", StringComparison.Ordinal)),
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _gemini.Verify(item => item.GenerateAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AskAsync_KoreanLanguageLearning_FindsKoreanTitleWithEnglishMetadataLanguage()
+    {
+        EnableReaderAi();
+        _gemini.Setup(item => item.EmbedAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new float[] { 0.1f, 0.2f });
+        _documents.Setup(item => item.SearchCatalogAsync(
+                It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RagSearchHit>
+            {
+                new()
+                {
+                    SourceType = "book",
+                    SourceId = Guid.NewGuid(),
+                    Title = "Integrated Korean: Beginning 1 (2nd Edition)",
+                    Content = "Integrated Korean Beginning 1 textbook.",
+                    Author = "Young-Mee Cho",
+                    Language = "en",
+                    Categories = ["Ngoại ngữ"],
+                    AvailableCopies = 10,
+                    TotalCopies = 10,
+                    Score = 0.78
+                },
+                new()
+                {
+                    SourceType = "book",
+                    SourceId = Guid.NewGuid(),
+                    Title = "English Grammar in Use",
+                    Content = "English grammar textbook.",
+                    Language = "en",
+                    Categories = ["Ngoại ngữ"],
+                    Score = 0.78
+                }
+            });
+        _documents.Setup(item => item.SearchAsync(
+                It.IsAny<float[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<RagSearchHit>());
+
+        var result = await _sut.AskAsync("Tôi muốn tìm sách về ngôn ngữ Hàn", "Reader");
+
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.Sources.Should().ContainSingle(source =>
+            source.Title == "Integrated Korean: Beginning 1 (2nd Edition)");
+        result.Data.Sources.Should().OnlyContain(source => source.SourceType == "book");
+        result.Data.Answer.Should().Contain("Tìm thấy 1 đầu sách");
+    }
+
+    [Fact]
+    public async Task AskAsync_GenericSemanticQuery_KeepsRelevantVectorMatchWithoutExactKeywordOverlap()
+    {
+        EnableReaderAi();
+        _gemini.Setup(item => item.EmbedAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new float[] { 0.1f, 0.2f });
+        _documents.Setup(item => item.SearchAsync(
+                It.IsAny<float[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RagSearchHit>
+            {
+                new()
+                {
+                    SourceType = "book",
+                    SourceId = Guid.NewGuid(),
+                    Title = "Cybersecurity Fundamentals",
+                    Content = "A practical guide to online privacy, identity protection and secure browsing.",
+                    Score = 0.72
+                }
+            });
+
+        var result = await _sut.AskAsync(
+            "Tôi muốn biết cách giữ an toàn thông tin cá nhân khi sử dụng các trang web.",
+            "Reader");
+
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.Sources.Should().ContainSingle(source => source.Title == "Cybersecurity Fundamentals");
+        result.Data.Answer.Should().Contain("Cybersecurity Fundamentals");
+        _gemini.Verify(item => item.GenerateAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task AskAsync_WhenHitsBelowThreshold_OmitsUnrelatedSources()
     {
         _settingsRepository.Setup(item => item.GetOrCreateAsync(It.IsAny<CancellationToken>()))
@@ -461,12 +652,24 @@ public class RagServiceTests
 
         var result = await sut.AskAsync("tìm sách xyzzy-khong-ton-tai", "Reader");
 
-        result.IsSuccess.Should().BeTrue();
-        result.Data!.Sources.Should().BeEmpty();
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("API Key");
         inbox.Verify(item => item.NotifyAiCredentialAsync(
             ownerId,
             It.Is<string>(value => value.Contains("không hợp lệ", StringComparison.Ordinal)),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task AskAsync_ReaderBookSearchWithoutCatalogMatchOrRagIndex_ReturnsExplicitIndexError()
+    {
+        EnableReaderAi();
+        _documents.Setup(item => item.CountAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        var result = await _sut.AskAsync("I am looking for books about quantum computing", "Reader");
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("chưa được đồng bộ");
     }
 
     [Fact]

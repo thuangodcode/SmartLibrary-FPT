@@ -11,9 +11,9 @@ import {
   getAcquisitionSuggestions,
   getAiSettings,
   getLibrarianWorkspace,
+  markMyAiForLibrary,
   reindexRag,
   saveLibrarianAiSettings,
-  useMyAiForLibrary,
   type AiCriterion,
   type AiLibrarianWorkspace,
   type AiSettingsStatus,
@@ -67,7 +67,8 @@ const LibrarianAiPage = () => {
   const categoriesQuery = useHomeCategories();
   const [status, setStatus] = useState<AiSettingsStatus | null>(null);
   const [workspace, setWorkspace] = useState<AiLibrarianWorkspace | null>(null);
-  const [loading, setLoading] = useState(() => Boolean(accessToken));
+  const [loadedToken, setLoadedToken] = useState<string | null>(null);
+  const loading = Boolean(accessToken) && loadedToken !== accessToken;
   const [error, setError] = useState<string | null>(accessToken ? null : 'Vui lòng đăng nhập thủ thư.');
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -79,7 +80,9 @@ const LibrarianAiPage = () => {
   const [searchResult, setSearchResult] = useState<RagAskResult | null>(null);
   const [statsRange, setStatsRange] = useState('30');
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
-  const [workspaceLoading, setWorkspaceLoading] = useState(() => Boolean(accessToken));
+  const [loadedWorkspaceKey, setLoadedWorkspaceKey] = useState<string | null>(null);
+  const workspaceKey = `${accessToken ?? ''}:${statsRange}`;
+  const workspaceLoading = Boolean(accessToken) && loadedWorkspaceKey !== workspaceKey;
   const [flags, setFlags] = useState<Record<CriterionFlag, boolean>>(flagsFromStatus(null));
   const [justSaved, setJustSaved] = useState(false);
   const [confirm, setConfirm] = useState<'leave' | null>(null);
@@ -109,25 +112,7 @@ const LibrarianAiPage = () => {
   const saveHint = dirty ? 'dirty' : justSaved ? 'saved' : null;
 
   useEffect(() => {
-    if (dirty) setJustSaved(false);
-  }, [dirty]);
-
-  const loadWorkspace = async (token: string, days: string) => {
-    setWorkspaceLoading(true);
-    try {
-      setWorkspace(await getLibrarianWorkspace(token, Number(days)));
-      setWorkspaceError(null);
-    } catch (loadError: unknown) {
-      setWorkspace(null);
-      setWorkspaceError(loadError instanceof Error ? loadError.message : 'Không tải được dữ liệu nghiệp vụ.');
-    } finally {
-      setWorkspaceLoading(false);
-    }
-  };
-
-  useEffect(() => {
     if (!accessToken) return;
-    setLoading(true);
     void getAiSettings(accessToken)
       .then((next) => {
         applyStatus(next);
@@ -136,13 +121,29 @@ const LibrarianAiPage = () => {
       .catch((loadError: unknown) => {
         setError(loadError instanceof Error ? loadError.message : 'Không tải được trạng thái AI.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => setLoadedToken(accessToken));
   }, [accessToken]);
 
   useEffect(() => {
     if (!accessToken) return;
-    void loadWorkspace(accessToken, statsRange);
-  }, [accessToken, statsRange]);
+    let cancelled = false;
+    void getLibrarianWorkspace(accessToken, Number(statsRange))
+      .then((next) => {
+        if (cancelled) return;
+        setWorkspace(next);
+        setWorkspaceError(null);
+        setLoadedWorkspaceKey(workspaceKey);
+      })
+      .catch((loadError: unknown) => {
+        if (cancelled) return;
+        setWorkspace(null);
+        setWorkspaceError(loadError instanceof Error ? loadError.message : 'Không tải được dữ liệu nghiệp vụ.');
+        setLoadedWorkspaceKey(workspaceKey);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, statsRange, workspaceKey]);
 
   const notifySave = (toast: Parameters<typeof showToast>[0]) => {
     if (saveToastId.current) dismissToast(saveToastId.current);
@@ -153,7 +154,7 @@ const LibrarianAiPage = () => {
     if (!accessToken) return;
     setLibraryBusy(true);
     try {
-      applyStatus(await useMyAiForLibrary(accessToken));
+      applyStatus(await markMyAiForLibrary(accessToken));
       showToast({
         type: 'success',
         title: 'Đã dùng cho độc giả',
@@ -453,7 +454,10 @@ const LibrarianAiPage = () => {
                           className={`ai-switch${item.enabled ? ' is-on' : ''}`}
                           aria-checked={item.enabled}
                           disabled={saving}
-                          onClick={() => setFlags((current) => ({ ...current, [item.flag]: !current[item.flag] }))}
+                          onClick={() => {
+                            setJustSaved(false);
+                            setFlags((current) => ({ ...current, [item.flag]: !current[item.flag] }));
+                          }}
                           aria-label={`Bật ${item.label}`}
                         >
                           <span />

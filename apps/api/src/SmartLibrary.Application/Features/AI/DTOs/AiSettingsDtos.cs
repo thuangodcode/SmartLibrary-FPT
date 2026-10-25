@@ -3,6 +3,7 @@ namespace SmartLibrary.Application.Features.Ai.DTOs;
 public class AiSettingsStatusDto
 {
     public bool HasApiKey { get; set; }
+    public string? ApiKey { get; set; }
     public string? ApiKeyLast4 { get; set; }
     public string Provider { get; set; } = "gemini";
     public string ChatModel { get; set; } = "gemini-3.8-flash";
@@ -38,6 +39,7 @@ public class AiProviderStatusDto
 {
     public string Id { get; set; } = "gemini";
     public bool HasApiKey { get; set; }
+    public string? ApiKey { get; set; }
     public string? ApiKeyLast4 { get; set; }
     public string? ChatModel { get; set; }
     public string? EmbeddingModel { get; set; }

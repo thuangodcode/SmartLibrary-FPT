@@ -14,9 +14,9 @@ namespace SmartLibrary.Api.Controllers;
 public class CirculationMeController : ControllerBase
 {
     private readonly CirculationService _circulation;
-    private readonly IHubContext<SupportChatHub> _hub;
+    private readonly IHubContext<NotificationHub> _hub;
 
-    public CirculationMeController(CirculationService circulation, IHubContext<SupportChatHub> hub)
+    public CirculationMeController(CirculationService circulation, IHubContext<NotificationHub> hub)
     {
         _circulation = circulation;
         _hub = hub;
@@ -69,7 +69,9 @@ public class CirculationMeController : ControllerBase
         return Ok(ApiResponse<CirculationLoanDto>.Ok(result.Data!, new { message = "Đã gửi yêu cầu mượn và giữ bản sao. Chờ thủ thư tiếp nhận." }));
     }
 
+    /// <summary>Renews the authenticated reader's eligible loan according to library policy.</summary>
     [HttpPost("loans/{id:guid}/renew")]
+    [Authorize(Roles = "Reader")]
     public async Task<IActionResult> Renew(Guid id, CancellationToken ct)
     {
         var result = await _circulation.RenewAsync(id, CirculationService.ReadUserId(User), byLibrarian: false, ct);
@@ -108,6 +110,19 @@ public class CirculationMeController : ControllerBase
             : BadRequest(ApiResponse<object>.Fail(result.Error!));
     }
 
+    /// <summary>Join the reservation queue for a book that has no available copies.</summary>
+    [HttpPost("book-reservations")]
+    [Authorize(Roles = "Reader")]
+    public async Task<IActionResult> CreateBookReservation(
+        [FromBody] RequestBookReservationRequest request, CancellationToken ct)
+    {
+        var result = await _circulation.CreateMyReservationForBookAsync(
+            CirculationService.ReadUserId(User), request.BookId, ct);
+        return result.IsSuccess
+            ? Ok(ApiResponse<CirculationReservationDto>.Ok(result.Data!, new { message = "Đã đặt trước sách." }))
+            : BadRequest(ApiResponse<object>.Fail(result.Error!));
+    }
+
     [HttpPost("reservations/{id:guid}/cancel")]
     public async Task<IActionResult> CancelReservation(Guid id, CancellationToken ct)
     {
@@ -119,9 +134,9 @@ public class CirculationMeController : ControllerBase
 
     private async Task BroadcastBorrowUpdateAsync(CirculationLoanDto loan, CancellationToken ct)
     {
-        await _hub.Clients.Group(SupportChatHub.ReaderGroup(loan.ReaderId))
+        await _hub.Clients.Group(NotificationHub.UserGroup(loan.ReaderId))
             .SendAsync("BorrowStatusUpdated", loan, ct);
-        await _hub.Clients.Group(SupportChatHub.LibrarianGroup)
+        await _hub.Clients.Group(NotificationHub.LibrarianGroup)
             .SendAsync("BorrowRequestUpdated", loan, ct);
     }
 }

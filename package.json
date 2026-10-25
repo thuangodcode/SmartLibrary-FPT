@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev:api": "dotnet run --project apps/api/src/SmartLibrary.Api",
+    "dev:api": "node scripts/dev-api.mjs",
+    "dev:api:stop": "node scripts/dev-api.mjs --stop",
     "build:api": "dotnet build apps/api/SmartLibrary.slnx",
     "test:api": "dotnet test apps/api/SmartLibrary.slnx",
     "dev:web": "npm --prefix apps/web run dev",

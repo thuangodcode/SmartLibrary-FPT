@@ -1,0 +1,67 @@
+.lib-request-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.lib-request-status {
+  gap: 5px;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+}
+
+.lib-request-status svg {
+  flex: 0 0 auto;
+}
+
+.lib-request-status.is-waiting,
+.lib-request-status.is-review {
+  border-color: #f2dfae;
+  background: #fff7e4;
+  color: #8a5a00;
+}
+
+.lib-request-status.is-submitted {
+  border-color: #c9ddf7;
+  background: #edf5ff;
+  color: #2864a3;
+}
+
+.lib-request-status.is-approved {
+  border-color: #c6e8d3;
+  background: #eaf7ef;
+  color: #207347;
+}
+
+.lib-request-status.is-review.is-rejected,
+.lib-status-badge.rejected {
+  border-color: #efc9c5;
+  background: #fff2f0;
+  color: #a33e34;
+}
+
+.lib-status-badge.approved {
+  border: 1px solid #c6e8d3;
+  background: #eaf7ef;
+  color: #207347;
+}
+
+.lib-status-badge.pending {
+  border: 1px solid #f2dfae;
+  background: #fff7e4;
+  color: #8a5a00;
+}
+
+.lib-status-badge.viewed {
+  border: 1px solid #c9ddf7;
+  background: #edf5ff;
+  color: #2864a3;
+}
+
+@media (max-width: 950px) {
+  .lib-request-statuses {
+    grid-column: 1 / -1;
+  }
+}

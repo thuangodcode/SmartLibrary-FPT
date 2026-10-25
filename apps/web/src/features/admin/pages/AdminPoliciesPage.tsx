@@ -25,8 +25,12 @@ import {
   formFromDetail,
   formatDateTime,
   orderedChips,
+  paramHint,
+  paramKind,
+  paramLimits,
   policyHref,
   usePolicyClient,
+  validatePolicyForm,
   type ApiResult,
   type FormState,
   type ListResult,
@@ -263,6 +267,7 @@ function PolicyList() {
 function PolicyView() {
   const { policyCode } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { authHeaders, toast, showToast } = usePolicyClient();
   const [detail, setDetail] = useState<PolicyDetail | null>(null);
   const [tab, setTab] = useState<'general' | 'rules' | 'targets' | 'history'>('general');
@@ -274,13 +279,17 @@ function PolicyView() {
   const [deleting, setDeleting] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const loadDetail = useCallback(async (key: string) => {
+  const loadDetail = useCallback(async (key: string, signal?: AbortSignal) => {
     setLoading(true);
     setNotFound(false);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/policy-rules/${encodeURIComponent(key)}`, { headers: authHeaders });
+      const res = await fetch(`${API_BASE_URL}/api/v1/policy-rules/${encodeURIComponent(key)}`, {
+        headers: authHeaders,
+        signal,
+      });
       const json = await parseApiResponse<ApiResult<PolicyDetail>>(res);
+      if (signal?.aborted) return;
       if (res.status === 404 || !json?.success || !json.data) {
         setDetail(null);
         setNotFound(true);
@@ -291,10 +300,11 @@ function PolicyView() {
         navigate(policyHref(json.data.code), { replace: true });
       }
     } catch (err) {
+      if (signal?.aborted) return;
       setDetail(null);
       setError(err instanceof Error ? err.message : 'Không tải được chi tiết chính sách.');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [authHeaders, navigate]);
 
@@ -306,13 +316,24 @@ function PolicyView() {
       }, 0);
       return () => window.clearTimeout(timer);
     }
+    const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      void loadDetail(policyCode);
-      setTab('general');
+      void loadDetail(policyCode, controller.signal);
       setMenuOpen(false);
     }, 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [policyCode, loadDetail]);
+
+  useEffect(() => {
+    const state = location.state as { toast?: string; tab?: 'general' | 'rules' } | null;
+    if (!state?.toast && state?.tab !== 'rules') return;
+    if (state.tab === 'rules') setTab('rules');
+    if (state.toast) showToast(state.toast, 'success');
+    navigate('.', { replace: true, state: {} });
+  }, [location.state, navigate, showToast]);
 
   useEffect(() => {
     const onDocClick = (event: MouseEvent) => {
@@ -494,13 +515,17 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadDetail = useCallback(async (key: string) => {
+  const loadDetail = useCallback(async (key: string, signal?: AbortSignal) => {
     setLoading(true);
     setNotFound(false);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/policy-rules/${encodeURIComponent(key)}`, { headers: authHeaders });
+      const res = await fetch(`${API_BASE_URL}/api/v1/policy-rules/${encodeURIComponent(key)}`, {
+        headers: authHeaders,
+        signal,
+      });
       const json = await parseApiResponse<ApiResult<PolicyDetail>>(res);
+      if (signal?.aborted) return;
       if (res.status === 404 || !json?.success || !json.data) {
         setNotFound(true);
         return;
@@ -510,16 +535,21 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
         navigate(policyHref(json.data.code, '/edit'), { replace: true });
       }
     } catch (err) {
+      if (signal?.aborted) return;
       setError(err instanceof Error ? err.message : 'Không tải được chính sách.');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [authHeaders, navigate]);
 
   useEffect(() => {
     if (mode !== 'edit' || !policyCode) return undefined;
-    const timer = window.setTimeout(() => { void loadDetail(policyCode); }, 0);
-    return () => window.clearTimeout(timer);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => { void loadDetail(policyCode, controller.signal); }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [mode, policyCode, loadDetail]);
 
   const onTypeChange = (policyType: PolicyType) => {
@@ -536,8 +566,9 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
   };
 
   const persist = async (status: PolicyStatus) => {
-    if (!form.name.trim()) {
-      showToast('Vui lòng nhập tên chính sách.', 'error');
+    const validationError = validatePolicyForm({ ...form, status });
+    if (validationError) {
+      showToast(validationError, 'error');
       return;
     }
     setSaving(true);
@@ -555,13 +586,22 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
           status,
           priority: form.priority,
           overridesGeneral: form.overridesGeneral,
-          parameters: form.parameters,
+          parameters: form.parameters.map((parameter) => ({
+            key: parameter.key,
+            value: parameter.value.trim(),
+            label: parameter.label ?? null,
+          })),
           targets: form.targets,
         }),
       });
       const json = await parseApiResponse<ApiResult<PolicyDetail>>(res);
       if (!res.ok || !json?.success || !json.data) throw new Error(json?.error || 'Lưu chính sách thất bại.');
-      navigate(policyHref(json.data.code));
+      navigate(policyHref(json.data.code), {
+        state: {
+          toast: 'Đã lưu chính sách. Giá trị mới sẽ áp dụng cho lượt mượn và phí phạt tiếp theo.',
+          tab: 'rules',
+        },
+      });
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Lỗi lưu chính sách.', 'error');
     } finally {
@@ -610,7 +650,7 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
           <header className="pol-form-head">
             <div>
               <h1>{mode === 'edit' ? 'Chỉnh sửa chính sách' : 'Thêm chính sách'}</h1>
-              <p>{mode === 'edit' ? `Cập nhật dữ liệu thật của ${policyCode}. Hủy sẽ quay về chi tiết mà không lưu.` : 'Chỉ hiển thị trường tương ứng với danh mục đã chọn.'}</p>
+              <p>{mode === 'edit' ? `Sửa số ngày, mức phí rồi bấm Lưu thay đổi. Dữ liệu được ghi vào database và dùng cho lượt mượn mới.` : 'Nhập số ngày mượn, mức phí hoặc hạn mức tương ứng danh mục đã chọn.'}</p>
             </div>
             <button type="button" className="pol-btn" onClick={cancel} disabled={saving}><ArrowLeft size={16} /> Hủy</button>
           </header>
@@ -634,9 +674,37 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
           </div>
           <h2 className="pol-section-title">Cấu hình chính sách · {TYPE_LABELS[form.policyType]}</h2>
           <div className="pol-form-grid">
-            {form.parameters.map((p, idx) => (
-              <label key={p.key}>{p.label || p.key}<input value={p.value} onChange={(e) => setParam(idx, e.target.value)} /></label>
-            ))}
+            {form.parameters.map((p, idx) => {
+              const kind = paramKind(p.key);
+              const limits = paramLimits(p.key);
+              const hint = paramHint(p.key);
+              return (
+                <label key={p.key}>
+                  {p.label || p.key}
+                  {kind === 'boolean' ? (
+                    <select value={p.value} onChange={(e) => setParam(idx, e.target.value)}>
+                      <option value="">Chưa đặt</option>
+                      <option value="true">Có</option>
+                      <option value="false">Không</option>
+                    </select>
+                  ) : kind === 'integer' ? (
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={limits.min}
+                      max={limits.max}
+                      step={1}
+                      value={p.value}
+                      placeholder="Nhập số nguyên dương"
+                      onChange={(e) => setParam(idx, e.target.value)}
+                    />
+                  ) : (
+                    <input value={p.value} onChange={(e) => setParam(idx, e.target.value)} />
+                  )}
+                  {hint ? <span className="pol-field-hint">{hint}</span> : null}
+                </label>
+              );
+            })}
           </div>
           <h2 className="pol-section-title">Đối tượng áp dụng</h2>
           {form.targets.map((t, idx) => (

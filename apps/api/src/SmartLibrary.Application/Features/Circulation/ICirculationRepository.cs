@@ -6,14 +6,19 @@ namespace SmartLibrary.Application.Features.Circulation;
 
 public interface ICirculationRepository
 {
-    Task MarkOverdueAsync(CancellationToken ct);
+    Task<IReadOnlyList<CirculationReminderDto>> MarkOverdueAsync(CancellationToken ct);
     Task<CirculationStatsDto> GetStatsAsync(int finePerDay, CancellationToken ct);
     Task<(IReadOnlyList<CirculationLoanDto> Items, int Total)> GetLoansAsync(
         string? search, string? status, DateTime? borrowedFromUtc, DateTime? borrowedBeforeUtc,
         int page, int pageSize, int finePerDay, CancellationToken ct);
     Task<CirculationLoanDto?> GetLoanAsync(Guid id, int finePerDay, CancellationToken ct);
     Task<UserProfile?> FindReaderAsync(string key, CancellationToken ct);
+    Task<UserProfile?> FindReaderAccountAsync(Guid readerId, CancellationToken ct);
+    Task<IReadOnlyList<CirculationReaderOptionDto>> SearchReaderOptionsAsync(string search, int limit, CancellationToken ct);
+    Task<IReadOnlyList<CirculationBookOptionDto>> SearchBookOptionsAsync(string search, int limit, CancellationToken ct);
     Task<BookCopy?> FindCopyByBarcodeAsync(string barcode, CancellationToken ct);
+    Task<string?> GetBookTitleAsync(Guid bookId, CancellationToken ct);
+    Task<bool> HasActiveLoanForBookAsync(Guid readerId, Guid bookId, CancellationToken ct);
     Task<BookCopy?> FindAvailableCopyForBookAsync(Guid bookId, CancellationToken ct);
     Task<bool> HasActiveLoanAsync(Guid copyId, Guid? exceptLoanId, CancellationToken ct);
     Task<int> CountActiveLoansAsync(Guid readerId, Guid? exceptLoanId, CancellationToken ct);
@@ -23,6 +28,7 @@ public interface ICirculationRepository
     Task<IReadOnlyDictionary<DateTime, int>> GetPickupRequestCountsAsync(IReadOnlyList<DateTime> pickupTimes, CancellationToken ct);
     Task LockBorrowReaderAsync(Guid readerId, CancellationToken ct);
     Task LockPickupSlotAsync(DateTime pickupAt, CancellationToken ct);
+    Task LockReservationBookAsync(Guid bookId, CancellationToken ct);
     Task<bool> HasOtherBorrowRequestAsync(Guid copyId, Guid exceptLoanId, CancellationToken ct);
     Task<IReadOnlyList<Guid>> GetExpiredPickupRequestIdsAsync(DateTime expiredBeforeUtc, int limit, CancellationToken ct);
     Task LockBorrowRequestAsync(Guid loanId, CancellationToken ct);
@@ -34,7 +40,7 @@ public interface ICirculationRepository
     Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct);
     Task<IReadOnlyList<CirculationFineDto>> GetFinesForReaderAsync(Guid readerId, CancellationToken ct);
     Task<(IReadOnlyList<CirculationLoanDto> Items, int Total)> GetLoansForReaderAsync(
-        Guid readerId, int page, int pageSize, int finePerDay, CancellationToken ct);
+        Guid readerId, int page, int pageSize, CirculationSettings settings, CancellationToken ct);
     Task<bool> HasOpenFineAsync(Guid borrowRecordId, CancellationToken ct);
     Task<bool> HasOverdueFineAsync(Guid borrowRecordId, CancellationToken ct);
     Task<bool> HasCompensationFineAsync(Guid borrowRecordId, CancellationToken ct);
@@ -55,7 +61,7 @@ public interface ICirculationRepository
     Task<bool> HasOtherReservationAsync(Guid bookId, Guid readerId, CancellationToken ct);
     Task<Reservation?> FindOpenReservationAsync(Guid readerId, Guid bookId, CancellationToken ct);
     Task AddReservationAsync(Reservation reservation, CancellationToken ct);
-    Task<IReadOnlyList<Guid>> ExpireReadyReservationsAsync(CancellationToken ct);
+    Task<IReadOnlyList<ExpiredReservationDto>> ExpireReadyReservationsAsync(CancellationToken ct);
     Task<Reservation?> ReadyNextReservationAsync(Guid bookId, int pickupHours, CancellationToken ct);
     Task<int> CountReadyReservationsAsync(Guid bookId, Guid exceptReaderId, CancellationToken ct);
     Task<int> CountAvailableCopiesAsync(Guid bookId, CancellationToken ct);

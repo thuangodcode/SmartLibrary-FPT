@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
 import { AlertCircle, Camera, Check, CircleHelp, LoaderCircle, MessageCircle, Send, UserRound } from 'lucide-react';
 import HomeNavbar from '../../home/components/HomeNavbar';
+import HomeFooter from '../../home/components/HomeFooter';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
@@ -414,6 +415,7 @@ const SupportPage = () => {
           </div>
         )}
       </main>
+      <HomeFooter />
     </div>
   );
 };

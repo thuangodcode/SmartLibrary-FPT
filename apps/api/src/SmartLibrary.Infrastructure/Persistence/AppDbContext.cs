@@ -24,6 +24,7 @@ public class AppDbContext : DbContext
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<Fine> Fines => Set<Fine>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<ReaderFavorite> ReaderFavorites => Set<ReaderFavorite>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<BookEmbedding> BookEmbeddings => Set<BookEmbedding>();
     public DbSet<ReadingPreference> ReadingPreferences => Set<ReadingPreference>();
