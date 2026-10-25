@@ -549,13 +549,128 @@
   font-weight: 500;
 }
 
+.circ-page--overdue {
+  gap: 22px;
+}
+
+.circ-page--overdue .circ-card {
+  padding: 22px;
+}
+
+.circ-page--overdue .circ-stat {
+  min-height: 120px;
+  padding: 18px;
+}
+
+.circ-page--overdue .circ-stat small {
+  font-size: 14px;
+}
+
+.circ-page--overdue .circ-stat strong {
+  font-size: 28px;
+}
+
+.circ-page--overdue .circ-stat em {
+  font-size: 12px;
+}
+
+.circ-page--overdue .circ-card h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.circ-page--overdue .circ-table {
+  font-size: 14px;
+}
+
+.circ-page--overdue .circ-badge {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.circ-page--overdue .circ-hint,
+.circ-page--overdue .circ-incident-meta,
+.circ-page--overdue .circ-incident-note {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.circ-page--overdue .circ-incident {
+  gap: 12px;
+  padding: 20px 0;
+}
+
+.circ-page--overdue .circ-incident-head b {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.circ-page--overdue .circ-incident-head small {
+  margin-top: 3px;
+  font-size: 14px;
+}
+
 .circ-incident-form {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: 14px;
+  padding: 18px;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   background: #f8fafc;
+}
+
+.circ-page--overdue .circ-field,
+.circ-page--overdue .circ-check {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.circ-page--overdue .circ-field select,
+.circ-page--overdue .circ-field input,
+.circ-page--overdue .circ-field textarea {
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.circ-page--overdue .circ-field textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.circ-page--overdue .circ-field select:focus,
+.circ-page--overdue .circ-field input:focus,
+.circ-page--overdue .circ-field textarea:focus {
+  border-color: #ea580c;
+  outline: 3px solid rgb(234 88 12 / 14%);
+}
+
+.circ-incident-fixed-field {
+  display: flex;
+  min-height: 44px;
+  box-sizing: border-box;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 14px;
+}
+
+.circ-hint--warning {
+  color: #9a3412;
+}
+
+.circ-page--overdue .circ-btn {
+  min-height: 42px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.circ-page--overdue .circ-incident-form .circ-hint {
+  margin: 0;
 }
 
 .circ-check {
@@ -1709,5 +1824,105 @@
 
   .circ-selected-option {
     padding: 11px;
+  }
+}
+
+.circ-payment-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 56%);
+}
+
+.circ-payment-dialog {
+  position: relative;
+  display: grid;
+  width: min(420px, 100%);
+  justify-items: center;
+  gap: 12px;
+  border-radius: 16px;
+  background: #fff;
+  padding: 28px;
+  box-shadow: 0 24px 70px rgb(15 23 42 / 24%);
+  text-align: center;
+}
+
+.circ-payment-dialog > p {
+  margin: 0;
+  color: #ea580c;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.circ-payment-dialog h2 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 22px;
+}
+
+.circ-payment-amount {
+  color: #166534;
+  font-size: 25px;
+}
+
+.circ-payment-dialog > span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.circ-payment-dialog > a {
+  color: #166534;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.circ-payment-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 23px;
+  cursor: pointer;
+}
+
+.circ-payment-options {
+  display: grid;
+  width: 100%;
+  gap: 10px;
+}
+
+.circ-payment-dialog > .circ-btn {
+  justify-content: center;
+}
+
+.circ-payment-dialog > .circ-btn:not(.circ-btn--primary) {
+  color: #a23b26;
+}
+
+.circ-payment-reference,
+.circ-reconciliation-warning {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+}
+
+.circ-payment-reference { color: #64748b; }
+.circ-reconciliation-warning { color: #b45309; font-weight: 700; }
+
+@media (max-width: 640px) {
+  .circ-payment-dialog {
+    padding: 24px 18px;
   }
 }

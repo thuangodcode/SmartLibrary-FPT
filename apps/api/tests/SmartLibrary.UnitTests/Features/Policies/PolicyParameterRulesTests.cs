@@ -41,11 +41,23 @@ public class PolicyParameterRulesTests
     }
 
     [Fact]
-    public void Validate_AllowsEmptyOptionalFields()
+    public void Validate_ActiveFineFeeRequiresAllFees()
     {
         var error = PolicyParameterRules.Validate("FineFee", "Active", [
             new PolicyRuleParameterDto { Key = "overdue_fee_per_day", Value = "5000" },
-            new PolicyRuleParameterDto { Key = "damage_fee", Value = "" }
+            new PolicyRuleParameterDto { Key = "damage_fee", Value = "20000" },
+            new PolicyRuleParameterDto { Key = "lost_book_fee", Value = "" }
+        ]);
+        error.Should().Contain("lost_book_fee");
+    }
+
+    [Fact]
+    public void Validate_ActiveFineFeeAcceptsLegacyFeeKeys()
+    {
+        var error = PolicyParameterRules.Validate("FineFee", "Active", [
+            new PolicyRuleParameterDto { Key = "overdue_fee_per_day", Value = "5000" },
+            new PolicyRuleParameterDto { Key = "damaged_book_fee", Value = "20000" },
+            new PolicyRuleParameterDto { Key = "lost_fee", Value = "15000" }
         ]);
         error.Should().BeNull();
     }

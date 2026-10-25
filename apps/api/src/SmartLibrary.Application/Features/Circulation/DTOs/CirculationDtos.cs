@@ -165,7 +165,21 @@ public class CirculationFineDto
     public string Status { get; init; } = string.Empty;
     public DateTime CreatedAt { get; init; }
     public DateTime? PaidAt { get; init; }
+    public string? PaymentMethod { get; init; }
+    public string? PaymentReference { get; init; }
+    public string? PendingPaymentStatus { get; init; }
+    public string? CheckoutUrl { get; init; }
+    public string? QrCode { get; init; }
+    public DateTime? PaymentExpiresAt { get; init; }
+    public bool ReconciliationRequired { get; init; }
 }
+
+public sealed record FinePaymentCheckoutDto(
+    Guid FineId,
+    decimal Amount,
+    string CheckoutUrl,
+    string QrCode,
+    DateTime? ExpiresAt);
 
 public class CirculationFineListDto
 {

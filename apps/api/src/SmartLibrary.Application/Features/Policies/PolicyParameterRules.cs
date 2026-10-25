@@ -70,6 +70,16 @@ public static class PolicyParameterRules
             && !filled.ContainsKey("max_days"))
             return "Vui lòng nhập số ngày mượn (số nguyên dương).";
 
+        if (isActive && string.Equals(policyType, "FineFee", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!filled.ContainsKey("overdue_fee_per_day"))
+                return "Vui lòng nhập mức phạt quá hạn mỗi ngày (overdue_fee_per_day).";
+            if (!filled.ContainsKey("damage_fee") && !filled.ContainsKey("damaged_book_fee"))
+                return "Vui lòng nhập phí sách hỏng (damage_fee).";
+            if (!filled.ContainsKey("lost_book_fee") && !filled.ContainsKey("lost_fee"))
+                return "Vui lòng nhập phí sách mất/hư hỏng nặng (lost_book_fee).";
+        }
+
         return null;
     }
 

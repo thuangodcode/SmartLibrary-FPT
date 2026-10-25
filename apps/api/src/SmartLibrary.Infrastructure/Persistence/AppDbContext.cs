@@ -23,6 +23,7 @@ public class AppDbContext : DbContext
     public DbSet<BorrowRecord> BorrowRecords => Set<BorrowRecord>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<Fine> Fines => Set<Fine>();
+    public DbSet<FinePayment> FinePayments => Set<FinePayment>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<ReaderFavorite> ReaderFavorites => Set<ReaderFavorite>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -137,6 +138,26 @@ public class AppDbContext : DbContext
                 v => v.ToString().ToLower(),
                 v => Enum.Parse<FineStatus>(v, true)
             );
+            entity.Property(f => f.PaymentMethod).HasMaxLength(20);
+            entity.Property(f => f.PaymentReference).HasMaxLength(100);
+            entity.HasMany(f => f.Payments).WithOne(p => p.Fine).HasForeignKey(p => p.FineId);
+        });
+
+        modelBuilder.Entity<FinePayment>(entity =>
+        {
+            entity.ToTable("fine_payments");
+            entity.Property(payment => payment.Method).HasMaxLength(20);
+            entity.Property(payment => payment.Status).HasConversion(
+                value => value.ToString().ToLower(),
+                value => Enum.Parse<FinePaymentStatus>(value, true));
+            entity.Property(payment => payment.PaymentLinkId).HasMaxLength(100);
+            entity.Property(payment => payment.ProviderReference).HasMaxLength(100);
+            entity.HasIndex(payment => payment.OrderCode)
+                .IsUnique()
+                .HasFilter("order_code IS NOT NULL");
+            entity.HasIndex(payment => payment.FineId)
+                .IsUnique()
+                .HasFilter("status = 'pending' AND method = 'PayOS'");
         });
 
         modelBuilder.Entity<Notification>(entity =>

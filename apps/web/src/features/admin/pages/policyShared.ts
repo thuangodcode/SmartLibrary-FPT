@@ -303,7 +303,7 @@ export function buildSummaryCards(parameters: PolicyParameter[]): SummaryCard[] 
     cards.push({
       value: format ? format(param.value) : param.value,
       unit,
-      label: param.label || fallbackLabel,
+      label: param.label && param.label !== key ? param.label : fallbackLabel,
     });
   };
 

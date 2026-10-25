@@ -380,6 +380,106 @@
   color: #a5462a;
 }
 
+.history-record-payment-method {
+  color: #526c59 !important;
+  font-weight: 650;
+}
+
+.history-pay-button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #b9d3bf;
+  border-radius: 4px;
+  background: #f1f8f2;
+  padding: 0 10px;
+  color: #285b39;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.history-pay-button:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
+.history-payment-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 56%);
+}
+
+.history-payment-dialog {
+  position: relative;
+  display: grid;
+  width: min(420px, 100%);
+  justify-items: center;
+  gap: 12px;
+  border-radius: 16px;
+  background: #fff;
+  padding: 28px;
+  box-shadow: 0 24px 70px rgb(15 23 42 / 24%);
+  text-align: center;
+}
+
+.history-payment-dialog > p {
+  margin: 0;
+  color: #dc6a2e;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.history-payment-dialog h2 {
+  margin: 0;
+  color: #1b2820;
+  font-size: 22px;
+}
+
+.history-payment-amount {
+  color: #244d39;
+  font-size: 25px;
+}
+
+.history-payment-dialog > span,
+.history-payment-dialog > small {
+  color: #69766c;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.history-payment-dialog > a {
+  color: #285b39;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.history-payment-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f4f1;
+  color: #4e5a51;
+  font-size: 23px;
+  cursor: pointer;
+}
+
+
+
 .history-spinner {
   animation: history-spin 1s linear infinite;
 }
@@ -455,5 +555,9 @@
 
   .history-record-dates {
     gap: 4px 9px;
+  }
+
+  .history-payment-dialog {
+    padding: 24px 18px;
   }
 }

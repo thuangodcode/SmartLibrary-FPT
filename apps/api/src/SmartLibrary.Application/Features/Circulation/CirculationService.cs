@@ -12,11 +12,16 @@ public class CirculationService
 {
     private readonly ICirculationRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPayOSPaymentGateway _payOS;
 
-    public CirculationService(ICirculationRepository repository, IUnitOfWork unitOfWork)
+    public CirculationService(
+        ICirculationRepository repository,
+        IUnitOfWork unitOfWork,
+        IPayOSPaymentGateway payOS)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
+        _payOS = payOS;
     }
 
     public async Task<CirculationStatsDto> GetStatsAsync(CancellationToken ct = default)
@@ -243,6 +248,11 @@ public class CirculationService
                 incidentOpened = await OpenIncidentIfNeededAsync(loan, condition, librarianId, ct);
             else
                 createdFine = await AddOverdueFineIfNeededAsync(loan, overdueDays, settings.FinePerDay, ct);
+            var overdueFineAlreadyExists = !isLostOrDamaged
+                && overdueDays > 0
+                && createdFine is null
+                && settings.FinePerDay > 0
+                && await _repository.HasOverdueFineAsync(loan.Id, ct);
 
             if (loan.BookCopy is { IsAvailable: true })
             {
@@ -252,7 +262,13 @@ public class CirculationService
 
             await NotifyAsync(loan.ReaderId,
                 incidentOpened ? "Hồ sơ mất/hỏng sách" : "Đã trả sách",
-                ReturnMessage(loan.BookCopy?.Book?.Title, overdueDays, createdFine, incidentOpened),
+                ReturnMessage(
+                    loan.BookCopy?.Book?.Title,
+                    overdueDays,
+                    createdFine,
+                    incidentOpened,
+                    settings.FinePerDay > 0,
+                    overdueFineAlreadyExists),
                 createdFine is > 0 || incidentOpened ? "fine" : "return", ct);
 
             await _unitOfWork.SaveChangesAsync(ct);
@@ -535,24 +551,193 @@ public class CirculationService
         return Result<CirculationFineDto>.Success((await _repository.GetFineDtoAsync(fine.Id, ct))!);
     }
 
-    public async Task<Result<CirculationFineDto>> PayFineAsync(Guid id, CancellationToken ct = default)
-    {
-        var fine = await _repository.GetTrackedFineAsync(id, ct);
-        if (fine is null)
-            return Result<CirculationFineDto>.Failure("Không tìm thấy khoản phạt.");
-        if (fine.Status == FineStatus.Paid)
-            return Result<CirculationFineDto>.Success((await _repository.GetFineDtoAsync(id, ct))!);
-        if (fine.Status != FineStatus.Pending)
-            return Result<CirculationFineDto>.Failure("Khoản phạt này không còn chờ thanh toán.");
+    public Task<Result<CirculationFineDto>> PayFineAsync(Guid id, CancellationToken ct = default)
+        => PayFineAsync(id, Guid.Empty, ct);
 
-        fine.Status = FineStatus.Paid;
-        fine.PaidAt = DateTime.UtcNow;
-        await TryResolveIncidentAfterPaymentAsync(fine.Id, ct);
-        await NotifyAsync(fine.ReaderId, "Đã thanh toán khoản phí",
-            $"Khoản phí {fine.Amount:0}đ đã được ghi nhận thanh toán.",
-            "fine_paid", ct, entityId: fine.Id);
-        await _unitOfWork.SaveChangesAsync(ct);
-        return Result<CirculationFineDto>.Success((await _repository.GetFineDtoAsync(id, ct))!);
+    public async Task<Result<CirculationFineDto>> PayFineAsync(
+        Guid id, Guid librarianId, CancellationToken ct = default)
+        => await _repository.InTransactionAsync(async () =>
+        {
+            await _repository.LockFineAsync(id, ct);
+            var fine = await _repository.GetTrackedFineAsync(id, ct);
+            if (fine is null)
+                return Result<CirculationFineDto>.Failure("Không tìm thấy khoản phạt.");
+            if (fine.Status == FineStatus.Paid)
+                return Result<CirculationFineDto>.Success((await _repository.GetFineDtoAsync(id, ct))!);
+            if (fine.Status != FineStatus.Pending)
+                return Result<CirculationFineDto>.Failure("Khoản phạt này không còn chờ thanh toán.");
+
+            var pendingPayment = await _repository.GetPendingPayOSPaymentAsync(id, ct);
+            if (pendingPayment is not null)
+            {
+                var isExpired = pendingPayment.ExpiresAt.HasValue && pendingPayment.ExpiresAt <= DateTime.UtcNow;
+                if (!isExpired && pendingPayment.OrderCode.HasValue)
+                    await _payOS.CancelCheckoutAsync(pendingPayment.OrderCode.Value, "Thanh toán tiền mặt tại quầy", ct);
+                pendingPayment.Status = isExpired ? FinePaymentStatus.Expired : FinePaymentStatus.Cancelled;
+            }
+
+            var now = DateTime.UtcNow;
+            fine.Status = FineStatus.Paid;
+            fine.PaidAt = now;
+            fine.PaymentMethod = "Cash";
+            fine.PaymentReference = null;
+            fine.RecordedById = librarianId == Guid.Empty ? null : librarianId;
+            await _repository.AddFinePaymentAsync(new FinePayment
+            {
+                FineId = fine.Id,
+                Method = "Cash",
+                Status = FinePaymentStatus.Paid,
+                Amount = fine.Amount,
+                InitiatedById = librarianId == Guid.Empty ? null : librarianId,
+                RecordedById = librarianId == Guid.Empty ? null : librarianId,
+                PaidAt = now
+            }, ct);
+            await TryResolveIncidentAfterPaymentAsync(fine.Id, ct);
+            await NotifyAsync(fine.ReaderId, "Đã thanh toán khoản phí",
+                $"Khoản phí {fine.Amount:0}đ đã được ghi nhận thanh toán bằng tiền mặt.",
+                "fine_paid", ct, entityId: fine.Id);
+            await _unitOfWork.SaveChangesAsync(ct);
+            return Result<CirculationFineDto>.Success((await _repository.GetFineDtoAsync(id, ct))!);
+        }, ct);
+
+    public async Task<Result<FinePaymentCheckoutDto>> CreatePayOSCheckoutAsync(
+        Guid fineId, Guid initiatedById, Guid? readerId, CancellationToken ct = default)
+    {
+        if (!_payOS.IsConfigured)
+            return Result<FinePaymentCheckoutDto>.Failure(
+                "PayOS chưa được cấu hình trên máy chủ. Hãy cấu hình credentials và callback URLs rồi thử lại.");
+
+        return await _repository.InTransactionAsync(async () =>
+        {
+            await _repository.LockFineAsync(fineId, ct);
+            var fine = await _repository.GetTrackedFineAsync(fineId, ct);
+            if (fine is null || (readerId.HasValue && fine.ReaderId != readerId.Value))
+                return Result<FinePaymentCheckoutDto>.Failure("Không tìm thấy khoản phạt.");
+            if (fine.Status != FineStatus.Pending)
+                return Result<FinePaymentCheckoutDto>.Failure("Khoản phạt này không còn chờ thanh toán.");
+            if (fine.Amount <= 0 || fine.Amount != decimal.Truncate(fine.Amount) || fine.Amount > 9_007_199_254_740_991m)
+                return Result<FinePaymentCheckoutDto>.Failure("Số tiền phạt không hợp lệ để tạo thanh toán PayOS.");
+
+            var pendingPayment = await _repository.GetPendingPayOSPaymentAsync(fineId, ct);
+            if (pendingPayment is not null)
+            {
+                var stillActive = pendingPayment.ExpiresAt is null || pendingPayment.ExpiresAt > DateTime.UtcNow;
+                if (stillActive && pendingPayment.OrderCode.HasValue)
+                {
+                    var providerStatus = await _payOS.GetCheckoutStatusAsync(pendingPayment.OrderCode.Value, ct);
+                    if (providerStatus is "Pending" or "Processing" or "Paid" or "Underpaid")
+                    {
+                        if (string.IsNullOrWhiteSpace(pendingPayment.CheckoutUrl)
+                            || string.IsNullOrWhiteSpace(pendingPayment.QrCode))
+                            return Result<FinePaymentCheckoutDto>.Failure(
+                                "PayOS đang xử lý liên kết cũ. Vui lòng tải lại trạng thái trước khi thử lại.");
+                        return Result<FinePaymentCheckoutDto>.Success(new FinePaymentCheckoutDto(
+                            fineId, pendingPayment.Amount, pendingPayment.CheckoutUrl,
+                            pendingPayment.QrCode, pendingPayment.ExpiresAt));
+                    }
+                    if (providerStatus == "Cancelled")
+                        pendingPayment.Status = FinePaymentStatus.Cancelled;
+                    else if (providerStatus is "Expired" or "Failed")
+                        pendingPayment.Status = FinePaymentStatus.Expired;
+                    else
+                        return Result<FinePaymentCheckoutDto>.Failure(
+                            "PayOS trả về trạng thái liên kết không xác định; chưa tạo giao dịch mới.");
+                }
+                else
+                {
+                    pendingPayment.Status = FinePaymentStatus.Expired;
+                }
+            }
+
+            var orderCode = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000 + Random.Shared.Next(0, 1000);
+            var code = fine.Id.ToString("N")[..8].ToUpperInvariant();
+            var checkout = await _payOS.CreateCheckoutAsync(
+                fine.Id, orderCode, decimal.ToInt64(fine.Amount), $"FINE {code}", ct);
+            if (!Uri.TryCreate(checkout.CheckoutUrl, UriKind.Absolute, out var checkoutUri)
+                || checkoutUri.Scheme != Uri.UriSchemeHttps
+                || string.IsNullOrWhiteSpace(checkout.PaymentLinkId)
+                || string.IsNullOrWhiteSpace(checkout.QrCode))
+                throw new InvalidOperationException("PayOS trả về thông tin liên kết thanh toán không hợp lệ.");
+
+            var payment = new FinePayment
+            {
+                FineId = fine.Id,
+                Method = "PayOS",
+                Status = FinePaymentStatus.Pending,
+                Amount = fine.Amount,
+                InitiatedById = initiatedById == Guid.Empty ? null : initiatedById,
+                OrderCode = orderCode,
+                PaymentLinkId = checkout.PaymentLinkId,
+                CheckoutUrl = checkout.CheckoutUrl,
+                QrCode = checkout.QrCode,
+                ExpiresAt = checkout.ExpiresAt ?? DateTime.UtcNow.AddMinutes(15)
+            };
+            await _repository.AddFinePaymentAsync(payment, ct);
+            await _unitOfWork.SaveChangesAsync(ct);
+            return Result<FinePaymentCheckoutDto>.Success(new FinePaymentCheckoutDto(
+                fineId, payment.Amount, payment.CheckoutUrl, payment.QrCode, payment.ExpiresAt));
+        }, ct);
+    }
+
+    public async Task<Result<bool>> ProcessPayOSWebhookAsync(
+        PayOSWebhookEnvelope webhook, CancellationToken ct = default)
+    {
+        var data = await _payOS.VerifyWebhookAsync(webhook, ct);
+        if (!webhook.Success || webhook.Code != "00" || data.Code != "00" || data.Currency != "VND")
+            return Result<bool>.Success(true);
+
+        var fineId = await _repository.GetFineIdForPaymentOrderAsync(data.OrderCode, ct);
+        if (!fineId.HasValue)
+            return Result<bool>.Failure("Không tìm thấy yêu cầu thanh toán PayOS tương ứng.");
+
+        return await _repository.InTransactionAsync(async () =>
+        {
+            await _repository.LockFineAsync(fineId.Value, ct);
+            var payment = await _repository.GetTrackedFinePaymentByOrderCodeAsync(data.OrderCode, ct);
+            var fine = await _repository.GetTrackedFineAsync(fineId.Value, ct);
+            if (payment is null || fine is null || payment.FineId != fine.Id)
+                return Result<bool>.Failure("Không tìm thấy khoản phạt của giao dịch PayOS.");
+            if (payment.Status is FinePaymentStatus.Paid or FinePaymentStatus.PaidAfterSettlement)
+                return Result<bool>.Success(true);
+            if (payment.Status is FinePaymentStatus.Cancelled or FinePaymentStatus.Expired)
+                return Result<bool>.Success(true);
+            if (payment.Status != FinePaymentStatus.Pending
+                || payment.Amount != data.Amount
+                || fine.Amount != data.Amount
+                || !string.Equals(payment.PaymentLinkId, data.PaymentLinkId, StringComparison.Ordinal))
+                return Result<bool>.Failure("Thông tin giao dịch PayOS không khớp khoản phạt.");
+
+            var now = DateTime.UtcNow;
+            payment.ProviderReference = data.Reference;
+            payment.PaidAt = now;
+            if (fine.Status == FineStatus.Paid)
+            {
+                payment.Status = FinePaymentStatus.PaidAfterSettlement;
+                await NotifyAsync(fine.ReaderId, "Cần đối soát khoản phí",
+                    "PayOS báo đã nhận thêm một khoản thanh toán cho phí đã được ghi nhận trước đó. Vui lòng liên hệ thủ thư để đối soát.",
+                    "fine_payment_reconciliation", ct, entityId: fine.Id);
+            }
+            else if (fine.Status == FineStatus.Pending)
+            {
+                payment.Status = FinePaymentStatus.Paid;
+                fine.Status = FineStatus.Paid;
+                fine.PaidAt = now;
+                fine.PaymentMethod = "PayOS";
+                fine.PaymentReference = data.Reference;
+                fine.RecordedById = null;
+                await TryResolveIncidentAfterPaymentAsync(fine.Id, ct);
+                await NotifyAsync(fine.ReaderId, "Đã thanh toán khoản phí",
+                    $"Khoản phí {fine.Amount:0}đ đã được PayOS xác nhận thanh toán.",
+                    "fine_paid", ct, entityId: fine.Id);
+            }
+            else
+            {
+                return Result<bool>.Failure("Khoản phạt không còn ở trạng thái có thể thanh toán.");
+            }
+
+            await _unitOfWork.SaveChangesAsync(ct);
+            return Result<bool>.Success(true);
+        }, ct);
     }
 
     public async Task<IReadOnlyList<CirculationIncidentDto>> GetIncidentsAsync(CancellationToken ct = default)
@@ -1230,15 +1415,25 @@ public class CirculationService
             copy.Book.AvailableCopies -= 1;
     }
 
-    private static string ReturnMessage(string? title, int overdueDays, decimal? fine, bool incidentOpened)
+    private static string ReturnMessage(
+        string? title,
+        int overdueDays,
+        decimal? fine,
+        bool incidentOpened,
+        bool overdueFeeConfigured,
+        bool overdueFineAlreadyExists)
     {
         var book = string.IsNullOrWhiteSpace(title) ? "sách" : $"“{title}”";
         if (incidentOpened)
             return $"Đã lập hồ sơ sự cố cho {book}. Thủ thư sẽ xác minh trước khi tính bồi thường.";
         if (fine is > 0)
             return $"Đã trả {book} quá hạn {overdueDays} ngày. Phí quá hạn {fine:0}đ.";
+        if (overdueDays > 0 && !overdueFeeConfigured)
+            return $"Đã trả {book} quá hạn {overdueDays} ngày. Chưa lập phí vì Admin chưa cấu hình mức phạt quá hạn.";
+        if (overdueDays > 0 && overdueFineAlreadyExists)
+            return $"Đã trả {book} quá hạn {overdueDays} ngày. Phí quá hạn đã được ghi nhận trước đó, không lập trùng.";
         if (overdueDays > 0)
-            return $"Đã trả {book} quá hạn {overdueDays} ngày. Chưa lập phí vì chưa cấu hình mức phạt hoặc đã có khoản phí.";
+            return $"Đã trả {book} quá hạn {overdueDays} ngày. Chưa lập được phí, vui lòng kiểm tra danh sách phí phạt.";
         return $"Đã trả {book} đúng hạn.";
     }
 

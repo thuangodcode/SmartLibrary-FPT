@@ -64,6 +64,12 @@ npm run dev:api
 # Health check: http://localhost:5278/api/health-check
 ```
 
+### Thanh toán phí phạt PayOS
+
+Luồng phí phạt hỗ trợ tiền mặt tại quầy và PayOS. Chỉ webhook PayOS đã xác thực chữ ký mới xác nhận giao dịch trực tuyến; URL chuyển hướng không được dùng làm bằng chứng thanh toán. Cấu hình `PayOS__ClientId`, `PayOS__ApiKey`, `PayOS__ChecksumKey`, `PayOS__ReturnUrl` và `PayOS__CancelUrl` qua biến môi trường (Render) hoặc `.env` local. Không đưa credentials vào Git/chat.
+
+Đăng ký webhook HTTPS công khai với PayOS tại `https://<api-host>/api/v1/payments/payos/webhook`. Return/Cancel URLs cần trỏ đến trang `/history` của frontend. Migration API `20261026000000_AddPayOSFinePayments` được áp dụng khi API khởi động; nếu triển khai schema bằng Supabase CLI, áp dụng thêm `supabase/migrations/00024_payos_fine_payments.sql`.
+
 `npm run dev:api` kiểm tra health check trước khi khởi động. Nếu API đang chạy khỏe trên cổng `5278`, lệnh sẽ bám vào tiến trình hiện có; nhấn **Ctrl+C** trong terminal đó để dừng đúng API của repository. Có thể dừng API tường minh bằng `npm run dev:api:stop`. Nếu cổng đang bị dịch vụ khác chiếm, lệnh sẽ báo rõ để bạn xử lý xung đột.
 
 ### 2. Web App

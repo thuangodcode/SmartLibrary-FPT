@@ -225,15 +225,37 @@ public sealed class ReportService(IReportRepository repository)
         var onTime = await current.CountAsync(x => x.ReturnDate != null && x.DueDate != null && x.ReturnDate <= x.DueDate, ct);
         var returnedPrevious = await previous.CountAsync(x => x.ReturnDate != null, ct);
         var borrowedPrevious = await previous.CountAsync(ct);
-        var fines = repository.Fines.AsNoTracking().Where(x => x.PaidAt >= start && x.PaidAt < end && x.Status == SmartLibrary.Domain.Enums.FineStatus.Paid);
-        var fineRevenue = await fines.SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
-        var fineCount = await fines.CountAsync(ct);
-        var finePreviousQuery = repository.Fines.AsNoTracking().Where(x => x.PaidAt >= previousStart && x.PaidAt < start && x.Status == SmartLibrary.Domain.Enums.FineStatus.Paid);
-        var finePrevious = await finePreviousQuery.SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
-        var finePreviousCount = await finePreviousQuery.CountAsync(ct);
+        var currentPayments = repository.FinePayments.AsNoTracking()
+            .Where(x => x.PaidAt >= start && x.PaidAt < end
+                        && (x.Status == SmartLibrary.Domain.Enums.FinePaymentStatus.Paid
+                            || x.Status == SmartLibrary.Domain.Enums.FinePaymentStatus.PaidAfterSettlement));
+        var legacyCurrentFines = repository.Fines.AsNoTracking()
+            .Where(x => x.Status == SmartLibrary.Domain.Enums.FineStatus.Paid
+                        && x.PaidAt >= start && x.PaidAt < end
+                        && !repository.FinePayments.Any(payment => payment.FineId == x.Id));
+        var fineRevenue = (await currentPayments.SumAsync(x => (decimal?)x.Amount, ct) ?? 0)
+            + (await legacyCurrentFines.SumAsync(x => (decimal?)x.Amount, ct) ?? 0);
+        var fineCount = await currentPayments.CountAsync(ct) + await legacyCurrentFines.CountAsync(ct);
+        var finePreviousPayments = repository.FinePayments.AsNoTracking()
+            .Where(x => x.PaidAt >= previousStart && x.PaidAt < start
+                        && (x.Status == SmartLibrary.Domain.Enums.FinePaymentStatus.Paid
+                            || x.Status == SmartLibrary.Domain.Enums.FinePaymentStatus.PaidAfterSettlement));
+        var finePreviousLegacy = repository.Fines.AsNoTracking()
+            .Where(x => x.Status == SmartLibrary.Domain.Enums.FineStatus.Paid
+                        && x.PaidAt >= previousStart && x.PaidAt < start
+                        && !repository.FinePayments.Any(payment => payment.FineId == x.Id));
+        var finePreviousCount = await finePreviousPayments.CountAsync(ct) + await finePreviousLegacy.CountAsync(ct);
+        var cashFineRevenue = await currentPayments.Where(x => x.Method == "Cash")
+            .SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
+        var payOSFineRevenue = await currentPayments.Where(x => x.Method == "PayOS")
+            .SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
+        var legacyFineRevenue = (await legacyCurrentFines.SumAsync(x => (decimal?)x.Amount, ct) ?? 0)
+            + (await currentPayments.Where(x => x.Method != "Cash" && x.Method != "PayOS")
+                .SumAsync(x => (decimal?)x.Amount, ct) ?? 0);
         static decimal Change(decimal currentValue, decimal previousValue) => previousValue == 0 ? (currentValue == 0 ? 0 : 100) : Math.Round((currentValue - previousValue) / previousValue * 100, 1);
         return new ReportSummaryDto(start, end.AddDays(-1), borrowed, returned, returned == 0 ? 0 : Math.Round((decimal)onTime / returned * 100, 1),
-            Change(borrowed, borrowedPrevious), Change(returned, returnedPrevious), fineRevenue, fineCount, Change(fineCount, finePreviousCount), null, false);
+            Change(borrowed, borrowedPrevious), Change(returned, returnedPrevious), fineRevenue, fineCount,
+            Change(fineCount, finePreviousCount), null, false, cashFineRevenue, payOSFineRevenue, legacyFineRevenue);
     }
 
     public async Task<IReadOnlyList<CategoryBorrowDto>> BorrowByCategoryAsync(DateTime? from, DateTime? to, CancellationToken ct)

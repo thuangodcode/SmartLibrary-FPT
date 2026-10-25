@@ -8,6 +8,7 @@ public interface IReportRepository
     IQueryable<ReportTemplate> Templates { get; }
     IQueryable<SmartLibrary.Domain.Entities.BorrowRecord> BorrowRecords { get; }
     IQueryable<SmartLibrary.Domain.Entities.Fine> Fines { get; }
+    IQueryable<SmartLibrary.Domain.Entities.FinePayment> FinePayments { get; }
     IQueryable<SmartLibrary.Domain.Entities.UserProfile> Users { get; }
     IQueryable<SmartLibrary.Domain.Entities.Notification> Notifications { get; }
     IQueryable<SmartLibrary.Domain.Entities.ReportReview> Reviews { get; }

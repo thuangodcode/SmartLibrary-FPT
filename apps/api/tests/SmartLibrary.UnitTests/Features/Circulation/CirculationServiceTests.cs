@@ -12,6 +12,7 @@ public class CirculationServiceTests
 {
     private readonly Mock<ICirculationRepository> _repo = new();
     private readonly Mock<IUnitOfWork> _uow = new();
+    private readonly Mock<IPayOSPaymentGateway> _payOS = new();
     private readonly CirculationService _sut;
     private readonly CirculationSettings _settings = new()
     {
@@ -31,7 +32,8 @@ public class CirculationServiceTests
 
     public CirculationServiceTests()
     {
-        _sut = new CirculationService(_repo.Object, _uow.Object);
+        _sut = new CirculationService(_repo.Object, _uow.Object, _payOS.Object);
+        _payOS.SetupGet(x => x.IsConfigured).Returns(true);
         _repo.Setup(x => x.GetSettingsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(_settings);
         _repo.Setup(x => x.CountActiveLoansAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
         _repo.Setup(x => x.HasOverdueLoansAsync(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
@@ -51,11 +53,21 @@ public class CirculationServiceTests
             .Returns((Func<Task<SmartLibrary.Application.Common.Result<CirculationIncidentDto>>> work, CancellationToken _) => work());
         _repo.Setup(x => x.InTransactionAsync(It.IsAny<Func<Task<SmartLibrary.Application.Common.Result<CirculationReservationDto>>>>(), It.IsAny<CancellationToken>()))
             .Returns((Func<Task<SmartLibrary.Application.Common.Result<CirculationReservationDto>>> work, CancellationToken _) => work());
+        _repo.Setup(x => x.InTransactionAsync(It.IsAny<Func<Task<SmartLibrary.Application.Common.Result<CirculationFineDto>>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<SmartLibrary.Application.Common.Result<CirculationFineDto>>> work, CancellationToken _) => work());
+        _repo.Setup(x => x.InTransactionAsync(It.IsAny<Func<Task<SmartLibrary.Application.Common.Result<FinePaymentCheckoutDto>>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<SmartLibrary.Application.Common.Result<FinePaymentCheckoutDto>>> work, CancellationToken _) => work());
+        _repo.Setup(x => x.InTransactionAsync(It.IsAny<Func<Task<SmartLibrary.Application.Common.Result<bool>>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<SmartLibrary.Application.Common.Result<bool>>> work, CancellationToken _) => work());
         _repo.Setup(x => x.InTransactionAsync(It.IsAny<Func<Task<CirculationLoanDto>>>(), It.IsAny<CancellationToken>()))
             .Returns((Func<Task<CirculationLoanDto>> work, CancellationToken _) => work());
         _repo.Setup(x => x.AddNotificationAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         _repo.Setup(x => x.AddLoanAsync(It.IsAny<BorrowRecord>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         _repo.Setup(x => x.AddFineAsync(It.IsAny<Fine>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _repo.Setup(x => x.AddFinePaymentAsync(It.IsAny<FinePayment>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _repo.Setup(x => x.LockFineAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _repo.Setup(x => x.GetPendingPayOSPaymentAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((FinePayment?)null);
         _repo.Setup(x => x.CountReadyReservationsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
         _repo.Setup(x => x.CountAvailableCopiesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _repo.Setup(x => x.ExpireReadyReservationsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<ExpiredReservationDto>());
@@ -173,6 +185,108 @@ public class CirculationServiceTests
 
         first.IsSuccess.Should().BeTrue();
         second.IsSuccess.Should().BeTrue();
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PayFine_WhenCashReceived_RecordsCashChannelAndReceipt()
+    {
+        var id = Guid.NewGuid();
+        var librarianId = Guid.NewGuid();
+        var fine = new Fine
+        {
+            Id = id,
+            ReaderId = Guid.NewGuid(),
+            Status = FineStatus.Pending,
+            Amount = 5000
+        };
+        _repo.Setup(x => x.GetTrackedFineAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(fine);
+        _repo.Setup(x => x.GetFineDtoAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationFineDto { Id = id, Status = "Paid", Amount = 5000, PaymentMethod = "Cash" });
+
+        var result = await _sut.PayFineAsync(id, librarianId);
+
+        result.IsSuccess.Should().BeTrue();
+        fine.Status.Should().Be(FineStatus.Paid);
+        fine.PaymentMethod.Should().Be("Cash");
+        fine.RecordedById.Should().Be(librarianId);
+        _repo.Verify(x => x.AddFinePaymentAsync(It.Is<FinePayment>(payment =>
+            payment.FineId == id
+            && payment.Method == "Cash"
+            && payment.Status == FinePaymentStatus.Paid
+            && payment.Amount == fine.Amount
+            && payment.RecordedById == librarianId), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreatePayOSCheckout_UsesExactFineAmountAndReusesPendingIntent()
+    {
+        var fine = new Fine
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = Guid.NewGuid(),
+            Status = FineStatus.Pending,
+            Amount = 5000
+        };
+        var checkout = new PayOSCheckoutResult(
+            "payos-link", "https://payos.vn/checkout", "qr-payload", DateTime.UtcNow.AddMinutes(15));
+        _repo.Setup(x => x.GetTrackedFineAsync(fine.Id, It.IsAny<CancellationToken>())).ReturnsAsync(fine);
+        _repo.Setup(x => x.GetPendingPayOSPaymentAsync(fine.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((FinePayment?)null);
+        _payOS.Setup(x => x.CreateCheckoutAsync(
+                fine.Id, It.IsAny<long>(), 5000, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(checkout);
+
+        var result = await _sut.CreatePayOSCheckoutAsync(fine.Id, Guid.NewGuid(), fine.ReaderId);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.Amount.Should().Be(5000);
+        result.Data.CheckoutUrl.Should().Be(checkout.CheckoutUrl);
+        _repo.Verify(x => x.AddFinePaymentAsync(It.Is<FinePayment>(payment =>
+            payment.FineId == fine.Id
+            && payment.Method == "PayOS"
+            && payment.Amount == 5000
+            && payment.Status == FinePaymentStatus.Pending), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ProcessPayOSWebhook_WhenAmountDoesNotMatch_DoesNotSettleFine()
+    {
+        const long orderCode = 123456;
+        var fine = new Fine
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = Guid.NewGuid(),
+            Status = FineStatus.Pending,
+            Amount = 5000
+        };
+        var payment = new FinePayment
+        {
+            FineId = fine.Id,
+            Fine = fine,
+            Method = "PayOS",
+            Status = FinePaymentStatus.Pending,
+            Amount = 5000,
+            OrderCode = orderCode,
+            PaymentLinkId = "payos-link"
+        };
+        var data = new PayOSWebhookPayload(
+            orderCode, 4000, "FINE 12345678", "", "bank-reference", "",
+            "VND", "payos-link", "00", "", null, null, null, null, null, null);
+        _repo.Setup(x => x.GetFineIdForPaymentOrderAsync(orderCode, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(fine.Id);
+        _repo.Setup(x => x.GetTrackedFinePaymentByOrderCodeAsync(orderCode, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payment);
+        _repo.Setup(x => x.GetTrackedFineAsync(fine.Id, It.IsAny<CancellationToken>())).ReturnsAsync(fine);
+        _payOS.Setup(x => x.VerifyWebhookAsync(It.IsAny<PayOSWebhookEnvelope>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(data);
+
+        var result = await _sut.ProcessPayOSWebhookAsync(new PayOSWebhookEnvelope(
+            "00", "success", true, data, "verified-by-gateway"));
+
+        result.IsSuccess.Should().BeFalse();
+        fine.Status.Should().Be(FineStatus.Pending);
+        payment.Status.Should().Be(FinePaymentStatus.Pending);
         _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 

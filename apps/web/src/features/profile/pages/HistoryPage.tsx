@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { QRCodeCanvas } from 'qrcode.react';
 import {
   AlertCircle,
   ArrowLeft,
@@ -50,6 +51,20 @@ interface CirculationFine {
   status: string;
   createdAt: string;
   paidAt: string | null;
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
+  pendingPaymentStatus?: string | null;
+  checkoutUrl?: string | null;
+  qrCode?: string | null;
+  paymentExpiresAt?: string | null;
+}
+
+interface FinePaymentCheckout {
+  fineId: string;
+  amount: number;
+  checkoutUrl: string;
+  qrCode: string;
+  expiresAt: string | null;
 }
 
 interface LoanList {
@@ -103,6 +118,8 @@ const statusLabel: Record<string, string> = {
 
 const HistoryPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const returnFineId = searchParams.get('fineId');
+  const paymentRedirect = searchParams.get('payment');
   const token = useAuthStore((state) => state.accessToken);
   const { showToast } = useToast();
   const [loans, setLoans] = useState<LoanList | null>(null);
@@ -119,7 +136,12 @@ const HistoryPage = () => {
     setSearchParams(next, { replace: true });
   };
   const [renewingId, setRenewingId] = useState<string | null>(null);
+  const [paymentCheckout, setPaymentCheckout] = useState<FinePaymentCheckout | null>(null);
+  const [paymentBusy, setPaymentBusy] = useState<string | null>(null);
   const renewalRequestInFlight = useRef(false);
+  const paymentRedirectInfoShown = useRef(false);
+  const paymentRedirectHandled = useRef(false);
+  const paymentRedirectKey = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -222,6 +244,98 @@ const HistoryPage = () => {
       setRenewingId(null);
     }
   };
+
+  const createPayOSCheckout = async (fine: CirculationFine) => {
+    if (!token || paymentBusy) return;
+    setPaymentBusy(fine.id);
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/me/circulation/fines/${fine.id}/pay/payos`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await parseApiResponse<ApiEnvelope<FinePaymentCheckout>>(response);
+      if (!response.ok || !result?.success || !result.data) {
+        throw new Error(result?.error || 'Không thể tạo thanh toán PayOS.');
+      }
+      setPaymentCheckout(result.data);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Không thể tạo thanh toán PayOS.';
+      setError(message);
+      showToast({ type: 'error', title: 'Không thể thanh toán', message });
+    } finally {
+      setPaymentBusy(null);
+    }
+  };
+
+  useEffect(() => {
+    const shouldPoll = Boolean(paymentCheckout || (paymentRedirect === 'return' && returnFineId));
+    if (!shouldPoll) return undefined;
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      setRefreshKey((current) => current + 1);
+      if (attempts >= 24) window.clearInterval(timer);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [paymentCheckout, paymentRedirect, returnFineId]);
+
+  useEffect(() => {
+    if (!paymentCheckout) return;
+    const paid = fines.some((fine) => fine.id === paymentCheckout.fineId && fine.status === 'Paid');
+    if (paid) {
+      setPaymentCheckout(null);
+      showToast({
+        type: 'success',
+        title: 'Đã xác nhận thanh toán',
+        message: 'PayOS đã xác nhận giao dịch. Khoản phí đã được cập nhật.',
+      });
+    }
+  }, [fines, paymentCheckout, showToast]);
+
+  useEffect(() => {
+    const key = returnFineId && paymentRedirect ? `${paymentRedirect}:${returnFineId}` : null;
+    if (paymentRedirectKey.current !== key) {
+      paymentRedirectKey.current = key;
+      paymentRedirectInfoShown.current = false;
+      paymentRedirectHandled.current = false;
+    }
+    if (!returnFineId || !paymentRedirect || loading || paymentRedirectHandled.current) return;
+    const next = new URLSearchParams(searchParams);
+    if (paymentRedirect === 'cancel') {
+      paymentRedirectHandled.current = true;
+      showToast({
+        type: 'info',
+        title: 'Thanh toán chưa hoàn tất',
+        message: 'Khoản phí vẫn đang chờ thanh toán; hệ thống chưa ghi nhận đã thu.',
+      });
+      next.delete('payment');
+      next.delete('fineId');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+    if (paymentRedirect !== 'return') return;
+
+    const fine = fines.find((item) => item.id === returnFineId);
+    if (fine?.status === 'Paid' && fine.paymentMethod === 'PayOS') {
+      paymentRedirectHandled.current = true;
+      showToast({
+        type: 'success',
+        title: 'Đã xác nhận thanh toán',
+        message: 'PayOS đã xác nhận giao dịch.',
+      });
+      next.delete('payment');
+      next.delete('fineId');
+      setSearchParams(next, { replace: true });
+    } else if (!paymentRedirectInfoShown.current) {
+      paymentRedirectInfoShown.current = true;
+      showToast({
+        type: 'info',
+        title: 'Đang xác minh thanh toán',
+        message: 'Hệ thống đang chờ PayOS xác nhận. Trạng thái sẽ tự cập nhật; chưa ghi nhận giao dịch chỉ dựa trên trang chuyển hướng.',
+      });
+    }
+  }, [fines, loading, paymentRedirect, returnFineId, searchParams, setSearchParams, showToast]);
 
   return (
     <div className="annual-home history-page">
@@ -374,12 +488,29 @@ const HistoryPage = () => {
                     <span>Ghi nhận: {formatDate(fine.createdAt)}</span>
                     <span>Thanh toán: {formatDate(fine.paidAt)}</span>
                   </div>
+                  {fine.paymentMethod && (
+                    <span className="history-record-payment-method">
+                      Phương thức: {fine.paymentMethod === 'Cash' ? 'Tiền mặt tại quầy' : 'PayOS'}
+                      {fine.paymentReference ? ` · Mã giao dịch: ${fine.paymentReference}` : ''}
+                    </span>
+                  )}
                 </div>
                 <div className="history-fine-total">
                   <strong>{fine.amount.toLocaleString('vi-VN')}đ</strong>
                   <span className={`history-status history-status--${fine.status.toLowerCase()}`}>
                     {statusLabel[fine.status] ?? fine.status}
                   </span>
+                  {fine.status === 'Pending' && (
+                    <button
+                      type="button"
+                      className="history-pay-button"
+                      disabled={paymentBusy !== null}
+                      onClick={() => void createPayOSCheckout(fine)}
+                    >
+                      {paymentBusy === fine.id ? <LoaderCircle className="history-spinner" size={14} /> : <Wallet size={14} />}
+                      Thanh toán PayOS
+                    </button>
+                  )}
                 </div>
               </article>
             )) : (
@@ -404,6 +535,26 @@ const HistoryPage = () => {
           </nav>
         )}
       </main>
+      {paymentCheckout && (
+        <div className="history-payment-backdrop" role="presentation" onClick={() => setPaymentCheckout(null)}>
+          <section
+            className="history-payment-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="history-payment-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button type="button" className="history-payment-close" aria-label="Đóng" onClick={() => setPaymentCheckout(null)}>×</button>
+            <p>THANH TOÁN PHÍ PHẠT</p>
+            <h2 id="history-payment-title">Quét mã QR PayOS</h2>
+            <strong className="history-payment-amount">{paymentCheckout.amount.toLocaleString('vi-VN')}đ</strong>
+            <QRCodeCanvas value={paymentCheckout.qrCode} size={220} level="M" includeMargin />
+            <span>Quét mã bằng ứng dụng ngân hàng hoặc mở trang thanh toán PayOS.</span>
+            <a href={paymentCheckout.checkoutUrl} target="_blank" rel="noreferrer">Mở trang thanh toán</a>
+            <small>Trang sẽ tự cập nhật sau khi PayOS xác nhận giao dịch. Không đóng trang thanh toán trước khi hoàn tất.</small>
+          </section>
+        </div>
+      )}
       <HomeFooter />
     </div>
   );

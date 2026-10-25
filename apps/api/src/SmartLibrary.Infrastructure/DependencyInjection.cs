@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<IAiRecommendationService, AiRecommendationService>();
         services.AddHttpClient<IEmailService, EmailService>();
         services.AddHttpClient();
+        services.AddScoped<IPayOSPaymentGateway, PayOSPaymentGateway>();
         services.AddScoped<IAdminUserManagementService, AdminUserManagementService>();
         services.AddScoped<IUserProfileService, UserProfileService>();
         services.AddScoped<IStorageService, StorageService>();

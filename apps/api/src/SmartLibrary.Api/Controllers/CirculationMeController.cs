@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using PayOS.Exceptions;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Circulation;
 using SmartLibrary.Application.Features.Circulation.DTOs;
@@ -15,11 +16,16 @@ public class CirculationMeController : ControllerBase
 {
     private readonly CirculationService _circulation;
     private readonly IHubContext<NotificationHub> _hub;
+    private readonly ILogger<CirculationMeController> _logger;
 
-    public CirculationMeController(CirculationService circulation, IHubContext<NotificationHub> hub)
+    public CirculationMeController(
+        CirculationService circulation,
+        IHubContext<NotificationHub> hub,
+        ILogger<CirculationMeController> logger)
     {
         _circulation = circulation;
         _hub = hub;
+        _logger = logger;
     }
 
     [HttpGet("loans")]
@@ -38,6 +44,31 @@ public class CirculationMeController : ControllerBase
         return result.IsSuccess
             ? Ok(ApiResponse<IReadOnlyList<CirculationFineDto>>.Ok(result.Data!))
             : Unauthorized(ApiResponse<object>.Fail(result.Error!));
+    }
+
+    [HttpPost("fines/{id:guid}/pay/payos")]
+    [Authorize(Roles = "Reader")]
+    public async Task<IActionResult> CreatePayOSFineCheckout(Guid id, CancellationToken ct)
+    {
+        var readerId = CirculationService.ReadUserId(User);
+        try
+        {
+            var result = await _circulation.CreatePayOSCheckoutAsync(id, readerId, readerId, ct);
+            return result.IsSuccess
+                ? Ok(ApiResponse<FinePaymentCheckoutDto>.Ok(result.Data!))
+                : BadRequest(ApiResponse<object>.Fail(result.Error!));
+        }
+        catch (PayOSException ex)
+        {
+            _logger.LogError(ex, "PayOS could not create a checkout for reader fine {FineId}.", id);
+            return StatusCode(StatusCodes.Status502BadGateway,
+                ApiResponse<object>.Fail("PayOS hiện không thể tạo liên kết thanh toán. Vui lòng thử lại."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex, "Invalid PayOS configuration while creating reader checkout for fine {FineId}.", id);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse<object>.Fail(ex.Message));
+        }
     }
 
     [HttpPost("loans")]

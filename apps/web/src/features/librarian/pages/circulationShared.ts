@@ -87,6 +87,13 @@ export interface CirculationFine {
   status: string;
   createdAt: string;
   paidAt?: string | null;
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
+  pendingPaymentStatus?: string | null;
+  checkoutUrl?: string | null;
+  qrCode?: string | null;
+  paymentExpiresAt?: string | null;
+  reconciliationRequired?: boolean;
 }
 
 export interface CirculationReservation {

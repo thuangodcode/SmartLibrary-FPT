@@ -52,7 +52,12 @@ public interface ICirculationRepository
     Task<IReadOnlyList<CirculationIncidentDto>> GetIncidentsAsync(int finePerDay, CancellationToken ct);
     Task<CirculationIncidentDto?> GetIncidentDtoAsync(Guid id, int finePerDay, CancellationToken ct);
     Task<Fine?> GetTrackedFineAsync(Guid id, CancellationToken ct);
+    Task LockFineAsync(Guid id, CancellationToken ct);
     Task<CirculationFineDto?> GetFineDtoAsync(Guid id, CancellationToken ct);
+    Task<FinePayment?> GetPendingPayOSPaymentAsync(Guid fineId, CancellationToken ct);
+    Task<Guid?> GetFineIdForPaymentOrderAsync(long orderCode, CancellationToken ct);
+    Task<FinePayment?> GetTrackedFinePaymentByOrderCodeAsync(long orderCode, CancellationToken ct);
+    Task AddFinePaymentAsync(FinePayment payment, CancellationToken ct);
     Task<IReadOnlyList<CirculationLoanDto>> GetPendingAsync(int finePerDay, CancellationToken ct);
     Task<IReadOnlyList<CirculationReservationDto>> GetReservationsAsync(CancellationToken ct);
     Task<IReadOnlyList<CirculationReservationDto>> GetReservationsForReaderAsync(Guid readerId, CancellationToken ct);

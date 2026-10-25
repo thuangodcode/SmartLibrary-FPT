@@ -11,8 +11,12 @@ public class Fine : AuditableEntity, ISoftDeletable
     public string Reason { get; set; } = string.Empty;
     public FineStatus Status { get; set; } = FineStatus.Pending;
     public DateTime? PaidAt { get; set; }
+    public string? PaymentMethod { get; set; }
+    public string? PaymentReference { get; set; }
+    public Guid? RecordedById { get; set; }
     public string? Notes { get; set; }
     public bool IsDeleted { get; set; }
+    public ICollection<FinePayment> Payments { get; set; } = [];
 
     // Navigation
     public BorrowRecord BorrowRecord { get; set; } = null!;

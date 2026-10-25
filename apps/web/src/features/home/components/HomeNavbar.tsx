@@ -418,7 +418,6 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
             </div>
           </div>
           <Link to="/books" aria-current={activeSection === 'catalog' ? 'page' : undefined} onClick={closeMenu}>Khám phá sách</Link>
-          {user?.role === 'Reader' && <Link to="/favorites" onClick={closeMenu}><Heart size={15} aria-hidden="true" /> Yêu thích</Link>}
           <Link to="/news" aria-current={activeSection === 'news' ? 'page' : undefined} onClick={closeMenu}>Tin tức</Link>
           <a href="/#library" onClick={closeMenu}>Thư viện</a>
         </nav>

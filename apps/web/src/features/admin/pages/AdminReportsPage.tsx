@@ -9,7 +9,7 @@ import './AdminReportsExperience.css';
 import './AdminAssignments.css';
 
 interface ApiEnvelope<T> { success?: boolean; data?: T; error?: string }
-interface Summary { from: string; to: string; borrowed: number; returned: number; returnedOnTimeRate: number; borrowedChangePercent: number; returnedChangePercent: number; fineRevenue: number; fineTransactions: number; fineChangePercent: number; libraryVisits: number | null; libraryVisitsAvailable: boolean }
+interface Summary { from: string; to: string; borrowed: number; returned: number; returnedOnTimeRate: number; borrowedChangePercent: number; returnedChangePercent: number; fineRevenue: number; fineTransactions: number; fineChangePercent: number; cashFineRevenue: number; payOSFineRevenue: number; unclassifiedFineRevenue: number; libraryVisits: number | null; libraryVisitsAvailable: boolean }
 interface CategoryStat { category: string; count: number; percent: number }
 interface ReportItem { id: string; code: string; name: string; submitter: string; createdAt: string; format: string; status: string; isViewed: boolean; isApproved: boolean; isRejected?: boolean }
 interface ReportList { items: ReportItem[]; totalCount: number; page: number; pageSize: number; totalPages: number }
@@ -17,7 +17,7 @@ interface Librarian { id: string; fullName: string; status: string; isActive: bo
 interface LibrarianList { items: Librarian[] }
 interface ReportTemplate { id: string; name: string; reportType: string; isEnabled: boolean }
 interface ReportRequest { id: string; librarianId: string; librarianName: string; templateId: string; templateName: string; reportType: string; periodStart: string; periodEnd: string; name: string; status: string; createdAt: string; reportId?: string | null; lastReportStatus?: string | null; lastReviewComment?: string | null }
-interface FinanceFine { id: string; code: string; readerName: string; bookTitle: string; barcode: string; amount: number; reason: string; status: string; createdAt: string; paidAt?: string | null }
+interface FinanceFine { id: string; code: string; readerName: string; bookTitle: string; barcode: string; amount: number; reason: string; status: string; createdAt: string; paidAt?: string | null; paymentMethod?: string | null; paymentReference?: string | null; reconciliationRequired?: boolean }
 
 const number = (value: number) => value.toLocaleString('vi-VN');
 const money = (value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value);
@@ -257,6 +257,9 @@ const AdminReportsPage: React.FC = () => {
     { label: 'Lượt vào thư viện', value: summary.libraryVisitsAvailable && summary.libraryVisits !== null ? number(summary.libraryVisits) : 'Chưa có dữ liệu', note: 'Nguồn ghi nhận lượt vào chưa được kết nối', icon: UsersRound, tone: 'blue' },
     { label: 'Phí đã thu', value: money(summary.fineRevenue), note: `${number(summary.fineTransactions)} giao dịch`, icon: CircleDollarSign, tone: 'purple' },
     { label: 'Giao dịch phí', value: number(summary.fineTransactions), note: 'Giao dịch trong kỳ', icon: CircleDollarSign, tone: 'purple' },
+    { label: 'Thu tiền mặt', value: money(summary.cashFineRevenue), note: 'Đã xác nhận tại quầy', icon: WalletCards, tone: 'orange' },
+    { label: 'Thu qua PayOS', value: money(summary.payOSFineRevenue), note: 'Đã xác nhận qua webhook', icon: CircleDollarSign, tone: 'green' },
+    { label: 'Chưa phân loại', value: money(summary.unclassifiedFineRevenue), note: 'Khoản cũ hoặc cần đối soát', icon: AlertCircle, tone: 'blue' },
   ] : [];
   const sectionDetails: Record<string, { title: string; description: string }> = {
     assignments: { title: 'Theo dõi giao việc', description: 'Theo dõi các yêu cầu báo cáo đã giao cho Thủ thư.' },
@@ -269,7 +272,7 @@ const AdminReportsPage: React.FC = () => {
   const sectionCards = activeSection === 'activity'
     ? cards.filter((card) => ['Sách mượn', 'Sách trả', 'Lượt vào thư viện'].includes(card.label))
     : activeSection === 'finance'
-      ? cards.filter((card) => ['Phí đã thu', 'Giao dịch phí'].includes(card.label))
+      ? cards.filter((card) => ['Phí đã thu', 'Giao dịch phí', 'Thu tiền mặt', 'Thu qua PayOS', 'Chưa phân loại'].includes(card.label))
       : [];
   const pendingFines = financeFines.filter((fine) => fine.status === 'Pending');
   const pendingFineAmount = pendingFines.reduce((total, fine) => total + fine.amount, 0);
@@ -369,7 +372,7 @@ const AdminReportsPage: React.FC = () => {
       <div className="reports-panel-title"><div><span>CHI TIẾT PHÍ PHẠT</span><h2>Các khoản phạt gần đây</h2></div><div className="reports-finance-heading-meta"><span>{number(financeFines.length)} khoản ghi nhận</span><button type="button" onClick={() => void loadFinanceFines()} disabled={financeLoading}>{financeLoading ? <LoaderCircle className="reports-spin" size={15}/> : 'Làm mới'}</button></div></div>
       {financeError ? <div className="reports-error" role="alert"><AlertCircle size={17}/><span>{financeError}</span><button type="button" onClick={() => void loadFinanceFines()}>Thử lại</button></div>
         : financeLoading && !financeFines.length ? <div className="reports-finance-loading"><LoaderCircle className="reports-spin" size={18}/> Đang tải chi tiết phí phạt…</div>
-          : financeFines.length ? <div className="reports-table-wrap"><table className="reports-table reports-finance-table"><thead><tr><th>Khoản phạt</th><th>Độc giả</th><th>Sách</th><th>Lý do</th><th className="num">Số tiền</th><th>Thời điểm</th><th>Trạng thái</th></tr></thead><tbody>{financeFines.slice(0, 8).map((fine) => <tr key={fine.id}><td><strong>{fine.code}</strong><small>Ghi nhận {date(fine.createdAt)}</small></td><td>{fine.readerName}</td><td><strong>{fine.bookTitle}</strong><small>{fine.barcode}</small></td><td className="reports-finance-reason">{fine.reason}</td><td className="num reports-finance-amount">{money(fine.amount)}</td><td>{fine.paidAt ? <><span>{date(fine.paidAt)}</span><small>Đã thu</small></> : <span className="reports-finance-missing">—</span>}</td><td><span className={`status-pill ${fine.status === 'Paid' ? 'approved' : fine.status === 'Waived' ? 'unapproved' : 'pending'}`}>{fine.status === 'Paid' ? 'Đã thanh toán' : fine.status === 'Waived' ? 'Đã miễn' : 'Chưa thanh toán'}</span></td></tr>)}</tbody></table></div>
+          : financeFines.length ? <div className="reports-table-wrap"><table className="reports-table reports-finance-table"><thead><tr><th>Khoản phạt</th><th>Độc giả</th><th>Sách</th><th>Lý do</th><th className="num">Số tiền</th><th>Thời điểm</th><th>Phương thức</th><th>Trạng thái</th></tr></thead><tbody>{financeFines.slice(0, 8).map((fine) => <tr key={fine.id}><td><strong>{fine.code}</strong><small>Ghi nhận {date(fine.createdAt)}</small></td><td>{fine.readerName}</td><td><strong>{fine.bookTitle}</strong><small>{fine.barcode}</small></td><td className="reports-finance-reason">{fine.reason}</td><td className="num reports-finance-amount">{money(fine.amount)}</td><td>{fine.paidAt ? <><span>{date(fine.paidAt)}</span><small>Đã thu</small></> : <span className="reports-finance-missing">—</span>}</td><td>{fine.paymentMethod === 'Cash' ? 'Tiền mặt' : fine.paymentMethod === 'PayOS' ? 'PayOS' : fine.status === 'Paid' ? 'Chưa phân loại' : '—'}{fine.paymentReference && <small>{fine.paymentReference}</small>}</td><td><span className={`status-pill ${fine.reconciliationRequired ? 'pending' : fine.status === 'Paid' ? 'approved' : fine.status === 'Waived' ? 'unapproved' : 'pending'}`}>{fine.reconciliationRequired ? 'Cần đối soát' : fine.status === 'Paid' ? 'Đã thanh toán' : fine.status === 'Waived' ? 'Đã miễn' : 'Chưa thanh toán'}</span></td></tr>)}</tbody></table></div>
             : <div className="reports-finance-empty"><CircleDollarSign size={20}/><strong>Chưa có khoản phạt</strong><span>Khi Thủ thư ghi nhận phí phạt, chi tiết sẽ xuất hiện tại đây.</span></div>}
     </section>}
     {activeSection === 'activity' && <section className="reports-panel category-panel"><div className="reports-panel-title"><div><span>HOẠT ĐỘNG THƯ VIỆN</span><h2>Mượn theo nhóm sách</h2></div><span className="live-badge"><i/> Dữ liệu trực tiếp</span></div>{loading && !summary ? <p className="reports-muted">Đang tải thống kê…</p> : categories.length ? <div className="category-list">{categories.map((item) => <div className="category-row" key={item.category}><div className="category-copy"><strong>{item.category}</strong><span>{number(item.count)} lượt mượn · {item.percent}%</span></div><div className="category-track"><div style={{ width: `${item.percent}%` }}/></div></div>)}</div> : <div className="reports-empty"><ChartNoAxesCombined size={20}/><span>Chưa có dữ liệu mượn theo nhóm sách trong kỳ.</span></div>}</section>}

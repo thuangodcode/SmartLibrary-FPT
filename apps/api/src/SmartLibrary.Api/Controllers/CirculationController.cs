@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using PayOS.Exceptions;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Circulation;
 using SmartLibrary.Application.Features.Circulation.DTOs;
@@ -15,11 +16,16 @@ public class CirculationController : ControllerBase
 {
     private readonly CirculationService _circulation;
     private readonly IHubContext<NotificationHub> _hub;
+    private readonly ILogger<CirculationController> _logger;
 
-    public CirculationController(CirculationService circulation, IHubContext<NotificationHub> hub)
+    public CirculationController(
+        CirculationService circulation,
+        IHubContext<NotificationHub> hub,
+        ILogger<CirculationController> logger)
     {
         _circulation = circulation;
         _hub = hub;
+        _logger = logger;
     }
 
     [HttpGet("stats")]
@@ -148,12 +154,51 @@ public class CirculationController : ControllerBase
     }
 
     [HttpPost("fines/{id:guid}/pay")]
+    [HttpPost("fines/{id:guid}/pay/cash")]
     public async Task<IActionResult> PayFine(Guid id, CancellationToken ct)
     {
-        var result = await _circulation.PayFineAsync(id, ct);
-        return result.IsSuccess
-            ? Ok(ApiResponse<CirculationFineDto>.Ok(result.Data!, new { message = "Đã ghi nhận thanh toán." }))
-            : BadRequest(ApiResponse<object>.Fail(result.Error!));
+        try
+        {
+            var result = await _circulation.PayFineAsync(id, CirculationService.ReadUserId(User), ct);
+            return result.IsSuccess
+                ? Ok(ApiResponse<CirculationFineDto>.Ok(result.Data!, new { message = "Đã ghi nhận thanh toán tiền mặt." }))
+                : BadRequest(ApiResponse<object>.Fail(result.Error!));
+        }
+        catch (PayOSException ex)
+        {
+            _logger.LogError(ex, "Could not cancel PayOS link before cash settlement for fine {FineId}.", id);
+            return StatusCode(StatusCodes.Status502BadGateway,
+                ApiResponse<object>.Fail("PayOS chưa xác nhận hủy liên kết; khoản phí chưa được ghi nhận tiền mặt."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Cash settlement blocked because PayOS link cancellation was not confirmed for fine {FineId}.", id);
+            return Conflict(ApiResponse<object>.Fail(ex.Message));
+        }
+    }
+
+    [HttpPost("fines/{id:guid}/pay/payos")]
+    public async Task<IActionResult> CreatePayOSFineCheckout(Guid id, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _circulation.CreatePayOSCheckoutAsync(
+                id, CirculationService.ReadUserId(User), null, ct);
+            return result.IsSuccess
+                ? Ok(ApiResponse<FinePaymentCheckoutDto>.Ok(result.Data!))
+                : BadRequest(ApiResponse<object>.Fail(result.Error!));
+        }
+        catch (PayOSException ex)
+        {
+            _logger.LogError(ex, "PayOS could not create a checkout for fine {FineId}.", id);
+            return StatusCode(StatusCodes.Status502BadGateway,
+                ApiResponse<object>.Fail("PayOS hiện không thể tạo liên kết thanh toán. Vui lòng thử lại."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex, "Invalid PayOS configuration while creating checkout for fine {FineId}.", id);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse<object>.Fail(ex.Message));
+        }
     }
 
     [HttpGet("pending")]

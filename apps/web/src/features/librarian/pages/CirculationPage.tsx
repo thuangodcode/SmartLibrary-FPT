@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import {
@@ -1161,6 +1162,8 @@ function OverdueView() {
   const [incidents, setIncidents] = useState<CirculationIncident[]>([]);
   const [drafts, setDrafts] = useState<Record<string, IncidentDraft>>({});
   const [error, setError] = useState<string | null>(null);
+  const [overdueLoadFailed, setOverdueLoadFailed] = useState(false);
+  const [incidentLoadFailed, setIncidentLoadFailed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -1176,13 +1179,36 @@ function OverdueView() {
       const statsJson = await parseApiResponse<ApiResult<CirculationStats>>(statsRes);
       const overdueJson = await parseApiResponse<ApiResult<CirculationLoan[]>>(overdueRes);
       const incidentJson = await parseApiResponse<ApiResult<CirculationIncident[]>>(incidentRes);
-      if (!overdueRes.ok || !overdueJson?.success) throw new Error(overdueJson?.error || 'Không tải được sách quá hạn.');
-      setError(null);
-      setStats(statsJson?.data ?? null);
-      setItems(overdueJson.data ?? []);
-      setIncidents(incidentJson?.data ?? []);
+      const errors: string[] = [];
+      if (statsRes.ok && statsJson?.success && statsJson.data) {
+        setStats(statsJson.data ?? null);
+      } else {
+        setStats(null);
+        errors.push(statsJson?.error || 'Không tải được chính sách phí.');
+      }
+      if (overdueRes.ok && overdueJson?.success && overdueJson.data) {
+        setItems(overdueJson.data ?? []);
+        setOverdueLoadFailed(false);
+      } else {
+        setOverdueLoadFailed(true);
+        errors.push(overdueJson?.error || 'Không tải được sách quá hạn.');
+      }
+      if (incidentRes.ok && incidentJson?.success && incidentJson.data) {
+        setIncidents(incidentJson.data ?? []);
+        setIncidentLoadFailed(false);
+      } else {
+        setIncidentLoadFailed(true);
+        errors.push(incidentJson?.error || 'Không tải được hồ sơ sự cố.');
+      }
+      const error = errors.length > 0 ? errors.join(' ') : null;
+      setError(error);
+      if (error) {
+        showToast({ type: 'error', title: 'Dữ liệu quá hạn chưa đầy đủ', message: error });
+      }
     } catch (err) {
       const message = errorMessage(err, 'Lỗi tải dữ liệu.');
+      setOverdueLoadFailed(true);
+      setIncidentLoadFailed(true);
       setError(message);
       showToast({ type: 'error', title: 'Không tải được dữ liệu quá hạn', message });
     } finally {
@@ -1192,14 +1218,19 @@ function OverdueView() {
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
-  const draftOf = (item: CirculationIncident): IncidentDraft => drafts[item.id] ?? {
+  const initialDraftOf = (item: CirculationIncident): IncidentDraft => ({
     severity: item.kind === 'Lost' ? 'Lost' : 'Light',
-    applyOverdue: item.overdueDays > 0,
+    applyOverdue: item.overdueDays > 0 && (item.suggestedOverdueFine ?? 0) > 0,
     notes: '',
-  };
+  });
+
+  const draftOf = (item: CirculationIncident): IncidentDraft => drafts[item.id] ?? initialDraftOf(item);
 
   const patchDraft = (id: string, item: CirculationIncident, patch: Partial<IncidentDraft>) => {
-    setDrafts((current) => ({ ...current, [id]: { ...draftOf(item), ...patch } }));
+    setDrafts((current) => ({
+      ...current,
+      [id]: { ...(current[id] ?? initialDraftOf(item)), ...patch },
+    }));
   };
 
   const recordFine = async (loan: CirculationLoan) => {
@@ -1234,7 +1265,9 @@ function OverdueView() {
     const draft = draftOf(item);
     const expectedFee = policyIncidentFee(stats, draft.severity);
     if (!expectedFee || expectedFee <= 0) {
-      const message = 'Chưa có mức phí trong chính sách Admin. Không ghi nhận số tiền do Thủ thư nhập tay.';
+      const message = stats
+        ? `Admin cần cấu hình ${draft.severity === 'Light' ? 'damage_fee' : 'lost_book_fee'} trong Chính sách > Phí phạt. Không ghi nhận số tiền do Thủ thư nhập tay.`
+        : 'Chưa tải được cấu hình phí. Hãy làm mới trang trước khi xác nhận.';
       setError(message);
       showToast({ type: 'error', title: 'Thiếu chính sách phí', message });
       return;
@@ -1294,7 +1327,7 @@ function OverdueView() {
   };
 
   return (
-    <section className="circ-page">
+    <section className="circ-page circ-page--overdue">
       <Chrome tab="overdue" stats={stats} loading={loading} />
       <div className="circ-toolbar-end">
         <span />
@@ -1309,6 +1342,8 @@ function OverdueView() {
         <h2>Sách quá hạn</h2>
         {loading ? (
           <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải danh sách quá hạn...</p>
+        ) : overdueLoadFailed ? (
+          <p className="circ-error" role="alert">Không thể xác định danh sách quá hạn. Hãy bấm “Làm mới” để thử lại.</p>
         ) : !items.length ? <p className="circ-empty">Không có sách quá hạn.</p> : (
           <div className="circ-table-wrap">
             <table className="circ-table">
@@ -1338,7 +1373,17 @@ function OverdueView() {
                       {loan.hasOpenFine || loan.hasFine ? (
                         <Link className="circ-btn" to={tabPath('fines')}>Xem</Link>
                       ) : (
-                        <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void recordFine(loan)}>Ghi nhận phạt</button>
+                        <button
+                          type="button"
+                          className="circ-btn circ-btn--primary"
+                          disabled={busy || !loan.suggestedFine || loan.suggestedFine <= 0}
+                          title={loan.suggestedFine && loan.suggestedFine > 0
+                            ? 'Tạo khoản phí quá hạn theo chính sách hiện hành'
+                            : 'Admin cần cấu hình overdue_fee_per_day trong Chính sách > Phí phạt'}
+                          onClick={() => void recordFine(loan)}
+                        >
+                          Ghi nhận phạt
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -1350,9 +1395,11 @@ function OverdueView() {
       </div>
       <div className="circ-card">
         <h2>Hư hỏng & thất lạc</h2>
-        <p className="circ-hint">Không ghi nhận mất sách hay bồi thường khi độc giả tự báo. Thủ thư đối chiếu bản sao, phiếu mượn rồi xác nhận. Phí sách hỏng và sách mất lấy từ chính sách Admin, không nhập tay. Không tự khóa tài khoản.</p>
+        <p className="circ-hint">Đối chiếu sách và phiếu mượn trước khi xác nhận. Mức bồi thường lấy từ chính sách Admin.</p>
         {loading ? (
           <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải hồ sơ sự cố...</p>
+        ) : incidentLoadFailed ? (
+          <p className="circ-error" role="alert">Không thể tải hồ sơ sự cố. Hãy bấm “Làm mới” để thử lại.</p>
         ) : !incidents.length ? <p className="circ-empty">Chưa có hồ sơ mất sách hoặc hư hỏng.</p> : incidents.map((item) => {
           const draft = draftOf(item);
           const amount = policyIncidentFee(stats, draft.severity);
@@ -1373,34 +1420,74 @@ function OverdueView() {
                 {item.overdueDays > 0 ? ` · quá hạn ${item.overdueDays} ngày` : ''}
                 {item.totalAmount > 0 ? ` · ${formatMoney(item.totalAmount)}` : ''}
               </p>
-              {item.description && <p className="circ-incident-note">{item.description}</p>}
+              {item.description && pending && <p className="circ-incident-note">{item.description}</p>}
               {pending ? (
                 <div className="circ-incident-form">
-                  <label className="circ-field">
-                    Mức độ
-                    <select value={draft.severity} onChange={(e) => patchDraft(item.id, item, { severity: e.target.value })} disabled={item.kind === 'Lost'}>
-                      {item.kind !== 'Lost' && <option value="Light">Hư hỏng nhẹ, còn dùng được</option>}
-                      {item.kind !== 'Lost' && <option value="Severe">Hư hỏng nặng, phải mua đền</option>}
-                      <option value="Lost">Mất sách, bồi thường giá trị tài liệu</option>
-                    </select>
-                  </label>
-                  <p className="circ-hint">
+                  {item.kind === 'Lost' ? (
+                    <div className="circ-field">
+                      <span>Mức độ đã ghi nhận</span>
+                      <div className="circ-incident-fixed-field">Mất sách, bồi thường giá trị tài liệu</div>
+                    </div>
+                  ) : (
+                    <label className="circ-field">
+                      Mức độ hư hỏng
+                      <select value={draft.severity} onChange={(e) => patchDraft(item.id, item, { severity: e.target.value })}>
+                        <option value="Light">Hư hỏng nhẹ, còn sử dụng được</option>
+                        <option value="Severe">Hư hỏng nặng, cần bồi thường</option>
+                      </select>
+                    </label>
+                  )}
+                  <p className="circ-hint" role={amount > 0 ? undefined : 'status'}>
                     {amount > 0
-                      ? `Phí dự kiến theo chính sách Admin: ${formatMoney(amount)}${overdue ? ` + quá hạn ${formatMoney(overdue)} = ${formatMoney(amount + overdue)}` : ''}. Backend tự tính khi xác nhận.`
-                      : 'Chưa cấu hình phí sách hỏng/mất. Admin hãy vào Chính sách > Phí phạt.'}
+                      ? `Dự kiến theo chính sách: ${formatMoney(amount)}${overdue ? ` + quá hạn ${formatMoney(overdue)} = ${formatMoney(amount + overdue)}` : ''}.`
+                      : stats
+                        ? `Chưa thể xác nhận: Admin cần cấu hình ${draft.severity === 'Light' ? 'damage_fee' : 'lost_book_fee'} trong Chính sách > Phí phạt.`
+                        : 'Chưa thể xác nhận vì chưa tải được chính sách phí. Hãy bấm “Làm mới” để thử lại.'}
                   </p>
-                  <label className="circ-check">
-                    <input type="checkbox" checked={draft.applyOverdue} onChange={(e) => patchDraft(item.id, item, { applyOverdue: e.target.checked })} disabled={item.overdueDays <= 0} />
-                    Cộng phạt quá hạn {item.suggestedOverdueFine ? formatMoney(item.suggestedOverdueFine) : '(chưa có mức trong chính sách)'}
-                  </label>
+                  {item.overdueDays > 0 && item.suggestedOverdueFine ? (
+                    <label className="circ-check">
+                      <input
+                        type="checkbox"
+                        checked={draft.applyOverdue}
+                        onChange={(e) => patchDraft(item.id, item, { applyOverdue: e.target.checked })}
+                      />
+                      Cộng phí quá hạn {formatMoney(item.suggestedOverdueFine)}
+                    </label>
+                  ) : item.overdueDays > 0 ? (
+                    <p className="circ-hint circ-hint--warning" role="status">
+                      Phiếu trễ {item.overdueDays} ngày nhưng chưa có mức phí quá hạn hợp lệ. Kiểm tra chính sách `overdue_fee_per_day`.
+                    </p>
+                  ) : null}
                   <label className="circ-field">
                     Biên bản / ghi chú xác minh
-                    <input value={draft.notes} onChange={(e) => patchDraft(item.id, item, { notes: e.target.value })} placeholder="Đã đối chiếu bản sao và phiếu mượn" />
+                    <textarea
+                      value={draft.notes}
+                      onChange={(e) => patchDraft(item.id, item, { notes: e.target.value })}
+                      placeholder="Ghi kết quả đối chiếu bản sao và phiếu mượn..."
+                      rows={3}
+                      maxLength={2000}
+                      aria-label="Biên bản / ghi chú xác minh"
+                    />
                   </label>
                   <div className="circ-actions">
-                    <button type="button" className="circ-btn circ-btn--primary" disabled={busy || amount <= 0} onClick={() => void confirmIncident(item)}>Xác nhận bồi thường</button>
+                    <button
+                      type="button"
+                      className="circ-btn circ-btn--primary"
+                      disabled={busy || amount <= 0}
+                      title={amount > 0
+                        ? 'Xác nhận hồ sơ và lập khoản phí theo chính sách'
+                        : stats
+                          ? `Admin cần cấu hình ${draft.severity === 'Light' ? 'damage_fee' : 'lost_book_fee'} trước khi xác nhận`
+                          : 'Chưa tải được chính sách phí; hãy làm mới trang'}
+                      onClick={() => void confirmIncident(item)}
+                    >
+                      Xác nhận bồi thường
+                    </button>
                     <button type="button" className="circ-btn" disabled={busy} onClick={() => void rejectIncident(item)}>Từ chối / tìm thấy sách</button>
-                    <Link className="circ-btn" to={tabPath('fines')}>Xem phí</Link>
+                    <Link className="circ-btn" to={tabPath('fines')}>Danh sách phí</Link>
+                    {item.totalAmount <= 0 && (
+                      <span className="circ-hint">Khoản bồi thường chỉ được lập sau khi xác nhận hồ sơ.</span>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -1428,14 +1515,18 @@ function FinesView() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedFine, setSelectedFine] = useState<CirculationFine | null>(null);
+  const [paymentCheckout, setPaymentCheckout] = useState<{
+    fineId: string; amount: number; checkoutUrl: string; qrCode: string; expiresAt: string | null;
+  } | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(searchInput), 400);
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       const query = new URLSearchParams();
       if (search.trim()) query.set('search', search.trim());
@@ -1450,11 +1541,11 @@ function FinesView() {
       setError(message);
       showToast({ type: 'error', title: 'Không tải được danh sách phí phạt', message });
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, [headers, search, showToast, status]);
 
-  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+  useEffect(() => { void Promise.resolve().then(() => load()); }, [load]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -1471,17 +1562,19 @@ function FinesView() {
 
   useEffect(() => { void Promise.resolve().then(loadStats); }, [loadStats]);
 
-  const pay = async (id: string) => {
-    if (!window.confirm('Xác nhận đã thu tiền phạt này? Hệ thống không tự đánh dấu đã thanh toán.')) return;
+  const payCash = async (id: string) => {
+    if (!window.confirm('Xác nhận đã nhận đủ tiền mặt từ độc giả?')) return;
     setBusy(true);
     setMessage(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/circulation/fines/${id}/pay`, { method: 'POST', headers });
+      const res = await fetch(`${API_BASE_URL}/api/v1/circulation/fines/${id}/pay/cash`, { method: 'POST', headers });
       const json = await parseApiResponse<ApiResult<unknown>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Không ghi nhận thanh toán.');
-      const message = json.meta?.message || 'Đã ghi nhận thanh toán.';
+      const message = json.meta?.message || 'Đã ghi nhận thanh toán tiền mặt.';
       setMessage(message);
       showToast({ type: 'success', title: 'Đã ghi nhận thanh toán', message });
+      setSelectedFine(null);
+      setPaymentCheckout(null);
       await Promise.all([load(), loadStats()]);
     } catch (err) {
       const message = errorMessage(err, 'Không ghi nhận thanh toán.');
@@ -1491,6 +1584,52 @@ function FinesView() {
       setBusy(false);
     }
   };
+
+  const createPayOSCheckout = async (fine: CirculationFine) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/circulation/fines/${fine.id}/pay/payos`, {
+        method: 'POST',
+        headers,
+      });
+      const result = await parseApiResponse<ApiResult<{
+        fineId: string; amount: number; checkoutUrl: string; qrCode: string; expiresAt: string | null;
+      }>>(response);
+      if (!response.ok || !result?.success || !result.data) {
+        throw new Error(result?.error || 'Không thể tạo thanh toán PayOS.');
+      }
+      setPaymentCheckout(result.data);
+      await load();
+    } catch (err) {
+      const message = errorMessage(err, 'Không thể tạo thanh toán PayOS.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không thể tạo thanh toán PayOS', message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!paymentCheckout) return undefined;
+    const timer = window.setInterval(() => void load(true), 5000);
+    return () => window.clearInterval(timer);
+  }, [load, paymentCheckout]);
+
+  useEffect(() => {
+    if (!paymentCheckout) return;
+    const checkoutFine = items.find((fine) => fine.id === paymentCheckout.fineId);
+    if (checkoutFine?.status === 'Paid' || (!checkoutFine && status === 'Pending')) {
+      setPaymentCheckout(null);
+      setSelectedFine(null);
+      showToast({
+        type: 'success',
+        title: 'Đã xác nhận thanh toán',
+        message: 'PayOS đã xác nhận giao dịch.',
+      });
+      void loadStats();
+    }
+  }, [items, loadStats, paymentCheckout, showToast, status]);
 
   return (
     <section className="circ-page">
@@ -1525,7 +1664,7 @@ function FinesView() {
             <table className="circ-table">
               <thead>
                 <tr>
-                  <th>Mã</th><th>Độc giả</th><th>Sách</th><th>Lý do</th><th>Số tiền</th><th>Ngày</th><th>Trạng thái</th><th>Thao tác</th>
+                  <th>Mã</th><th>Độc giả</th><th>Sách</th><th>Lý do</th><th>Số tiền</th><th>Ngày</th><th>Phương thức</th><th>Trạng thái</th><th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -1538,13 +1677,18 @@ function FinesView() {
                     <td>{formatMoney(fine.amount)}</td>
                     <td>{formatDate(fine.createdAt)}</td>
                     <td>
+                      {fine.paymentMethod === 'Cash' ? 'Tiền mặt' : fine.paymentMethod === 'PayOS' ? 'PayOS' : '—'}
+                      {fine.paymentReference && <small className="circ-payment-reference">{fine.paymentReference}</small>}
+                    </td>
+                    <td>
                       <span className={`circ-badge is-${fine.status.toLowerCase()}`}>
                         {fine.status === 'Pending' ? 'Chưa thanh toán' : (STATUS_LABELS[fine.status] ?? fine.status)}
                       </span>
+                      {fine.reconciliationRequired && <small className="circ-reconciliation-warning">Cần đối soát giao dịch</small>}
                     </td>
                     <td>
                       {fine.status === 'Pending' ? (
-                        <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void pay(fine.id)}>Ghi nhận thanh toán</button>
+                        <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => { setSelectedFine(fine); setPaymentCheckout(null); }}>Ghi nhận thanh toán</button>
                       ) : '—'}
                     </td>
                   </tr>
@@ -1554,6 +1698,41 @@ function FinesView() {
           </div>
         )}
       </div>
+      {selectedFine && (
+        <div className="circ-payment-backdrop" role="presentation" onClick={() => { setSelectedFine(null); setPaymentCheckout(null); }}>
+          <section
+            className="circ-payment-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="circ-payment-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button type="button" className="circ-payment-close" aria-label="Đóng" onClick={() => { setSelectedFine(null); setPaymentCheckout(null); }}>×</button>
+            <p>GHI NHẬN THANH TOÁN · {selectedFine.code}</p>
+            <h2 id="circ-payment-title">{selectedFine.readerName}</h2>
+            <strong className="circ-payment-amount">{formatMoney(selectedFine.amount)}</strong>
+            {!paymentCheckout ? (
+              <div className="circ-payment-options">
+                <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void createPayOSCheckout(selectedFine)}>
+                  Tạo mã QR PayOS
+                </button>
+                <button type="button" className="circ-btn" disabled={busy} onClick={() => void payCash(selectedFine.id)}>
+                  Xác nhận đã nhận tiền mặt
+                </button>
+              </div>
+            ) : (
+              <>
+                <QRCodeCanvas value={paymentCheckout.qrCode} size={220} level="M" includeMargin />
+                <span>Đợi PayOS xác nhận trước khi hoàn tất. Không xác nhận tiền mặt cho cùng khoản này.</span>
+                <a href={paymentCheckout.checkoutUrl} target="_blank" rel="noreferrer">Mở trang thanh toán PayOS</a>
+                <button type="button" className="circ-btn" disabled={busy} onClick={() => void payCash(selectedFine.id)}>
+                  Hủy link PayOS và ghi nhận tiền mặt
+                </button>
+              </>
+            )}
+          </section>
+        </div>
+      )}
     </section>
   );
 }

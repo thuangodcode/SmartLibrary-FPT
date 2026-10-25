@@ -1,4 +1,5 @@
 using System.Data;
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using SmartLibrary.Application.Features.Circulation;
@@ -36,6 +37,7 @@ public class CirculationRepository : ICirculationRepository
     public async Task<CirculationStatsDto> GetStatsAsync(int finePerDay, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
+        var overdueCutoff = CirculationRules.StartOfLibraryDateUtc(now);
         var weekStart = now.Date.AddDays(-(int)now.DayOfWeek + (int)DayOfWeek.Monday);
         if (now.DayOfWeek == DayOfWeek.Sunday)
             weekStart = now.Date.AddDays(-6);
@@ -48,7 +50,9 @@ public class CirculationRepository : ICirculationRepository
             {
                 Borrowed = group.Count(x => x.Status == BorrowStatus.Borrowed || x.Status == BorrowStatus.Overdue),
                 Returned = group.Count(x => x.Status == BorrowStatus.Returned),
-                Overdue = group.Count(x => x.Status == BorrowStatus.Overdue),
+                Overdue = group.Count(x =>
+                    x.Status == BorrowStatus.Overdue
+                    || (x.Status == BorrowStatus.Borrowed && x.DueDate != null && x.DueDate < overdueCutoff)),
                 DueSoon = group.Count(x =>
                     x.Status == BorrowStatus.Borrowed && x.DueDate != null &&
                     x.DueDate >= now && x.DueDate <= dueSoonLimit),
@@ -56,9 +60,14 @@ public class CirculationRepository : ICirculationRepository
                 BorrowedLast = group.Count(x => x.BorrowDate >= lastWeekStart && x.BorrowDate < weekStart),
                 ReturnedThis = group.Count(x => x.ReturnDate >= weekStart && x.ReturnDate < weekStart.AddDays(7)),
                 ReturnedLast = group.Count(x => x.ReturnDate >= lastWeekStart && x.ReturnDate < weekStart),
-                OverdueThis = group.Count(x => x.Status == BorrowStatus.Overdue && x.DueDate >= weekStart),
+                OverdueThis = group.Count(x =>
+                    (x.Status == BorrowStatus.Overdue
+                     || (x.Status == BorrowStatus.Borrowed && x.DueDate != null && x.DueDate < overdueCutoff))
+                    && x.DueDate >= weekStart && x.DueDate < weekStart.AddDays(7)),
                 OverdueLast = group.Count(x =>
-                    x.DueDate >= lastWeekStart && x.DueDate < weekStart && x.Status == BorrowStatus.Overdue)
+                    x.DueDate >= lastWeekStart && x.DueDate < weekStart
+                    && (x.Status == BorrowStatus.Overdue
+                        || (x.Status == BorrowStatus.Borrowed && x.DueDate < overdueCutoff)))
             })
             .SingleOrDefaultAsync(ct);
 
@@ -311,8 +320,10 @@ public class CirculationRepository : ICirculationRepository
 
     public async Task<IReadOnlyList<CirculationLoanDto>> GetOverdueAsync(int finePerDay, CancellationToken ct)
     {
+        var cutoff = CirculationRules.StartOfLibraryDateUtc(DateTime.UtcNow);
         var rows = await LoanQuery()
-            .Where(x => x.Status == BorrowStatus.Overdue)
+            .Where(x => x.Status == BorrowStatus.Overdue
+                        || (x.Status == BorrowStatus.Borrowed && x.DueDate != null && x.DueDate < cutoff))
             .OrderBy(x => x.DueDate)
             .ToListAsync(ct);
         return await MapLoansAsync(rows, finePerDay, ct);
@@ -322,6 +333,7 @@ public class CirculationRepository : ICirculationRepository
     {
         var query = _db.Fines.AsNoTracking()
             .Include(x => x.Reader)
+            .Include(x => x.Payments)
             .Include(x => x.BorrowRecord).ThenInclude(x => x.BookCopy).ThenInclude(x => x.Book)
             .AsQueryable();
 
@@ -405,6 +417,7 @@ public class CirculationRepository : ICirculationRepository
     {
         var rows = await _db.Fines.AsNoTracking()
             .Include(x => x.Reader)
+            .Include(x => x.Payments)
             .Include(x => x.BorrowRecord).ThenInclude(x => x.BookCopy).ThenInclude(x => x.Book)
             .Where(x => x.ReaderId == readerId)
             .OrderByDescending(x => x.CreatedAt)
@@ -483,6 +496,7 @@ public class CirculationRepository : ICirculationRepository
     {
         var row = await _db.Fines.AsNoTracking()
             .Include(x => x.Reader)
+            .Include(x => x.Payments)
             .Include(x => x.BorrowRecord).ThenInclude(x => x.BookCopy).ThenInclude(x => x.Book)
             .FirstOrDefaultAsync(x => x.Id == id, ct);
         return row is null ? null : MapFine(row);
@@ -493,6 +507,31 @@ public class CirculationRepository : ICirculationRepository
 
     public Task<Fine?> GetTrackedFineAsync(Guid id, CancellationToken ct)
         => _db.Fines.FirstOrDefaultAsync(x => x.Id == id, ct);
+
+    public async Task LockFineAsync(Guid id, CancellationToken ct)
+        => await _db.Fines
+            .FromSqlInterpolated($"SELECT * FROM fines WHERE id = {id} FOR UPDATE")
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(ct);
+
+    public Task<FinePayment?> GetPendingPayOSPaymentAsync(Guid fineId, CancellationToken ct)
+        => _db.FinePayments.FirstOrDefaultAsync(payment =>
+            payment.FineId == fineId &&
+            payment.Method == "PayOS" &&
+            payment.Status == FinePaymentStatus.Pending, ct);
+
+    public Task<Guid?> GetFineIdForPaymentOrderAsync(long orderCode, CancellationToken ct)
+        => _db.FinePayments.AsNoTracking()
+            .Where(payment => payment.OrderCode == orderCode)
+            .Select(payment => (Guid?)payment.FineId)
+            .FirstOrDefaultAsync(ct);
+
+    public Task<FinePayment?> GetTrackedFinePaymentByOrderCodeAsync(long orderCode, CancellationToken ct)
+        => _db.FinePayments.Include(payment => payment.Fine)
+            .FirstOrDefaultAsync(payment => payment.OrderCode == orderCode, ct);
+
+    public async Task AddFinePaymentAsync(FinePayment payment, CancellationToken ct)
+        => await _db.FinePayments.AddAsync(payment, ct);
 
     public async Task<IReadOnlyList<CirculationLoanDto>> GetPendingAsync(int finePerDay, CancellationToken ct)
     {
@@ -813,7 +852,19 @@ public class CirculationRepository : ICirculationRepository
     private static int? ReadInt(IReadOnlyDictionary<string, string> map, string key)
     {
         if (!map.TryGetValue(key, out var raw)) return null;
-        return int.TryParse(raw, out var number) ? number : null;
+        if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
+            return number;
+
+        var normalized = raw.Trim();
+        if (System.Text.RegularExpressions.Regex.IsMatch(normalized, @"^\d{1,3}([.,]\d{3})+$"))
+        {
+            normalized = normalized.Replace(".", string.Empty, StringComparison.Ordinal)
+                .Replace(",", string.Empty, StringComparison.Ordinal);
+            if (int.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out number))
+                return number;
+        }
+
+        return null;
     }
 
     private static bool ReadBool(IReadOnlyDictionary<string, string> map, string key)
@@ -986,19 +1037,34 @@ public class CirculationRepository : ICirculationRepository
         };
     }
 
-    private static CirculationFineDto MapFine(Fine fine) => new()
+    private static CirculationFineDto MapFine(Fine fine)
     {
-        Id = fine.Id,
-        Code = "SL-" + fine.Id.ToString("N")[^6..].ToUpperInvariant(),
-        BorrowRecordId = fine.BorrowRecordId,
-        ReaderId = fine.ReaderId,
-        ReaderName = fine.Reader.FullName,
-        BookTitle = fine.BorrowRecord.BookCopy.Book.Title,
-        Barcode = fine.BorrowRecord.BookCopy.Barcode,
-        Amount = fine.Amount,
-        Reason = fine.Reason,
-        Status = fine.Status.ToString(),
-        CreatedAt = fine.CreatedAt,
-        PaidAt = fine.PaidAt
-    };
+        var pendingPayment = fine.Payments
+            .Where(payment => payment.Status == FinePaymentStatus.Pending)
+            .OrderByDescending(payment => payment.CreatedAt)
+            .FirstOrDefault();
+        return new CirculationFineDto
+        {
+            Id = fine.Id,
+            Code = "SL-" + fine.Id.ToString("N")[^6..].ToUpperInvariant(),
+            BorrowRecordId = fine.BorrowRecordId,
+            ReaderId = fine.ReaderId,
+            ReaderName = fine.Reader.FullName,
+            BookTitle = fine.BorrowRecord.BookCopy.Book.Title,
+            Barcode = fine.BorrowRecord.BookCopy.Barcode,
+            Amount = fine.Amount,
+            Reason = fine.Reason,
+            Status = fine.Status.ToString(),
+            CreatedAt = fine.CreatedAt,
+            PaidAt = fine.PaidAt,
+            PaymentMethod = fine.PaymentMethod,
+            PaymentReference = fine.PaymentReference,
+            PendingPaymentStatus = pendingPayment?.Status.ToString(),
+            CheckoutUrl = pendingPayment?.CheckoutUrl,
+            QrCode = pendingPayment?.QrCode,
+            PaymentExpiresAt = pendingPayment?.ExpiresAt,
+            ReconciliationRequired = fine.Payments.Any(payment =>
+                payment.Status == FinePaymentStatus.PaidAfterSettlement)
+        };
+    }
 }
