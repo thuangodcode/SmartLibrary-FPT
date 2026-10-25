@@ -7,6 +7,7 @@ import { parseApiResponse } from '../../../lib/api';
 import { useToast } from '../../../components/ui/useToast';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { BookCover } from '../components/BookCover';
+import HomeFooter from '../components/HomeFooter';
 import HomeNavbar from '../components/HomeNavbar';
 import { useBookAvailability, useBookReviews, useHomeBook, type BookReview } from '../hooks/useHomeData';
 import './HomePage.css';
@@ -266,6 +267,7 @@ const BookDetailPage = () => {
           <div className="book-detail-cover-skeleton" />
           <div className="book-detail-copy-skeleton"><span /><span /><span /><span /></div>
         </main>
+        <HomeFooter />
       </div>
     );
   }
@@ -279,6 +281,7 @@ const BookDetailPage = () => {
           <p>{bookQuery.error?.message || 'Không tìm thấy đầu sách này.'}</p>
           <Link to="/books"><ArrowLeft size={16} /> Trở về khám phá sách</Link>
         </main>
+        <HomeFooter />
       </div>
     );
   }
@@ -507,6 +510,7 @@ const BookDetailPage = () => {
           )}
         </section>
       </main>
+      <HomeFooter />
       {borrowSuccessOpen && (
         <div className="book-borrow-success-backdrop" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setBorrowSuccessOpen(false);

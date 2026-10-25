@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, LibraryBig, X } from "lucide-react";
 import { getPersonalizedRecommendations, type AiBookSuggestion } from "../../ai/aiApi";
 import { useAuthStore } from "../../auth/store/useAuthStore";
 import { BookCard } from "../components/BookCard";
+import HomeFooter from "../components/HomeFooter";
 import HomeNavbar from "../components/HomeNavbar";
 import RagAskPanel from "../components/RagAskPanel";
 import { useHomeBooks, useHomeCategories } from "../hooks/useHomeData";
@@ -302,9 +303,7 @@ const HomeCatalogPage = () => {
           </section>
         </div>
       </main>
-      <footer className="annual-info-footer">
-        <span>© 2026 SmartLibrary · FPT University HCMC</span>
-      </footer>
+      <HomeFooter />
     </div>
   );
 };

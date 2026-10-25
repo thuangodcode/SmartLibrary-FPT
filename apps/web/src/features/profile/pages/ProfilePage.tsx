@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import HomeNavbar from '../../home/components/HomeNavbar';
+import HomeFooter from '../../home/components/HomeFooter';
 import './ProfilePage.css';
 
 interface ApiResult<T> {
@@ -394,6 +395,7 @@ const ProfilePage: React.FC = () => {
     <div className="annual-home profile-home">
       <HomeNavbar />
       <main className="profile-main">{profileContent}</main>
+      <HomeFooter />
     </div>
   );
 };

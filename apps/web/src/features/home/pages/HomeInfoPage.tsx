@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
 import { MOCK_FAQS, MOCK_NEWS } from '../mock';
+import HomeFooter from '../components/HomeFooter';
 import HomeNavbar from '../components/HomeNavbar';
 import './HomePage.css';
 import './HomeInfoPage.css';
@@ -22,7 +22,7 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
 
   return (
     <div className="annual-home annual-info-page">
-      <HomeNavbar activeSection={section} />
+      <HomeNavbar activeSection={section === 'news' ? 'news' : undefined} />
 
       <main className="annual-info-main">
         <header className="annual-info-heading">
@@ -57,14 +57,7 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
         )}
       </main>
 
-      <footer className="annual-info-footer">
-        <Link to="/">SmartLibrary</Link>
-        <nav aria-label="Liên kết cuối trang">
-          <Link to="/news">Tin tức</Link>
-          <Link to="/policies">Chính sách</Link>
-        </nav>
-        <span>© 2026 FPT University HCMC</span>
-      </footer>
+      <HomeFooter />
     </div>
   );
 };

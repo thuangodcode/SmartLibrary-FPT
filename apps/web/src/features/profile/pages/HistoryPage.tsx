@@ -12,6 +12,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import HomeNavbar from '../../home/components/HomeNavbar';
+import HomeFooter from '../../home/components/HomeFooter';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
@@ -395,6 +396,7 @@ const HistoryPage = () => {
           </nav>
         )}
       </main>
+      <HomeFooter />
     </div>
   );
 };
