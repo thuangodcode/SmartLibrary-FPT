@@ -196,6 +196,7 @@ public static class SearchTopicGuard
             "math" => HasMath(hay),
             "hardware" => HasHardware(hay),
             "business" when intent.Language is not null => HasBusiness(hay),
+            "literature" => HasLiterature(hay),
             "it" when intent.Language is not null => HasIt(hay),
             _ when intent.Language is not null => true,
             _ => DistinctiveOverlap(intent, hay)
@@ -247,6 +248,8 @@ public static class SearchTopicGuard
             topics.Add("vocabulary");
         if (HasBusiness(fold) && DetectLanguage(fold) is not null)
             topics.Add("business");
+        if (HasLiterature(fold))
+            topics.Add("literature");
         return topics;
     }
 
@@ -261,6 +264,7 @@ public static class SearchTopicGuard
             "math" => HasMath(hay),
             "vocabulary" => HasVocabulary(hay),
             "business" => HasBusiness(hay),
+            "literature" => HasLiterature(hay),
             _ => false
         };
     }
@@ -273,6 +277,7 @@ public static class SearchTopicGuard
         "grammar" => "ngữ pháp",
         "vocabulary" => "từ vựng",
         "business" => "thương mại",
+        "literature" => "văn học",
         _ => topic
     };
 
@@ -339,6 +344,11 @@ public static class SearchTopicGuard
 
     private static bool HasBusiness(string fold)
         => ContainsAny(fold, "thuong mai", "thuongmai", "business", "kinh te", "kinhte");
+
+    private static bool HasLiterature(string fold)
+        => ContainsAny(fold,
+            "van hoc", "vanhoc", "literature", "literary",
+            "tieu thuyet", "tieuthuyet", "truyen ngan", "truyenngan", "novel");
 
     private static bool HasIt(string fold)
         => ContainsAny(fold,

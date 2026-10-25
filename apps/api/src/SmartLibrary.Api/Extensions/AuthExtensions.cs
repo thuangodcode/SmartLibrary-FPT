@@ -9,16 +9,33 @@ public static class AuthExtensions
 {
     public static IServiceCollection AddJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
+        var supabaseAuth = $"{(configuration["Supabase:Url"] ?? configuration["Jwt:Issuer"] ?? string.Empty).TrimEnd('/')}"
+            .Replace("/auth/v1", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .TrimEnd('/') + "/auth/v1";
+        var issuer = configuration["Jwt:Issuer"];
+        if (string.IsNullOrWhiteSpace(issuer))
+            issuer = supabaseAuth;
+        var audience = configuration["Jwt:Audience"];
+        if (string.IsNullOrWhiteSpace(audience))
+            audience = "authenticated";
+
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
+                options.MapInboundClaims = false;
+                options.RequireHttpsMetadata = supabaseAuth.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+                options.MetadataAddress = $"{supabaseAuth}/.well-known/openid-configuration";
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
-                    ValidateIssuerSigningKey = false,
-                    ValidateLifetime = false,
-                    SignatureValidator = (token, _) => new Microsoft.IdentityModel.JsonWebTokens.JsonWebToken(token)
+                    ValidateIssuer = true,
+                    ValidIssuer = issuer,
+                    ValidateAudience = true,
+                    ValidAudience = audience,
+                    ValidateIssuerSigningKey = true,
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.FromMinutes(1),
+                    NameClaimType = "sub",
+                    RoleClaimType = ClaimTypes.Role
                 };
 
                 options.Events = new JwtBearerEvents
@@ -35,14 +52,10 @@ public static class AuthExtensions
                     },
                     OnTokenValidated = async context =>
                     {
-                        var authorizationHeader = context.HttpContext.Request.Headers.Authorization.ToString();
-                        var rawToken = authorizationHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-                            ? authorizationHeader["Bearer ".Length..].Trim()
-                            : context.HttpContext.Request.Path.StartsWithSegments("/hubs/support-chat")
-                                ? context.Request.Query["access_token"].ToString()
-                                : null;
                         var identity = context.Principal?.Identity as ClaimsIdentity;
-                        if (string.IsNullOrWhiteSpace(rawToken) || identity is null)
+                        var userId = identity?.FindFirst("sub")?.Value
+                            ?? identity?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                        if (identity is null || string.IsNullOrWhiteSpace(userId))
                         {
                             context.Fail("The access token could not be validated.");
                             return;
@@ -52,17 +65,6 @@ public static class AuthExtensions
                         {
                             var identityProvider = context.HttpContext.RequestServices
                                 .GetRequiredService<IIdentityProvider>();
-                            var userId = await identityProvider.GetAuthenticatedUserIdAsync(
-                                rawToken,
-                                context.HttpContext.RequestAborted);
-                            var tokenSubject = identity.FindFirst("sub")?.Value
-                                ?? identity.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                            if (userId is null || !string.Equals(userId, tokenSubject, StringComparison.OrdinalIgnoreCase))
-                            {
-                                context.Fail("The access token is not valid for this user.");
-                                return;
-                            }
-
                             var role = await identityProvider.GetActiveUserRoleAsync(userId);
                             if (role is null)
                             {
@@ -86,7 +88,7 @@ public static class AuthExtensions
                             context.HttpContext.RequestServices
                                 .GetRequiredService<ILoggerFactory>()
                                 .CreateLogger("SupabaseTokenValidation")
-                                .LogError(exception, "Supabase token validation failed.");
+                                .LogError(exception, "JWT role lookup failed.");
                             context.Fail("The identity provider could not validate the access token.");
                         }
                     }

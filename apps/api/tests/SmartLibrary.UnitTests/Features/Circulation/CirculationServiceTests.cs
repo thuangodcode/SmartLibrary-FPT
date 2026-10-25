@@ -18,7 +18,10 @@ public class CirculationServiceTests
         MaxBooks = 2,
         BorrowDays = 14,
         MaxRenewals = 4,
+        RenewalDays = 14,
         FinePerDay = 5000,
+        DamageFee = 10000,
+        LostFee = 200000,
         RestrictIfUnpaid = true,
         AllowReservation = true,
         PickupCapacityPerSlot = 5,
@@ -178,13 +181,32 @@ public class CirculationServiceTests
     {
         var loanId = Guid.NewGuid();
         _repo.Setup(x => x.GetTrackedLoanAsync(loanId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BorrowRecord { Id = loanId, ReaderId = Guid.NewGuid() });
+            .ReturnsAsync(new BorrowRecord { Id = loanId, ReaderId = Guid.NewGuid(), DueDate = DateTime.UtcNow.AddDays(-3) });
         _repo.Setup(x => x.HasOverdueFineAsync(loanId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         var result = await _sut.RecordFineAsync(new RecordFineRequest { BorrowRecordId = loanId, Amount = 15000 });
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("đã có phí quá hạn");
+    }
+
+    [Fact]
+    public async Task RecordFine_IgnoresClientAmount_UsesAdminPolicy()
+    {
+        var loanId = Guid.NewGuid();
+        var due = DateTime.UtcNow.AddDays(-3);
+        _repo.Setup(x => x.GetTrackedLoanAsync(loanId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BorrowRecord { Id = loanId, ReaderId = Guid.NewGuid(), DueDate = due });
+        _repo.Setup(x => x.HasOverdueFineAsync(loanId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repo.Setup(x => x.GetFineDtoAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationFineDto { Amount = 15000, Status = "Pending" });
+
+        var result = await _sut.RecordFineAsync(new RecordFineRequest { BorrowRecordId = loanId, Amount = 50000 });
+
+        var expected = CirculationRules.OverdueFineAmount(
+            CirculationRules.CalendarOverdueDays(due, DateTime.UtcNow), _settings.FinePerDay);
+        result.IsSuccess.Should().BeTrue();
+        _repo.Verify(x => x.AddFineAsync(It.Is<Fine>(fine => fine.Amount == expected), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -219,16 +241,39 @@ public class CirculationServiceTests
     }
 
     [Fact]
-    public async Task ConfirmIncident_WhenLostWithoutValue_Fails()
+    public async Task ConfirmIncident_WhenLostFeeMissing_Fails()
+    {
+        var incident = PendingLostIncident();
+        _repo.Setup(x => x.GetSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationSettings { FinePerDay = 5000, DamageFee = 10000, LostFee = 0 });
+        _repo.Setup(x => x.GetTrackedIncidentAsync(incident.Id, It.IsAny<CancellationToken>())).ReturnsAsync(incident);
+
+        var result = await _sut.ConfirmIncidentAsync(
+            incident.Id,
+            new ConfirmIncidentRequest { Severity = "Lost", ReplacementValue = 5000 },
+            Guid.NewGuid());
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("lost_book_fee");
+        _repo.Verify(x => x.AddFineAsync(It.IsAny<Fine>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ConfirmIncident_IgnoresClientAmount_UsesAdminPolicy()
     {
         var incident = PendingLostIncident();
         _repo.Setup(x => x.GetTrackedIncidentAsync(incident.Id, It.IsAny<CancellationToken>())).ReturnsAsync(incident);
+        _repo.Setup(x => x.HasCompensationFineAsync(incident.BorrowRecordId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repo.Setup(x => x.GetIncidentDtoAsync(incident.Id, _settings.FinePerDay, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationIncidentDto { Id = incident.Id, Status = "CompensationPending", CompensationAmount = 200000 });
 
-        var result = await _sut.ConfirmIncidentAsync(incident.Id, new ConfirmIncidentRequest { Severity = "Lost" }, Guid.NewGuid());
+        var result = await _sut.ConfirmIncidentAsync(
+            incident.Id,
+            new ConfirmIncidentRequest { Severity = "Lost", ReplacementValue = 5000 },
+            Guid.NewGuid());
 
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("giá trị tài liệu");
-        _repo.Verify(x => x.AddFineAsync(It.IsAny<Fine>(), It.IsAny<CancellationToken>()), Times.Never);
+        result.IsSuccess.Should().BeTrue();
+        _repo.Verify(x => x.AddFineAsync(It.Is<Fine>(fine => fine.Amount == 200000), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -296,7 +341,7 @@ public class CirculationServiceTests
         _repo.Setup(x => x.AddFineAsync(It.IsAny<Fine>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         _repo.Setup(x => x.AddNotificationAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         _repo.Setup(x => x.GetIncidentDtoAsync(incident.Id, _settings.FinePerDay, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CirculationIncidentDto { Id = incident.Id, Status = "CompensationPending", CompensationAmount = 20000 });
+            .ReturnsAsync(new CirculationIncidentDto { Id = incident.Id, Status = "CompensationPending", CompensationAmount = 10000 });
 
         var result = await _sut.ConfirmIncidentAsync(incident.Id, new ConfirmIncidentRequest
         {
@@ -307,7 +352,7 @@ public class CirculationServiceTests
         result.IsSuccess.Should().BeTrue();
         incident.BookCopy.IsAvailable.Should().BeTrue();
         incident.BookCopy.Condition.Should().Be(BookCondition.Damaged);
-        _repo.Verify(x => x.AddFineAsync(It.Is<Fine>(f => f.Amount == 20000 && f.Reason.StartsWith("Bồi thường hư hỏng")), It.IsAny<CancellationToken>()), Times.Once);
+        _repo.Verify(x => x.AddFineAsync(It.Is<Fine>(f => f.Amount == 10000 && f.Reason.StartsWith("Bồi thường hư hỏng")), It.IsAny<CancellationToken>()), Times.Once);
         _repo.Verify(x => x.AddFineAsync(It.Is<Fine>(f => f.Reason.StartsWith("Phạt quá hạn")), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -418,6 +463,58 @@ public class CirculationServiceTests
             && notification.Message.Contains("SE123456")
             && notification.Message.Contains(copy.Id.ToString())
             && notification.Message.Contains(copy.Barcode)), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteCheckout_WhenAdminSetsSevenDays_UsesSevenDays()
+    {
+        var settings = _settings with { BorrowDays = 7, BorrowDaysVi = 14 };
+        _repo.Setup(x => x.GetSettingsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(settings);
+        var reader = ActiveReader();
+        var copy = ReadyCopy();
+        copy.IsAvailable = false;
+        var loan = new BorrowRecord
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = reader.Id,
+            BookCopyId = copy.Id,
+            Status = BorrowStatus.Approved,
+            BookCopy = copy
+        };
+        _repo.Setup(x => x.GetTrackedLoanAsync(loan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(loan);
+        _repo.Setup(x => x.FindReaderAsync(reader.Id.ToString(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+        _repo.Setup(x => x.GetLoanAsync(loan.Id, settings.FinePerDay, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationLoanDto { Id = loan.Id, Status = "Borrowed" });
+
+        var result = await _sut.CompleteCheckoutAsync(loan.Id, Guid.NewGuid());
+
+        result.IsSuccess.Should().BeTrue();
+        loan.DueDate.Should().BeCloseTo(loan.BorrowDate!.Value.AddDays(7), TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task CompleteCheckout_WhenBorrowDaysMissing_Fails()
+    {
+        _repo.Setup(x => x.GetSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationSettings { FinePerDay = 5000 });
+        var reader = ActiveReader();
+        var copy = ReadyCopy();
+        var loan = new BorrowRecord
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = reader.Id,
+            BookCopyId = copy.Id,
+            Status = BorrowStatus.Approved,
+            BookCopy = copy
+        };
+        _repo.Setup(x => x.GetTrackedLoanAsync(loan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(loan);
+        _repo.Setup(x => x.FindReaderAsync(reader.Id.ToString(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+
+        var result = await _sut.CompleteCheckoutAsync(loan.Id, Guid.NewGuid());
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("thời hạn mượn");
+        loan.Status.Should().Be(BorrowStatus.Approved);
     }
 
     [Fact]
@@ -562,7 +659,7 @@ public class CirculationServiceTests
 
         result.IsSuccess.Should().BeTrue();
         loan.DueDate.Should().BeAfter(originalDueDate);
-        loan.DueDate.Should().BeCloseTo(originalDueDate.AddDays(_settings.RenewalDaysForeign), TimeSpan.FromSeconds(1));
+        loan.DueDate.Should().BeCloseTo(originalDueDate.AddDays(_settings.RenewalDays), TimeSpan.FromSeconds(1));
         loan.RenewalCount.Should().Be(1);
         loan.Status.Should().Be(BorrowStatus.Borrowed);
         loan.Notes.Should().Contain("Tự gia hạn lần 1");

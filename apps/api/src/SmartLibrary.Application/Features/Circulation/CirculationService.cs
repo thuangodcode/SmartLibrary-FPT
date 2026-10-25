@@ -21,7 +21,11 @@ public class CirculationService
     public async Task<CirculationStatsDto> GetStatsAsync(CancellationToken ct = default)
     {
         var settings = await _repository.GetSettingsAsync(ct);
-        return await _repository.GetStatsAsync(settings.FinePerDay, ct);
+        var stats = await _repository.GetStatsAsync(settings.FinePerDay, ct);
+        stats.BorrowDays = CirculationRules.BorrowDays(settings, null);
+        stats.DamageFee = settings.DamageFee;
+        stats.LostFee = settings.LostFee;
+        return stats;
     }
 
     public async Task<int> GetBorrowableCopyCountAsync(Guid bookId, CancellationToken ct = default)
@@ -144,6 +148,10 @@ public class CirculationService
             var readerError = await CheckReaderAsync(currentReader, currentSettings, DateTime.UtcNow, ct);
             if (readerError is not null)
                 return Result<CirculationLoanDto>.Failure(readerError);
+            var borrowDays = CirculationRules.BorrowDays(currentSettings, copy.Book?.Language);
+            var missingDays = CirculationRules.MissingBorrowDays(borrowDays);
+            if (missingDays is not null)
+                return Result<CirculationLoanDto>.Failure(missingDays);
             if (!await _repository.TryClaimCopyAsync(copy.Id, ct))
                 return Result<CirculationLoanDto>.Failure("Bản sao vừa được người khác mượn. Thử lại với bản sao khác.");
 
@@ -156,7 +164,7 @@ public class CirculationService
                 LibrarianId = librarianId == Guid.Empty ? null : librarianId,
                 Status = BorrowStatus.Borrowed,
                 BorrowDate = now,
-                DueDate = now.AddDays(CirculationRules.BorrowDays(currentSettings, copy.Book?.Language)),
+                DueDate = now.AddDays(borrowDays),
                 Notes = "Thủ thư lập phiếu tại quầy."
             };
             await _repository.AddLoanAsync(loan, ct);
@@ -351,11 +359,15 @@ public class CirculationService
                 await _unitOfWork.SaveChangesAsync(ct);
                 return Result<CirculationLoanDto>.Failure(readerError);
             }
+            var borrowDays = CirculationRules.BorrowDays(settings, loan.BookCopy.Book.Language);
+            var missingDays = CirculationRules.MissingBorrowDays(borrowDays);
+            if (missingDays is not null)
+                return Result<CirculationLoanDto>.Failure(missingDays);
 
             loan.Status = BorrowStatus.Borrowed;
             loan.LibrarianId = librarianId == Guid.Empty ? loan.LibrarianId : librarianId;
             loan.BorrowDate = now;
-            loan.DueDate = now.AddDays(CirculationRules.BorrowDays(settings, loan.BookCopy.Book.Language));
+            loan.DueDate = now.AddDays(borrowDays);
             await CompleteReservationAsync(loan.ReaderId, loan.BookCopy.BookId, now, ct);
             var student = string.IsNullOrWhiteSpace(reader.StudentId) ? "Chưa có mã sinh viên" : reader.StudentId;
             await NotifyAsync(loan.ReaderId, "Đã hoàn tất mượn sách",
@@ -428,6 +440,9 @@ public class CirculationService
                 return Result<CirculationLoanDto>.Failure(error);
 
             var days = CirculationRules.RenewalDays(settings, loan.BookCopy?.Book.Language);
+            var missingDays = CirculationRules.MissingRenewalDays(days);
+            if (missingDays is not null)
+                return Result<CirculationLoanDto>.Failure(missingDays);
             var oldDue = loan.DueDate;
             var baseDate = loan.DueDate.HasValue && loan.DueDate.Value > now ? loan.DueDate.Value : now;
             loan.DueDate = baseDate.AddDays(days);
@@ -479,19 +494,25 @@ public class CirculationService
 
     public async Task<Result<CirculationFineDto>> RecordFineAsync(RecordFineRequest request, CancellationToken ct = default)
     {
-        if (request.Amount <= 0)
-            return Result<CirculationFineDto>.Failure("Số tiền phạt phải lớn hơn 0.");
-
         var loan = await _repository.GetTrackedLoanAsync(request.BorrowRecordId, ct);
         if (loan is null)
             return Result<CirculationFineDto>.Failure("Không tìm thấy phiếu mượn.");
 
-        var reason = string.IsNullOrWhiteSpace(request.Reason) ? CirculationRules.OverdueReasonPrefix : request.Reason.Trim();
+        var settings = await _repository.GetSettingsAsync(ct);
+        if (settings.FinePerDay <= 0)
+            return Result<CirculationFineDto>.Failure("Chưa cấu hình phí quá hạn. Admin hãy vào Chính sách > Phí phạt và đặt overdue_fee_per_day.");
+
+        var overdueDays = CirculationRules.CalendarOverdueDays(loan.DueDate, DateTime.UtcNow);
+        if (overdueDays <= 0)
+            return Result<CirculationFineDto>.Failure("Phiếu này chưa quá hạn nên không ghi nhận phí quá hạn.");
+
+        var reason = $"{CirculationRules.OverdueReasonPrefix} {overdueDays} ngày";
         var duplicate = await FineDuplicateErrorAsync(loan.Id, reason, ct);
         if (duplicate is not null)
             return Result<CirculationFineDto>.Failure(duplicate);
 
-        var fine = NewFine(loan.Id, loan.ReaderId, decimal.Round(request.Amount, 0), reason);
+        var amount = CirculationRules.OverdueFineAmount(overdueDays, settings.FinePerDay);
+        var fine = NewFine(loan.Id, loan.ReaderId, amount, reason);
         await _repository.AddFineAsync(fine, ct);
         await NotifyAsync(loan.ReaderId, "Khoản phí mới", $"Thư viện đã ghi nhận khoản phí {fine.Amount:0}đ. {fine.Reason}", "fine", ct);
         await _unitOfWork.SaveChangesAsync(ct);
@@ -535,7 +556,7 @@ public class CirculationService
                 return Result<CirculationIncidentDto>.Failure("Không tìm thấy hồ sơ mất/hỏng sách.");
 
             var error = CirculationRules.ValidateIncidentConfirmation(
-                incident.Kind, incident.Status, severity, request.ReplacementValue, request.AssessedFee);
+                incident.Kind, incident.Status, severity, settings.DamageFee, settings.LostFee);
             if (error is not null)
                 return Result<CirculationIncidentDto>.Failure(error);
             if (await _repository.HasCompensationFineAsync(incident.BorrowRecordId, ct) || incident.CompensationFineId.HasValue)
@@ -547,7 +568,7 @@ public class CirculationService
                 incident.Kind = BookIncidentKind.Lost;
 
             var now = DateTime.UtcNow;
-            var compensation = CirculationRules.CompensationAmount(severity, request.ReplacementValue, request.AssessedFee);
+            var compensation = CirculationRules.PolicyFee(settings, severity);
             var compensationFine = NewFine(
                 incident.BorrowRecordId, incident.ReaderId, compensation,
                 CirculationRules.CompensationReason(severity), $"incident:{incident.Id}");
@@ -568,8 +589,8 @@ public class CirculationService
             }
 
             incident.Severity = severity;
-            incident.ReplacementValue = severity == BookIncidentSeverity.Light ? null : request.ReplacementValue;
-            incident.AssessedFee = severity == BookIncidentSeverity.Light ? request.AssessedFee : null;
+            incident.ReplacementValue = severity == BookIncidentSeverity.Light ? null : compensation;
+            incident.AssessedFee = severity == BookIncidentSeverity.Light ? compensation : null;
             incident.IncludeOverdue = overdueFine is not null;
             incident.CompensationFineId = compensationFine.Id;
             incident.OverdueFineId = overdueFine?.Id;
