@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Moq;
+using System.Security.Cryptography;
 using SmartLibrary.Application.Features.Ai;
 using SmartLibrary.Application.Features.Ai.DTOs;
 using SmartLibrary.Application.Interfaces;
@@ -349,6 +350,45 @@ public class AiSettingsServiceTests
         result.Data!.ApiKey.Should().Be("library-key-aaaaaaaaaaaa");
         result.Data.OwnerUserId.Should().Be(libraryId);
         result.Data.Provider.Should().Be("gemini");
+    }
+
+    [Fact]
+    public async Task ResolveForAskAsync_WhenLibraryCredentialCannotBeDecrypted_ReturnsActionableFailure()
+    {
+        _policy.IsEnabled = true;
+        _policy.ReaderAiEnabled = true;
+        _policy.EncryptedApiKey = "legacy-encrypted";
+        _protector.Setup(item => item.Unprotect("legacy-encrypted"))
+            .Throws(new CryptographicException("Authentication tag mismatch"));
+
+        var result = await _sut.ResolveForAskAsync("Reader", Guid.NewGuid());
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("Ai:EncryptionKey");
+        result.Error.Should().Contain("nhập, lưu lại API Key");
+    }
+
+    [Fact]
+    public async Task ResolveForAskAsync_WhenActiveLibrarianCredentialCannotBeDecrypted_ReturnsActionableFailure()
+    {
+        var librarianId = Guid.NewGuid();
+        _policy.IsEnabled = true;
+        _policy.ReaderAiEnabled = true;
+        _policy.ActiveLibrarianUserId = librarianId;
+        _users[librarianId] = new UserAiSetting
+        {
+            UserId = librarianId,
+            EncryptedApiKey = "library-encrypted",
+            IsEnabled = true
+        };
+        _protector.Setup(item => item.Unprotect("library-encrypted"))
+            .Throws(new CryptographicException("Authentication tag mismatch"));
+
+        var result = await _sut.ResolveForAskAsync("Reader", Guid.NewGuid());
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("Ai:EncryptionKey");
+        result.Error.Should().Contain("nhập, lưu lại API Key");
     }
 
     [Fact]

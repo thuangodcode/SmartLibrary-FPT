@@ -42,7 +42,8 @@ public static class AuthExtensions
                 {
                     OnMessageReceived = context =>
                     {
-                        if (context.HttpContext.Request.Path.StartsWithSegments("/hubs/support-chat"))
+                        if (context.HttpContext.Request.Path.StartsWithSegments("/hubs/support-chat")
+                            || context.HttpContext.Request.Path.StartsWithSegments("/hubs/notifications"))
                         {
                             var accessToken = context.Request.Query["access_token"];
                             if (!string.IsNullOrEmpty(accessToken))

@@ -11,6 +11,8 @@ public class AiSettingsService
 {
     public const string AdminRole = "Admin";
     public const string LibrarianRole = "Librarian";
+    private const string CredentialEncryptionError =
+        "Không giải mã được API Key AI đã lưu. Ai:EncryptionKey trên máy chủ có thể đã thay đổi; hãy giữ cố định khóa này và nhập, lưu lại API Key AI trong trang cấu hình AI.";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -294,7 +296,10 @@ public class AiSettingsService
             ? NormalizeProvider(user.Provider)
             : NormalizeProvider(provider);
         if (!TryUnlockProvider(user, bag, target, out var apiKey, out var chatModel, out var baseUrl))
-            return Result<AiConnectionTestDto>.Failure("Chưa lưu API Key cho nhà cung cấp này.");
+            return Result<AiConnectionTestDto>.Failure(
+                HasStoredProviderKey(user, bag, target)
+                    ? CredentialEncryptionError
+                    : "Chưa lưu API Key cho nhà cung cấp này.");
 
         var state = GetOrCreateState(bag, target);
         var embeddingModel = string.IsNullOrWhiteSpace(state.EmbeddingModel)
@@ -326,9 +331,19 @@ public class AiSettingsService
             var key = Unlock(libraryUser);
             if (!string.IsNullOrWhiteSpace(key))
                 return Result<AiRuntimeCredential>.Success(ToCredential(libraryUser, key));
+            if (!string.IsNullOrWhiteSpace(libraryUser.EncryptedApiKey))
+                return Result<AiRuntimeCredential>.Failure(CredentialEncryptionError);
         }
 
-        var legacy = UnlockApiKey(policy);
+        string? legacy;
+        try
+        {
+            legacy = UnlockApiKey(policy);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result<AiRuntimeCredential>.Failure(ex.Message);
+        }
         if (!string.IsNullOrWhiteSpace(legacy))
         {
             return Result<AiRuntimeCredential>.Success(new AiRuntimeCredential
@@ -361,7 +376,11 @@ public class AiSettingsService
                 return Result<AiRuntimeCredential>.Failure("Admin đã tắt quyền AI của tài khoản này.");
             var key = user is null ? null : Unlock(user);
             if (string.IsNullOrWhiteSpace(key))
+            {
+                if (!string.IsNullOrWhiteSpace(user?.EncryptedApiKey))
+                    return Result<AiRuntimeCredential>.Failure(CredentialEncryptionError);
                 return Result<AiRuntimeCredential>.Failure("Chưa cấu hình API Key.");
+            }
 
             return Result<AiRuntimeCredential>.Success(ToCredential(user!, key));
         }
@@ -391,7 +410,16 @@ public class AiSettingsService
     {
         if (string.IsNullOrWhiteSpace(settings.EncryptedApiKey))
             return null;
-        return _protector.Unprotect(settings.EncryptedApiKey);
+        try
+        {
+            return _protector.Unprotect(settings.EncryptedApiKey);
+        }
+        catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException
+                                   or FormatException
+                                   or InvalidOperationException)
+        {
+            throw new InvalidOperationException(CredentialEncryptionError, ex);
+        }
     }
 
     public static string? GateAsk(AiSetting settings, string role)
@@ -656,7 +684,16 @@ public class AiSettingsService
 
         if (bag.TryGetValue(provider, out var state) && !string.IsNullOrWhiteSpace(state.EncryptedApiKey))
         {
-            apiKey = _protector.Unprotect(state.EncryptedApiKey);
+            try
+            {
+                apiKey = _protector.Unprotect(state.EncryptedApiKey);
+            }
+            catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException
+                                       or FormatException
+                                       or InvalidOperationException)
+            {
+                return false;
+            }
             chatModel = string.IsNullOrWhiteSpace(state.ChatModel) ? settings.ChatModel : state.ChatModel;
             baseUrl = string.IsNullOrWhiteSpace(state.BaseUrl) ? settings.BaseUrl : state.BaseUrl;
             return !string.IsNullOrWhiteSpace(apiKey);
@@ -665,12 +702,29 @@ public class AiSettingsService
         if (string.Equals(settings.Provider, provider, StringComparison.OrdinalIgnoreCase)
             && !string.IsNullOrWhiteSpace(settings.EncryptedApiKey))
         {
-            apiKey = _protector.Unprotect(settings.EncryptedApiKey);
+            try
+            {
+                apiKey = _protector.Unprotect(settings.EncryptedApiKey);
+            }
+            catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException
+                                       or FormatException
+                                       or InvalidOperationException)
+            {
+                return false;
+            }
             return !string.IsNullOrWhiteSpace(apiKey);
         }
 
         return false;
     }
+
+    private static bool HasStoredProviderKey(
+        UserAiSetting settings,
+        Dictionary<string, StoredProviderState> bag,
+        string provider)
+        => (bag.TryGetValue(provider, out var state) && !string.IsNullOrWhiteSpace(state.EncryptedApiKey))
+           || (string.Equals(settings.Provider, provider, StringComparison.OrdinalIgnoreCase)
+               && !string.IsNullOrWhiteSpace(settings.EncryptedApiKey));
 
     private static void WriteTestResult(
         UserAiSetting settings,

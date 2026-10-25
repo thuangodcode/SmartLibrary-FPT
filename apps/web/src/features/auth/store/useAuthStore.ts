@@ -4,6 +4,18 @@ import { parseApiResponse } from '../../../lib/api';
 
 let hydrationPromise: Promise<void> | null = null;
 
+const isAccessTokenExpiring = (token: string, skewSeconds = 60): boolean => {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return true;
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const claims = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='))) as { exp?: number };
+    return typeof claims.exp !== 'number' || claims.exp <= Math.floor(Date.now() / 1000) + skewSeconds;
+  } catch {
+    return true;
+  }
+};
+
 export interface User {
   id: string;
   email: string;
@@ -96,7 +108,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         });
         const result = await parseApiResponse<AuthApiResponse<{ accessToken?: string }>>(response);
         const refreshedToken = result?.data?.accessToken;
-        if (!response.ok || !result?.success || !refreshedToken) return null;
+        if (!response.ok || !result?.success || !refreshedToken) {
+          if (response.status === 400 || response.status === 401) {
+            localStorage.removeItem('sl_refresh_cookie');
+          }
+          return null;
+        }
 
         localStorage.setItem('sl_token', refreshedToken);
         localStorage.setItem('sl_refresh_cookie', '1');
@@ -104,7 +121,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       };
 
       try {
-        if (localStorage.getItem('sl_refresh_cookie') === '1') {
+        let refreshAttempted = false;
+        if (
+          localStorage.getItem('sl_refresh_cookie') === '1'
+          && isAccessTokenExpiring(token)
+        ) {
+          refreshAttempted = true;
           token = (await refreshAccessToken()) ?? token;
         }
 
@@ -113,7 +135,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (response.status === 401) {
+        if (response.status === 401 && !refreshAttempted) {
           const refreshedToken = await refreshAccessToken();
           if (refreshedToken) {
             token = refreshedToken;
