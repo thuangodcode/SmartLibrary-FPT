@@ -285,7 +285,6 @@ const LibrarianCreateCategoryPage: React.FC = () => {
                 <div className="lib-create-cat-dropzone-badges">
                   <span>Hỗ trợ: JPG, PNG, WEBP, GIF</span>
                   <span>Tối đa: 10 MB</span>
-                  <span className="badge-cloud">⚡ Cloudinary Upload</span>
                 </div>
               </div>
             ) : (
@@ -308,7 +307,7 @@ const LibrarianCreateCategoryPage: React.FC = () => {
 
                   <div className="lib-create-cat-cloud-badge">
                     <Sparkles size={14} />
-                    <span>Tệp sẽ được tải trực tiếp lên Cloudinary khi bấm Lưu</span>
+                    <span>Hình ảnh sẽ được lưu cùng thông tin danh mục</span>
                   </div>
 
                   <div className="lib-create-cat-preview-actions">
@@ -359,7 +358,7 @@ const LibrarianCreateCategoryPage: React.FC = () => {
               {submitting ? (
                 <>
                   <div className="lib-create-cat-btn-spinner" />
-                  <span>Đang tải ảnh lên Cloudinary & lưu...</span>
+                  <span>Đang lưu thông tin danh mục...</span>
                 </>
               ) : (
                 <>

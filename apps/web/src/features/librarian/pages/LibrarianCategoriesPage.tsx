@@ -9,7 +9,6 @@ import {
   BookMarked,
   Image as ImageIcon,
   RefreshCw,
-  Library,
   ChevronLeft,
   ChevronRight,
   Archive,
@@ -206,16 +205,6 @@ const LibrarianCategoriesPage: React.FC = () => {
           <div>
             <span className="lib-cat-metric-label">Tổng đầu sách đang quản lý</span>
             <strong className="lib-cat-metric-value">{totalBooks}</strong>
-          </div>
-        </div>
-
-        <div className="lib-cat-metric-card">
-          <div className="lib-cat-metric-icon green">
-            <Library size={22} />
-          </div>
-          <div>
-            <span className="lib-cat-metric-label">Hệ thống lưu trữ ảnh</span>
-            <strong className="lib-cat-metric-value">Cloudinary Active</strong>
           </div>
         </div>
       </section>
