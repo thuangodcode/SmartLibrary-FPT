@@ -279,13 +279,17 @@ function PolicyView() {
   const [deleting, setDeleting] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const loadDetail = useCallback(async (key: string) => {
+  const loadDetail = useCallback(async (key: string, signal?: AbortSignal) => {
     setLoading(true);
     setNotFound(false);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/policy-rules/${encodeURIComponent(key)}`, { headers: authHeaders });
+      const res = await fetch(`${API_BASE_URL}/api/v1/policy-rules/${encodeURIComponent(key)}`, {
+        headers: authHeaders,
+        signal,
+      });
       const json = await parseApiResponse<ApiResult<PolicyDetail>>(res);
+      if (signal?.aborted) return;
       if (res.status === 404 || !json?.success || !json.data) {
         setDetail(null);
         setNotFound(true);
@@ -296,10 +300,11 @@ function PolicyView() {
         navigate(policyHref(json.data.code), { replace: true });
       }
     } catch (err) {
+      if (signal?.aborted) return;
       setDetail(null);
       setError(err instanceof Error ? err.message : 'Không tải được chi tiết chính sách.');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [authHeaders, navigate]);
 
@@ -311,11 +316,15 @@ function PolicyView() {
       }, 0);
       return () => window.clearTimeout(timer);
     }
+    const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      void loadDetail(policyCode);
+      void loadDetail(policyCode, controller.signal);
       setMenuOpen(false);
     }, 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [policyCode, loadDetail]);
 
   useEffect(() => {
@@ -506,13 +515,17 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadDetail = useCallback(async (key: string) => {
+  const loadDetail = useCallback(async (key: string, signal?: AbortSignal) => {
     setLoading(true);
     setNotFound(false);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/policy-rules/${encodeURIComponent(key)}`, { headers: authHeaders });
+      const res = await fetch(`${API_BASE_URL}/api/v1/policy-rules/${encodeURIComponent(key)}`, {
+        headers: authHeaders,
+        signal,
+      });
       const json = await parseApiResponse<ApiResult<PolicyDetail>>(res);
+      if (signal?.aborted) return;
       if (res.status === 404 || !json?.success || !json.data) {
         setNotFound(true);
         return;
@@ -522,16 +535,21 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
         navigate(policyHref(json.data.code, '/edit'), { replace: true });
       }
     } catch (err) {
+      if (signal?.aborted) return;
       setError(err instanceof Error ? err.message : 'Không tải được chính sách.');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [authHeaders, navigate]);
 
   useEffect(() => {
     if (mode !== 'edit' || !policyCode) return undefined;
-    const timer = window.setTimeout(() => { void loadDetail(policyCode); }, 0);
-    return () => window.clearTimeout(timer);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => { void loadDetail(policyCode, controller.signal); }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [mode, policyCode, loadDetail]);
 
   const onTypeChange = (policyType: PolicyType) => {
