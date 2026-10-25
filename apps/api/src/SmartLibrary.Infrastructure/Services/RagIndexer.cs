@@ -64,10 +64,13 @@ public class RagIndexer : IRagIndexer
             .Concat(policies.Select(policy => ("policy", policy.Id)))
             .ToList();
         var sourceIds = sources.Select(source => source.Id).ToHashSet();
-        var sourceTypes = sources.Select(source => source.Item1).Distinct().ToArray();
-        var existingDocuments = await _db.RagDocuments.AsNoTracking()
-            .Where(document => sourceTypes.Contains(document.SourceType) && sourceIds.Contains(document.SourceId))
-            .ToDictionaryAsync(document => (document.SourceType, document.SourceId), ct);
+        var existingDocuments = sourceIds.Count == 0
+            ? new Dictionary<(string SourceType, Guid SourceId), RagDocument>()
+            : (await _db.RagDocuments.AsNoTracking()
+                    .Where(document => document.SourceType == "book" || document.SourceType == "policy")
+                    .ToListAsync(ct))
+                .Where(document => sourceIds.Contains(document.SourceId))
+                .ToDictionary(document => (document.SourceType, document.SourceId));
         var totalItems = books.Count + policies.Count;
         var completedItems = 0;
         progress?.Invoke(completedItems, totalItems);
