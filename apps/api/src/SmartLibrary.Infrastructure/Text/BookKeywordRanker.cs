@@ -100,7 +100,7 @@ internal static class BookKeywordRanker
             return Math.Max(named ? 0.82 : 0, 0.35 + (0.5 * Math.Min(1, distinctiveHits / (double)Math.Min(distinctive.Count, 8))));
         if (distinctiveHits >= 1)
             return named ? 0.82 : 0.55;
-        return named ? 0.82 : 0;
+        return named ? 0.82 : 0.5;
     }
 
     private static List<string> Distinctive(IEnumerable<string> terms)

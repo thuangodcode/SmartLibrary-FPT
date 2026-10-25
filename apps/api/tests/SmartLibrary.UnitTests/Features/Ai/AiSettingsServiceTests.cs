@@ -130,6 +130,7 @@ public class AiSettingsServiceTests
 
         var otherLibrarian = await _sut.GetStatusAsync("Librarian", Guid.NewGuid());
         otherLibrarian.HasApiKey.Should().BeFalse();
+        otherLibrarian.ApiKey.Should().BeNull();
         otherLibrarian.ApiKeyLast4.Should().BeNull();
         otherLibrarian.CanEditApiKey.Should().BeTrue();
     }
@@ -160,23 +161,29 @@ public class AiSettingsServiceTests
             librarianB);
 
         savedA.IsSuccess.Should().BeTrue();
-        savedA.Data!.ApiKeyLast4.Should().Be("5678");
+        savedA.Data!.ApiKey.Should().Be("AIzaSyLibrarianA-Key-12345678");
+        savedA.Data.ApiKeyLast4.Should().Be("5678");
         savedA.Data.CanEditApiKey.Should().BeTrue();
-        savedB.Data!.ApiKeyLast4.Should().Be("s-99");
+        savedB.Data!.ApiKey.Should().Be("sk-librarian-b-key-for-tests-99");
+        savedB.Data.ApiKeyLast4.Should().Be("s-99");
         savedB.Data.Provider.Should().Be("openai");
 
         var statusA = await _sut.GetStatusAsync("Librarian", librarianA);
         var statusB = await _sut.GetStatusAsync("Librarian", librarianB);
+        statusA.ApiKey.Should().Be("AIzaSyLibrarianA-Key-12345678");
         statusA.ApiKeyLast4.Should().Be("5678");
         statusA.Provider.Should().Be("gemini");
+        statusB.ApiKey.Should().Be("sk-librarian-b-key-for-tests-99");
         statusB.ApiKeyLast4.Should().Be("s-99");
         statusB.Provider.Should().Be("openai");
         _users[librarianA].EncryptedApiKey.Should().Be("enc:AIzaSyLibrarianA-Key-12345678");
         _users[librarianB].EncryptedApiKey.Should().Be("enc:sk-librarian-b-key-for-tests-99");
 
         var admin = await _sut.GetStatusAsync("Admin", Guid.NewGuid());
+        admin.ApiKey.Should().BeNull();
         admin.ApiKeyLast4.Should().BeNull();
         admin.LibrarianAccounts.Should().OnlyContain(item => item.HasApiKey);
+        JsonFreeOfSecrets(admin);
     }
 
     [Fact]

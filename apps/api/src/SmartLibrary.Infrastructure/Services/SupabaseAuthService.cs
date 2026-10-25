@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -14,6 +15,7 @@ public class SupabaseAuthService : IIdentityProvider
     private readonly IConfiguration _configuration;
     private readonly ILogger<SupabaseAuthService> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IMemoryCache _cache;
     private readonly string _supabaseUrl;
     private readonly string _anonKey;
     private readonly string _serviceRoleKey;
@@ -23,12 +25,14 @@ public class SupabaseAuthService : IIdentityProvider
         HttpClient httpClient,
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
-        ILogger<SupabaseAuthService> logger)
+        ILogger<SupabaseAuthService> logger,
+        IMemoryCache cache)
     {
         _httpClient = httpClient;
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _logger = logger;
+        _cache = cache;
         _supabaseUrl = configuration["Supabase:Url"] ?? "https://placeholder.supabase.co";
         _anonKey = configuration["Supabase:AnonKey"] ?? string.Empty;
         _serviceRoleKey = configuration["Supabase:ServiceRoleKey"] ?? string.Empty;
@@ -298,6 +302,10 @@ public class SupabaseAuthService : IIdentityProvider
         if (!Guid.TryParse(userId, out var uid))
             return null;
 
+        var cacheKey = "auth-role:" + userId;
+        if (_cache.TryGetValue(cacheKey, out string? cached))
+            return string.IsNullOrEmpty(cached) ? null : cached;
+
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
         await using var cmd = new NpgsqlCommand(@"
@@ -310,7 +318,9 @@ public class SupabaseAuthService : IIdentityProvider
               AND p.status::text = 'Active'
             LIMIT 1;", conn);
         cmd.Parameters.AddWithValue("uid", uid);
-        return await cmd.ExecuteScalarAsync() as string;
+        var role = await cmd.ExecuteScalarAsync() as string;
+        _cache.Set(cacheKey, role ?? string.Empty, TimeSpan.FromSeconds(role is null ? 5 : 30));
+        return role;
     }
 
     public async Task LogoutAsync(string accessToken)

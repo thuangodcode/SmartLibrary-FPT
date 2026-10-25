@@ -708,6 +708,13 @@
   resize: vertical;
 }
 
+.pol-field-hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #9aa1af;
+}
+
 .pol-target-edit {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;

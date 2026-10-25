@@ -394,7 +394,7 @@ export const MOCK_FAQS: FaqItem[] = [
   {
     id: 'f1',
     question: 'Tôi được mượn tối đa bao nhiêu cuốn sách cùng một lúc?',
-    answer: 'Sinh viên được mượn tối đa 5 cuốn sách trong thời hạn 14 ngày. Đối với sinh viên làm Đồ án tốt nghiệp (Capstone), hạn mức được nâng lên 8 cuốn trong 30 ngày.',
+    answer: 'Số sách được mượn và thời hạn mượn theo chính sách hiện hành do Admin cấu hình. Bạn xem hạn trả trên phiếu mượn sau khi Thủ thư xác nhận.',
     category: 'Quy định mượn'
   },
   {
@@ -406,13 +406,13 @@ export const MOCK_FAQS: FaqItem[] = [
   {
     id: 'f3',
     question: 'Làm thế nào để gia hạn thêm thời gian giữ sách?',
-    answer: 'Bạn có thể vào mục "Lịch sử mượn" trên ứng dụng Web hoặc App Mobile, bấm nút "Gia hạn". Mỗi cuốn sách được gia hạn tối đa 2 lần (mỗi lần 7 ngày) nếu không có độc giả khác đặt trước.',
+    answer: 'Bạn có thể vào mục "Lịch sử mượn" và bấm "Gia hạn". Số lần gia hạn và số ngày mỗi lần do Admin cấu hình. Hệ thống sẽ từ chối nếu vượt giới hạn hoặc chưa đủ điều kiện.',
     category: 'Gia hạn'
   },
   {
     id: 'f4',
     question: 'Phí phạt quá hạn mượn sách được tính ra sao?',
-    answer: 'Phí quá hạn là 5.000 VNĐ / ngày / cuốn. Bạn có thể thanh toán trực tiếp qua cổng VNPay/MoMo trên ứng dụng hoặc tại Quầy thủ thư tầng 1.',
+    answer: 'Phí quá hạn, phí sách hỏng và phí sách mất lấy từ chính sách Admin. Số tiền trên phiếu phạt là số đã được hệ thống ghi nhận, không tính lại trên giao diện.',
     category: 'Phạt & Phí'
   }
 ];

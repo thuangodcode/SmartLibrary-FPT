@@ -77,11 +77,36 @@ public static class CirculationRules
             name.Contains("textbook", StringComparison.OrdinalIgnoreCase));
     }
 
-    public static int RenewalDays(CirculationSettings settings, string? language)
-        => IsVietnamese(language) ? settings.RenewalDaysVi : settings.RenewalDaysForeign;
-
     public static int BorrowDays(CirculationSettings settings, string? language)
-        => IsVietnamese(language) ? settings.BorrowDaysVi : settings.BorrowDaysForeign;
+    {
+        if (settings.BorrowDays > 0)
+            return settings.BorrowDays;
+        var specific = IsVietnamese(language) ? settings.BorrowDaysVi : settings.BorrowDaysForeign;
+        return specific > 0 ? specific : 0;
+    }
+
+    public static int RenewalDays(CirculationSettings settings, string? language)
+    {
+        if (settings.RenewalDays > 0)
+            return settings.RenewalDays;
+        var specific = IsVietnamese(language) ? settings.RenewalDaysVi : settings.RenewalDaysForeign;
+        if (specific > 0)
+            return specific;
+        return BorrowDays(settings, language);
+    }
+
+    public static string? MissingBorrowDays(int days)
+        => days <= 0
+            ? "Chưa cấu hình thời hạn mượn. Admin hãy vào Chính sách > Thời hạn mượn và đặt số ngày."
+            : null;
+
+    public static string? MissingRenewalDays(int days)
+        => days <= 0
+            ? "Chưa cấu hình số ngày gia hạn. Admin hãy vào Chính sách > Gia hạn."
+            : null;
+
+    public static int PolicyFee(CirculationSettings settings, BookIncidentSeverity severity)
+        => severity == BookIncidentSeverity.Light ? settings.DamageFee : settings.LostFee;
 
     public static int? MaxBooksFor(CirculationSettings settings, ReaderType? readerType)
         => readerType == ReaderType.Lecturer
@@ -195,8 +220,8 @@ public static class CirculationRules
         BookIncidentKind kind,
         BookIncidentStatus status,
         BookIncidentSeverity severity,
-        decimal? replacementValue,
-        decimal? assessedFee)
+        int damageFee,
+        int lostFee)
     {
         if (status != BookIncidentStatus.PendingReview)
             return "Hồ sơ này không còn chờ xác nhận.";
@@ -204,12 +229,12 @@ public static class CirculationRules
             return "Hồ sơ thất lạc: xác nhận mất sách sau khi đối chiếu bản sao và phiếu mượn, hoặc từ chối nếu tìm thấy sách.";
         return severity switch
         {
-            BookIncidentSeverity.Light when assessedFee is null or <= 0
-                => "Hư hỏng nhẹ cần nhập mức phí theo mức độ. Không mặc định đền nguyên giá sách.",
-            BookIncidentSeverity.Severe when replacementValue is null or <= 0
-                => "Hư hỏng nặng không sửa được: nhập giá mua đền do thủ thư xác minh. Hệ thống không có giá sách mặc định.",
-            BookIncidentSeverity.Lost when replacementValue is null or <= 0
-                => "Mất sách: nhập giá trị tài liệu do thủ thư xác minh. Không tự lấy giá từ catalog.",
+            BookIncidentSeverity.Light when damageFee <= 0
+                => "Chưa cấu hình phí phạt sách hỏng. Admin hãy vào Chính sách > Phí phạt và đặt damage_fee.",
+            BookIncidentSeverity.Severe when lostFee <= 0
+                => "Chưa cấu hình phí phạt sách mất/hư nặng. Admin hãy vào Chính sách > Phí phạt và đặt lost_book_fee.",
+            BookIncidentSeverity.Lost when lostFee <= 0
+                => "Chưa cấu hình phí phạt sách mất. Admin hãy vào Chính sách > Phí phạt và đặt lost_book_fee.",
             BookIncidentSeverity.Unknown
                 => "Chọn mức độ: hư hỏng nhẹ, hư hỏng nặng hoặc mất sách.",
             _ => null

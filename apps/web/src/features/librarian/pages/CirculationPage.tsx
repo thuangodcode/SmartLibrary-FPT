@@ -61,9 +61,13 @@ interface LoanList {
 
 interface IncidentDraft {
   severity: string;
-  amount: string;
   applyOverdue: boolean;
   notes: string;
+}
+
+function policyIncidentFee(stats: CirculationStats | null, severity: string): number {
+  if (!stats) return 0;
+  return severity === 'Light' ? stats.damageFee || 0 : stats.lostFee || 0;
 }
 
 interface ReservationOption {
@@ -706,6 +710,21 @@ export function DirectCheckoutPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [borrowDays, setBorrowDays] = useState<number | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers });
+        const result = await parseApiResponse<ApiResult<CirculationStats>>(response);
+        if (response.ok && result?.success) {
+          setBorrowDays(result.data?.borrowDays ?? 0);
+        }
+      } catch {
+        setBorrowDays(null);
+      }
+    })();
+  }, [headers]);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -768,7 +787,11 @@ export function DirectCheckoutPage() {
           <input required value={barcode} onChange={(event) => setBarcode(event.target.value)}
             placeholder="Quét hoặc nhập mã bản sao" />
         </label>
-        <p className="circ-checkout-hint">Hệ thống kiểm tra chính sách mượn và tình trạng bản sao trước khi tạo phiếu.</p>
+        <p className="circ-checkout-hint">
+          {borrowDays && borrowDays > 0
+            ? `Thời hạn mượn theo chính sách Admin: ${borrowDays} ngày. Hệ thống tự tính ngày đến hạn khi xác nhận.`
+            : 'Thời hạn mượn và ngày đến hạn do Backend lấy từ chính sách Admin. Thủ thư không nhập số ngày riêng.'}
+        </p>
         <button type="submit" className="circ-btn circ-btn--primary" disabled={busy}>
           {busy ? 'Đang xử lý...' : 'Xác nhận mượn sách'}
         </button>
@@ -1171,7 +1194,6 @@ function OverdueView() {
 
   const draftOf = (item: CirculationIncident): IncidentDraft => drafts[item.id] ?? {
     severity: item.kind === 'Lost' ? 'Lost' : 'Light',
-    amount: '',
     applyOverdue: item.overdueDays > 0,
     notes: '',
   };
@@ -1181,16 +1203,17 @@ function OverdueView() {
   };
 
   const recordFine = async (loan: CirculationLoan) => {
-    const suggested = loan.suggestedFine && loan.suggestedFine > 0 ? String(loan.suggestedFine) : '0';
-    const amount = Number(window.prompt('Nhập số tiền phạt (VND). Không tự tạo phạt nếu bạn hủy.', suggested) ?? '0');
-    if (!amount || amount <= 0) return;
+    const preview = loan.suggestedFine && loan.suggestedFine > 0
+      ? `Phí dự kiến theo chính sách: ${formatMoney(loan.suggestedFine)}. Backend sẽ tự tính lại khi ghi nhận.`
+      : 'Backend sẽ lấy phí quá hạn từ chính sách Admin. Thủ thư không nhập số tiền.';
+    if (!window.confirm(`${preview}\nTiếp tục ghi nhận phí quá hạn?`)) return;
     setBusy(true);
     setMessage(null);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/circulation/fines`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ borrowRecordId: loan.id, amount, reason: `Phạt quá hạn ${loan.overdueDays} ngày` }),
+        body: JSON.stringify({ borrowRecordId: loan.id }),
       });
       const json = await parseApiResponse<ApiResult<unknown>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Không ghi nhận được phạt.');
@@ -1209,11 +1232,11 @@ function OverdueView() {
 
   const confirmIncident = async (item: CirculationIncident) => {
     const draft = draftOf(item);
-    const amount = Number(draft.amount);
-    if (!amount || amount <= 0) {
-      const message = 'Nhập số tiền sau khi đã đối chiếu bản sao và phiếu mượn. Hệ thống không tự lấy giá sách.';
+    const expectedFee = policyIncidentFee(stats, draft.severity);
+    if (!expectedFee || expectedFee <= 0) {
+      const message = 'Chưa có mức phí trong chính sách Admin. Không ghi nhận số tiền do Thủ thư nhập tay.';
       setError(message);
-      showToast({ type: 'error', title: 'Thông tin chưa hợp lệ', message });
+      showToast({ type: 'error', title: 'Thiếu chính sách phí', message });
       return;
     }
     setBusy(true);
@@ -1224,8 +1247,6 @@ function OverdueView() {
         severity: draft.severity,
         applyOverdue: draft.applyOverdue,
         notes: draft.notes,
-        replacementValue: draft.severity === 'Light' ? null : amount,
-        assessedFee: draft.severity === 'Light' ? amount : null,
       };
       const res = await fetch(`${API_BASE_URL}/api/v1/circulation/incidents/${item.id}/confirm`, {
         method: 'POST',
@@ -1329,12 +1350,12 @@ function OverdueView() {
       </div>
       <div className="circ-card">
         <h2>Hư hỏng & thất lạc</h2>
-        <p className="circ-hint">Không ghi nhận mất sách hay bồi thường khi độc giả tự báo. Thủ thư đối chiếu bản sao, phiếu mượn rồi xác nhận. Hư hỏng nhẹ tính phí theo mức độ; hư hỏng nặng hoặc mất sách mới mua đền. Không tự khóa tài khoản.</p>
+        <p className="circ-hint">Không ghi nhận mất sách hay bồi thường khi độc giả tự báo. Thủ thư đối chiếu bản sao, phiếu mượn rồi xác nhận. Phí sách hỏng và sách mất lấy từ chính sách Admin, không nhập tay. Không tự khóa tài khoản.</p>
         {loading ? (
           <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải hồ sơ sự cố...</p>
         ) : !incidents.length ? <p className="circ-empty">Chưa có hồ sơ mất sách hoặc hư hỏng.</p> : incidents.map((item) => {
           const draft = draftOf(item);
-          const amount = Number(draft.amount) || 0;
+          const amount = policyIncidentFee(stats, draft.severity);
           const overdue = draft.applyOverdue ? (item.suggestedOverdueFine ?? 0) : 0;
           const pending = item.status === 'PendingReview';
           return (
@@ -1363,10 +1384,11 @@ function OverdueView() {
                       <option value="Lost">Mất sách, bồi thường giá trị tài liệu</option>
                     </select>
                   </label>
-                  <label className="circ-field">
-                    {draft.severity === 'Light' ? 'Mức phí theo độ hư hỏng (VND)' : 'Giá trị bồi thường / mua đền (VND)'}
-                    <input type="number" min={1} value={draft.amount} onChange={(e) => patchDraft(item.id, item, { amount: e.target.value })} placeholder="Thủ thư nhập sau khi xác minh" />
-                  </label>
+                  <p className="circ-hint">
+                    {amount > 0
+                      ? `Phí dự kiến theo chính sách Admin: ${formatMoney(amount)}${overdue ? ` + quá hạn ${formatMoney(overdue)} = ${formatMoney(amount + overdue)}` : ''}. Backend tự tính khi xác nhận.`
+                      : 'Chưa cấu hình phí sách hỏng/mất. Admin hãy vào Chính sách > Phí phạt.'}
+                  </p>
                   <label className="circ-check">
                     <input type="checkbox" checked={draft.applyOverdue} onChange={(e) => patchDraft(item.id, item, { applyOverdue: e.target.checked })} disabled={item.overdueDays <= 0} />
                     Cộng phạt quá hạn {item.suggestedOverdueFine ? formatMoney(item.suggestedOverdueFine) : '(chưa có mức trong chính sách)'}
@@ -1375,11 +1397,8 @@ function OverdueView() {
                     Biên bản / ghi chú xác minh
                     <input value={draft.notes} onChange={(e) => patchDraft(item.id, item, { notes: e.target.value })} placeholder="Đã đối chiếu bản sao và phiếu mượn" />
                   </label>
-                  {amount > 0 && (
-                    <p className="circ-hint">Tạm tính: {formatMoney(amount)}{overdue ? ` + ${formatMoney(overdue)} = ${formatMoney(amount + overdue)}` : ''}. Đây không phải mức cố định cho mọi trường hợp.</p>
-                  )}
                   <div className="circ-actions">
-                    <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void confirmIncident(item)}>Xác nhận bồi thường</button>
+                    <button type="button" className="circ-btn circ-btn--primary" disabled={busy || amount <= 0} onClick={() => void confirmIncident(item)}>Xác nhận bồi thường</button>
                     <button type="button" className="circ-btn" disabled={busy} onClick={() => void rejectIncident(item)}>Từ chối / tìm thấy sách</button>
                     <Link className="circ-btn" to={tabPath('fines')}>Xem phí</Link>
                   </div>

@@ -4,6 +4,7 @@ import { parseApiResponse } from '../../lib/api';
 export interface AiProviderStatus {
   id: string;
   hasApiKey: boolean;
+  apiKey?: string | null;
   apiKeyLast4: string | null;
   chatModel: string | null;
   embeddingModel: string | null;
@@ -16,6 +17,7 @@ export interface AiProviderStatus {
 
 export interface AiSettingsStatus {
   hasApiKey: boolean;
+  apiKey?: string | null;
   apiKeyLast4: string | null;
   provider: string;
   chatModel: string;

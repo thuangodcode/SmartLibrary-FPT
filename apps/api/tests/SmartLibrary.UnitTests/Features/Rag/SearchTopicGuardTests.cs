@@ -213,6 +213,33 @@ public class SearchTopicGuardTests
     }
 
     [Fact]
+    public void LiteratureCategory_FindsVietnameseFiction()
+    {
+        const string query = "Kiểm đếm tôi về sách văn học";
+        SearchTopicGuard.Parse(query).Topics.Should().Contain("literature");
+        SearchTopicGuard.Allows(
+                query,
+                "Tôi thấy hoa vàng trên cỏ xanh",
+                "Tiểu thuyết nổi tiếng của Nguyễn Nhật Ánh.",
+                ["Nguyễn Nhật Ánh"],
+                ["Văn học"],
+                "9786041004429",
+                "BK000003",
+                "vi")
+            .Should().BeTrue();
+        SearchTopicGuard.Allows(
+                query,
+                "Python nâng cao",
+                "Python cho kỹ sư",
+                ["Bùi Việt Hà"],
+                ["CNTT & Phần mềm"],
+                "1234567890",
+                "BK000011",
+                "en")
+            .Should().BeFalse();
+    }
+
+    [Fact]
     public void CompoundPythonAndCleanCode_DoesNotForcePythonOnEveryHit()
     {
         const string query = "Python nâng cao và Clean Code";

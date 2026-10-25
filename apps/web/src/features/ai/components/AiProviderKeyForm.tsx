@@ -16,6 +16,11 @@ import { useToast } from '../../../components/ui/useToast';
 
 type ConnectionState = 'idle' | 'missing' | 'testing' | 'ok' | 'error';
 
+function keyFor(status: AiSettingsStatus, tab: AiProviderId): string {
+  const item = status.providers?.find((entry) => entry.id === tab);
+  return (item?.apiKey || (item?.isActive ? status.apiKey : '') || '').trim();
+}
+
 function connectionState(status: AiSettingsStatus | null, testing: boolean): ConnectionState {
   if (testing) return 'testing';
   if (!status?.hasApiKey) return 'missing';
@@ -43,8 +48,8 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
   const [providerId, setProviderId] = useState<AiProviderId>(
     isProviderId(status.provider) ? status.provider : 'gemini',
   );
-  const [apiKey, setApiKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
+  const [apiKey, setApiKey] = useState(() => keyFor(status, isProviderId(status.provider) ? status.provider : 'gemini'));
+  const [showKey, setShowKey] = useState(true);
   const [keyError, setKeyError] = useState<string | null>(null);
   const [chatModel, setChatModel] = useState(status.chatModel || 'gemini-3.8-flash');
   const [embeddingModel, setEmbeddingModel] = useState(status.embeddingModel || 'gemini-embedding-001');
@@ -61,7 +66,8 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
   const savedChat = saved?.chatModel || provider.chatModels[0]?.id || '';
   const savedEmbed = saved?.embeddingModel || provider.embeddingModels[0]?.id || '';
   const savedBase = saved?.baseUrl || '';
-  const dirty = Boolean(apiKey.trim())
+  const storedKey = keyFor(status, providerId);
+  const dirty = apiKey.trim() !== storedKey
     || chatModel !== savedChat
     || embeddingModel !== savedEmbed
     || (provider.needsBaseUrl && baseUrl.trim() !== savedBase);
@@ -73,12 +79,12 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
     setChatModel(item?.chatModel || def.chatModels[0]?.id || '');
     setEmbeddingModel(item?.embeddingModel || def.embeddingModels[0]?.id || '');
     setBaseUrl(item?.baseUrl || '');
+    setApiKey(keyFor(next, tab));
   };
 
   const selectTab = (id: AiProviderId) => {
     setProviderId(id);
-    setApiKey('');
-    setShowKey(false);
+    setShowKey(true);
     setKeyError(null);
     fill(status, id);
   };
@@ -109,16 +115,12 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
         baseUrl: provider.needsBaseUrl ? baseUrl.trim() : undefined,
       });
       onStatus(next);
-      setApiKey('');
-      setShowKey(false);
       fill(next, providerId);
       setJustSaved(true);
       showToast({
         type: 'success',
         title: 'Đã lưu cấu hình',
-        message: next.apiKeyLast4
-          ? `${provider.name} đang dùng token ••••${next.apiKeyLast4}.`
-          : `${provider.name} đã lưu. Khóa bí mật không hiển thị lại.`,
+        message: `${provider.name} đang dùng token trong ô nhập.`,
       });
     } catch (saveError) {
       showToast({
@@ -169,8 +171,8 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
         </span>
       </div>
       <p>
-        API Key chỉ thuộc tài khoản thủ thư này, được mã hóa phía máy chủ.
-        Sau khi lưu, khóa không hiển thị lại. Admin không đọc được khóa.
+        API Key thuộc tài khoản thủ thư này và được mã hóa khi lưu.
+        Ô nhập luôn hiện token đang dùng. Chỉ đổi khi bạn sửa rồi bấm Lưu. Admin không đọc được khóa.
       </p>
       {status.accountEnabled === false && (
         <p className="ai-cfg-warn">Admin đã tắt quyền AI của tài khoản này. Lưu khóa được nhưng không gọi được AI.</p>
@@ -216,7 +218,7 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
               type={showKey ? 'text' : 'password'}
               autoComplete="off"
               value={apiKey}
-              placeholder={tabHasKey ? 'Nhập key mới để thay token đang dùng' : provider.keyPlaceholder}
+              placeholder={provider.keyPlaceholder}
               onChange={(event) => {
                 setApiKey(event.target.value);
                 setKeyError(null);
