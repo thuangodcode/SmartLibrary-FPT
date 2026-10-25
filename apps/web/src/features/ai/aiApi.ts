@@ -112,6 +112,24 @@ export interface RagReindexResult {
   syncedAt: string;
 }
 
+export interface RagReindexJob {
+  jobId: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  completedItems: number;
+  totalItems: number;
+  message: string;
+  result: RagReindexResult | null;
+}
+
+export interface RagReindexResult {
+  booksIndexed: number;
+  policiesIndexed: number;
+  skippedUnchanged: number;
+  failed: number;
+  documentCount: number;
+  syncedAt: string;
+}
+
 export interface AiBookSuggestion {
   id: string;
   title: string;
@@ -222,7 +240,26 @@ export const testAiConnection = (token: string, provider?: string) =>
   callApi<AiConnectionTest>(token, '/api/v1/ai/test', json({ provider }));
 
 export const reindexRag = (token: string) =>
-  callApi<RagReindexResult>(token, '/api/v1/ai/reindex', { method: 'POST' });
+  callApi<RagReindexJob>(token, '/api/v1/ai/reindex', { method: 'POST' });
+
+export const getRagReindexJob = (token: string, jobId: string) =>
+  callApi<RagReindexJob>(token, `/api/v1/ai/reindex/${jobId}`, { method: 'GET' });
+
+export const runRagReindex = async (
+  token: string,
+  onProgress?: (job: RagReindexJob) => void,
+): Promise<RagReindexResult> => {
+  let job = await reindexRag(token);
+  onProgress?.(job);
+  while (job.status === 'queued' || job.status === 'running') {
+    await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    job = await getRagReindexJob(token, job.jobId);
+    onProgress?.(job);
+  }
+  if (job.status === 'failed') throw new Error(job.message);
+  if (!job.result) throw new Error('Tác vụ đồng bộ kết thúc nhưng không có kết quả trả về.');
+  return job.result;
+};
 
 export const getAcquisitionSuggestions = (token: string) =>
   callApi<RagAskResult>(token, '/api/v1/ai/acquisition-suggestions', { method: 'POST' });

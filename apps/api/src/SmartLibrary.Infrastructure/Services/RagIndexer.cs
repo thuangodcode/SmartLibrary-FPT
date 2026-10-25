@@ -42,43 +42,70 @@ public class RagIndexer : IRagIndexer
     public Task DeleteAsync(string sourceType, Guid sourceId, CancellationToken ct = default)
         => _documents.DeleteBySourceAsync(sourceType, sourceId, ct);
 
-    public async Task<RagReindexResultDto> ReindexAllAsync(CancellationToken ct = default)
+    public async Task<RagReindexResultDto> ReindexAllAsync(
+        CancellationToken ct = default,
+        Action<int, int>? progress = null)
     {
         var result = new RagReindexResultDto { SyncedAt = DateTime.UtcNow };
-        var bookIds = await _db.Books.AsNoTracking()
-            .Where(book => !book.IsDeleted)
-            .Select(book => book.Id)
-            .ToListAsync(ct);
+        var credential = await _settings.ResolveLibraryAsync(ct);
+        if (!credential.IsSuccess || credential.Data is null)
+            throw new InvalidOperationException("Chưa cấu hình nhà cung cấp embedding nên không thể tạo embedding.");
 
-        foreach (var bookId in bookIds)
+        var books = await _db.Books.AsNoTracking()
+            .Include(book => book.Authors)
+            .Include(book => book.Categories)
+            .Where(book => !book.IsDeleted)
+            .ToListAsync(ct);
+        var policies = await _db.PolicyRules.AsNoTracking()
+            .Include(policy => policy.Parameters)
+            .Where(policy => !policy.IsDeleted && policy.Status == PolicyRuleStatus.Active)
+            .ToListAsync(ct);
+        var sources = books.Select(book => ("book", book.Id))
+            .Concat(policies.Select(policy => ("policy", policy.Id)))
+            .ToList();
+        var sourceIds = sources.Select(source => source.Id).ToHashSet();
+        var sourceTypes = sources.Select(source => source.Item1).Distinct().ToArray();
+        var existingDocuments = await _db.RagDocuments.AsNoTracking()
+            .Where(document => sourceTypes.Contains(document.SourceType) && sourceIds.Contains(document.SourceId))
+            .ToDictionaryAsync(document => (document.SourceType, document.SourceId), ct);
+        var totalItems = books.Count + policies.Count;
+        var completedItems = 0;
+        progress?.Invoke(completedItems, totalItems);
+
+        foreach (var book in books)
         {
             try
             {
-                Apply(result, await TryUpsertAsync("book", bookId, ct), isBook: true);
+                var payload = BuildBookText(book);
+                existingDocuments.TryGetValue(("book", book.Id), out var existing);
+                var status = await UpsertPayloadAsync(
+                    "book", book.Id, payload.Title, payload.Content, existing, credential.Data, ct);
+                Apply(result, status, isBook: true);
             }
             catch (Exception ex)
             {
                 result.Failed++;
-                _logger.LogWarning(ex, "Lỗi index sách {BookId}.", bookId);
+                _logger.LogWarning(ex, "Lỗi index sách {BookId}.", book.Id);
             }
+            progress?.Invoke(++completedItems, totalItems);
         }
 
-        var policyIds = await _db.PolicyRules.AsNoTracking()
-            .Where(policy => !policy.IsDeleted && policy.Status == PolicyRuleStatus.Active)
-            .Select(policy => policy.Id)
-            .ToListAsync(ct);
-
-        foreach (var policyId in policyIds)
+        foreach (var policy in policies)
         {
             try
             {
-                Apply(result, await TryUpsertAsync("policy", policyId, ct), isBook: false);
+                var payload = BuildPolicyText(policy);
+                existingDocuments.TryGetValue(("policy", policy.Id), out var existing);
+                var status = await UpsertPayloadAsync(
+                    "policy", policy.Id, payload.Title, payload.Content, existing, credential.Data, ct);
+                Apply(result, status, isBook: false);
             }
             catch (Exception ex)
             {
                 result.Failed++;
-                _logger.LogWarning(ex, "Lỗi index chính sách {PolicyId}.", policyId);
+                _logger.LogWarning(ex, "Lỗi index chính sách {PolicyId}.", policy.Id);
             }
+            progress?.Invoke(++completedItems, totalItems);
         }
 
         result.DocumentCount = await _documents.CountAsync(ct);
@@ -110,15 +137,31 @@ public class RagIndexer : IRagIndexer
             return "deleted";
         }
 
-        var title = payload.Value.Title;
-        var content = payload.Value.Content;
         var credential = await _settings.ResolveLibraryAsync(ct);
         if (!credential.IsSuccess || credential.Data is null)
             throw new InvalidOperationException("Chưa cấu hình nhà cung cấp embedding nên không thể tạo embedding.");
 
-        var cred = credential.Data;
-        var hash = Sha256($"v2:{cred.EmbeddingProvider}:{cred.EmbeddingModel}\n{content}");
         var existing = await _documents.FindBySourceAsync(sourceType, sourceId, ct);
+        return await UpsertPayloadAsync(
+            sourceType,
+            sourceId,
+            payload.Value.Title,
+            payload.Value.Content,
+            existing,
+            credential.Data,
+            ct);
+    }
+
+    private async Task<string> UpsertPayloadAsync(
+        string sourceType,
+        Guid sourceId,
+        string title,
+        string content,
+        RagDocument? existing,
+        AiRuntimeCredential cred,
+        CancellationToken ct)
+    {
+        var hash = Sha256($"v2:{cred.EmbeddingProvider}:{cred.EmbeddingModel}\n{content}");
         if (existing is not null && existing.ContentHash == hash)
             return "skipped";
 
@@ -151,6 +194,11 @@ public class RagIndexer : IRagIndexer
         if (book is null)
             return null;
 
+        return BuildBookText(book);
+    }
+
+    private static (string Title, string Content) BuildBookText(SmartLibrary.Domain.Entities.Book book)
+    {
         var authors = string.Join(", ", book.Authors.Select(author => author.Name));
         var categories = string.Join(", ", book.Categories.Select(category => category.Name));
         var content = $"""
@@ -175,6 +223,11 @@ public class RagIndexer : IRagIndexer
         if (policy is null || policy.Status != PolicyRuleStatus.Active)
             return null;
 
+        return BuildPolicyText(policy);
+    }
+
+    private static (string Title, string Content) BuildPolicyText(PolicyRule policy)
+    {
         var parameters = string.Join(
             "; ",
             policy.Parameters.Select(param => $"{param.DisplayLabel ?? param.ParamKey}={param.ParamValue}"));

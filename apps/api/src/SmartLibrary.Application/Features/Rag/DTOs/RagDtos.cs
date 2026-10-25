@@ -58,3 +58,13 @@ public class RagReindexResultDto
     public int DocumentCount { get; set; }
     public DateTime SyncedAt { get; set; }
 }
+
+public class RagReindexJobDto
+{
+    public Guid JobId { get; set; }
+    public string Status { get; set; } = "queued";
+    public int CompletedItems { get; set; }
+    public int TotalItems { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public RagReindexResultDto? Result { get; set; }
+}

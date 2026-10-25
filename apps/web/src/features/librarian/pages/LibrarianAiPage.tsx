@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, LoaderCircle, Save, Search, Sparkles } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowUpRight,
+  BookOpen,
+  CheckCircle2,
+  LoaderCircle,
+  MapPin,
+  PackageCheck,
+  Save,
+  Search,
+  Sparkles,
+} from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { useHomeCategories } from '../../home/hooks/useHomeData';
@@ -12,12 +23,13 @@ import {
   getAiSettings,
   getLibrarianWorkspace,
   markMyAiForLibrary,
-  reindexRag,
+  runRagReindex,
   saveLibrarianAiSettings,
   type AiCriterion,
   type AiLibrarianWorkspace,
   type AiSettingsStatus,
   type RagAskResult,
+  type RagReindexJob,
   type RagSource,
 } from '../../ai/aiApi';
 import AiProviderKeyForm from '../../ai/components/AiProviderKeyForm';
@@ -88,6 +100,7 @@ const LibrarianAiPage = () => {
   const [confirm, setConfirm] = useState<'leave' | null>(null);
   const [libraryBusy, setLibraryBusy] = useState(false);
   const [reindexing, setReindexing] = useState(false);
+  const [reindexProgress, setReindexProgress] = useState<RagReindexJob | null>(null);
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const saveToastId = useRef<string | null>(null);
   const savingRef = useRef(false);
@@ -174,8 +187,9 @@ const LibrarianAiPage = () => {
   const reindex = async () => {
     if (!accessToken) return;
     setReindexing(true);
+    setReindexProgress(null);
     try {
-      const result = await reindexRag(accessToken);
+      const result = await runRagReindex(accessToken, setReindexProgress);
       setStatus((current) => current
         ? { ...current, documentCount: result.documentCount, documentsSyncedAt: result.syncedAt, needsReindex: false }
         : current);
@@ -388,10 +402,39 @@ const LibrarianAiPage = () => {
               </button>
               {status?.useForLibrary && (
                 <button type="button" className="ai-btn" disabled={reindexing || !status.hasApiKey} onClick={() => void reindex()}>
-                  {reindexing ? 'Đang đồng bộ…' : 'Đồng bộ dữ liệu RAG'}
+                  {reindexing ? <LoaderCircle className="ai-spin" size={14} /> : <Sparkles size={14} />}
+                  {reindexing ? 'Đang đồng bộ dữ liệu…' : 'Đồng bộ dữ liệu RAG'}
                 </button>
               )}
             </div>
+            {reindexing && (
+              <div className="ai-biz-reindex-progress" role="status" aria-live="polite">
+                <LoaderCircle className="ai-spin" size={17} />
+                <div>
+                  <strong>{reindexProgress?.message || 'Đang cập nhật kho tìm kiếm ngữ nghĩa'}</strong>
+                  <span>
+                    Sách không thay đổi sẽ được bỏ qua. Nếu đây là lần đầu dùng ONNX hoặc vừa đổi model,
+                    máy chủ cần tải model và tạo lại embedding cho toàn bộ sách.
+                  </span>
+                  {Boolean(reindexProgress?.totalItems) && (
+                    <div
+                      className="ai-biz-reindex-track"
+                      role="progressbar"
+                      aria-label="Tiến độ đồng bộ RAG"
+                      aria-valuemin={0}
+                      aria-valuemax={reindexProgress?.totalItems}
+                      aria-valuenow={reindexProgress?.completedItems}
+                    >
+                      <span style={{
+                        width: `${Math.round(
+                          ((reindexProgress?.completedItems ?? 0) / (reindexProgress?.totalItems ?? 1)) * 100,
+                        )}%`,
+                      }} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </section>
 
           {accessToken && status && (
@@ -498,8 +541,18 @@ const LibrarianAiPage = () => {
                 </button>
               </div>
               {preview && (
-                <div className="ai-biz-result">
-                  <p>{preview.answer}</p>
+                <div className="ai-biz-preview">
+                  <div className="ai-biz-preview-head">
+                    <div>
+                      <span className="ai-biz-preview-eyebrow"><Sparkles size={13} /> GỢI Ý TỪ DỮ LIỆU THƯ VIỆN</span>
+                      <h3>Kết quả phân tích</h3>
+                      <p>{preview.answer}</p>
+                    </div>
+                    <div className="ai-biz-preview-count">
+                      <strong>{preview.sources.filter((source) => source.sourceType === 'book').length}</strong>
+                      <span>đầu sách</span>
+                    </div>
+                  </div>
                   <BookSourceList sources={preview.sources} empty="Không có sách thật khớp tiêu chí hiện tại." />
                 </div>
               )}
@@ -669,27 +722,56 @@ const LibrarianAiPage = () => {
   );
 };
 
-function formatBookSource(source: RagSource) {
-  const copies = Number.isFinite(source.availableCopies) && Number.isFinite(source.totalCopies)
-    ? ` · bản sao ${source.availableCopies}/${source.totalCopies}`
-    : '';
-  const score = Number.isFinite(source.score) && source.score > 0
-    ? ` · liên quan ${(source.score * 100).toFixed(0)}%`
-    : '';
-  return `${source.title}${source.author ? ` · ${source.author}` : ''}${source.isbn ? ` · ISBN ${source.isbn}` : ''}${copies}${score}`;
-}
-
 function BookSourceList({ sources, empty }: { sources: RagSource[]; empty?: string }) {
   const books = sources.filter((item) => item.sourceType === 'book');
   if (books.length === 0) {
     return empty ? <p className="ai-biz-muted">{empty}</p> : null;
   }
   return (
-    <ul>
-      {books.map((source) => (
-        <li key={`${source.sourceType}-${source.sourceId}`}>{formatBookSource(source)}</li>
-      ))}
-    </ul>
+    <div className="ai-biz-book-grid">
+      {books.map((source) => {
+        const availableCopies = source.availableCopies ?? 0;
+        const totalCopies = source.totalCopies ?? 0;
+        const availability = availableCopies > 0;
+        const matchLabel = source.matchLabel || (source.score >= 0.7 ? 'Phù hợp cao' : 'Có liên quan');
+        return (
+          <article className="ai-biz-book-card" key={`${source.sourceType}-${source.sourceId}`}>
+            <div className="ai-biz-book-cover">
+              {source.coverImageUrl ? (
+                <img src={source.coverImageUrl} alt={`Bìa sách ${source.title}`} loading="lazy" />
+              ) : (
+                <div className="ai-biz-book-cover-empty"><BookOpen size={28} /><span>SmartLibrary</span></div>
+              )}
+              <span className={`ai-biz-match${source.score >= 0.7 ? ' is-strong' : ''}`}>{matchLabel}</span>
+            </div>
+            <div className="ai-biz-book-info">
+              <div className="ai-biz-book-categories">
+                {(source.categories ?? []).slice(0, 2).map((category) => <span key={category}>{category}</span>)}
+              </div>
+              <h4>{source.title}</h4>
+              <p className="ai-biz-book-author">{source.author || 'Chưa cập nhật tác giả'}</p>
+              <div className={`ai-biz-book-stock${availability ? ' is-available' : ''}`}>
+                <PackageCheck size={14} />
+                <span>
+                  {availability
+                    ? `Còn ${availableCopies} / ${totalCopies} bản`
+                    : `Hết bản mượn · ${totalCopies} bản trong kho`}
+                </span>
+              </div>
+              {(source.isbn || source.location) && (
+                <div className="ai-biz-book-meta">
+                  {source.isbn && <span>ISBN {source.isbn}</span>}
+                  {source.location && <span><MapPin size={12} />{source.location}</span>}
+                </div>
+              )}
+              <Link className="ai-biz-book-link" to={`/librarian/books/${source.sourceId}`}>
+                Xem chi tiết <ArrowUpRight size={14} />
+              </Link>
+            </div>
+          </article>
+        );
+      })}
+    </div>
   );
 }
 

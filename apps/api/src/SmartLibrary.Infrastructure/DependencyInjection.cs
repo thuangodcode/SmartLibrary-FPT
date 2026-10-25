@@ -51,6 +51,9 @@ public static class DependencyInjection
         services.AddScoped<IRagDocumentRepository, RagDocumentRepository>();
         services.AddScoped<IRagIndexer, RagIndexer>();
         services.AddHostedService<RagWarmupHostedService>();
+        services.AddSingleton<RagReindexJobService>();
+        services.AddSingleton<IRagReindexJobQueue>(provider => provider.GetRequiredService<RagReindexJobService>());
+        services.AddHostedService(provider => provider.GetRequiredService<RagReindexJobService>());
 
         // Services
         services.AddSingleton<ISecretProtector, SecretProtector>();

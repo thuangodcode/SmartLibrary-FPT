@@ -7,7 +7,7 @@ import AiConfirmDialog from '../../ai/components/AiConfirmDialog';
 import { findProvider } from '../../ai/aiProviders';
 import {
   getAiSettings,
-  reindexRag,
+  runRagReindex,
   saveAdminAiSettings,
   setLibrarianAiAccountEnabled,
   type AiServiceFlag,
@@ -147,7 +147,7 @@ const AdminAiSettingsPage = () => {
     if (!accessToken) return;
     setReindexing(true);
     try {
-      const result = await reindexRag(accessToken);
+      const result = await runRagReindex(accessToken);
       setStatus((current) => current
         ? { ...current, documentCount: result.documentCount, documentsSyncedAt: result.syncedAt, needsReindex: false }
         : current);

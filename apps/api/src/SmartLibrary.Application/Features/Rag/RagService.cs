@@ -89,15 +89,12 @@ public class RagService
     public async Task<Result<RagReindexResultDto>> ReindexAsync(
         string role,
         Guid? userId = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Action<int, int>? progress = null)
     {
-        var policy = await _settings.GetEntityAsync(ct);
-        var isDesignated = userId is Guid id
-            && id != Guid.Empty
-            && policy.ActiveLibrarianUserId == id
-            && AiSettingsService.IsLibrarianOnly(role);
-        if (!AiSettingsService.IsAdmin(role) && !isDesignated)
-            return Result<RagReindexResultDto>.Failure("Chỉ Admin hoặc thủ thư đang dùng cho thư viện được đồng bộ RAG.");
+        var access = await CanReindexAsync(role, userId, ct);
+        if (!access.IsSuccess)
+            return Result<RagReindexResultDto>.Failure(access.Error!);
 
         var credential = await _settings.ResolveLibraryAsync(ct);
         if (!credential.IsSuccess)
@@ -105,7 +102,7 @@ public class RagService
 
         try
         {
-            var result = await _indexer.ReindexAllAsync(ct);
+            var result = await _indexer.ReindexAllAsync(ct, progress);
             await _settings.UpdateSyncStatsAsync(
                 result.SyncedAt,
                 result.DocumentCount,
@@ -118,6 +115,21 @@ public class RagService
             await NotifyCredentialAsync(credential.Data?.OwnerUserId, ex.Message, ct);
             return Result<RagReindexResultDto>.Failure(Sanitize(ex.Message));
         }
+    }
+
+    public async Task<Result<bool>> CanReindexAsync(
+        string role,
+        Guid? userId = null,
+        CancellationToken ct = default)
+    {
+        var policy = await _settings.GetEntityAsync(ct);
+        var isDesignated = userId is Guid id
+            && id != Guid.Empty
+            && policy.ActiveLibrarianUserId == id
+            && AiSettingsService.IsLibrarianOnly(role);
+        return AiSettingsService.IsAdmin(role) || isDesignated
+            ? Result<bool>.Success(true)
+            : Result<bool>.Failure("Chỉ Admin hoặc thủ thư đang dùng cho thư viện được đồng bộ RAG.");
     }
 
     public async Task<Result<RagAskResultDto>> SuggestAcquisitionsAsync(

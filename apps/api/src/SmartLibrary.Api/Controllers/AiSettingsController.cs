@@ -17,12 +17,18 @@ public class AiSettingsController : ControllerBase
 {
     private readonly AiSettingsService _settings;
     private readonly RagService _rag;
+    private readonly IRagReindexJobQueue _reindexJobs;
     private readonly AiInsightsService _insights;
 
-    public AiSettingsController(AiSettingsService settings, RagService rag, AiInsightsService insights)
+    public AiSettingsController(
+        AiSettingsService settings,
+        RagService rag,
+        IRagReindexJobQueue reindexJobs,
+        AiInsightsService insights)
     {
         _settings = settings;
         _rag = rag;
+        _reindexJobs = reindexJobs;
         _insights = insights;
     }
 
@@ -129,18 +135,33 @@ public class AiSettingsController : ControllerBase
     [HttpPost("reindex")]
     public async Task<IActionResult> Reindex(CancellationToken ct)
     {
-        TryGetCurrentUserId(out var actorId);
-        var result = await _rag.ReindexAsync(CurrentRole(), actorId, ct);
-        if (!result.IsSuccess)
+        if (!TryGetCurrentUserId(out var actorId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
+
+        var access = await _rag.CanReindexAsync(CurrentRole(), actorId, ct);
+        if (!access.IsSuccess)
         {
-            var status = result.Error!.Contains("Chỉ Admin", StringComparison.OrdinalIgnoreCase)
-                         || result.Error.Contains("thủ thư đang dùng", StringComparison.OrdinalIgnoreCase)
-                ? 403
-                : 400;
-            return StatusCode(status, ApiResponse<object>.Fail(result.Error));
+            return StatusCode(403, ApiResponse<object>.Fail(access.Error!));
         }
 
-        return Ok(ApiResponse<RagReindexResultDto>.Ok(result.Data!, new { message = "Đã đồng bộ dữ liệu RAG." }));
+        var result = await _reindexJobs.StartAsync(CurrentRole(), actorId, ct);
+        if (!result.IsSuccess)
+            return Conflict(ApiResponse<object>.Fail(result.Error!));
+
+        return Accepted(ApiResponse<RagReindexJobDto>.Ok(result.Data!, new { message = "Đã bắt đầu đồng bộ dữ liệu RAG." }));
+    }
+
+    [HttpGet("reindex/{jobId:guid}")]
+    public async Task<IActionResult> ReindexStatus(Guid jobId, CancellationToken ct)
+    {
+        if (!TryGetCurrentUserId(out var actorId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
+
+        var result = await _reindexJobs.GetAsync(jobId, actorId, ct);
+        if (!result.IsSuccess)
+            return NotFound(ApiResponse<object>.Fail(result.Error!));
+
+        return Ok(ApiResponse<RagReindexJobDto>.Ok(result.Data!));
     }
 
     [HttpPost("acquisition-suggestions")]
