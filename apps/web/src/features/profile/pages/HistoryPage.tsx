@@ -44,6 +44,7 @@ interface CirculationLoan {
 interface CirculationFine {
   id: string;
   code: string;
+  borrowRecordId: string;
   bookTitle: string;
   barcode: string;
   amount: number;
@@ -139,6 +140,7 @@ const HistoryPage = () => {
   const [paymentCheckout, setPaymentCheckout] = useState<FinePaymentCheckout | null>(null);
   const [paymentBusy, setPaymentBusy] = useState<string | null>(null);
   const renewalRequestInFlight = useRef(false);
+  const quietRefreshRef = useRef(false);
   const paymentRedirectInfoShown = useRef(false);
   const paymentRedirectHandled = useRef(false);
   const paymentRedirectKey = useRef<string | null>(null);
@@ -156,8 +158,12 @@ const HistoryPage = () => {
 
     let cancelled = false;
     const load = async () => {
-      setLoading(true);
-      setError(null);
+      const quiet = quietRefreshRef.current;
+      quietRefreshRef.current = false;
+      if (!quiet) {
+        setLoading(true);
+        setError(null);
+      }
       try {
         const headers = { Authorization: `Bearer ${token}` };
         const [loanResponse, fineResponse] = await Promise.all([
@@ -179,9 +185,13 @@ const HistoryPage = () => {
           setFines(fineResult.data);
         }
       } catch (caught) {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : 'Không thể tải dữ liệu mượn trả.');
+        if (!cancelled && !quiet) {
+          const message = caught instanceof Error ? caught.message : 'Không thể tải dữ liệu mượn trả.';
+          setError(message);
+          showToast({ type: 'error', title: 'Không thể tải lịch sử mượn trả', message });
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !quiet) setLoading(false);
       }
     };
 
@@ -189,7 +199,7 @@ const HistoryPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [page, refreshKey, token]);
+  }, [page, refreshKey, showToast, token]);
 
   const visibleLoans = useMemo(() => {
     const records = loans?.items ?? [];
@@ -207,6 +217,16 @@ const HistoryPage = () => {
   const unpaidTotal = fines
     .filter((fine) => fine.status === 'Pending')
     .reduce((total, fine) => total + fine.amount, 0);
+
+  const pendingFinesByLoan = useMemo(() => {
+    const grouped = new Map<string, CirculationFine[]>();
+    fines.filter((fine) => fine.status === 'Pending').forEach((fine) => {
+      const loanFines = grouped.get(fine.borrowRecordId) ?? [];
+      loanFines.push(fine);
+      grouped.set(fine.borrowRecordId, loanFines);
+    });
+    return grouped;
+  }, [fines]);
 
   const renewLoan = async (loan: CirculationLoan) => {
     if (!token || renewalRequestInFlight.current) return;
@@ -274,6 +294,7 @@ const HistoryPage = () => {
     let attempts = 0;
     const timer = window.setInterval(() => {
       attempts += 1;
+      quietRefreshRef.current = true;
       setRefreshKey((current) => current + 1);
       if (attempts >= 24) window.clearInterval(timer);
     }, 5000);
@@ -281,8 +302,20 @@ const HistoryPage = () => {
   }, [paymentCheckout, paymentRedirect, returnFineId]);
 
   useEffect(() => {
+    if (!paymentCheckout) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPaymentCheckout(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [paymentCheckout]);
+
+  useEffect(() => {
     if (!paymentCheckout) return;
-    const paid = fines.some((fine) => fine.id === paymentCheckout.fineId && fine.status === 'Paid');
+    const paid = fines.some((fine) =>
+      fine.id === paymentCheckout.fineId
+      && fine.status === 'Paid'
+      && fine.paymentMethod === 'PayOS');
     if (paid) {
       setPaymentCheckout(null);
       showToast({
@@ -465,6 +498,20 @@ const HistoryPage = () => {
                       Gia hạn
                     </button>
                   )}
+                  {(pendingFinesByLoan.get(loan.id) ?? []).map((fine) => (
+                    <button
+                      key={fine.id}
+                      type="button"
+                      className="history-pay-button"
+                      onClick={() => void createPayOSCheckout(fine)}
+                      disabled={paymentBusy !== null}
+                    >
+                      {paymentBusy === fine.id
+                        ? <LoaderCircle className="history-spinner" size={14} />
+                        : <Wallet size={14} />}
+                      Thanh toán khoản phạt · {fine.amount.toLocaleString('vi-VN')}đ
+                    </button>
+                  ))}
                 </div>
               </article>
             )) : (
@@ -546,12 +593,19 @@ const HistoryPage = () => {
           >
             <button type="button" className="history-payment-close" aria-label="Đóng" onClick={() => setPaymentCheckout(null)}>×</button>
             <p>THANH TOÁN PHÍ PHẠT</p>
-            <h2 id="history-payment-title">Quét mã QR PayOS</h2>
+            <h2 id="history-payment-title">
+              {fines.find((fine) => fine.id === paymentCheckout.fineId)?.reason ?? 'Quét mã QR PayOS'}
+            </h2>
+            {fines.find((fine) => fine.id === paymentCheckout.fineId)?.code && (
+              <span className="history-payment-reference">
+                Mã khoản phạt: {fines.find((fine) => fine.id === paymentCheckout.fineId)?.code}
+              </span>
+            )}
             <strong className="history-payment-amount">{paymentCheckout.amount.toLocaleString('vi-VN')}đ</strong>
             <QRCodeCanvas value={paymentCheckout.qrCode} size={220} level="M" includeMargin />
             <span>Quét mã bằng ứng dụng ngân hàng hoặc mở trang thanh toán PayOS.</span>
             <a href={paymentCheckout.checkoutUrl} target="_blank" rel="noreferrer">Mở trang thanh toán</a>
-            <small>Trang sẽ tự cập nhật sau khi PayOS xác nhận giao dịch. Không đóng trang thanh toán trước khi hoàn tất.</small>
+            <small>Trang sẽ tự cập nhật sau khi PayOS xác nhận giao dịch. Đóng cửa sổ này không hủy giao dịch; trạng thái chỉ được cập nhật khi webhook PayOS hợp lệ đến máy chủ.</small>
           </section>
         </div>
       )}
