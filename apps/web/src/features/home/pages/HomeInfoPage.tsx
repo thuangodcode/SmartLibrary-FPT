@@ -9,9 +9,7 @@ import {
   ArrowRight,
   X,
   Share2,
-  RefreshCw,
   BookOpen,
-  Bell,
   CheckCircle2,
   ChevronRight
 } from 'lucide-react';
@@ -147,16 +145,15 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
 
   // News states
   const [articles, setArticles] = useState<NewsArticleItem[]>(FALLBACK_NEWS);
-  const [loading, setLoading] = useState<boolean>(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('Tất cả');
+  const [searchInput, setSearchInput] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeArticle, setActiveArticle] = useState<NewsArticleItem | null>(null);
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [liveUpdatedToast, setLiveUpdatedToast] = useState<string | null>(null);
 
   // Fetch news from API with fallback
-  const fetchNews = useCallback(async (isSilent = false) => {
-    if (!isSilent) setLoading(true);
+  const fetchNews = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/news`);
       if (res.ok) {
@@ -187,8 +184,6 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
     } catch {
       // In case of network/offline, always fall back so page is never empty
       setArticles(FALLBACK_NEWS);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -197,6 +192,20 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
       void Promise.resolve().then(() => fetchNews());
     }
   }, [section, fetchNews]);
+
+  useEffect(() => {
+    if (!activeArticle) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActiveArticle(null);
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [activeArticle]);
 
   // Real-time synchronization: listen for SignalR broadcast event dispatched by HomeNavbar
   useEffect(() => {
@@ -211,7 +220,7 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
 
       setLiveUpdatedToast(`Thủ thư ${actionText}: "${detail?.title || 'Tin tức mới'}"`);
       // Refetch immediately
-      fetchNews(true);
+      fetchNews();
 
       // Auto dismiss live toast after 5s
       setTimeout(() => {
@@ -309,35 +318,12 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
       )}
 
       <main className="annual-info-main news-theme-main">
-        {/* Page Top Heading */}
-        <header className="annual-info-heading news-custom-heading">
-          <div className="news-badge-tag">
-            <span className="news-indicator-pulse" />
-            <span>SMARTLIBRARY · FPT UNIVERSITY</span>
-          </div>
-          <h1>{title}</h1>
-          <p className="news-sub-description">{description}</p>
-
-          {section === 'news' && (
-            <div className="news-meta-strip">
-              <span className="news-meta-chip">
-                <Bell size={13} />
-                {articles.length} bài viết & thông báo
-              </span>
-              <span className="news-meta-chip live-chip">
-                <span className="live-dot" /> Đồng bộ thời gian thực
-              </span>
-              <button
-                className="news-refresh-btn"
-                onClick={() => fetchNews()}
-                title="Làm mới tin tức"
-              >
-                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-                Làm mới
-              </button>
-            </div>
-          )}
-        </header>
+        {section !== 'news' && (
+          <header className="annual-info-heading news-custom-heading">
+            <h1>{title}</h1>
+            <p className="news-sub-description">{description}</p>
+          </header>
+        )}
 
         {section === 'news' && (
           <div className="news-container">
@@ -359,25 +345,39 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
               </div>
 
               {/* Search Bar */}
-              <div className="news-search-box">
+              <form
+                className="news-search-box"
+                role="search"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setSearchQuery(searchInput.trim());
+                }}
+              >
                 <Search size={16} className="news-search-icon" />
                 <input
                   type="text"
                   placeholder="Tìm tin tức, thông báo, sự kiện..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
                   className="news-search-input"
+                  aria-label="Tìm kiếm tin tức"
                 />
-                {searchQuery && (
+                {(searchInput || searchQuery) && (
                   <button
-                    onClick={() => setSearchQuery('')}
+                    type="button"
+                    onClick={() => {
+                      setSearchInput('');
+                      setSearchQuery('');
+                    }}
                     className="news-search-clear"
                     title="Xóa tìm kiếm"
+                    aria-label="Xóa tìm kiếm"
                   >
                     <X size={14} />
                   </button>
                 )}
-              </div>
+                <button type="submit" className="news-search-submit">Tìm</button>
+              </form>
             </div>
 
             {/* Hero / Spotlight Card (Only in 'Tất cả' view without search query) */}
@@ -386,6 +386,14 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
                 <article
                   className="news-hero-card"
                   onClick={() => setActiveArticle(heroArticle)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setActiveArticle(heroArticle);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
                 >
                   <div className="news-hero-image-wrap">
                     <img
@@ -411,6 +419,8 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
                   </div>
 
                   <div className="news-hero-content">
+                    <h2 className="news-hero-title">{heroArticle.title}</h2>
+
                     <div className="news-item-meta">
                       <span className="meta-item">
                         <Calendar size={13} />
@@ -428,7 +438,6 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
                       </span>
                     </div>
 
-                    <h2 className="news-hero-title">{heroArticle.title}</h2>
                     <p className="news-hero-summary">{heroArticle.summary}</p>
 
                     <div className="news-hero-footer">
@@ -451,6 +460,14 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
                       key={item.id}
                       className="news-card"
                       onClick={() => setActiveArticle(item)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setActiveArticle(item);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
                     >
                       <div className="news-card-thumb">
                         <img
@@ -472,6 +489,8 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
                       </div>
 
                       <div className="news-card-body">
+                        <h3 className="news-card-title">{item.title}</h3>
+
                         <div className="news-card-meta">
                           <span className="meta-item">
                             <Calendar size={12} />
@@ -484,7 +503,6 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
                           </span>
                         </div>
 
-                        <h3 className="news-card-title">{item.title}</h3>
                         <p className="news-card-excerpt">{item.summary}</p>
 
                         <div className="news-card-footer">
@@ -512,6 +530,7 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
                   <button
                     className="news-clear-filter-btn"
                     onClick={() => {
+                      setSearchInput('');
                       setSearchQuery('');
                       setSelectedCategory('Tất cả');
                     }}
@@ -543,12 +562,13 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
         <div
           className="news-modal-overlay"
           onClick={() => setActiveArticle(null)}
-          role="dialog"
-          aria-modal="true"
         >
           <div
             className="news-modal-content"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="news-article-title"
           >
             {/* Modal Header Bar */}
             <div className="news-modal-bar">
@@ -607,7 +627,7 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
                     {getReadTime(activeArticle.content, activeArticle.summary)}
                   </span>
                 </div>
-                <h1 className="news-modal-title">{activeArticle.title}</h1>
+                <h2 id="news-article-title" className="news-modal-title">{activeArticle.title}</h2>
               </header>
 
               {activeArticle.summary && (
