@@ -155,6 +155,24 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
         message: payload.message || `“${payload.bookTitle || 'Sách'}” đã sẵn sàng. Hãy gửi yêu cầu mượn trong thời gian giữ.`,
       });
     });
+    hub.on('AnnouncementPublished', (payload: { title?: string; summary?: string; id?: string }) => {
+      if (!active) return;
+      window.dispatchEvent(new CustomEvent('smartlibrary:news-updated', { detail: payload }));
+      void loadReaderNotifications();
+      showToast({
+        type: 'info',
+        title: 'Thông báo mới từ Thư viện',
+        message: payload.title || 'Thủ thư vừa phát thông báo mới. Hãy xem mục Tin tức & Thông báo.',
+      });
+    });
+    hub.on('AnnouncementUpdated', (payload: unknown) => {
+      if (!active) return;
+      window.dispatchEvent(new CustomEvent('smartlibrary:news-updated', { detail: payload }));
+    });
+    hub.on('AnnouncementDeleted', (payload: unknown) => {
+      if (!active) return;
+      window.dispatchEvent(new CustomEvent('smartlibrary:news-updated', { detail: payload }));
+    });
     const startHub = async () => {
       try {
         await hub.start();

@@ -24,6 +24,7 @@ import LibrarianCategoriesPage from './features/librarian/pages/LibrarianCategor
 import LibrarianCreateCategoryPage from './features/librarian/pages/LibrarianCreateCategoryPage';
 import LibrarianCategoryBooksPage from './features/librarian/pages/LibrarianCategoryBooksPage';
 import LibrarianBookDetailPage from './features/librarian/pages/LibrarianBookDetailPage';
+import LibrarianNewsPage from './features/librarian/pages/LibrarianNewsPage';
 import CirculationPage, { DirectCheckoutPage } from './features/librarian/pages/CirculationPage';
 import { AdminLayout } from './features/admin/components/AdminLayout';
 import AdminOverviewPage from './features/admin/pages/AdminOverviewPage';
@@ -114,6 +115,7 @@ function App() {
         <Route path="reports" element={<LibrarianReportsPage />} />
         <Route path="reports/new" element={<LibrarianReportsPage />} />
         <Route path="reports/:id" element={<LibrarianReportDetailPage />} />
+        <Route path="news" element={<LibrarianNewsPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="support/requests" element={<LibrarianSupportPage view="requests" />} />
         <Route path="support/replies" element={<LibrarianSupportPage view="replies" />} />
