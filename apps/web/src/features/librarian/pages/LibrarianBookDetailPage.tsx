@@ -15,7 +15,6 @@ import {
   Layers,
   User,
   Clock,
-  Sparkles,
   MapPin,
   ChevronLeft,
   ChevronRight,
@@ -440,12 +439,6 @@ const LibrarianBookDetailPage: React.FC = () => {
                 <span>Chưa có ảnh bìa</span>
               </div>
             )}
-            {book.coverImageUrl && (
-              <div className="lib-book-cloudinary-tag">
-                <Sparkles size={11} style={{ display: 'inline', marginRight: 4 }} />
-                Cloudinary Active
-              </div>
-            )}
           </div>
         </div>
 
@@ -860,7 +853,7 @@ const LibrarianBookDetailPage: React.FC = () => {
 
               {/* Cover Image Upload */}
               <div className="lib-cat-form-group">
-                <label>Ảnh bìa sách (Cloudinary)</label>
+                <label>Ảnh bìa sách</label>
                 <div className="lib-cat-edit-image-row">
                   {editCoverPreview ? (
                     <div className="lib-cat-edit-preview-box">

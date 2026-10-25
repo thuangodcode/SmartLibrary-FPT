@@ -9,7 +9,6 @@ import {
   UploadCloud,
   X,
   AlertCircle,
-  Sparkles,
   RefreshCw,
   User,
 } from 'lucide-react';
@@ -301,18 +300,6 @@ const LibrarianNewsPage: React.FC = () => {
             <strong className="lib-news-metric-value">{pinnedCount}</strong>
           </div>
         </div>
-
-        <div className="lib-news-metric-card">
-          <div className="lib-news-metric-icon green">
-            <Sparkles size={22} />
-          </div>
-          <div>
-            <span className="lib-news-metric-label">Đồng bộ Realtime</span>
-            <strong className="lib-news-metric-value" style={{ fontSize: 16, color: '#059669' }}>
-              SignalR Active
-            </strong>
-          </div>
-        </div>
       </section>
 
       {/* ─── Toolbar ─── */}
@@ -519,7 +506,7 @@ const LibrarianNewsPage: React.FC = () => {
 
               {/* Cover image upload */}
               <div className="lib-news-form-group">
-                <label>Hình ảnh bài viết (Lưu trữ Cloudinary)</label>
+                <label>Hình ảnh bài viết</label>
                 <div className="lib-news-image-upload-row">
                   {imagePreview ? (
                     <div className="lib-news-preview-box">
