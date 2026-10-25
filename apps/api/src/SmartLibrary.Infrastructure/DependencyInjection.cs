@@ -58,7 +58,7 @@ public static class DependencyInjection
         services.AddScoped<IBookCatalogCache, BookCatalogCache>();
         services.AddHttpClient<IGeminiClient, GeminiClient>(client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(20);
+            client.Timeout = TimeSpan.FromSeconds(60);
         });
         services.AddScoped<IAiRecommendationService, AiRecommendationService>();
         services.AddHttpClient<IEmailService, EmailService>();

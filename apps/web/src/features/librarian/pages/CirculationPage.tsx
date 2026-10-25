@@ -1570,6 +1570,7 @@ function FinesView() {
   const [paymentCheckout, setPaymentCheckout] = useState<{
     fineId: string; amount: number; checkoutUrl: string; qrCode: string; expiresAt: string | null;
   } | null>(null);
+  const paymentConfirmationNotified = useRef<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(searchInput), 400);
@@ -1663,26 +1664,28 @@ function FinesView() {
     }
   };
 
-  useEffect(() => {
-    if (!paymentCheckout) return undefined;
-    const timer = window.setInterval(() => void load(true, true), 5000);
-    return () => window.clearInterval(timer);
-  }, [load, paymentCheckout]);
+  const checkoutFine = paymentCheckout
+    ? items.find((fine) => fine.id === paymentCheckout.fineId)
+    : undefined;
+  const paymentConfirmed = checkoutFine?.status === 'Paid';
 
   useEffect(() => {
-    if (!paymentCheckout) return;
-    const checkoutFine = items.find((fine) => fine.id === paymentCheckout.fineId);
-    if (checkoutFine?.status === 'Paid') {
-      setPaymentCheckout(null);
-      setSelectedFine(null);
-      showToast({
-        type: 'success',
-        title: 'Đã xác nhận thanh toán',
-        message: 'PayOS đã xác nhận giao dịch.',
-      });
-      void Promise.all([load(), loadStats()]);
-    }
-  }, [items, load, loadStats, paymentCheckout, showToast]);
+    if (!paymentCheckout || paymentConfirmed) return undefined;
+    const timer = window.setInterval(() => void load(true, true), 5000);
+    return () => window.clearInterval(timer);
+  }, [load, paymentCheckout, paymentConfirmed]);
+
+  useEffect(() => {
+    if (!paymentCheckout || !paymentConfirmed
+      || paymentConfirmationNotified.current === paymentCheckout.fineId) return;
+    paymentConfirmationNotified.current = paymentCheckout.fineId;
+    showToast({
+      type: 'success',
+      title: 'Đã xác nhận thanh toán',
+      message: 'PayOS đã xác nhận giao dịch.',
+    });
+    void Promise.all([load(), loadStats()]);
+  }, [load, loadStats, paymentCheckout, paymentConfirmed, showToast]);
 
   return (
     <section className="circ-page">
@@ -1751,7 +1754,7 @@ function FinesView() {
           </div>
         )}
       </div>
-      {selectedFine && (
+      {selectedFine && !paymentConfirmed && (
         <div className="circ-payment-backdrop" role="presentation" onClick={() => { setSelectedFine(null); setCashConfirmation(null); setPaymentCheckout(null); }}>
           <section
             className="circ-payment-dialog"

@@ -141,6 +141,7 @@ const HistoryPage = () => {
   const [paymentBusy, setPaymentBusy] = useState<string | null>(null);
   const renewalRequestInFlight = useRef(false);
   const quietRefreshRef = useRef(false);
+  const paymentConfirmationNotified = useRef<string | null>(null);
   const paymentRedirectInfoShown = useRef(false);
   const paymentRedirectHandled = useRef(false);
   const paymentRedirectKey = useRef<string | null>(null);
@@ -217,6 +218,10 @@ const HistoryPage = () => {
   const unpaidTotal = fines
     .filter((fine) => fine.status === 'Pending')
     .reduce((total, fine) => total + fine.amount, 0);
+  const checkoutPaid = paymentCheckout !== null && fines.some((fine) =>
+    fine.id === paymentCheckout.fineId
+    && fine.status === 'Paid'
+    && fine.paymentMethod === 'PayOS');
 
   const pendingFinesByLoan = useMemo(() => {
     const grouped = new Map<string, CirculationFine[]>();
@@ -289,7 +294,7 @@ const HistoryPage = () => {
   };
 
   useEffect(() => {
-    const shouldPoll = Boolean(paymentCheckout || (paymentRedirect === 'return' && returnFineId));
+    const shouldPoll = Boolean((paymentCheckout && !checkoutPaid) || (paymentRedirect === 'return' && returnFineId));
     if (!shouldPoll) return undefined;
     let attempts = 0;
     const timer = window.setInterval(() => {
@@ -299,7 +304,7 @@ const HistoryPage = () => {
       if (attempts >= 24) window.clearInterval(timer);
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [paymentCheckout, paymentRedirect, returnFineId]);
+  }, [checkoutPaid, paymentCheckout, paymentRedirect, returnFineId]);
 
   useEffect(() => {
     if (!paymentCheckout) return undefined;
@@ -311,20 +316,15 @@ const HistoryPage = () => {
   }, [paymentCheckout]);
 
   useEffect(() => {
-    if (!paymentCheckout) return;
-    const paid = fines.some((fine) =>
-      fine.id === paymentCheckout.fineId
-      && fine.status === 'Paid'
-      && fine.paymentMethod === 'PayOS');
-    if (paid) {
-      setPaymentCheckout(null);
-      showToast({
-        type: 'success',
-        title: 'Đã xác nhận thanh toán',
-        message: 'PayOS đã xác nhận giao dịch. Khoản phí đã được cập nhật.',
-      });
-    }
-  }, [fines, paymentCheckout, showToast]);
+    if (!paymentCheckout || !checkoutPaid
+      || paymentConfirmationNotified.current === paymentCheckout.fineId) return;
+    paymentConfirmationNotified.current = paymentCheckout.fineId;
+    showToast({
+      type: 'success',
+      title: 'Đã xác nhận thanh toán',
+      message: 'PayOS đã xác nhận giao dịch. Khoản phí đã được cập nhật.',
+    });
+  }, [checkoutPaid, paymentCheckout, showToast]);
 
   useEffect(() => {
     const key = returnFineId && paymentRedirect ? `${paymentRedirect}:${returnFineId}` : null;
@@ -582,7 +582,7 @@ const HistoryPage = () => {
           </nav>
         )}
       </main>
-      {paymentCheckout && (
+      {paymentCheckout && !checkoutPaid && (
         <div className="history-payment-backdrop" role="presentation" onClick={() => setPaymentCheckout(null)}>
           <section
             className="history-payment-dialog"

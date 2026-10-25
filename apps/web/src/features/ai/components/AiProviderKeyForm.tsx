@@ -49,7 +49,7 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
     isProviderId(status.provider) ? status.provider : 'gemini',
   );
   const [apiKey, setApiKey] = useState(() => keyFor(status, isProviderId(status.provider) ? status.provider : 'gemini'));
-  const [showKey, setShowKey] = useState(true);
+  const [showKey, setShowKey] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
   const [chatModel, setChatModel] = useState(status.chatModel || 'gemini-3.8-flash');
   const [embeddingModel, setEmbeddingModel] = useState(status.embeddingModel || 'gemini-embedding-001');
@@ -84,7 +84,7 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
 
   const selectTab = (id: AiProviderId) => {
     setProviderId(id);
-    setShowKey(true);
+    setShowKey(false);
     setKeyError(null);
     fill(status, id);
   };
@@ -116,6 +116,7 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
       });
       onStatus(next);
       fill(next, providerId);
+      setShowKey(false);
       setJustSaved(true);
       showToast({
         type: 'success',
@@ -172,7 +173,7 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
       </div>
       <p>
         API Key thuộc tài khoản thủ thư này và được mã hóa khi lưu.
-        Ô nhập luôn hiện token đang dùng. Chỉ đổi khi bạn sửa rồi bấm Lưu. Admin không đọc được khóa.
+        Token đang lưu được điền vào ô và mặc định được ẩn. Hãy lưu mọi thay đổi trước khi kiểm tra kết nối. Admin không đọc được khóa.
       </p>
       {status.accountEnabled === false && (
         <p className="ai-cfg-warn">Admin đã tắt quyền AI của tài khoản này. Lưu khóa được nhưng không gọi được AI.</p>
@@ -270,10 +271,17 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
           <button type="button" className="ai-btn ai-btn--primary" disabled={saving} onClick={() => void save()}>
             <Save size={14} /> {saving ? 'Đang lưu…' : 'Lưu cấu hình'}
           </button>
-          <button type="button" className="ai-btn" disabled={testing || !tabHasKey} onClick={() => void test()}>
+          <button
+            type="button"
+            className="ai-btn"
+            disabled={testing || saving || dirty || !tabHasKey}
+            title={dirty ? 'Hãy lưu cấu hình trước khi kiểm tra kết nối.' : undefined}
+            onClick={() => void test()}
+          >
             <Wifi size={14} /> {testing ? 'Đang kiểm tra…' : 'Kiểm tra kết nối'}
           </button>
           {dirty && <span className="ai-cfg-save-state is-dirty">Chưa lưu thay đổi</span>}
+          {dirty && <span className="ai-cfg-save-state">Lưu cấu hình trước khi kiểm tra.</span>}
           {showSaved && <span className="ai-cfg-save-state is-saved">Đã lưu</span>}
         </div>
       </div>

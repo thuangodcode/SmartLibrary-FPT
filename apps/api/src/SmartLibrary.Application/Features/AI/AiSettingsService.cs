@@ -481,7 +481,7 @@ public class AiSettingsService
         try
         {
             using var chatCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            chatCts.CancelAfter(TimeSpan.FromSeconds(12));
+            chatCts.CancelAfter(TimeSpan.FromSeconds(30));
             var reply = await _gemini.GenerateAsync(
                 provider, apiKey, chatModel, "Reply with exactly: OK", baseUrl, chatCts.Token);
             var ok = !string.IsNullOrWhiteSpace(reply);
@@ -494,7 +494,7 @@ public class AiSettingsService
                 try
                 {
                     using var embedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                    embedCts.CancelAfter(TimeSpan.FromSeconds(8));
+                    embedCts.CancelAfter(TimeSpan.FromSeconds(25));
                     var vector = await _gemini.EmbedAsync(
                         provider, apiKey, embeddingModel, "SmartLibrary connection test", baseUrl, embedCts.Token);
                     if (vector.Length == 0)
@@ -507,7 +507,8 @@ public class AiSettingsService
                 }
                 catch (OperationCanceledException) when (!ct.IsCancellationRequested)
                 {
-                    message = $"{DisplayName(provider)} chat thành công. Embedding quá thời gian chờ, thử lại sau.";
+                    ok = false;
+                    message = $"{DisplayName(provider)} chat thành công nhưng embedding quá thời gian chờ. Hãy thử lại hoặc kiểm tra kết nối mạng từ máy chủ.";
                 }
             }
             else if (ok)
@@ -523,6 +524,12 @@ public class AiSettingsService
                 TestedAt = testedAt,
                 Provider = provider
             });
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            const string message = "Kiểm tra kết nối AI quá thời gian chờ. Hãy thử lại; nếu tiếp tục, kiểm tra kết nối mạng của máy chủ tới nhà cung cấp AI.";
+            await persist(testedAt, false, message);
+            return Result<AiConnectionTestDto>.Failure(message);
         }
         catch (Exception ex)
         {
