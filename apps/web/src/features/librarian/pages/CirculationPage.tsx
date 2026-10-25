@@ -368,6 +368,47 @@ function Chrome({ tab, stats, loading }: { tab: CirculationTab; stats: Circulati
   );
 }
 
+function CirculationConfirmDialog({
+  eyebrow,
+  title,
+  message,
+  confirmLabel,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  eyebrow: string;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="circ-payment-backdrop" role="presentation" onClick={onCancel}>
+      <section
+        className="circ-payment-dialog circ-confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="circ-confirm-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <p>{eyebrow}</p>
+        <h2 id="circ-confirm-title">{title}</h2>
+        <span>{message}</span>
+        <div className="circ-payment-options circ-confirm-actions">
+          <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={onConfirm}>
+            {busy && <LoaderCircle className="spin" size={14} />}
+            {confirmLabel}
+          </button>
+          <button type="button" className="circ-btn" disabled={busy} onClick={onCancel}>Hủy</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function LoansView() {
   const headers = useCirculationAuth();
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -1167,6 +1208,7 @@ function OverdueView() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [fineToRecord, setFineToRecord] = useState<CirculationLoan | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1234,10 +1276,6 @@ function OverdueView() {
   };
 
   const recordFine = async (loan: CirculationLoan) => {
-    const preview = loan.suggestedFine && loan.suggestedFine > 0
-      ? `Phí dự kiến theo chính sách: ${formatMoney(loan.suggestedFine)}. Backend sẽ tự tính lại khi ghi nhận.`
-      : 'Backend sẽ lấy phí quá hạn từ chính sách Admin. Thủ thư không nhập số tiền.';
-    if (!window.confirm(`${preview}\nTiếp tục ghi nhận phí quá hạn?`)) return;
     setBusy(true);
     setMessage(null);
     try {
@@ -1251,6 +1289,7 @@ function OverdueView() {
       const message = json.meta?.message || 'Đã ghi nhận phạt.';
       setMessage(message);
       showToast({ type: 'success', title: 'Đã ghi nhận phí phạt', message });
+      setFineToRecord(null);
       await load();
     } catch (err) {
       const message = errorMessage(err, 'Không ghi nhận được phạt.');
@@ -1380,7 +1419,7 @@ function OverdueView() {
                           title={loan.suggestedFine && loan.suggestedFine > 0
                             ? 'Tạo khoản phí quá hạn theo chính sách hiện hành'
                             : 'Admin cần cấu hình overdue_fee_per_day trong Chính sách > Phí phạt'}
-                          onClick={() => void recordFine(loan)}
+                          onClick={() => setFineToRecord(loan)}
                         >
                           Ghi nhận phạt
                         </button>
@@ -1499,6 +1538,17 @@ function OverdueView() {
           );
         })}
       </div>
+      {fineToRecord && (
+        <CirculationConfirmDialog
+          eyebrow="GHI NHẬN PHÍ QUÁ HẠN"
+          title={`${fineToRecord.readerName} · ${fineToRecord.bookTitle}`}
+          message={`Phí dự kiến theo chính sách: ${formatMoney(fineToRecord.suggestedFine ?? 0)}. Hệ thống sẽ tự tính lại theo chính sách Admin khi ghi nhận.`}
+          confirmLabel="Ghi nhận phí"
+          busy={busy}
+          onConfirm={() => void recordFine(fineToRecord)}
+          onCancel={() => setFineToRecord(null)}
+        />
+      )}
     </section>
   );
 }
@@ -1516,6 +1566,7 @@ function FinesView() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedFine, setSelectedFine] = useState<CirculationFine | null>(null);
+  const [cashConfirmation, setCashConfirmation] = useState<'cash' | 'cancel-payos' | null>(null);
   const [paymentCheckout, setPaymentCheckout] = useState<{
     fineId: string; amount: number; checkoutUrl: string; qrCode: string; expiresAt: string | null;
   } | null>(null);
@@ -1525,12 +1576,14 @@ function FinesView() {
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
-  const load = useCallback(async (quiet = false) => {
+  const load = useCallback(async (quiet = false, includePaidDuringCheckout = false) => {
     if (!quiet) setLoading(true);
     try {
       const query = new URLSearchParams();
       if (search.trim()) query.set('search', search.trim());
-      if (status !== 'All') query.set('status', status);
+      if (status !== 'All' && !(includePaidDuringCheckout && status === 'Pending')) {
+        query.set('status', status);
+      }
       const fineRes = await fetch(`${API_BASE_URL}/api/v1/circulation/fines?${query}`, { headers });
       const fineJson = await parseApiResponse<ApiResult<CirculationFine[]>>(fineRes);
       if (!fineRes.ok || !fineJson?.success) throw new Error(fineJson?.error || 'Không tải được phí phạt.');
@@ -1563,7 +1616,6 @@ function FinesView() {
   useEffect(() => { void Promise.resolve().then(loadStats); }, [loadStats]);
 
   const payCash = async (id: string) => {
-    if (!window.confirm('Xác nhận đã nhận đủ tiền mặt từ độc giả?')) return;
     setBusy(true);
     setMessage(null);
     try {
@@ -1575,6 +1627,7 @@ function FinesView() {
       showToast({ type: 'success', title: 'Đã ghi nhận thanh toán', message });
       setSelectedFine(null);
       setPaymentCheckout(null);
+      setCashConfirmation(null);
       await Promise.all([load(), loadStats()]);
     } catch (err) {
       const message = errorMessage(err, 'Không ghi nhận thanh toán.');
@@ -1612,14 +1665,14 @@ function FinesView() {
 
   useEffect(() => {
     if (!paymentCheckout) return undefined;
-    const timer = window.setInterval(() => void load(true), 5000);
+    const timer = window.setInterval(() => void load(true, true), 5000);
     return () => window.clearInterval(timer);
   }, [load, paymentCheckout]);
 
   useEffect(() => {
     if (!paymentCheckout) return;
     const checkoutFine = items.find((fine) => fine.id === paymentCheckout.fineId);
-    if (checkoutFine?.status === 'Paid' || (!checkoutFine && status === 'Pending')) {
+    if (checkoutFine?.status === 'Paid') {
       setPaymentCheckout(null);
       setSelectedFine(null);
       showToast({
@@ -1627,9 +1680,9 @@ function FinesView() {
         title: 'Đã xác nhận thanh toán',
         message: 'PayOS đã xác nhận giao dịch.',
       });
-      void loadStats();
+      void Promise.all([load(), loadStats()]);
     }
-  }, [items, loadStats, paymentCheckout, showToast, status]);
+  }, [items, load, loadStats, paymentCheckout, showToast]);
 
   return (
     <section className="circ-page">
@@ -1699,7 +1752,7 @@ function FinesView() {
         )}
       </div>
       {selectedFine && (
-        <div className="circ-payment-backdrop" role="presentation" onClick={() => { setSelectedFine(null); setPaymentCheckout(null); }}>
+        <div className="circ-payment-backdrop" role="presentation" onClick={() => { setSelectedFine(null); setCashConfirmation(null); setPaymentCheckout(null); }}>
           <section
             className="circ-payment-dialog"
             role="dialog"
@@ -1707,7 +1760,7 @@ function FinesView() {
             aria-labelledby="circ-payment-title"
             onClick={(event) => event.stopPropagation()}
           >
-            <button type="button" className="circ-payment-close" aria-label="Đóng" onClick={() => { setSelectedFine(null); setPaymentCheckout(null); }}>×</button>
+            <button type="button" className="circ-payment-close" aria-label="Đóng" onClick={() => { setSelectedFine(null); setCashConfirmation(null); setPaymentCheckout(null); }}>×</button>
             <p>GHI NHẬN THANH TOÁN · {selectedFine.code}</p>
             <h2 id="circ-payment-title">{selectedFine.readerName}</h2>
             <strong className="circ-payment-amount">{formatMoney(selectedFine.amount)}</strong>
@@ -1716,7 +1769,7 @@ function FinesView() {
                 <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void createPayOSCheckout(selectedFine)}>
                   Tạo mã QR PayOS
                 </button>
-                <button type="button" className="circ-btn" disabled={busy} onClick={() => void payCash(selectedFine.id)}>
+                <button type="button" className="circ-btn" disabled={busy} onClick={() => setCashConfirmation('cash')}>
                   Xác nhận đã nhận tiền mặt
                 </button>
               </div>
@@ -1725,13 +1778,26 @@ function FinesView() {
                 <QRCodeCanvas value={paymentCheckout.qrCode} size={220} level="M" includeMargin />
                 <span>Đợi PayOS xác nhận trước khi hoàn tất. Không xác nhận tiền mặt cho cùng khoản này.</span>
                 <a href={paymentCheckout.checkoutUrl} target="_blank" rel="noreferrer">Mở trang thanh toán PayOS</a>
-                <button type="button" className="circ-btn" disabled={busy} onClick={() => void payCash(selectedFine.id)}>
+                <button type="button" className="circ-btn" disabled={busy} onClick={() => setCashConfirmation('cancel-payos')}>
                   Hủy link PayOS và ghi nhận tiền mặt
                 </button>
               </>
             )}
           </section>
         </div>
+      )}
+      {selectedFine && cashConfirmation && (
+        <CirculationConfirmDialog
+          eyebrow={cashConfirmation === 'cancel-payos' ? 'CHUYỂN SANG TIỀN MẶT' : 'THU TIỀN MẶT TẠI QUẦY'}
+          title={`Xác nhận ${formatMoney(selectedFine.amount)}?`}
+          message={cashConfirmation === 'cancel-payos'
+            ? 'Chỉ xác nhận nếu đã nhận đủ tiền mặt. Hệ thống sẽ yêu cầu PayOS hủy liên kết đang chờ trước khi ghi nhận thanh toán tiền mặt.'
+            : 'Chỉ tiếp tục sau khi đã nhận đủ tiền mặt từ độc giả. Giao dịch sẽ được lưu riêng với phương thức Tiền mặt trong báo cáo.'}
+          confirmLabel={cashConfirmation === 'cancel-payos' ? 'Hủy PayOS và ghi nhận' : 'Đã nhận tiền mặt'}
+          busy={busy}
+          onConfirm={() => void payCash(selectedFine.id)}
+          onCancel={() => setCashConfirmation(null)}
+        />
       )}
     </section>
   );
