@@ -35,6 +35,10 @@ LoadDotEnv();
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Ensure the API binds to port 5278 by default (consistent with web/mobile frontends)
+var configuredUrls = builder.Configuration["ASPNETCORE_URLS"] ?? Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "http://localhost:5278";
+builder.WebHost.UseUrls(configuredUrls);
+
 // ── Serilog ──
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev:api": "dotnet run --project apps/api/src/SmartLibrary.Api",
+    "dev:api": "dotnet run --project apps/api/src/SmartLibrary.Api --launch-profile SmartLibrary.Api",
     "build:api": "dotnet build apps/api/SmartLibrary.slnx",
     "test:api": "dotnet test apps/api/SmartLibrary.slnx",
     "dev:web": "npm --prefix apps/web run dev",
