@@ -306,6 +306,8 @@ public static class SearchTopicGuard
     public static IReadOnlyList<string> DetectTopics(string fold)
     {
         var topics = new List<string>();
+        if (HasCSharp(fold))
+            topics.Add("csharp");
         if (fold.Contains("python", StringComparison.Ordinal))
             topics.Add("python");
         if (HasGrammar(fold))
@@ -328,6 +330,7 @@ public static class SearchTopicGuard
         var hay = Fold(haystack);
         return topic switch
         {
+            "csharp" => HasCSharp(hay),
             "python" => hay.Contains("python", StringComparison.Ordinal),
             "grammar" => HasGrammar(hay),
             "hardware" => HasHardware(hay),
@@ -341,6 +344,7 @@ public static class SearchTopicGuard
 
     public static string TopicLabel(string topic) => topic switch
     {
+        "csharp" => "C#",
         "hardware" => "vi mạch / linh kiện điện tử",
         "math" => "toán rời rạc / tư duy logic",
         "python" => "Python",
@@ -350,6 +354,9 @@ public static class SearchTopicGuard
         "literature" => "văn học",
         _ => topic
     };
+
+    private static bool HasCSharp(string fold)
+        => ContainsAny(fold, "c#", "c sharp", "c-sharp", "csharp");
 
     private static string? DetectDomain(string fold)
     {

@@ -109,6 +109,70 @@ public class RagServiceTests
     }
 
     [Fact]
+    public async Task AskAsync_CSharpSearchFiltersUnrelatedVectorHitsAndExpandsEmbeddingQuery()
+    {
+        EnableReaderAi();
+        string? embeddedText = null;
+        _gemini.Setup(item => item.EmbedAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, string, string?, CancellationToken>(
+                (_, _, _, text, _, _) => embeddedText = text)
+            .ReturnsAsync(new float[] { 0.1f, 0.2f });
+        _documents.Setup(item => item.SearchCatalogAsync(
+                It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RagSearchHit>
+            {
+                new()
+                {
+                    SourceType = "book",
+                    SourceId = Guid.NewGuid(),
+                    Title = "Marketing Management",
+                    Content = "Marketing strategy and management.",
+                    Categories = ["Kinh tế và Quản trị"],
+                    Score = 0.78
+                }
+            });
+        _documents.Setup(item => item.SearchAsync(
+                It.IsAny<float[]>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RagSearchHit>
+            {
+                new()
+                {
+                    SourceType = "book",
+                    SourceId = Guid.NewGuid(),
+                    Title = "Algorithms (4th Edition)",
+                    Content = "A general introduction to algorithms.",
+                    Categories = ["Công nghệ thông tin"],
+                    Score = 0.88
+                },
+                new()
+                {
+                    SourceType = "book",
+                    SourceId = Guid.NewGuid(),
+                    Title = "C# in a Nutshell",
+                    Content = "A guide to the C Sharp programming language.",
+                    Categories = ["Công nghệ thông tin"],
+                    Score = 0.69
+                }
+            });
+
+        var result = await _sut.AskAsync(
+            "Tôi muốn tìm hiểu thêm về lập trình C# thì nên đọc sách nào?",
+            "Reader");
+
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.Sources.Should().ContainSingle(source => source.Title == "C# in a Nutshell");
+        result.Data.Sources.Should().OnlyContain(source => source.SourceType == "book");
+        result.Data.Answer.Should().NotContain("Marketing");
+        embeddedText.Should().Contain("C# (C Sharp)");
+    }
+
+    [Fact]
     public async Task AskAsync_EnglishLanguageLearning_UsesSemanticSearchAndOnlyReturnsRelevantCatalogBooks()
     {
         EnableReaderAi();

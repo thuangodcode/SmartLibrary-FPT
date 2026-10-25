@@ -38,6 +38,33 @@ public class SearchTopicGuardTests
     }
 
     [Fact]
+    public void CSharpQuery_RecognizesAliasesAndRejectsUnrelatedBooks()
+    {
+        const string query = "Tôi muốn tìm hiểu về lập trình C# thì nên đọc sách nào?";
+
+        SearchTopicGuard.Parse(query).Topics.Should().Contain("csharp");
+        SearchTopicGuard.Allows(
+                query,
+                "C# in a Nutshell",
+                "A guide to the C Sharp programming language.",
+                [],
+                ["Công nghệ thông tin"],
+                null,
+                null)
+            .Should().BeTrue();
+        SearchTopicGuard.Allows(
+                query,
+                "Algorithms (4th Edition)",
+                "A general introduction to algorithms and data structures.",
+                [],
+                ["Công nghệ thông tin"],
+                null,
+                null)
+            .Should().BeFalse();
+        SearchTopicGuard.MatchesTopic("csharp", "Visual C-Sharp").Should().BeTrue();
+    }
+
+    [Fact]
     public void MatchLabel_DoesNotUseRawCosinePercent()
     {
         SearchTopicGuard.MatchLabel(0.78).Should().Be("Phù hợp cao");

@@ -296,6 +296,8 @@ public class RagService
         var text = bookSearch
             ? $"Tìm sách trong thư viện phù hợp với nhu cầu sau: {question}"
             : question;
+        if (SearchTopicGuard.Parse(question).Topics.Contains("csharp", StringComparer.Ordinal))
+            text += " C# (C Sharp) programming language and .NET software development.";
         return text.Length <= MaxEmbedChars ? text : text[..MaxEmbedChars];
     }
 
