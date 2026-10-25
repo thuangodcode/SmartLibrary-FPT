@@ -20,6 +20,7 @@ export interface AiSettingsStatus {
   apiKey?: string | null;
   apiKeyLast4: string | null;
   provider: string;
+  embeddingProvider: string;
   chatModel: string;
   embeddingModel: string;
   baseUrl?: string | null;

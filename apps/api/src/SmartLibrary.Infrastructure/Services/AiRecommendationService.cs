@@ -115,7 +115,7 @@ public class AiRecommendationService : IAiRecommendationService
         var credential = await _settings.ResolveLibraryAsync(ct);
         if (!credential.IsSuccess || credential.Data is null)
             return [];
-        if (!AiSettingsService.SupportsEmbedding(credential.Data.Provider))
+        if (!AiSettingsService.SupportsEmbedding(credential.Data.EmbeddingProvider))
             return [];
 
         try
@@ -130,7 +130,12 @@ public class AiRecommendationService : IAiRecommendationService
                 : "Sách phù hợp độc giả FPT HCMC, thể loại: " + string.Join(", ", names);
             var cred = credential.Data;
             var embedding = await _gemini.EmbedAsync(
-                cred.Provider, cred.ApiKey, cred.EmbeddingModel, prompt, cred.BaseUrl, ct);
+                cred.EmbeddingProvider,
+                cred.EmbeddingApiKey,
+                cred.EmbeddingModel,
+                prompt,
+                cred.EmbeddingBaseUrl,
+                ct);
             return (await _documents.SearchAsync(embedding, take * 2, ct))
                 .Where(hit => hit.SourceType == "book" && hit.Score >= 0.28)
                 .Select(hit => hit.SourceId)

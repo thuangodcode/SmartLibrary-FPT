@@ -290,6 +290,45 @@ public class AiSettingsServiceTests
     }
 
     [Fact]
+    public async Task ResolveLibraryAsync_UsesDeepSeekForChatAndGeminiForEmbeddings()
+    {
+        var librarianId = Guid.NewGuid();
+        await _sut.SaveMyProviderAsync(
+            new SaveAiSettingsRequest
+            {
+                Provider = "gemini",
+                ApiKey = "AIzaSyGeminiEmbeddingKeyForUnitTest123",
+                ChatModel = "gemini-2.5-flash",
+                EmbeddingProvider = "gemini",
+                EmbeddingModel = "gemini-embedding-001"
+            },
+            "Librarian",
+            librarianId);
+        var savedChat = await _sut.SaveMyProviderAsync(
+            new SaveAiSettingsRequest
+            {
+                Provider = "deepseek",
+                ApiKey = "sk-deepseek-chat-key-for-unit-tests",
+                ChatModel = "deepseek-flash",
+                EmbeddingProvider = "gemini",
+                EmbeddingModel = "gemini-embedding-001"
+            },
+            "Librarian",
+            librarianId);
+
+        var result = await _sut.ResolveLibraryAsync();
+
+        savedChat.IsSuccess.Should().BeTrue();
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.Provider.Should().Be("deepseek");
+        result.Data.ApiKey.Should().Be("sk-deepseek-chat-key-for-unit-tests");
+        result.Data.ChatModel.Should().Be("deepseek-flash");
+        result.Data.EmbeddingProvider.Should().Be("gemini");
+        result.Data.EmbeddingApiKey.Should().Be("AIzaSyGeminiEmbeddingKeyForUnitTest123");
+        result.Data.EmbeddingModel.Should().Be("gemini-embedding-001");
+    }
+
+    [Fact]
     public async Task TestConnectionAsync_InvalidKey_ReturnsVendorError()
     {
         var librarianId = Guid.NewGuid();

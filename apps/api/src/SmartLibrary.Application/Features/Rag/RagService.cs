@@ -107,7 +107,10 @@ public class RagService
         {
             var result = await _indexer.ReindexAllAsync(ct);
             await _settings.UpdateSyncStatsAsync(
-                result.SyncedAt, result.DocumentCount, credential.Data!.EmbeddingModel, ct);
+                result.SyncedAt,
+                result.DocumentCount,
+                $"{credential.Data!.EmbeddingProvider}:{credential.Data.EmbeddingModel}",
+                ct);
             return Result<RagReindexResultDto>.Success(result);
         }
         catch (Exception ex)
@@ -184,7 +187,12 @@ public class RagService
             try
             {
                 var embedding = await _gemini.EmbedAsync(
-                    cred.Provider, cred.ApiKey, cred.EmbeddingModel, EmbedText(query, readerBookSearch), cred.BaseUrl, ct);
+                    cred.EmbeddingProvider,
+                    cred.EmbeddingApiKey,
+                    cred.EmbeddingModel,
+                    EmbedText(query, readerBookSearch),
+                    cred.EmbeddingBaseUrl,
+                    ct);
                 semantic.AddRange((await _documents.SearchAsync(embedding, 8, ct))
                     .Where(hit => hit.Score >= MinRelevantScore)
                     .Where(hit => !readerBookSearch

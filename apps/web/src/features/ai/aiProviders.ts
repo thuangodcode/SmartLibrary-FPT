@@ -68,11 +68,11 @@ export const AI_PROVIDERS: AiProviderDef[] = [
   {
     id: 'deepseek',
     name: 'DeepSeek',
-    hint: 'API tương thích OpenAI tại api.deepseek.com. Không hỗ trợ embedding RAG.',
+    hint: 'API chat tương thích OpenAI tại api.deepseek.com. Dùng Gemini/OpenAI riêng cho embedding RAG.',
     keyPlaceholder: 'sk-…',
     needsBaseUrl: false,
     chatModels: [
-      { id: 'deepseek-chat', label: 'deepseek-chat' },
+      { id: 'deepseek-flash', label: 'deepseek-flash' },
     ],
     embeddingModels: [],
   },

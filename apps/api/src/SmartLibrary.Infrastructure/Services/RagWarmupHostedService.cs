@@ -43,7 +43,10 @@ public sealed class RagWarmupHostedService : BackgroundService
             var indexer = scope.ServiceProvider.GetRequiredService<IRagIndexer>();
             var result = await indexer.ReindexAllAsync(stoppingToken);
             await settingsService.UpdateSyncStatsAsync(
-                result.SyncedAt, result.DocumentCount, credential.Data!.EmbeddingModel, stoppingToken);
+                result.SyncedAt,
+                result.DocumentCount,
+                $"{credential.Data!.EmbeddingProvider}:{credential.Data.EmbeddingModel}",
+                stoppingToken);
             _logger.LogInformation(
                 "Đã đồng bộ RAG: {Books} sách, {Policies} chính sách, {Failed} lỗi, tổng {Count} tài liệu.",
                 result.BooksIndexed,

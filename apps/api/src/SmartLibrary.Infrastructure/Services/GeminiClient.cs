@@ -54,7 +54,7 @@ public sealed class GeminiClient : IGeminiClient
 
     private Task<string> GeminiGenerateAsync(string apiKey, string model, string prompt, CancellationToken ct)
         => FirstWorkingAsync(
-            [ResolveGeminiChatModel(model), "gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash"],
+            [ResolveGeminiChatModel(model), "gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash"],
             candidate => GeminiGenerateOnceAsync(apiKey, candidate, prompt, ct),
             "Gemini không tạo được câu trả lời.");
 
@@ -133,12 +133,15 @@ public sealed class GeminiClient : IGeminiClient
         CancellationToken ct)
     {
         var url = ChatUrl(provider, baseUrl);
+        var resolvedModel = provider == "deepseek" && model.Equals("deepseek-chat", StringComparison.OrdinalIgnoreCase)
+            ? "deepseek-flash"
+            : model;
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         AddOpenAiExtraHeaders(request, provider);
         request.Content = JsonContent.Create(new
         {
-            model,
+            model = resolvedModel,
             messages = new[] { new { role = "user", content = prompt } },
             temperature = 0.2,
             max_tokens = 1024
@@ -312,7 +315,7 @@ public sealed class GeminiClient : IGeminiClient
             {
                 return await run(model);
             }
-            catch (InvalidOperationException ex) when (IsMissingModel(ex.Message))
+            catch (InvalidOperationException ex) when (IsMissingModel(ex.Message) || IsOverloaded(ex.Message))
             {
                 last = ex;
             }
@@ -327,6 +330,15 @@ public sealed class GeminiClient : IGeminiClient
            || message.Contains("is not found", StringComparison.OrdinalIgnoreCase)
            || message.Contains("no longer available", StringComparison.OrdinalIgnoreCase)
            || message.Contains("not supported", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsOverloaded(string message)
+        => message.Contains("429", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("503", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("RESOURCE_EXHAUSTED", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("UNAVAILABLE", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("high demand", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("overloaded", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("capacity", StringComparison.OrdinalIgnoreCase);
 
     private static string Clip(string text)
         => text.Length > 8000 ? text[..8000] : text;

@@ -123,11 +123,11 @@ public class RagIndexer : IRagIndexer
 
         var cred = credential.Data;
         var embedding = await _gemini.EmbedAsync(
-            cred.Provider,
-            cred.ApiKey,
+            cred.EmbeddingProvider,
+            cred.EmbeddingApiKey,
             cred.EmbeddingModel,
             content,
-            cred.BaseUrl,
+            cred.EmbeddingBaseUrl,
             ct);
         await _documents.UpsertAsync(new RagDocument
         {

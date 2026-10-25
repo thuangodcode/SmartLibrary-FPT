@@ -21,6 +21,21 @@ function keyFor(status: AiSettingsStatus, tab: AiProviderId): string {
   return (item?.apiKey || (item?.isActive ? status.apiKey : '') || '').trim();
 }
 
+function embeddingProviderFor(status: AiSettingsStatus, chatProvider: AiProviderId): AiProviderId {
+  if (isProviderId(status.embeddingProvider) && supportsEmbedding(status.embeddingProvider))
+    return status.embeddingProvider;
+  if (supportsEmbedding(chatProvider)) return chatProvider;
+  const configured = AI_PROVIDERS.find((item) =>
+    supportsEmbedding(item.id) && status.providers?.some((entry) => entry.id === item.id && entry.hasApiKey),
+  );
+  return configured?.id ?? 'gemini';
+}
+
+function normalizedChatModel(provider: AiProviderId, model: string | null | undefined): string {
+  if (provider === 'deepseek' && model === 'deepseek-chat') return 'deepseek-flash';
+  return model || findProvider(provider).chatModels[0]?.id || '';
+}
+
 function connectionState(status: AiSettingsStatus | null, testing: boolean): ConnectionState {
   if (testing) return 'testing';
   if (!status?.hasApiKey) return 'missing';
@@ -51,7 +66,14 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
   const [apiKey, setApiKey] = useState(() => keyFor(status, isProviderId(status.provider) ? status.provider : 'gemini'));
   const [showKey, setShowKey] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
-  const [chatModel, setChatModel] = useState(status.chatModel || 'gemini-3.8-flash');
+  const [chatModel, setChatModel] = useState(() => normalizedChatModel(
+    isProviderId(status.provider) ? status.provider : 'gemini',
+    status.chatModel,
+  ));
+  const [embeddingProvider, setEmbeddingProvider] = useState(() => embeddingProviderFor(
+    status,
+    isProviderId(status.provider) ? status.provider : 'gemini',
+  ));
   const [embeddingModel, setEmbeddingModel] = useState(status.embeddingModel || 'gemini-embedding-001');
   const [baseUrl, setBaseUrl] = useState(status.baseUrl || '');
   const [saving, setSaving] = useState(false);
@@ -59,25 +81,47 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
   const [justSaved, setJustSaved] = useState(false);
 
   const provider = findProvider(providerId);
+  const embeddingProviderDef = findProvider(embeddingProvider);
   const saved = status.providers?.find((item) => item.id === providerId);
+  const savedEmbedding = status.providers?.find((item) => item.id === embeddingProvider);
   const tabHasKey = Boolean(saved?.hasApiKey || (saved?.isActive && status.hasApiKey));
   const tabLast4 = saved?.apiKeyLast4 || (saved?.isActive ? status.apiKeyLast4 : null) || null;
-  const state = connectionState(status, testing);
   const savedChat = saved?.chatModel || provider.chatModels[0]?.id || '';
-  const savedEmbed = saved?.embeddingModel || provider.embeddingModels[0]?.id || '';
+  const savedEmbedProvider = embeddingProviderFor(status, providerId);
+  const savedEmbed = status.providers?.find((item) => item.id === savedEmbedProvider)?.embeddingModel
+    || (savedEmbedProvider === status.embeddingProvider ? status.embeddingModel : '')
+    || findProvider(savedEmbedProvider).embeddingModels[0]?.id
+    || '';
   const savedBase = saved?.baseUrl || '';
   const storedKey = keyFor(status, providerId);
+  const providerState = connectionState(
+    {
+      ...status,
+      hasApiKey: tabHasKey,
+      lastTestOk: saved?.lastTestOk ?? (saved?.isActive ? status.lastTestOk : null),
+    },
+    testing,
+  );
   const dirty = apiKey.trim() !== storedKey
     || chatModel !== savedChat
     || embeddingModel !== savedEmbed
+    || embeddingProvider !== savedEmbedProvider
     || (provider.needsBaseUrl && baseUrl.trim() !== savedBase);
   const showSaved = justSaved && !dirty;
 
   const fill = (next: AiSettingsStatus, tab: AiProviderId) => {
-    const def = findProvider(tab);
     const item = next.providers?.find((entry) => entry.id === tab);
-    setChatModel(item?.chatModel || def.chatModels[0]?.id || '');
-    setEmbeddingModel(item?.embeddingModel || def.embeddingModels[0]?.id || '');
+    const selectedEmbeddingProvider = embeddingProviderFor(next, tab);
+    const embeddingDef = findProvider(selectedEmbeddingProvider);
+    const embeddingStatus = next.providers?.find((entry) => entry.id === selectedEmbeddingProvider);
+    setChatModel(normalizedChatModel(tab, item?.chatModel || (item?.isActive ? next.chatModel : null)));
+    setEmbeddingProvider(selectedEmbeddingProvider);
+    setEmbeddingModel(
+      embeddingStatus?.embeddingModel
+      || (selectedEmbeddingProvider === next.embeddingProvider ? next.embeddingModel : '')
+      || embeddingDef.embeddingModels[0]?.id
+      || '',
+    );
     setBaseUrl(item?.baseUrl || '');
     setApiKey(keyFor(next, tab));
   };
@@ -100,8 +144,11 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
     }
     const ragOn = status.isEnabled
       && (status.readerAiEnabled || status.recommendEnabled || status.librarianAiEnabled);
-    if (ragOn && status.useForLibrary && !supportsEmbedding(providerId)) {
-      setKeyError('Nhà này không tạo embedding. Chọn Gemini hoặc OpenAI trước khi dùng cho độc giả.');
+    const embeddingKeyAvailable = embeddingProvider === providerId
+      ? Boolean(apiKey.trim() || tabHasKey)
+      : Boolean(savedEmbedding?.hasApiKey);
+    if (ragOn && status.useForLibrary && !embeddingKeyAvailable) {
+      setKeyError(`Hãy lưu API Key ${embeddingProviderDef.name} trước khi dùng cho RAG.`);
       return;
     }
     setKeyError(null);
@@ -111,6 +158,7 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
         provider: providerId,
         apiKey: apiKey.trim() || undefined,
         chatModel,
+        embeddingProvider,
         embeddingModel: embeddingModel || undefined,
         baseUrl: provider.needsBaseUrl ? baseUrl.trim() : undefined,
       });
@@ -167,14 +215,15 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
     <section className="ai-cfg-card">
       <div className="ai-cfg-card-head">
         <h2>Nhà cung cấp AI của bạn</h2>
-        <span className={`ai-cfg-badge ai-cfg-badge--${state === 'ok' ? 'ok' : state === 'error' ? 'bad' : 'idle'}`}>
-          {connectionLabel(state)}
+        <span className={`ai-cfg-badge ai-cfg-badge--${providerState === 'ok' ? 'ok' : providerState === 'error' ? 'bad' : 'idle'}`}>
+          {connectionLabel(providerState)}
         </span>
       </div>
       <p>
         API Key thuộc tài khoản thủ thư này và được mã hóa khi lưu.
         Token đang lưu được điền vào ô và mặc định được ẩn. Hãy lưu mọi thay đổi trước khi kiểm tra kết nối. Admin không đọc được khóa.
       </p>
+      <p>Nhà cung cấp đang chọn xử lý hội thoại; RAG dùng nhà cung cấp embedding riêng.</p>
       {status.accountEnabled === false && (
         <p className="ai-cfg-warn">Admin đã tắt quyền AI của tài khoản này. Lưu khóa được nhưng không gọi được AI.</p>
       )}
@@ -251,10 +300,32 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
             )}
           </label>
           <label>
+            Nhà cung cấp embedding cho RAG
+            <select
+              value={embeddingProvider}
+              onChange={(event) => {
+                const nextProvider = event.target.value as AiProviderId;
+                const nextDef = findProvider(nextProvider);
+                const nextSaved = status.providers?.find((item) => item.id === nextProvider);
+                setEmbeddingProvider(nextProvider);
+                setEmbeddingModel(
+                  nextSaved?.embeddingModel
+                  || (nextProvider === status.embeddingProvider ? status.embeddingModel : '')
+                  || nextDef.embeddingModels[0]?.id
+                  || '',
+                );
+              }}
+            >
+              {AI_PROVIDERS.filter((item) => supportsEmbedding(item.id)).map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+          <label>
             Model embedding
-            {provider.embeddingModels.length ? (
+            {embeddingProviderDef.embeddingModels.length ? (
               <select value={embeddingModel} onChange={(event) => setEmbeddingModel(event.target.value)}>
-                {provider.embeddingModels.map((model) => (
+                {embeddingProviderDef.embeddingModels.map((model) => (
                   <option key={model.id} value={model.id}>{model.label}</option>
                 ))}
               </select>
