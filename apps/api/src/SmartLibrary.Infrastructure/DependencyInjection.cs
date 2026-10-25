@@ -63,7 +63,7 @@ public static class DependencyInjection
         services.AddSingleton<ILocalEmbeddingClient, LocalE5EmbeddingClient>();
         services.AddHttpClient<IGeminiClient, GeminiClient>(client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(60);
+            client.Timeout = TimeSpan.FromMinutes(2);
         });
         services.AddScoped<IAiRecommendationService, AiRecommendationService>();
         services.AddHttpClient<IEmailService, EmailService>();

@@ -421,10 +421,50 @@ public class AiSettingsServiceTests
 
         var result = await _sut.TestConnectionAsync("Librarian", librarianId);
 
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("không hợp lệ");
-        result.Error.Should().NotContain("AIza");
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.Ok.Should().BeFalse();
+        result.Data.Message.Should().Contain("không hợp lệ");
+        result.Data.Message.Should().NotContain("AIza");
         _users[librarianId].LastTestOk.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_UsesLastTestResultForActiveProviderOnly()
+    {
+        var librarianId = Guid.NewGuid();
+        _users[librarianId] = new UserAiSetting
+        {
+            UserId = librarianId,
+            EncryptedApiKey = "enc:sk-deepseek-key-for-unit-test-123456",
+            Provider = "deepseek",
+            ChatModel = "deepseek-flash",
+            LastTestOk = false,
+            LastTestMessage = "DeepSeek PaymentRequired: Insufficient Balance",
+            IsEnabled = true
+        };
+
+        var saved = await _sut.SaveMyProviderAsync(
+            new SaveAiSettingsRequest
+            {
+                Provider = "gemini",
+                ApiKey = "AIzaSyGeminiKeyForUnitTest123456",
+                ChatModel = "gemini-3.8-flash",
+                EmbeddingProvider = "local",
+                EmbeddingModel = AiRuntimeCredential.LocalEmbeddingModelId
+            },
+            "Librarian",
+            librarianId);
+
+        var status = await _sut.GetStatusAsync("Librarian", librarianId);
+
+        saved.IsSuccess.Should().BeTrue();
+        status.Provider.Should().Be("gemini");
+        status.LastTestOk.Should().BeNull();
+        status.LastTestMessage.Should().BeNull();
+        status.Providers.Should().Contain(item =>
+            item.Id == "deepseek"
+            && item.LastTestOk == false
+            && item.LastTestMessage == "DeepSeek PaymentRequired: Insufficient Balance");
     }
 
     [Fact]

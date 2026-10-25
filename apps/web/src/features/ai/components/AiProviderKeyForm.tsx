@@ -98,7 +98,7 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
     {
       ...status,
       hasApiKey: tabHasKey,
-      lastTestOk: saved?.lastTestOk ?? (saved?.isActive ? status.lastTestOk : null),
+      lastTestOk: saved ? saved.lastTestOk : status.lastTestOk,
     },
     testing,
   );

@@ -336,8 +336,8 @@ public class AiSettingsService
                 await _repository.SaveUserAsync(user, ct);
             },
             ct);
-        if (!result.IsSuccess)
-            await NotifyCredentialAsync(actorId, result.Error, ct);
+        if (!result.IsSuccess || result.Data?.Ok == false)
+            await NotifyCredentialAsync(actorId, result.Error ?? result.Data?.Message, ct);
         return result;
     }
 
@@ -492,8 +492,8 @@ public class AiSettingsService
             true,
             (_, _, _) => Task.CompletedTask,
             ct);
-        if (!result.IsSuccess)
-            await NotifyCredentialAsync(cred.OwnerUserId, result.Error, ct);
+        if (!result.IsSuccess || result.Data?.Ok == false)
+            await NotifyCredentialAsync(cred.OwnerUserId, result.Error ?? result.Data?.Message, ct);
         return result;
     }
 
@@ -514,7 +514,7 @@ public class AiSettingsService
         try
         {
             using var chatCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            chatCts.CancelAfter(TimeSpan.FromSeconds(30));
+            chatCts.CancelAfter(TimeSpan.FromSeconds(90));
             var reply = await _gemini.GenerateAsync(
                 provider, apiKey, chatModel, "Reply with exactly: OK", baseUrl, chatCts.Token);
             var ok = !string.IsNullOrWhiteSpace(reply);
@@ -571,15 +571,24 @@ public class AiSettingsService
         {
             const string message = "Kiểm tra kết nối AI quá thời gian chờ. Hãy thử lại; nếu tiếp tục, kiểm tra kết nối mạng của máy chủ tới nhà cung cấp AI.";
             await persist(testedAt, false, message);
-            return Result<AiConnectionTestDto>.Failure(message);
+            return FailedTest(provider, testedAt, message);
         }
         catch (Exception ex)
         {
             var message = TrimError(ex.Message);
             await persist(testedAt, false, message);
-            return Result<AiConnectionTestDto>.Failure(message);
+            return FailedTest(provider, testedAt, message);
         }
     }
+
+    private static Result<AiConnectionTestDto> FailedTest(string provider, DateTime testedAt, string message)
+        => Result<AiConnectionTestDto>.Success(new AiConnectionTestDto
+        {
+            Ok = false,
+            Message = message,
+            TestedAt = testedAt,
+            Provider = provider
+        });
 
     private Task<UserAiSetting?> LoadLibraryUserAsync(AiSetting policy, CancellationToken ct)
         => policy.ActiveLibrarianUserId is Guid id
@@ -1003,6 +1012,7 @@ public class AiSettingsService
             ? new Dictionary<string, StoredProviderState>(StringComparer.OrdinalIgnoreCase)
             : ReadBag(mine);
         var active = NormalizeProvider(mine?.Provider ?? "gemini");
+        var hasActiveState = bag.TryGetValue(active, out var activeState);
         var selectedEmbeddingProvider = mine is null ? active : SelectedEmbeddingProvider(mine, bag);
         var canShowKeyMeta = mine is not null;
         var providers = KnownProviders.Select(id =>
@@ -1053,9 +1063,9 @@ public class AiSettingsService
             RecommendEnabled = policy.RecommendEnabled,
             TrendsEnabled = policy.TrendsEnabled,
             OverduePredictEnabled = policy.OverduePredictEnabled,
-            LastTestedAt = mine?.LastTestedAt,
-            LastTestOk = mine?.LastTestOk,
-            LastTestMessage = mine?.LastTestMessage,
+            LastTestedAt = hasActiveState ? activeState!.LastTestedAt : mine?.LastTestedAt,
+            LastTestOk = hasActiveState ? activeState!.LastTestOk : mine?.LastTestOk,
+            LastTestMessage = hasActiveState ? activeState!.LastTestMessage : mine?.LastTestMessage,
             DocumentsSyncedAt = policy.DocumentsSyncedAt,
             DocumentCount = policy.DocumentCount,
             CanEditApiKey = true,
