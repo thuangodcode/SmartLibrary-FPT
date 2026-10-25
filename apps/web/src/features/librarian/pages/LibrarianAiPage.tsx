@@ -90,11 +90,7 @@ const LibrarianAiPage = () => {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchResult, setSearchResult] = useState<RagAskResult | null>(null);
-  const [statsRange, setStatsRange] = useState('30');
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
-  const [loadedWorkspaceKey, setLoadedWorkspaceKey] = useState<string | null>(null);
-  const workspaceKey = `${accessToken ?? ''}:${statsRange}`;
-  const workspaceLoading = Boolean(accessToken) && loadedWorkspaceKey !== workspaceKey;
   const [flags, setFlags] = useState<Record<CriterionFlag, boolean>>(flagsFromStatus(null));
   const [justSaved, setJustSaved] = useState(false);
   const [confirm, setConfirm] = useState<'leave' | null>(null);
@@ -140,23 +136,21 @@ const LibrarianAiPage = () => {
   useEffect(() => {
     if (!accessToken) return;
     let cancelled = false;
-    void getLibrarianWorkspace(accessToken, Number(statsRange))
+    void getLibrarianWorkspace(accessToken, 30)
       .then((next) => {
         if (cancelled) return;
         setWorkspace(next);
         setWorkspaceError(null);
-        setLoadedWorkspaceKey(workspaceKey);
       })
       .catch((loadError: unknown) => {
         if (cancelled) return;
         setWorkspace(null);
         setWorkspaceError(loadError instanceof Error ? loadError.message : 'Không tải được dữ liệu nghiệp vụ.');
-        setLoadedWorkspaceKey(workspaceKey);
       });
     return () => {
       cancelled = true;
     };
-  }, [accessToken, statsRange, workspaceKey]);
+  }, [accessToken]);
 
   const notifySave = (toast: Parameters<typeof showToast>[0]) => {
     if (saveToastId.current) dismissToast(saveToastId.current);
@@ -310,7 +304,6 @@ const LibrarianAiPage = () => {
   }, [workspace, flags]);
 
   const bookHits = (searchResult?.sources ?? []).filter((item) => item.sourceType === 'book');
-  const trends = workspace?.trends;
 
   useEffect(() => {
     if (!dirty) return undefined;
@@ -437,12 +430,14 @@ const LibrarianAiPage = () => {
             )}
           </section>
 
-          {accessToken && status && (
-            <AiProviderKeyForm accessToken={accessToken} status={status} onStatus={applyStatus} />
-          )}
+          <div className="ai-biz-layout-grid">
+            <div className="ai-biz-provider-panel">
+              {accessToken && status && (
+                <AiProviderKeyForm accessToken={accessToken} status={status} onStatus={applyStatus} />
+              )}
+            </div>
 
-          <div className="ai-biz-grid">
-            <section className="ai-biz-card">
+            <section className="ai-biz-card ai-biz-suggestions">
               <h2><Sparkles size={16} /> Gợi ý sách phục vụ bạn đọc</h2>
               <p>Chỉnh tiêu chí rồi lưu. Dịch vụ do Admin bật. Tiêu chí này dùng cho gợi ý nhập sách và gợi ý độc giả.</p>
               <div className="ai-switch-row">
@@ -558,7 +553,7 @@ const LibrarianAiPage = () => {
               )}
             </section>
 
-            <section className="ai-biz-card">
+            <section className="ai-biz-card ai-biz-search-panel">
               <h2><Search size={16} /> Tìm kiếm ngữ nghĩa</h2>
               <p>
                 {(status?.documentCount ?? 0) > 0
@@ -607,95 +602,6 @@ const LibrarianAiPage = () => {
               )}
             </section>
           </div>
-
-          <section className="ai-biz-card">
-            <div className="ai-biz-card-head">
-              <div>
-                <h2>Thống kê lưu thông phục vụ AI</h2>
-                <p>
-                  Số liệu lấy từ phiếu mượn thật khi Admin bật phân tích xu hướng.
-                  {status?.trendsEnabled ? '' : ' Admin đang tắt phân tích xu hướng đọc.'}
-                  {status?.overduePredictEnabled ? '' : ' Cảnh báo quá hạn đang tắt.'}
-                </p>
-              </div>
-              <label>
-                Khoảng thời gian
-                <select
-                  value={statsRange}
-                  disabled={workspaceLoading}
-                  onChange={(event) => setStatsRange(event.target.value)}
-                >
-                  <option value="7">7 ngày</option>
-                  <option value="30">30 ngày</option>
-                  <option value="90">90 ngày</option>
-                </select>
-              </label>
-            </div>
-            {workspaceLoading && !trends ? (
-              <div className="ai-biz-blank"><LoaderCircle className="ai-spin" size={18} /> Đang tải số liệu lưu thông…</div>
-            ) : workspaceError ? (
-              <div className="ai-biz-blank" role="status">
-                Dịch vụ thống kê chưa khả dụng: {workspaceError}
-              </div>
-            ) : !status?.trendsEnabled ? (
-              <div className="ai-biz-blank">Admin đang tắt phân tích xu hướng đọc.</div>
-            ) : !trends ? (
-              <div className="ai-biz-blank">Chưa có dữ liệu lưu thông để thống kê.</div>
-            ) : (
-              <>
-                <div className="ai-biz-stats">
-                  <article>
-                    <p>Lượt mượn</p>
-                    <strong>{trends.borrowed}</strong>
-                    <small>{statsRange} ngày gần đây</small>
-                  </article>
-                  <article>
-                    <p>Lượt trả</p>
-                    <strong>{trends.returned}</strong>
-                    <small>{statsRange} ngày gần đây</small>
-                  </article>
-                  <article>
-                    <p>Đang quá hạn</p>
-                    <strong>{trends.overdue}</strong>
-                    <small>Toàn hệ thống</small>
-                  </article>
-                  <article>
-                    <p>Sắp đến hạn</p>
-                    <strong>{trends.dueSoon}</strong>
-                    <small>Trong 3 ngày tới</small>
-                  </article>
-                </div>
-                {!status?.overduePredictEnabled ? (
-                  <p className="ai-biz-muted">Admin đang tắt cảnh báo quá hạn.</p>
-                ) : workspace && workspace.overdueRisks.length > 0 ? (
-                  <div className="ai-biz-table-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Độc giả</th>
-                          <th>Sách</th>
-                          <th>Ngày trễ</th>
-                          <th>Mức rủi ro</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {workspace.overdueRisks.map((item) => (
-                          <tr key={item.loanId}>
-                            <td>{item.readerName}</td>
-                            <td>{item.bookTitle}</td>
-                            <td>{item.overdueDays}</td>
-                            <td>{item.risk}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="ai-biz-muted">Không có phiếu quá hạn trong dữ liệu hiện tại.</p>
-                )}
-              </>
-            )}
-          </section>
         </>
       )}
 
