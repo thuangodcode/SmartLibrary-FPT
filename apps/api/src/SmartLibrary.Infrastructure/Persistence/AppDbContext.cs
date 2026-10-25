@@ -47,6 +47,7 @@ public class AppDbContext : DbContext
     public DbSet<SupportComplaint> SupportComplaints => Set<SupportComplaint>();
     public DbSet<SupportComplaintReply> SupportComplaintReplies => Set<SupportComplaintReply>();
     public DbSet<SupportChatMessage> SupportChatMessages => Set<SupportChatMessage>();
+    public DbSet<NewsArticle> NewsArticles => Set<NewsArticle>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -350,6 +351,16 @@ public class AppDbContext : DbContext
             entity.HasIndex(x => new { x.ReaderId, x.IsReadByReader });
             entity.HasOne(x => x.Reader).WithMany().HasForeignKey(x => x.ReaderId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Sender).WithMany().HasForeignKey(x => x.SenderId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<NewsArticle>(entity =>
+        {
+            entity.ToTable("news_articles");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Title).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.Category).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Summary).HasMaxLength(1000).IsRequired();
+            entity.Property(x => x.AuthorName).HasMaxLength(150);
         });
 
         // Global query filter for soft delete
