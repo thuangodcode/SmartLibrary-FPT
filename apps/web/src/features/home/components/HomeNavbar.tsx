@@ -353,7 +353,6 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
           </div>
           <Link to="/books" aria-current={activeSection === 'catalog' ? 'page' : undefined} onClick={closeMenu}>Khám phá sách</Link>
           <Link to="/news" aria-current={activeSection === 'news' ? 'page' : undefined} onClick={closeMenu}>Tin tức</Link>
-          <Link to="/policies" aria-current={activeSection === 'policies' ? 'page' : undefined} onClick={closeMenu}>Chính sách</Link>
           <a href="/#library" onClick={closeMenu}>Thư viện</a>
         </nav>
       </div>
