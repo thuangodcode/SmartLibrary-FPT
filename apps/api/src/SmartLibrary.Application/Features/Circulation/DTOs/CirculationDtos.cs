@@ -41,10 +41,14 @@ public record CirculationLoanDto
     public bool HasFine { get; init; }
     public int RenewalCount { get; init; }
     public bool CanRenew { get; init; }
+    public string? RenewalUnavailableReason { get; init; }
     public bool RequiresApproval { get; init; }
     public string? Language { get; init; }
     public decimal? CreatedFineAmount { get; init; }
     public bool IncidentOpened { get; init; }
+    public Guid? ReadyReservationReaderId { get; init; }
+    public Guid? ReadyReservationBookId { get; init; }
+    public string? ReadyReservationBookTitle { get; init; }
 }
 
 public record CirculationSettings
@@ -211,6 +215,18 @@ public class BorrowRequest
 
 /// <summary>Request to borrow an available copy of a book.</summary>
 public sealed record RequestBookBorrowRequest(Guid BookId, DateTimeOffset PickupAt);
+
+/// <summary>Request to join the reservation queue for an unavailable book.</summary>
+public sealed record RequestBookReservationRequest(Guid BookId);
+
+/// <summary>Reader suggestion shown while a librarian searches the reservation form.</summary>
+public sealed record CirculationReaderOptionDto(Guid Id, string FullName, string? StudentId, string Email);
+
+/// <summary>Book suggestion shown while a librarian searches the reservation form.</summary>
+public sealed record CirculationBookOptionDto(Guid Id, string Title, string Code);
+
+/// <summary>Creates a reservation for a selected reader and book.</summary>
+public sealed record CreateLibrarianReservationRequest(Guid ReaderId, Guid BookId);
 
 public class ReportIncidentRequest
 {

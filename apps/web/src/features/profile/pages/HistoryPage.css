@@ -273,6 +273,14 @@
   opacity: .6;
 }
 
+.history-renew-note {
+  max-width: 220px;
+  color: #9a4d24;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: right;
+}
+
 .history-status {
   display: inline-flex;
   width: fit-content;

@@ -124,6 +124,43 @@ public class CirculationRepository : ICirculationRepository
             x.FullName.ToLower() == lower, ct);
     }
 
+    public Task<UserProfile?> FindReaderAccountAsync(Guid readerId, CancellationToken ct)
+        => _db.UserProfiles
+            .Include(x => x.Role)
+            .FirstOrDefaultAsync(x => x.Id == readerId && !x.IsDeleted && x.Role.Name == "Reader", ct);
+
+    public async Task<IReadOnlyList<CirculationReaderOptionDto>> SearchReaderOptionsAsync(
+        string search, int limit, CancellationToken ct)
+    {
+        var query = search.Trim().ToLower();
+        if (query.Length < 2) return [];
+        return await _db.UserProfiles.AsNoTracking()
+            .Where(x => !x.IsDeleted && x.Role.Name == "Reader"
+                && (x.FullName.ToLower().Contains(query)
+                    || (x.StudentId != null && x.StudentId.ToLower().Contains(query))
+                    || x.Email.ToLower().Contains(query)))
+            .OrderBy(x => x.FullName)
+            .Take(Math.Clamp(limit, 1, 10))
+            .Select(x => new CirculationReaderOptionDto(x.Id, x.FullName, x.StudentId, x.Email))
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<CirculationBookOptionDto>> SearchBookOptionsAsync(
+        string search, int limit, CancellationToken ct)
+    {
+        var query = search.Trim().ToLower();
+        if (query.Length < 2) return [];
+        return await _db.Books.AsNoTracking()
+            .Where(x => !x.IsDeleted
+                && (x.Title.ToLower().Contains(query)
+                    || x.Code.ToLower().Contains(query)
+                    || (x.Isbn != null && x.Isbn.ToLower().Contains(query))))
+            .OrderBy(x => x.Title)
+            .Take(Math.Clamp(limit, 1, 10))
+            .Select(x => new CirculationBookOptionDto(x.Id, x.Title, x.Code))
+            .ToListAsync(ct);
+    }
+
     public Task<BookCopy?> FindCopyByBarcodeAsync(string barcode, CancellationToken ct)
         => _db.BookCopies
             .Include(x => x.Book).ThenInclude(x => x.Categories)
@@ -204,6 +241,20 @@ public class CirculationRepository : ICirculationRepository
     public Task LockPickupSlotAsync(DateTime pickupAt, CancellationToken ct)
         => _db.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtext({pickupAt.ToString("O")})::bigint)", ct);
+
+    public Task LockReservationBookAsync(Guid bookId, CancellationToken ct)
+        => _db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtext({"reservation:" + bookId})::bigint)", ct);
+
+    public Task<string?> GetBookTitleAsync(Guid bookId, CancellationToken ct)
+        => _db.Books.Where(x => x.Id == bookId).Select(x => x.Title).FirstOrDefaultAsync(ct);
+
+    public Task<bool> HasActiveLoanForBookAsync(Guid readerId, Guid bookId, CancellationToken ct)
+        => _db.BorrowRecords.AnyAsync(x =>
+            x.ReaderId == readerId &&
+            x.BookCopy.BookId == bookId &&
+            (x.Status == BorrowStatus.Pending || x.Status == BorrowStatus.Approved
+             || x.Status == BorrowStatus.Borrowed || x.Status == BorrowStatus.Overdue), ct);
 
     public Task<bool> HasOtherBorrowRequestAsync(Guid copyId, Guid exceptLoanId, CancellationToken ct)
         => _db.BorrowRecords.AnyAsync(x =>
@@ -355,7 +406,7 @@ public class CirculationRepository : ICirculationRepository
     }
 
     public async Task<(IReadOnlyList<CirculationLoanDto> Items, int Total)> GetLoansForReaderAsync(
-        Guid readerId, int page, int pageSize, int finePerDay, CancellationToken ct)
+        Guid readerId, int page, int pageSize, CirculationSettings settings, CancellationToken ct)
     {
         var query = LoanQuery().Where(x => x.ReaderId == readerId);
         var total = await query.CountAsync(ct);
@@ -364,7 +415,60 @@ public class CirculationRepository : ICirculationRepository
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
-        return (await MapLoansAsync(rows, finePerDay, ct), total);
+        var loans = (await MapLoansAsync(rows, settings.FinePerDay, ct)).ToList();
+        if (loans.Count == 0)
+            return (loans, total);
+
+        var now = DateTime.UtcNow;
+        var hasUnpaidFines = settings.RestrictIfUnpaid
+            && await HasUnpaidFinesAsync(readerId, ct);
+        var reservedBookIds = new HashSet<Guid>();
+        if (settings.BlockRenewIfReserved)
+        {
+            var activeBookIds = rows
+                .Where(x => x.Status is BorrowStatus.Borrowed or BorrowStatus.Overdue)
+                .Select(x => x.BookCopy.BookId)
+                .Distinct()
+                .ToArray();
+            if (activeBookIds.Length > 0)
+            {
+                var reservedIds = await _db.Reservations.AsNoTracking()
+                    .Where(x => activeBookIds.Contains(x.BookId)
+                        && x.ReaderId != readerId
+                        && (x.Status == CirculationRules.ReservationPending
+                            || (x.Status == CirculationRules.ReservationReady
+                                && (x.ExpiresAt == null || x.ExpiresAt >= now))))
+                    .Select(x => x.BookId)
+                    .Distinct()
+                    .ToListAsync(ct);
+                reservedBookIds = reservedIds.ToHashSet();
+            }
+        }
+
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            var isRenewableStatus = row.Status is BorrowStatus.Borrowed or BorrowStatus.Overdue;
+            var unavailableReason = isRenewableStatus
+                ? CirculationRules.ValidateRenewal(
+                    settings,
+                    row.RenewalCount,
+                    row.DueDate,
+                    now,
+                    byLibrarian: false,
+                    CirculationRules.CalendarOverdueDays(row.DueDate, now) > 0,
+                    reservedBookIds.Contains(row.BookCopy.BookId),
+                    CirculationRules.IsTextbook(row.BookCopy.Book.Categories?.Select(x => x.Name)),
+                    hasUnpaidFines)
+                : "Chỉ có thể gia hạn phiếu đang mượn.";
+            loans[index] = loans[index] with
+            {
+                CanRenew = unavailableReason is null,
+                RenewalUnavailableReason = unavailableReason
+            };
+        }
+
+        return (loans, total);
     }
 
     public async Task<CirculationFineDto?> GetFineDtoAsync(Guid id, CancellationToken ct)
@@ -397,8 +501,7 @@ public class CirculationRepository : ICirculationRepository
                 .Include(x => x.Reader)
                 .Include(x => x.Book)
                 .Where(x => x.Status == CirculationRules.ReservationPending || x.Status == CirculationRules.ReservationReady)
-                .OrderByDescending(x => x.ReservedAt)
-                .Take(20),
+                .OrderBy(x => x.ReservedAt),
             ct);
 
     public Task<IReadOnlyList<CirculationReservationDto>> GetReservationsForReaderAsync(Guid readerId, CancellationToken ct)

@@ -143,8 +143,11 @@ public static class CirculationRules
         bool byLibrarian,
         bool isOverdue,
         bool hasReservation,
-        bool isTextbook)
+        bool isTextbook,
+        bool hasUnpaidFines = false)
     {
+        if (!byLibrarian && settings.RestrictIfUnpaid && hasUnpaidFines)
+            return "Còn phí chưa thanh toán nên chưa được tự gia hạn.";
         if (settings.MaxRenewals is null)
             return "Chưa cấu hình chính sách gia hạn. Vào Quản trị > Chính sách để thiết lập số lần gia hạn.";
         if (renewalCount >= settings.MaxRenewals.Value)

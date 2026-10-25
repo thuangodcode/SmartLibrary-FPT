@@ -24,6 +24,12 @@
 .book-detail-borrow:not(:disabled):hover { background: var(--detail-orange); transform: translateY(-2px); }
 .book-detail-borrow:focus-visible { outline: 3px solid rgb(233 107 32 / 35%); outline-offset: 3px; }
 .book-detail-borrow:disabled { background: #aebbb2; cursor: not-allowed; }
+.book-detail-circulation-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.book-detail-circulation-actions .book-detail-borrow { margin-top: 12px; }
+.book-detail-borrow.is-unavailable:disabled { background: #252525; color: #fff; }
+.book-detail-reserve { min-height: 56px; margin-top: 12px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--detail-orange); color: #fff; font-size: 15px; font-weight: 750; cursor: pointer; }
+.book-detail-reserve:not(:disabled):hover { background: #c24c16; }
+.book-detail-reserve:disabled { background: #d1d5db; color: #4b5563; cursor: not-allowed; }
 .book-detail-role-note { margin: 16px 0 0; background: var(--detail-warm); padding: 14px 16px; color: #755b39; font-size: 14px; }
 .book-detail-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 24px 0 0; padding-top: 0; }
 .book-detail-facts > div { min-width: 0; border: 1px solid #edf0ed; border-radius: 9px; background: #f7f9f7; padding: 12px 14px; }
@@ -111,6 +117,7 @@
   .book-detail-facts { grid-template-columns: 1fr; }
 }
 @media (max-width: 700px) {
+  .book-detail-circulation-actions { grid-template-columns: 1fr; }
   .annual-home > main.book-detail-main { width: min(calc(100% - 32px), 620px); padding: 22px 0 72px; }
   .book-detail-back { margin-bottom: 14px; }
   .book-detail-overview { grid-template-columns: 1fr; }

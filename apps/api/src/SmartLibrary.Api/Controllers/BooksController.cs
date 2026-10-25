@@ -5,6 +5,7 @@ using Npgsql;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Books;
 using SmartLibrary.Application.Features.Books.DTOs;
+using SmartLibrary.Application.Features.Circulation;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -16,10 +17,12 @@ namespace SmartLibrary.Api.Controllers;
 public class BooksController : ControllerBase
 {
     private readonly BookService _bookService;
+    private readonly CirculationService _circulation;
 
-    public BooksController(BookService bookService)
+    public BooksController(BookService bookService, CirculationService circulation)
     {
         _bookService = bookService;
+        _circulation = circulation;
     }
 
     /// <summary>
@@ -76,9 +79,11 @@ public class BooksController : ControllerBase
     public async Task<IActionResult> GetAvailability(Guid id, CancellationToken ct = default)
     {
         var result = await _bookService.GetAvailabilityAsync(id, ct);
-        return result.IsSuccess
-            ? Ok(ApiResponse<BookAvailabilityDto>.Ok(result.Data!))
-            : NotFound(ApiResponse<object>.Fail(result.Error!));
+        if (!result.IsSuccess)
+            return NotFound(ApiResponse<object>.Fail(result.Error!));
+        var availableCopies = await _circulation.GetBorrowableCopyCountAsync(id, ct);
+        return Ok(ApiResponse<BookAvailabilityDto>.Ok(
+            new BookAvailabilityDto(result.Data!.TotalCopies, availableCopies, availableCopies > 0)));
     }
 
     /// <summary>

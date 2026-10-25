@@ -69,7 +69,9 @@ public class CirculationMeController : ControllerBase
         return Ok(ApiResponse<CirculationLoanDto>.Ok(result.Data!, new { message = "Đã gửi yêu cầu mượn và giữ bản sao. Chờ thủ thư tiếp nhận." }));
     }
 
+    /// <summary>Renews the authenticated reader's eligible loan according to library policy.</summary>
     [HttpPost("loans/{id:guid}/renew")]
+    [Authorize(Roles = "Reader")]
     public async Task<IActionResult> Renew(Guid id, CancellationToken ct)
     {
         var result = await _circulation.RenewAsync(id, CirculationService.ReadUserId(User), byLibrarian: false, ct);
@@ -105,6 +107,19 @@ public class CirculationMeController : ControllerBase
         var result = await _circulation.CreateMyReservationAsync(CirculationService.ReadUserId(User), request.Barcode, ct);
         return result.IsSuccess
             ? Ok(ApiResponse<CirculationReservationDto>.Ok(result.Data!, new { message = "Đã tạo yêu cầu đặt trước." }))
+            : BadRequest(ApiResponse<object>.Fail(result.Error!));
+    }
+
+    /// <summary>Join the reservation queue for a book that has no available copies.</summary>
+    [HttpPost("book-reservations")]
+    [Authorize(Roles = "Reader")]
+    public async Task<IActionResult> CreateBookReservation(
+        [FromBody] RequestBookReservationRequest request, CancellationToken ct)
+    {
+        var result = await _circulation.CreateMyReservationForBookAsync(
+            CirculationService.ReadUserId(User), request.BookId, ct);
+        return result.IsSuccess
+            ? Ok(ApiResponse<CirculationReservationDto>.Ok(result.Data!, new { message = "Đã đặt trước sách." }))
             : BadRequest(ApiResponse<object>.Fail(result.Error!));
     }
 

@@ -64,6 +64,16 @@ public class CirculationController : ControllerBase
         if (!result.IsSuccess)
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
         var loan = result.Data!;
+        if (loan.ReadyReservationReaderId is { } readerId)
+        {
+            await _hub.Clients.Group(SupportChatHub.ReaderGroup(readerId))
+                .SendAsync("ReservationReady", new
+                {
+                    bookId = loan.ReadyReservationBookId,
+                    bookTitle = loan.ReadyReservationBookTitle,
+                    message = $"“{loan.ReadyReservationBookTitle}” đã sẵn sàng. Hãy gửi yêu cầu mượn trước khi hết thời gian giữ."
+                }, ct);
+        }
         var message = loan.IncidentOpened
             ? "Đã lập hồ sơ chờ thủ thư xác minh. Chưa tính bồi thường và không tự khóa tài khoản."
             : loan.CreatedFineAmount is > 0
@@ -154,10 +164,35 @@ public class CirculationController : ControllerBase
     public async Task<IActionResult> Reservations(CancellationToken ct)
         => Ok(ApiResponse<IReadOnlyList<CirculationReservationDto>>.Ok(await _circulation.GetReservationsAsync(ct)));
 
+    /// <summary>Search readers for the librarian reservation form.</summary>
+    [HttpGet("reservation-reader-options")]
+    public async Task<IActionResult> ReservationReaderOptions(
+        [FromQuery] string? search, CancellationToken ct)
+        => Ok(ApiResponse<IReadOnlyList<CirculationReaderOptionDto>>.Ok(
+            await _circulation.SearchReaderOptionsAsync(search, ct)));
+
+    /// <summary>Search library titles for the librarian reservation form.</summary>
+    [HttpGet("reservation-book-options")]
+    public async Task<IActionResult> ReservationBookOptions(
+        [FromQuery] string? search, CancellationToken ct)
+        => Ok(ApiResponse<IReadOnlyList<CirculationBookOptionDto>>.Ok(
+            await _circulation.SearchBookOptionsAsync(search, ct)));
+
     [HttpPost("reservations")]
     public async Task<IActionResult> CreateReservation([FromBody] CreateReservationRequest request, CancellationToken ct)
     {
         var result = await _circulation.CreateReservationAsync(request, ct);
+        return result.IsSuccess
+            ? Ok(ApiResponse<CirculationReservationDto>.Ok(result.Data!, new { message = "Đã tạo yêu cầu đặt trước." }))
+            : BadRequest(ApiResponse<object>.Fail(result.Error!));
+    }
+
+    /// <summary>Create a reservation for a selected reader and book that has no borrowable copies.</summary>
+    [HttpPost("reservations/by-book")]
+    public async Task<IActionResult> CreateReservationByBook(
+        [FromBody] CreateLibrarianReservationRequest request, CancellationToken ct)
+    {
+        var result = await _circulation.CreateLibrarianReservationAsync(request, ct);
         return result.IsSuccess
             ? Ok(ApiResponse<CirculationReservationDto>.Ok(result.Data!, new { message = "Đã tạo yêu cầu đặt trước." }))
             : BadRequest(ApiResponse<object>.Fail(result.Error!));

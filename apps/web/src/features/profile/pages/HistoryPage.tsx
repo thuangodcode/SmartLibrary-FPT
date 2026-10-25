@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
@@ -33,6 +33,7 @@ interface CirculationLoan {
   returnDate: string | null;
   renewalCount: number;
   canRenew: boolean;
+  renewalUnavailableReason?: string | null;
   hasOpenFine: boolean;
   suggestedFine: number | null;
 }
@@ -109,6 +110,7 @@ const HistoryPage = () => {
   const [page, setPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
   const [renewingId, setRenewingId] = useState<string | null>(null);
+  const renewalRequestInFlight = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -176,7 +178,8 @@ const HistoryPage = () => {
     .reduce((total, fine) => total + fine.amount, 0);
 
   const renewLoan = async (loan: CirculationLoan) => {
-    if (!token || renewingId) return;
+    if (!token || renewalRequestInFlight.current) return;
+    renewalRequestInFlight.current = true;
     setRenewingId(loan.id);
     setError(null);
     try {
@@ -188,19 +191,25 @@ const HistoryPage = () => {
       if (!response.ok || !result?.success) {
         throw new Error(result?.error || 'Không thể gia hạn phiếu mượn.');
       }
+      if (!result.data || result.data.id !== loan.id || !result.data.dueDate) {
+        throw new Error('Máy chủ không trả về hạn trả mới. Hãy tải lại danh sách phiếu mượn.');
+      }
       showToast({
         type: 'success',
         title: 'Gia hạn thành công',
-        message: `Hạn trả mới: ${formatDateTime(result.data?.dueDate ?? null)}.`,
+        message: `Hạn trả mới: ${formatDateTime(result.data.dueDate)}.`,
       });
       setRefreshKey((current) => current + 1);
     } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Vui lòng thử lại sau.';
+      setError(message);
       showToast({
         type: 'error',
         title: 'Không thể gia hạn',
-        message: caught instanceof Error ? caught.message : 'Vui lòng thử lại sau.',
+        message,
       });
     } finally {
+      renewalRequestInFlight.current = false;
       setRenewingId(null);
     }
   };
@@ -317,6 +326,9 @@ const HistoryPage = () => {
                   <span className={`history-status history-status--${loan.displayStatus.toLowerCase()}`}>
                     {statusLabel[loan.displayStatus] ?? loan.displayStatus}
                   </span>
+                  {['Borrowed', 'Overdue'].includes(loan.status) && !loan.canRenew && loan.renewalUnavailableReason && (
+                    <span className="history-renew-note">{loan.renewalUnavailableReason}</span>
+                  )}
                   {loan.canRenew && (
                     <button
                       type="button"

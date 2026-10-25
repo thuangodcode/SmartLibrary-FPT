@@ -165,6 +165,51 @@ public class CirculationRulesTests
     }
 
     [Fact]
+    public void ValidateRenewal_BlocksReaderWithUnpaidFineOnlyWhenPolicyRequiresIt()
+    {
+        var settings = new CirculationSettings
+        {
+            MaxRenewals = 4,
+            RestrictIfUnpaid = true,
+            SelfRenewBeforeDays = 1,
+            SelfRenewAfterDays = 1
+        };
+        var due = DateTime.UtcNow.AddHours(12);
+
+        CirculationRules.ValidateRenewal(settings, 0, due, DateTime.UtcNow, false, false, false, false, true)
+            .Should().Contain("phí chưa thanh toán");
+        CirculationRules.ValidateRenewal(settings with { RestrictIfUnpaid = false },
+                0, due, DateTime.UtcNow, false, false, false, false, true)
+            .Should().BeNull();
+        CirculationRules.ValidateRenewal(settings, 0, due, DateTime.UtcNow, true, false, false, false, true)
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void ValidateRenewal_AppliesReaderSpecificLimitOverdueReservationAndTextbookRules()
+    {
+        var due = DateTime.UtcNow;
+        var settings = new CirculationSettings
+        {
+            MaxRenewals = 2,
+            BlockRenewIfOverdue = true,
+            BlockRenewIfReserved = true,
+            SelfRenewBeforeDays = 1,
+            SelfRenewAfterDays = 1,
+            TextbookRequiresApproval = true
+        };
+
+        CirculationRules.ValidateRenewal(settings, 2, due, due, false, false, false, false)
+            .Should().Contain("hết số lần");
+        CirculationRules.ValidateRenewal(settings, 0, due, due.AddDays(1), false, true, false, false)
+            .Should().Contain("quá hạn");
+        CirculationRules.ValidateRenewal(settings, 0, due, due, false, false, true, false)
+            .Should().Contain("đặt trước");
+        CirculationRules.ValidateRenewal(settings, 0, due, due, false, false, false, true)
+            .Should().Contain("Giáo trình");
+    }
+
+    [Fact]
     public void MaxBooksFor_UsesGroupThenFallback()
     {
         var settings = new CirculationSettings { MaxBooks = 5, MaxBooksStudent = 10, MaxBooksLecturer = 20 };
