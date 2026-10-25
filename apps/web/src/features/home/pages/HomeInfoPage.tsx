@@ -37,6 +37,21 @@ export interface NewsArticleItem {
   updatedAt?: string;
 }
 
+type NewsArticleApiItem = Partial<NewsArticleItem> & {
+  Id?: string;
+  Title?: string;
+  Category?: string;
+  Summary?: string;
+  Content?: string;
+  ImageUrl?: string | null;
+  IsPinned?: boolean;
+  AuthorName?: string;
+  CreatedAt?: string;
+  UpdatedAt?: string;
+  coverImageUrl?: string | null;
+  publishedAt?: string;
+};
+
 const CATEGORIES = [
   'Tất cả',
   'Thông báo',
@@ -149,7 +164,7 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
         const list = Array.isArray(data) ? data : (data?.data ?? []);
         if (list.length > 0) {
           // Normalize fields
-          const mapped: NewsArticleItem[] = list.map((item: any) => ({
+          const mapped: NewsArticleItem[] = (list as NewsArticleApiItem[]).map((item) => ({
             id: String(item.id || item.Id),
             title: item.title || item.Title || '',
             category: item.category || item.Category || 'Thông báo',
@@ -179,7 +194,7 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
 
   useEffect(() => {
     if (section === 'news') {
-      fetchNews();
+      void Promise.resolve().then(() => fetchNews());
     }
   }, [section, fetchNews]);
 

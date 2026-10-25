@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import {
   Bell,
   Plus,
@@ -41,6 +41,9 @@ const CATEGORIES = [
   'Hướng dẫn',
 ];
 
+const errorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
 const LibrarianNewsPage: React.FC = () => {
   const accessToken = useAuthStore((s) => s.accessToken);
   const user = useAuthStore((s) => s.user);
@@ -71,7 +74,7 @@ const LibrarianNewsPage: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchNews = async () => {
+  const fetchNews = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/news`);
@@ -81,7 +84,7 @@ const LibrarianNewsPage: React.FC = () => {
       } else {
         setArticles([]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching news:', err);
       showToast({
         type: 'error',
@@ -91,11 +94,11 @@ const LibrarianNewsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
-    fetchNews();
-  }, []);
+    void Promise.resolve().then(() => fetchNews());
+  }, [fetchNews]);
 
   // Filtered articles
   const filteredArticles = useMemo(() => {
@@ -208,13 +211,13 @@ const LibrarianNewsPage: React.FC = () => {
       });
 
       setIsModalOpen(false);
-      fetchNews();
-    } catch (err: any) {
+      void fetchNews();
+    } catch (err: unknown) {
       console.error('Error saving news:', err);
       showToast({
         type: 'error',
         title: 'Thao tác thất bại',
-        message: err.message || 'Có lỗi xảy ra khi lưu bài viết.',
+        message: errorMessage(err, 'Có lỗi xảy ra khi lưu bài viết.'),
       });
     } finally {
       setSubmitting(false);
@@ -245,13 +248,13 @@ const LibrarianNewsPage: React.FC = () => {
       });
 
       setDeletingArticle(null);
-      fetchNews();
-    } catch (err: any) {
+      void fetchNews();
+    } catch (err: unknown) {
       console.error('Error deleting news:', err);
       showToast({
         type: 'error',
         title: 'Lỗi xóa thông báo',
-        message: err.message || 'Không thể xóa bài viết.',
+        message: errorMessage(err, 'Không thể xóa bài viết.'),
       });
     } finally {
       setIsDeleting(false);
