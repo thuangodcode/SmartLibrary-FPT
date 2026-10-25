@@ -523,8 +523,8 @@ const BookDetailPage = () => {
               <X size={19} />
             </button>
             <div className="book-borrow-success-mark" aria-hidden="true"><CheckCircle2 size={34} /></div>
-            <h2 id="borrow-success-title">Sách đang được giữ cho bạn</h2>
-            <p id="borrow-success-description">Thủ thư sẽ tiếp nhận yêu cầu. Hãy đến thư viện đúng khung giờ bạn đã chọn để nhận sách.</p>
+            <h2 id="borrow-success-title">Đã gửi yêu cầu mượn sách</h2>
+            <p id="borrow-success-description">Yêu cầu của bạn đã được gửi thành công. Thư viện sẽ thông báo khi thủ thư tiếp nhận.</p>
             <div className="book-borrow-success-actions">
               <button type="button" onClick={() => setBorrowSuccessOpen(false)}>Ở lại trang này</button>
               <button type="button" autoFocus onClick={() => navigate('/books')}>Tiếp tục khám phá sách <ArrowRight size={17} /></button>
