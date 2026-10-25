@@ -53,6 +53,7 @@ const navigation = [
   { label: 'Độc giả', to: '/librarian/readers', icon: Users, end: false },
   { label: 'Thiết lập AI nghiệp vụ', to: '/librarian/ai-settings', icon: Sparkles, end: false },
   { label: 'Thống kê & báo cáo', to: '/librarian/reports', icon: ChartNoAxesCombined, end: false },
+  { label: 'Tin tức & Thông báo', to: '/librarian/news', icon: Bell, end: false },
   { label: 'Hỗ trợ độc giả', to: '/librarian/support', icon: CircleHelp, end: false, children: supportChildren },
 ];
 
