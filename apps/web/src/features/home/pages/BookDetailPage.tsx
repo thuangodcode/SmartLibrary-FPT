@@ -7,11 +7,13 @@ import { parseApiResponse } from '../../../lib/api';
 import { useToast } from '../../../components/ui/useToast';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { BookCover } from '../components/BookCover';
+import FavoriteBookButton from '../components/FavoriteBookButton';
 import HomeFooter from '../components/HomeFooter';
 import HomeNavbar from '../components/HomeNavbar';
 import { useBookAvailability, useBookReviews, useHomeBook, type BookReview } from '../hooks/useHomeData';
 import './HomePage.css';
 import './BookDetailPage.css';
+import '../components/FavoriteBookButton.css';
 
 interface ApiEnvelope<T> {
   success?: boolean;
@@ -335,6 +337,7 @@ const BookDetailPage = () => {
 
             {isReader ? (
               <>
+                <FavoriteBookButton bookId={book.id} title={book.title} variant="detail" />
                 {(availabilityQuery.data?.canBorrow || hasReadyReservation) && (
                   <>
                     <label className="book-detail-pickup-label" htmlFor="book-detail-pickup-time">Chọn giờ đến nhận sách</label>

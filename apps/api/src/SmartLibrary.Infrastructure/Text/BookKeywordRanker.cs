@@ -58,14 +58,16 @@ internal static class BookKeywordRanker
         var queryFold = VietnameseText.Fold(query);
         var queryDigits = VietnameseText.Digits(query);
         var terms = Tokenize(query);
+        var intent = SearchTopicGuard.Parse(query);
         var authorText = string.Join(" ", authors);
         var categoryText = string.Join(" ", categories);
+        var languageText = BookLanguageText.SearchAliases(language);
         var titleFold = VietnameseText.Fold(title);
         var authorFold = VietnameseText.Fold(authorText);
         var codeFold = VietnameseText.Fold(code);
         var isbnDigits = VietnameseText.Digits(isbn);
         var hayTokens = new HashSet<string>(
-            Tokenize($"{title} {description} {code} {authorText} {categoryText}"),
+            Tokenize($"{title} {description} {code} {authorText} {categoryText} {languageText}"),
             StringComparer.Ordinal);
         var tokenHits = terms.Count(hayTokens.Contains);
         var distinctive = Distinctive(terms);
@@ -82,6 +84,12 @@ internal static class BookKeywordRanker
         if (authorFold.Length >= 4 && (queryFold.Contains(authorFold, StringComparison.Ordinal)
             || authorFold.Contains(queryFold, StringComparison.Ordinal)))
             return 0.9;
+        var languageEvidence = intent.WantsLanguageLearning
+            ? $"{title} {description} {authorText} {categoryText}"
+            : languageText;
+        if (intent.Language is not null
+            && SearchTopicGuard.Allows(intent, languageEvidence, intent.WantsLanguageLearning ? null : language))
+            return 0.78;
         if (tokenHits == 0)
             return named ? 0.82 : 0;
         if (distinctive.Count > 0 && distinctiveHits == 0)

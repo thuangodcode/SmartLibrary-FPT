@@ -53,6 +53,76 @@ public class SearchTopicGuardTests
     }
 
     [Fact]
+    public void EnglishLanguageLearningQuery_RecognizesLanguageAndRejectsBooksMerelyWrittenInEnglish()
+    {
+        const string query = "Bây giờ tôi muốn học về ngôn ngữ Anh.";
+        var intent = SearchTopicGuard.Parse(query);
+
+        intent.Language.Should().Be("english");
+        intent.WantsLanguageLearning.Should().BeTrue();
+        intent.NeedsClarification.Should().BeFalse();
+        SearchTopicGuard.Allows(
+                query,
+                "English Grammar in Use",
+                "Giáo trình ngữ pháp tiếng Anh cho người học.",
+                ["Raymond Murphy"],
+                ["Ngoại ngữ"],
+                null,
+                null,
+                "en")
+            .Should().BeTrue();
+        SearchTopicGuard.Allows(
+                query,
+                "Python nâng cao",
+                "Giáo trình lập trình Python.",
+                ["Bùi Việt Hà"],
+                ["Công nghệ thông tin"],
+                null,
+                null,
+                "en")
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public void KoreanLanguageLearningQuery_MatchesIntegratedKoreanEvenWhenBookMetadataLanguageIsEnglish()
+    {
+        const string query = "Tôi muốn tìm sách về ngôn ngữ Hàn";
+        var intent = SearchTopicGuard.Parse(query);
+
+        intent.Language.Should().Be("korean");
+        intent.WantsLanguageLearning.Should().BeTrue();
+        intent.NeedsClarification.Should().BeFalse();
+        SearchTopicGuard.Allows(
+                query,
+                "Integrated Korean: Beginning 1 (2nd Edition)",
+                "Integrated Korean Beginning 1 textbook.",
+                ["Young-Mee Cho"],
+                ["Ngoại ngữ"],
+                null,
+                null,
+                "en")
+            .Should().BeTrue();
+        SearchTopicGuard.Allows(
+                query,
+                "English Grammar in Use",
+                "English grammar textbook.",
+                ["Raymond Murphy"],
+                ["Ngoại ngữ"],
+                null,
+                null,
+                "en")
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public void BookSearchIntent_DoesNotTreatBorrowingPolicyQuestionsAsBookSearches()
+    {
+        SearchTopicGuard.IsBookSearch("Thời hạn mượn sách là bao lâu?").Should().BeFalse();
+        SearchTopicGuard.IsBookSearch("What is the loan policy for books?").Should().BeFalse();
+        SearchTopicGuard.IsBookSearch("Bây giờ tôi muốn học về ngôn ngữ Anh.").Should().BeTrue();
+    }
+
+    [Fact]
     public void ForeignLanguageCategory_IsNotAVagueLanguageQuestion()
     {
         SearchTopicGuard.Parse("sách liên quan đến ngoại ngữ").NeedsClarification.Should().BeFalse();

@@ -106,9 +106,20 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
                 if (!Enum.TryParse<AccountStatus>(status, true, out var parsedStatus))
                     throw new ValidationException("Trạng thái tài khoản không hợp lệ.");
 
-                users = users.Where(user =>
-                    user.Status == parsedStatus &&
-                    (parsedStatus != AccountStatus.Active || user.IsActive));
+                var matchingUserIds = parsedStatus == AccountStatus.Active
+                    ? _dbContext.Database.SqlQuery<Guid>($"""
+                        SELECT id AS "Value"
+                        FROM profiles
+                        WHERE status::text = {parsedStatus.ToString()}
+                          AND is_active = TRUE
+                        """)
+                    : _dbContext.Database.SqlQuery<Guid>($"""
+                        SELECT id AS "Value"
+                        FROM profiles
+                        WHERE status::text = {parsedStatus.ToString()}
+                        """);
+
+                users = users.Where(user => matchingUserIds.Contains(user.Id));
             }
         }
 

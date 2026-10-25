@@ -50,6 +50,36 @@ public class RealCatalogTopicTests
     }
 
     [Fact]
+    public void EnglishLanguageLearningQuery_DoesNotReturnUnrelatedBooksWrittenInEnglish()
+    {
+        Matches("Bây giờ tôi muốn học về ngôn ngữ Anh.")
+            .Should().Equal("English Grammar in Use (Advanced Edition)");
+    }
+
+    [Fact]
+    public void KoreanLanguageLearningQuery_FindsIntegratedKoreanDespiteEnglishMetadataLanguage()
+    {
+        var koreanBook = Book(
+            "Integrated Korean: Beginning 1 (2nd Edition)",
+            "Textbook for learning Korean.",
+            "Young-Mee Cho",
+            "Ngoại ngữ",
+            "9780824834401",
+            "en");
+
+        SearchTopicGuard.Allows(
+                "Tôi muốn tìm sách về ngôn ngữ Hàn",
+                koreanBook.Title,
+                koreanBook.Description,
+                [koreanBook.Author],
+                [koreanBook.Category],
+                koreanBook.Isbn,
+                null,
+                koreanBook.Language)
+            .Should().BeTrue();
+    }
+
+    [Fact]
     public void MissingBook_ReturnsEmpty()
     {
         Matches("Tìm sách xyzzy-khong-ton-tai-trong-thu-vien").Should().BeEmpty();

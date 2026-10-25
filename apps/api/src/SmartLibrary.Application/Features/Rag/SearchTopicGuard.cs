@@ -17,7 +17,7 @@ public static class SearchTopicGuard
         {
             if (intent.Topics.Count > 1)
                 return PickOnePerTopic(intent, hits);
-            return hits.Where(hit => MatchesTopic(intent.Topics[0], HitHay(hit), hit.Language)).ToList();
+            return hits.Where(hit => Allows(intent, HitHay(hit), hit.Language)).ToList();
         }
 
         return hits.Where(hit => Allows(
@@ -29,6 +29,16 @@ public static class SearchTopicGuard
             hit.Isbn,
             hit.Code,
             hit.Language)).ToList();
+    }
+
+    public static IReadOnlyList<RagSearchHit> FilterSemantic(string query, IReadOnlyList<RagSearchHit> hits)
+    {
+        var intent = Parse(query);
+        if (intent.NeedsClarification)
+            return [];
+        if (intent.Language is null && intent.Topics.Count == 0)
+            return hits;
+        return Filter(query, hits);
     }
 
     public static bool Allows(
@@ -60,7 +70,8 @@ public static class SearchTopicGuard
         foreach (var topic in intent.Topics)
         {
             var match = hits
-                .Where(hit => MatchesTopic(topic, HitHay(hit), hit.Language))
+                .Where(hit => Allows(intent, HitHay(hit), hit.Language)
+                              && MatchesTopic(topic, HitHay(hit), hit.Language))
                 .OrderByDescending(hit => hit.Score)
                 .FirstOrDefault();
             if (match is not null && selected.All(item => item.SourceId != match.SourceId))
@@ -150,6 +161,39 @@ public static class SearchTopicGuard
     public static string MatchLabel(double score)
         => score >= 0.7 ? HighMatch : RelatedMatch;
 
+    public static bool IsBookSearch(string query)
+    {
+        var fold = Fold(query);
+        var intent = Parse(query);
+        return intent.Language is not null
+               || intent.Topics.Count > 0
+               || intent.WantsLanguageLearning
+               || !ContainsAny(
+                fold,
+                "chinh sach",
+                "quy dinh",
+                "thoi han muon",
+                "quy trinh muon",
+                "muon sach",
+                "bao lau muon",
+                "gia han",
+                "qua han",
+                "muc phat",
+                "phi phat",
+                "dat truoc",
+                "tra sach",
+                "borrow",
+                "borrow policy",
+                "loan",
+                "loan policy",
+                "return",
+                "return policy",
+                "renew",
+                "due date",
+                "overdue",
+                "fine");
+    }
+
     public static SearchIntent Parse(string query)
     {
         var fold = Fold(query);
@@ -177,13 +221,14 @@ public static class SearchTopicGuard
             return false;
 
         var hay = Fold(haystack);
-        if (intent.Language == "japanese" && !HasJapanese(hay, language))
+        var languageCode = intent.WantsLanguageLearning ? null : language;
+        if (intent.Language == "japanese" && !HasJapanese(hay, languageCode))
             return false;
-        if (intent.Language == "english" && !HasEnglish(hay, language))
+        if (intent.Language == "english" && !HasEnglish(hay, languageCode))
             return false;
-        if (intent.Language == "korean" && !HasKorean(hay, language))
+        if (intent.Language == "korean" && !HasKorean(hay, languageCode))
             return false;
-        if (intent.Language == "chinese" && !HasChinese(hay, language))
+        if (intent.Language == "chinese" && !HasChinese(hay, languageCode))
             return false;
 
         if (intent.Topics.Count > 0)
@@ -219,9 +264,34 @@ public static class SearchTopicGuard
     }
 
     private static bool WantsLanguageLearning(string fold)
-        => fold.Contains("ngon ngu", StringComparison.Ordinal)
+        => ContainsAny(
+               fold,
+               "ngon ngu",
+               "tieng anh",
+               "tienganh",
+               "anh ngu",
+               "english language",
+               "learn english",
+               "learning english",
+               "hoc english",
+               "hoc tieng nhat",
+               "tieng nhat",
+               "nihongo",
+               "japanese language",
+               "learn japanese",
+               "tieng han",
+               "tienghan",
+               "hangul",
+               "korean language",
+               "learn korean",
+               "tieng trung",
+               "tiengtrung",
+               "tieng hoa",
+               "mandarin",
+               "chinese language",
+               "learn chinese")
            && !fold.Contains("python", StringComparison.Ordinal)
-           && !ContainsAny(fold, "lap trinh", "laptrinh", "ngoai ngu");
+           && !ContainsAny(fold, "lap trinh", "laptrinh", "ngoai ngu", "bang tieng", "in english");
 
     private static string? DetectLanguage(string fold)
     {
@@ -288,19 +358,19 @@ public static class SearchTopicGuard
 
     private static bool HasJapanese(string fold, string? language)
         => IsLang(language, "ja", "jp", "jpn", "japanese")
-           || ContainsAny(fold, "tieng nhat", "tiengnhat", "nhat ban", "nhatban", "japanese", "nihongo");
+           || ContainsAny(fold, "tieng nhat", "tiengnhat", "ngon ngu nhat", "nhat ban", "nhatban", "japanese", "nihongo");
 
     private static bool HasEnglish(string fold, string? language)
         => IsLang(language, "en", "eng", "english")
-           || ContainsAny(fold, "tieng anh", "tienganh", "anh ngu", "english");
+           || ContainsAny(fold, "tieng anh", "tienganh", "anh ngu", "english", "ngon ngu anh");
 
     private static bool HasKorean(string fold, string? language)
         => IsLang(language, "ko", "kr", "kor", "korean")
-           || ContainsAny(fold, "tieng han", "tienghan", "korean", "hangul");
+           || ContainsAny(fold, "tieng han", "tienghan", "han ngu", "ngon ngu han", "korean", "hangul");
 
     private static bool HasChinese(string fold, string? language)
         => IsLang(language, "zh", "cn", "chi", "chinese")
-           || ContainsAny(fold, "tieng trung", "tiengtrung", "tieng hoa", "chinese", "mandarin");
+           || ContainsAny(fold, "tieng trung", "tiengtrung", "ngon ngu trung", "tieng hoa", "chinese", "mandarin");
 
     private static bool HasLanguage(string language, string hay, string? code) => language switch
     {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
-import { Bell, BookOpen, Check, ChevronDown, CircleHelp, History, LogOut, Menu, Search, ShieldCheck, UserRound, X } from 'lucide-react';
+import { Bell, BookOpen, Check, ChevronDown, CircleHelp, Heart, History, LogOut, Menu, Search, ShieldCheck, UserRound, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import smartLibraryLogo from '../../../assets/figma/smartlibrary-logo.png';
 import { useToast } from '../../../components/ui/useToast';
@@ -306,6 +306,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
                       )}
                     </Link>
                     <Link to="/history" role="menuitem" onClick={closeMenu}><History size={16} /> Mượn & trả của tôi</Link>
+                    <Link to="/favorites" role="menuitem" onClick={closeMenu}><Heart size={16} /> Sách yêu thích</Link>
                   </>
                 )}
                 <button type="button" role="menuitem" onClick={handleLogout}><LogOut size={16} /> Đăng xuất</button>
@@ -352,6 +353,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
             </div>
           </div>
           <Link to="/books" aria-current={activeSection === 'catalog' ? 'page' : undefined} onClick={closeMenu}>Khám phá sách</Link>
+          {user?.role === 'Reader' && <Link to="/favorites" onClick={closeMenu}><Heart size={15} aria-hidden="true" /> Yêu thích</Link>}
           <Link to="/news" aria-current={activeSection === 'news' ? 'page' : undefined} onClick={closeMenu}>Tin tức</Link>
           <a href="/#library" onClick={closeMenu}>Thư viện</a>
         </nav>

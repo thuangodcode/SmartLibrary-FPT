@@ -58,18 +58,22 @@ public class RagService
             return Result<RagAskResultDto>.Failure(credential.Error ?? "Chưa cấu hình API Key.");
 
         var cred = credential.Data!;
+        var isReader = !AiSettingsService.IsStaff(role);
+        var readerBookSearch = isReader && SearchTopicGuard.IsBookSearch(query);
         var parts = SearchTopicGuard.SplitIntents(query);
         if (parts.All(part => SearchTopicGuard.Parse(part).NeedsClarification))
             return Ok(SearchTopicGuard.ClarifyMessage(SearchTopicGuard.Parse(query)), []);
 
         try
         {
-            var (hits, exact) = await RetrieveAsync(cred, query, ct);
+            var (hits, exact) = await RetrieveAsync(cred, query, isReader, ct);
             if (hits.Count == 0)
                 return Ok(EmptyAnswer(query), []);
 
             var listing = ExplainLocally(query, hits);
-            var answer = exact
+            var exactBookOnlyResult = exact && hits.All(hit => string.Equals(
+                hit.SourceType, "book", StringComparison.OrdinalIgnoreCase));
+            var answer = readerBookSearch || exactBookOnlyResult
                 ? listing
                 : await ExplainWithAiAsync(cred, query, hits, listing, ct);
 
@@ -139,11 +143,12 @@ public class RagService
     private async Task<(IReadOnlyList<RagSearchHit> Hits, bool Exact)> RetrieveAsync(
         AiRuntimeCredential cred,
         string query,
+        bool isReader,
         CancellationToken ct)
     {
         var parts = SearchTopicGuard.SplitIntents(query);
         if (parts.Count == 1)
-            return await RetrieveOneAsync(cred, parts[0], ct);
+            return await RetrieveOneAsync(cred, parts[0], isReader, ct);
 
         var combined = new List<RagSearchHit>();
         var exact = false;
@@ -151,7 +156,7 @@ public class RagService
         {
             if (SearchTopicGuard.Parse(part).NeedsClarification)
                 continue;
-            var retrieved = await RetrieveOneAsync(cred, part, ct);
+            var retrieved = await RetrieveOneAsync(cred, part, isReader, ct);
             exact |= retrieved.Exact;
             combined.AddRange(retrieved.Hits);
         }
@@ -164,37 +169,48 @@ public class RagService
     private async Task<(IReadOnlyList<RagSearchHit> Hits, bool Exact)> RetrieveOneAsync(
         AiRuntimeCredential cred,
         string query,
+        bool isReader,
         CancellationToken ct)
     {
-        var intent = SearchTopicGuard.Parse(query);
+        var readerBookSearch = isReader && SearchTopicGuard.IsBookSearch(query);
         var catalog = await _documents.SearchCatalogAsync(query, 15, ct);
         var catalogOnTopic = SearchTopicGuard.Filter(query, catalog);
-        var exact = catalogOnTopic.Any(hit => hit.Score >= ExactMatchScore)
-                    || (intent.Topics.Count > 0 && catalogOnTopic.Count > 0);
+        var exact = catalogOnTopic.Any(hit => hit.Score >= ExactMatchScore);
         var semantic = new List<RagSearchHit>();
-        var skipSemantic = catalogOnTopic.Count > 0
-            || intent.Language is not null
-            || intent.Domain is "math" or "python" or "grammar" or "hardware" or "multi"
-            || intent.Topics.Count > 0;
 
-        if (!exact && !skipSemantic && await _documents.CountAsync(ct) > 0)
+        var documentCount = exact ? 0 : await _documents.CountAsync(ct);
+        if (!exact && documentCount > 0)
         {
             try
             {
                 var embedding = await _gemini.EmbedAsync(
-                    cred.Provider, cred.ApiKey, cred.EmbeddingModel, EmbedText(query), cred.BaseUrl, ct);
+                    cred.Provider, cred.ApiKey, cred.EmbeddingModel, EmbedText(query, readerBookSearch), cred.BaseUrl, ct);
                 semantic.AddRange((await _documents.SearchAsync(embedding, 8, ct))
-                    .Where(hit => hit.Score >= MinRelevantScore));
+                    .Where(hit => hit.Score >= MinRelevantScore)
+                    .Where(hit => !readerBookSearch
+                                  || string.Equals(hit.SourceType, "book", StringComparison.OrdinalIgnoreCase)));
             }
             catch (Exception ex)
             {
+                if (readerBookSearch && catalogOnTopic.Count == 0)
+                    throw;
                 await NotifyCredentialAsync(cred.OwnerUserId, ex.Message, ct);
             }
         }
+        else if (readerBookSearch && catalogOnTopic.Count == 0)
+        {
+            throw new InvalidOperationException("Kho tìm kiếm ngữ nghĩa chưa được đồng bộ. Vui lòng liên hệ Thủ thư hoặc Admin.");
+        }
 
-        var merged = MergeHits(catalog, semantic);
-        var withFacts = semantic.Count == 0 ? merged : await _documents.AttachBookFactsAsync(merged, ct);
-        var onTopic = SearchTopicGuard.Filter(query, withFacts).Take(15).ToList();
+        var withFacts = semantic.Count == 0
+            ? semantic
+            : await _documents.AttachBookFactsAsync(semantic, ct);
+        var semanticOnTopic = SearchTopicGuard.FilterSemantic(query, withFacts);
+        var onTopic = MergeHits(catalogOnTopic, semanticOnTopic)
+            .Where(hit => !readerBookSearch
+                          || string.Equals(hit.SourceType, "book", StringComparison.OrdinalIgnoreCase))
+            .Take(15)
+            .ToList();
         return (onTopic, exact && onTopic.Count > 0);
     }
 
@@ -264,8 +280,13 @@ public class RagService
     private static Result<RagAskResultDto> Ok(string answer, IReadOnlyList<RagSourceDto> sources)
         => Result<RagAskResultDto>.Success(new RagAskResultDto { Answer = answer, Sources = sources });
 
-    private static string EmbedText(string question)
-        => question.Length <= MaxEmbedChars ? question : question[..MaxEmbedChars];
+    private static string EmbedText(string question, bool bookSearch)
+    {
+        var text = bookSearch
+            ? $"Tìm sách trong thư viện phù hợp với nhu cầu sau: {question}"
+            : question;
+        return text.Length <= MaxEmbedChars ? text : text[..MaxEmbedChars];
+    }
 
     private static string EmptyAnswer(string query)
     {
@@ -293,31 +314,51 @@ public class RagService
         if (books.Count == 0)
             return EmptyAnswer(query);
 
+        var availableBooks = books.Count(book => book.AvailableCopies > 0);
+        var availableCopies = books.Sum(book => Math.Max(0, book.AvailableCopies));
         var builder = new StringBuilder();
-        if (intent.Topics.Count > 1)
-        {
-            foreach (var topic in intent.Topics)
-            {
-                var match = books.FirstOrDefault(book => SearchTopicGuard.MatchesTopic(
-                    topic, $"{book.Title} {book.Content} {book.Author} {string.Join(' ', book.Categories)}"));
-                if (match is null)
-                    builder.Append("Thư viện chưa có sách về ").Append(SearchTopicGuard.TopicLabel(topic)).Append(". ");
-                else
-                    builder.Append("Nhu cầu ").Append(SearchTopicGuard.TopicLabel(topic))
-                        .Append(": ").Append(match.Title)
-                        .Append(string.IsNullOrWhiteSpace(match.Author) ? ". " : " · " + match.Author + ". ");
-            }
+        builder.Append("Tìm thấy ")
+            .Append(books.Count)
+            .Append(" đầu sách phù hợp trong kết quả từ danh mục thư viện. Có ")
+            .Append(availableBooks)
+            .Append(" đầu sách còn bản có thể mượn, tổng cộng ")
+            .Append(availableCopies)
+            .Append(" bản. ");
 
-            return builder.ToString().Trim();
+        var categories = books
+            .SelectMany(book => book.Categories)
+            .Where(category => !string.IsNullOrWhiteSpace(category))
+            .GroupBy(category => category, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Take(3)
+            .Select(group => $"{group.Key} ({group.Count()})")
+            .ToList();
+        if (categories.Count > 0)
+        {
+            builder.Append("Danh mục nổi bật: ")
+                .Append(string.Join(", ", categories))
+                .Append(". ");
         }
 
-        builder.Append("Đã tìm thấy ").Append(books.Count).Append(" đầu sách trong thư viện. ");
-        foreach (var book in books.Take(4))
+        builder.Append("Một số kết quả: ");
+        foreach (var book in books.Take(5))
         {
             builder.Append(book.Title);
             if (!string.IsNullOrWhiteSpace(book.Author))
                 builder.Append(" · ").Append(book.Author);
             builder.Append(". ");
+        }
+
+        if (intent.Topics.Count > 1)
+        {
+            foreach (var topic in intent.Topics.Where(topic => books.All(book => !SearchTopicGuard.MatchesTopic(
+                         topic, $"{book.Title} {book.Content} {book.Author} {string.Join(' ', book.Categories)}"))))
+            {
+                builder.Append("Thư viện chưa có sách về ")
+                    .Append(SearchTopicGuard.TopicLabel(topic))
+                    .Append(". ");
+            }
         }
 
         if (intent.Language == "japanese" && intent.Domain is null)

@@ -122,6 +122,33 @@
   color: #1c2b21;
 }
 
+.rag-ask-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.rag-ask-stats > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid #e8eee9;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.rag-ask-stats strong {
+  color: #1c2b21;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.rag-ask-stats span {
+  color: #617166;
+  font-size: 12px;
+}
+
 .rag-ask-grid {
   margin-top: 14px;
   display: grid;
