@@ -80,6 +80,12 @@ public record CirculationSettings
 
 public record PickupSlotDto(DateTimeOffset PickupAt, int RemainingCapacity, int Capacity);
 
+public sealed record CirculationReminderDto(
+    Guid ReaderId, Guid EntityId, Guid BookId, string BookTitle, DateTime? DueAt);
+
+public sealed record ExpiredReservationDto(
+    Guid Id, Guid ReaderId, Guid BookId, string BookTitle, DateTime? ExpiresAt);
+
 public class CirculationCopyIssueDto
 {
     public Guid? IncidentId { get; init; }

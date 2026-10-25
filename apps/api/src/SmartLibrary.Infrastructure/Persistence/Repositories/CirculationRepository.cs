@@ -17,12 +17,20 @@ public class CirculationRepository : ICirculationRepository
         _db = db;
     }
 
-    public async Task MarkOverdueAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<CirculationReminderDto>> MarkOverdueAsync(CancellationToken ct)
     {
         var cutoff = CirculationRules.StartOfLibraryDateUtc(DateTime.UtcNow);
+        var newlyOverdue = await _db.BorrowRecords.AsNoTracking()
+            .Where(x => x.Status == BorrowStatus.Borrowed && x.DueDate != null && x.DueDate < cutoff)
+            .Select(x => new CirculationReminderDto(
+                x.ReaderId, x.Id, x.BookCopy.BookId, x.BookCopy.Book.Title, x.DueDate))
+            .ToListAsync(ct);
+        if (newlyOverdue.Count == 0)
+            return newlyOverdue;
         await _db.BorrowRecords
             .Where(x => x.Status == BorrowStatus.Borrowed && x.DueDate != null && x.DueDate < cutoff)
             .ExecuteUpdateAsync(set => set.SetProperty(x => x.Status, BorrowStatus.Overdue), ct);
+        return newlyOverdue;
     }
 
     public async Task<CirculationStatsDto> GetStatsAsync(int finePerDay, CancellationToken ct)
@@ -515,7 +523,7 @@ public class CirculationRepository : ICirculationRepository
             ct);
 
     public Task<Reservation?> GetTrackedReservationAsync(Guid id, CancellationToken ct)
-        => _db.Reservations.FirstOrDefaultAsync(x => x.Id == id, ct);
+        => _db.Reservations.Include(x => x.Book).FirstOrDefaultAsync(x => x.Id == id, ct);
 
     public Task<bool> HasOpenReservationAsync(Guid readerId, Guid bookId, CancellationToken ct)
     {
@@ -547,22 +555,21 @@ public class CirculationRepository : ICirculationRepository
              || (x.Status == CirculationRules.ReservationReady && (x.ExpiresAt == null || x.ExpiresAt >= now))), ct);
     }
 
-    public async Task<IReadOnlyList<Guid>> ExpireReadyReservationsAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<ExpiredReservationDto>> ExpireReadyReservationsAsync(CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var bookIds = await _db.Reservations
+        var expired = await _db.Reservations.AsNoTracking()
             .Where(x => x.Status == CirculationRules.ReservationReady && x.ExpiresAt != null && x.ExpiresAt < now)
-            .Select(x => x.BookId)
-            .Distinct()
+            .Select(x => new ExpiredReservationDto(x.Id, x.ReaderId, x.BookId, x.Book.Title, x.ExpiresAt))
             .ToListAsync(ct);
-        if (bookIds.Count == 0)
-            return bookIds;
+        if (expired.Count == 0)
+            return expired;
         await _db.Reservations
             .Where(x => x.Status == CirculationRules.ReservationReady && x.ExpiresAt != null && x.ExpiresAt < now)
             .ExecuteUpdateAsync(set => set
                 .SetProperty(x => x.Status, CirculationRules.ReservationExpired)
                 .SetProperty(x => x.UpdatedAt, now), ct);
-        return bookIds;
+        return expired;
     }
 
     public async Task<Reservation?> ReadyNextReservationAsync(Guid bookId, int pickupHours, CancellationToken ct)

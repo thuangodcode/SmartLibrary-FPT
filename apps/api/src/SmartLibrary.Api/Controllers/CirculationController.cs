@@ -14,9 +14,9 @@ namespace SmartLibrary.Api.Controllers;
 public class CirculationController : ControllerBase
 {
     private readonly CirculationService _circulation;
-    private readonly IHubContext<SupportChatHub> _hub;
+    private readonly IHubContext<NotificationHub> _hub;
 
-    public CirculationController(CirculationService circulation, IHubContext<SupportChatHub> hub)
+    public CirculationController(CirculationService circulation, IHubContext<NotificationHub> hub)
     {
         _circulation = circulation;
         _hub = hub;
@@ -66,7 +66,7 @@ public class CirculationController : ControllerBase
         var loan = result.Data!;
         if (loan.ReadyReservationReaderId is { } readerId)
         {
-            await _hub.Clients.Group(SupportChatHub.ReaderGroup(readerId))
+            await _hub.Clients.Group(NotificationHub.UserGroup(readerId))
                 .SendAsync("ReservationReady", new
                 {
                     bookId = loan.ReadyReservationBookId,
@@ -122,10 +122,10 @@ public class CirculationController : ControllerBase
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
         if (existing.IsSuccess)
         {
-            await _hub.Clients.Group(SupportChatHub.ReaderGroup(existing.Data!.ReaderId))
+            await _hub.Clients.Group(NotificationHub.UserGroup(existing.Data!.ReaderId))
                 .SendAsync("BorrowStatusUpdated", new { id, status = "Rejected" }, ct);
         }
-        await _hub.Clients.Group(SupportChatHub.LibrarianGroup)
+        await _hub.Clients.Group(NotificationHub.LibrarianGroup)
             .SendAsync("BorrowRequestUpdated", new { id, status = "Rejected" }, ct);
         return Ok(ApiResponse<bool>.Ok(true, new { message = "Đã từ chối yêu cầu và giải phóng bản sao." }));
     }
@@ -242,9 +242,9 @@ public class CirculationController : ControllerBase
 
     private async Task BroadcastBorrowUpdateAsync(CirculationLoanDto loan, CancellationToken ct)
     {
-        await _hub.Clients.Group(SupportChatHub.ReaderGroup(loan.ReaderId))
+        await _hub.Clients.Group(NotificationHub.UserGroup(loan.ReaderId))
             .SendAsync("BorrowStatusUpdated", loan, ct);
-        await _hub.Clients.Group(SupportChatHub.LibrarianGroup)
+        await _hub.Clients.Group(NotificationHub.LibrarianGroup)
             .SendAsync("BorrowRequestUpdated", loan, ct);
     }
 }

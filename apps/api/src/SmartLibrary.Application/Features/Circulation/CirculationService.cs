@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Circulation.DTOs;
 using SmartLibrary.Application.Interfaces;
@@ -439,6 +440,10 @@ public class CirculationService
             if (byLibrarian && actorId != Guid.Empty)
                 loan.LibrarianId = actorId;
 
+            await NotifyAsync(loan.ReaderId, "Đã gia hạn sách",
+                $"“{loan.BookCopy?.Book?.Title}” đã được gia hạn đến {FormatDue(loan.DueDate)}.",
+                "renewal", ct, entityId: loan.Id);
+
             await _unitOfWork.SaveChangesAsync(ct);
             var updated = await _repository.GetLoanAsync(loan.Id, settings.FinePerDay, ct);
             if (updated is null)
@@ -471,8 +476,19 @@ public class CirculationService
         return await _repository.GetOverdueAsync(settings.FinePerDay, ct);
     }
 
-    public Task MarkOverdueAsync(CancellationToken ct = default)
-        => _repository.MarkOverdueAsync(ct);
+    public async Task<IReadOnlyList<CirculationReminderDto>> MarkOverdueAsync(CancellationToken ct = default)
+    {
+        var newlyOverdue = await _repository.MarkOverdueAsync(ct);
+        foreach (var loan in newlyOverdue)
+        {
+            await NotifyAsync(loan.ReaderId, "Sách đã quá hạn",
+                $"“{loan.BookTitle}” đã quá hạn trả. Vui lòng hoàn trả sách sớm để tránh phát sinh thêm phí.",
+                "overdue", ct, entityId: loan.EntityId);
+        }
+        if (newlyOverdue.Count > 0)
+            await _unitOfWork.SaveChangesAsync(ct);
+        return newlyOverdue;
+    }
 
     public Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct = default)
         => _repository.GetFinesAsync(search, status, ct);
@@ -511,6 +527,9 @@ public class CirculationService
         fine.Status = FineStatus.Paid;
         fine.PaidAt = DateTime.UtcNow;
         await TryResolveIncidentAfterPaymentAsync(fine.Id, ct);
+        await NotifyAsync(fine.ReaderId, "Đã thanh toán khoản phí",
+            $"Khoản phí {fine.Amount:0}đ đã được ghi nhận thanh toán.",
+            "fine_paid", ct, entityId: fine.Id);
         await _unitOfWork.SaveChangesAsync(ct);
         return Result<CirculationFineDto>.Success((await _repository.GetFineDtoAsync(id, ct))!);
     }
@@ -614,6 +633,10 @@ public class CirculationService
             : request.Notes.Trim());
         if (request.RestoreCopy && incident.BookCopy != null)
             SetCopyAvailability(incident.BookCopy, BookCondition.Good, true);
+
+        await NotifyAsync(incident.ReaderId, "Hồ sơ sự cố đã được từ chối",
+            $"Thư viện đã đối chiếu và từ chối trách nhiệm mất/hỏng đối với “{incident.BookCopy?.Book?.Title}”.",
+            "return", ct, entityId: incident.BorrowRecordId);
 
         await _unitOfWork.SaveChangesAsync(ct);
         var settings = await _repository.GetSettingsAsync(ct);
@@ -819,6 +842,9 @@ public class CirculationService
         var bookId = reservation.BookId;
         var wasReady = reservation.Status == CirculationRules.ReservationReady;
         reservation.Status = CirculationRules.ReservationCancelled;
+        await NotifyAsync(reservation.ReaderId, "Đã hủy đặt trước",
+            $"Yêu cầu đặt trước “{reservation.Book?.Title}” đã được hủy.",
+            "reservation", ct, href: $"/books/{reservation.BookId}", entityId: reservation.Id);
         await _unitOfWork.SaveChangesAsync(ct);
         if (wasReady)
         {
@@ -1064,12 +1090,21 @@ public class CirculationService
     private async Task ExpireAndReadyReservationsAsync(CancellationToken ct)
     {
         var settings = await _repository.GetSettingsAsync(ct);
-        var expiredBooks = await _repository.ExpireReadyReservationsAsync(ct);
-        foreach (var bookId in expiredBooks)
+        var expiredReservations = await _repository.ExpireReadyReservationsAsync(ct);
+        foreach (var reservation in expiredReservations)
+        {
+            await NotifyAsync(reservation.ReaderId, "Đặt trước đã hết hạn",
+                $"Thời gian giữ “{reservation.BookTitle}” đã kết thúc. Bạn có thể đặt trước lại nếu vẫn cần sách.",
+                "reservation", ct, href: $"/books/{reservation.BookId}", entityId: reservation.Id);
+        }
+        foreach (var bookId in expiredReservations.Select(item => item.BookId).Distinct())
             await ReadyNextReservationAsync(bookId, settings, ct);
-        if (expiredBooks.Count > 0)
+        if (expiredReservations.Count > 0)
             await _unitOfWork.SaveChangesAsync(ct);
     }
+
+    public Task ProcessReservationExpirationsAsync(CancellationToken ct = default)
+        => ExpireAndReadyReservationsAsync(ct);
 
     private async Task<Reservation?> ReadyNextReservationAsync(Guid bookId, CirculationSettings settings, CancellationToken ct)
     {
@@ -1109,13 +1144,31 @@ public class CirculationService
         incident.Description = AppendNote(incident.Description, "Đã thanh toán bồi thường. Không tự mở khóa tài khoản nếu còn hạn chế khác.");
     }
 
-    private Task NotifyAsync(Guid userId, string title, string message, string type, CancellationToken ct)
+    private Task NotifyAsync(
+        Guid userId,
+        string title,
+        string message,
+        string type,
+        CancellationToken ct,
+        string? href = null,
+        Guid? entityId = null)
         => _repository.AddNotificationAsync(new Notification
         {
             UserId = userId,
             Title = title,
             Message = message,
-            Type = type
+            Type = type,
+            Metadata = JsonSerializer.Serialize(new
+            {
+                href = href ?? type switch
+                {
+                    "borrow" or "return" or "renewal" or "due_soon" or "overdue" => "/history?tab=loans",
+                    "fine" or "fine_paid" => "/history?tab=fines",
+                    "reservation" => "/books",
+                    _ => (string?)null
+                },
+                entityId
+            })
         }, ct);
 
     private static Fine NewFine(Guid loanId, Guid readerId, decimal amount, string reason, string? notes = null)

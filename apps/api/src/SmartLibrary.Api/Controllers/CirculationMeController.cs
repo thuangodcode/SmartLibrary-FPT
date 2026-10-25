@@ -14,9 +14,9 @@ namespace SmartLibrary.Api.Controllers;
 public class CirculationMeController : ControllerBase
 {
     private readonly CirculationService _circulation;
-    private readonly IHubContext<SupportChatHub> _hub;
+    private readonly IHubContext<NotificationHub> _hub;
 
-    public CirculationMeController(CirculationService circulation, IHubContext<SupportChatHub> hub)
+    public CirculationMeController(CirculationService circulation, IHubContext<NotificationHub> hub)
     {
         _circulation = circulation;
         _hub = hub;
@@ -134,9 +134,9 @@ public class CirculationMeController : ControllerBase
 
     private async Task BroadcastBorrowUpdateAsync(CirculationLoanDto loan, CancellationToken ct)
     {
-        await _hub.Clients.Group(SupportChatHub.ReaderGroup(loan.ReaderId))
+        await _hub.Clients.Group(NotificationHub.UserGroup(loan.ReaderId))
             .SendAsync("BorrowStatusUpdated", loan, ct);
-        await _hub.Clients.Group(SupportChatHub.LibrarianGroup)
+        await _hub.Clients.Group(NotificationHub.LibrarianGroup)
             .SendAsync("BorrowRequestUpdated", loan, ct);
     }
 }
