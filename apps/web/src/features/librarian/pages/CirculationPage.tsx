@@ -447,7 +447,7 @@ function LoansView() {
     if (!accessToken) return undefined;
     let active = true;
     const hub = new HubConnectionBuilder()
-      .withUrl(`${API_BASE_URL}/hubs/support-chat`, { accessTokenFactory: () => accessToken })
+      .withUrl(`${API_BASE_URL}/hubs/notifications`, { accessTokenFactory: () => accessToken })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
       .build();

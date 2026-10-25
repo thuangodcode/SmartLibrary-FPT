@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
-import { Bell, BookOpen, Check, ChevronDown, CircleHelp, History, LogOut, Menu, Search, ShieldCheck, UserRound, X } from 'lucide-react';
+import { HubConnectionBuilder, HubConnectionState, LogLevel, type HubConnection } from '@microsoft/signalr';
+import { Bell, BookOpen, ChevronDown, CircleHelp, History, LogOut, Menu, Search, ShieldCheck, UserRound, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import smartLibraryLogo from '../../../assets/figma/smartlibrary-logo.png';
 import { useToast } from '../../../components/ui/useToast';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
-import { listInboxNotices, markInboxNoticeRead, type InboxNotice } from '../../librarian/notificationsApi';
+import {
+  listInboxNoticePage,
+  markAllInboxNoticesRead,
+  type InboxNotice,
+} from '../../librarian/notificationsApi';
 import { useHomeCategories } from '../hooks/useHomeData';
 import './HomeNavbar.css';
 
@@ -24,7 +28,11 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [supportUnreadCount, setSupportUnreadCount] = useState(0);
   const [readerNotifications, setReaderNotifications] = useState<InboxNotice[]>([]);
+  const [notificationPage, setNotificationPage] = useState(1);
+  const [notificationTotalPages, setNotificationTotalPages] = useState(1);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [newlySeenNotificationIds, setNewlySeenNotificationIds] = useState<Set<string>>(() => new Set());
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -34,6 +42,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
     () => user?.role === 'Reader' && Boolean(accessToken),
   );
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const categoriesQuery = useHomeCategories();
   const { showToast } = useToast();
   const categories = categoriesQuery.data ?? [];
@@ -41,14 +50,17 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
   const loadReaderNotifications = useCallback(async () => {
     if (!accessToken) return;
     try {
-      setReaderNotifications(await listInboxNotices(accessToken));
+      const result = await listInboxNoticePage(accessToken, notificationPage, 10);
+      setReaderNotifications(result.items);
+      setNotificationTotalPages(Math.max(1, result.totalPages));
+      setNotificationUnreadCount(result.unreadCount);
       setNotificationError(null);
     } catch (caught) {
       setNotificationError(caught instanceof Error ? caught.message : 'Không tải được thông báo.');
     } finally {
       setNotificationsLoading(false);
     }
-  }, [accessToken]);
+  }, [accessToken, notificationPage]);
 
   useEffect(() => {
     if (user?.role !== 'Reader' || !accessToken) return undefined;
@@ -57,13 +69,12 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
     return () => window.clearInterval(timer);
   }, [accessToken, loadReaderNotifications, user?.role]);
 
-  const markReaderNotificationRead = async (notice: InboxNotice) => {
-    if (!accessToken || notice.isRead) return;
+  const markAllReaderNotificationsRead = async () => {
+    if (!accessToken || notificationUnreadCount === 0) return;
     try {
-      await markInboxNoticeRead(accessToken, notice.id);
-      setReaderNotifications((current) => current.map((item) =>
-        item.id === notice.id ? { ...item, isRead: true } : item,
-      ));
+      await markAllInboxNoticesRead(accessToken);
+      setReaderNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
+      setNotificationUnreadCount(0);
     } catch (caught) {
       showToast({
         type: 'error',
@@ -72,19 +83,39 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
       });
     }
   };
+
+  const closeNotifications = () => {
+    setNotificationsOpen(false);
+    setNewlySeenNotificationIds(new Set());
+  };
+
+  const toggleNotifications = () => {
+    if (notificationsOpen) {
+      closeNotifications();
+      return;
+    }
+    setNewlySeenNotificationIds(new Set(readerNotifications.filter((notice) => !notice.isRead).map((notice) => notice.id)));
+    setNotificationsOpen(true);
+    void markAllReaderNotificationsRead();
+  };
+
   useEffect(() => {
-    const closeUserMenu = (event: PointerEvent) => {
+    const closePopovers = (event: PointerEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false);
       }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        closeNotifications();
+      }
     };
-    document.addEventListener('pointerdown', closeUserMenu);
-    return () => document.removeEventListener('pointerdown', closeUserMenu);
+    document.addEventListener('pointerdown', closePopovers);
+    return () => document.removeEventListener('pointerdown', closePopovers);
   }, []);
 
   useEffect(() => {
     if (user?.role !== 'Reader' || !accessToken) return undefined;
     let active = true;
+    const retryTimers: number[] = [];
     const loadSupportUnreadCount = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/api/v1/support/chat/unread-count`, {
@@ -97,19 +128,33 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
       }
     };
     const clearSupportUnreadCount = () => setSupportUnreadCount(0);
-    const hub = new HubConnectionBuilder()
+    const supportHub = new HubConnectionBuilder()
       .withUrl(`${API_BASE_URL}/hubs/support-chat`, {
         accessTokenFactory: () => accessToken,
       })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
       .build();
-    hub.on('ReceiveChatMessage', (message: { senderRole?: string }) => {
+    supportHub.on('ReceiveChatMessage', (message: { senderRole?: string }) => {
       if (active && message.senderRole !== 'Reader') {
         setSupportUnreadCount((count) => count + 1);
       }
     });
-    hub.on('BorrowStatusUpdated', (payload: {
+    const notificationHub = new HubConnectionBuilder()
+      .withUrl(`${API_BASE_URL}/hubs/notifications`, {
+        accessTokenFactory: () => accessToken,
+      })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Warning)
+      .build();
+    notificationHub.on('NotificationCreated', (notice: InboxNotice) => {
+      if (!active) return;
+      setNotificationUnreadCount((count) => count + (notice.isRead ? 0 : 1));
+      if (notificationPage === 1) {
+        setReaderNotifications((current) => [notice, ...current.filter((item) => item.id !== notice.id)].slice(0, 10));
+      }
+    });
+    notificationHub.on('BorrowStatusUpdated', (payload: {
       status?: string;
       bookTitle?: string;
       barcode?: string;
@@ -145,17 +190,17 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
         showToast({ type: 'error', title: 'Yêu cầu mượn đã bị hủy', message: 'Bản sao đã được trả về kho.' });
       }
     });
-    hub.on('ReservationReady', (payload: { bookId?: string; bookTitle?: string; message?: string }) => {
+    notificationHub.on('ReservationReady', (payload: { bookId?: string; bookTitle?: string; message?: string }) => {
       if (!active) return;
       window.dispatchEvent(new CustomEvent('reader-reservation-ready', { detail: payload }));
-      void loadReaderNotifications();
       showToast({
         type: 'success',
         title: 'Sách bạn đặt trước đã sẵn sàng',
         message: payload.message || `“${payload.bookTitle || 'Sách'}” đã sẵn sàng. Hãy gửi yêu cầu mượn trong thời gian giữ.`,
       });
     });
-    const startHub = async () => {
+    notificationHub.onreconnected(() => void loadReaderNotifications());
+    const startHub = async (hub: HubConnection, label: string, attempt = 0) => {
       try {
         await hub.start();
         if (!active) {
@@ -164,26 +209,31 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
         }
         await loadSupportUnreadCount();
       } catch (caught: unknown) {
-        if (active) {
+        if (active && attempt === 0) {
           showToast({
             type: 'error',
-            title: 'Không kết nối được thông báo mượn sách',
-            message: caught instanceof Error ? caught.message : 'Vui lòng tải lại trang để kết nối lại.',
+            title: `Không kết nối được ${label}`,
+            message: caught instanceof Error ? caught.message : 'Hệ thống sẽ thử lại khi bạn tải trang.',
           });
+        }
+        if (active && hub.state === HubConnectionState.Disconnected) {
+          retryTimers.push(window.setTimeout(() => void startHub(hub, label, attempt + 1), Math.min(30_000, 5_000 * (attempt + 1))));
         }
       }
     };
     window.addEventListener('reader-support-read', clearSupportUnreadCount);
     void loadSupportUnreadCount();
-    void startHub();
+    void startHub(supportHub, 'tin nhắn hỗ trợ');
+    void startHub(notificationHub, 'thông báo realtime');
     return () => {
       active = false;
+      retryTimers.forEach((timer) => window.clearTimeout(timer));
       window.removeEventListener('reader-support-read', clearSupportUnreadCount);
-      if (hub.state === HubConnectionState.Connected || hub.state === HubConnectionState.Reconnecting) {
-        void hub.stop();
+      for (const hub of [supportHub, notificationHub]) {
+        if (hub.state === HubConnectionState.Connected || hub.state === HubConnectionState.Reconnecting) void hub.stop();
       }
     };
-  }, [accessToken, loadReaderNotifications, showToast, user?.role]);
+  }, [accessToken, loadReaderNotifications, notificationPage, showToast, user?.role]);
 
   const closeMenu = () => {
     setIsMenuOpen(false);
@@ -218,51 +268,66 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
             {user.role === 'Admin' && <Link to="/admin" onClick={closeMenu}><ShieldCheck size={16} /> Quản trị</Link>}
             {user.role === 'Librarian' && <Link to="/librarian" onClick={closeMenu}><BookOpen size={16} /> Thủ thư</Link>}
             {user.role === 'Reader' && (
-              <div className={`annual-reader-notifications${notificationsOpen ? ' is-open' : ''}`}>
+              <div ref={notificationsRef} className={`annual-reader-notifications${notificationsOpen ? ' is-open' : ''}`}>
                 <button
                   type="button"
                   className="annual-reader-notifications-trigger"
                   aria-label="Thông báo"
                   aria-expanded={notificationsOpen}
-                  onClick={() => setNotificationsOpen((open) => !open)}
+                  onClick={toggleNotifications}
                 >
-                  <Bell size={18} />
-                  {readerNotifications.some((notice) => !notice.isRead) && (
-                    <span>{readerNotifications.filter((notice) => !notice.isRead).length > 9
+                  <Bell size={19} strokeWidth={1.9} aria-hidden="true" />
+                  {notificationUnreadCount > 0 && (
+                    <span>{notificationUnreadCount > 9
                       ? '9+'
-                      : readerNotifications.filter((notice) => !notice.isRead).length}</span>
+                      : notificationUnreadCount}</span>
                   )}
                 </button>
                 {notificationsOpen && (
                   <section className="annual-reader-notifications-popover" aria-label="Thông báo độc giả">
                     <header>
                       <strong>Thông báo</strong>
-                      <span>{readerNotifications.filter((notice) => !notice.isRead).length} chưa đọc</span>
+                      <span>Cập nhật gần đây</span>
                     </header>
                     {notificationError && <p className="annual-reader-notifications-error" role="alert">{notificationError}</p>}
                     {notificationsLoading && !readerNotifications.length ? (
                       <p className="annual-reader-notifications-empty">Đang tải thông báo...</p>
                     ) : !readerNotifications.length ? (
                       <p className="annual-reader-notifications-empty">Chưa có thông báo.</p>
-                    ) : readerNotifications.map((notice) => (
-                      <article className={notice.isRead ? 'is-read' : ''} key={notice.id}>
-                        <div>
+                    ) : readerNotifications.map((notice) => {
+                      const wasUnread = newlySeenNotificationIds.has(notice.id);
+                      const content = (
+                        <>
+                          <span className="annual-reader-notification-status" aria-hidden="true" />
+                          <div>
                           <strong>{notice.title}</strong>
                           <span>{notice.message}</span>
                           <small>{new Date(notice.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</small>
-                        </div>
-                        {!notice.isRead && (
-                          <button
-                            type="button"
-                            aria-label="Đánh dấu đã đọc"
-                            onClick={() => void markReaderNotificationRead(notice)}
-                          >
-                            <Check size={14} />
-                          </button>
-                        )}
-                        {notice.href && <Link to={notice.href} onClick={() => setNotificationsOpen(false)}>Xem</Link>}
-                      </article>
-                    ))}
+                          </div>
+                        </>
+                      );
+                      return notice.href ? (
+                        <Link
+                          className={`annual-reader-notification-item${wasUnread ? ' is-unread' : ''}`}
+                          key={notice.id}
+                          to={notice.href}
+                          onClick={closeNotifications}
+                        >
+                          {content}
+                        </Link>
+                      ) : (
+                        <article className={`annual-reader-notification-item${wasUnread ? ' is-unread' : ''}`} key={notice.id}>
+                          {content}
+                        </article>
+                      );
+                    })}
+                    {notificationTotalPages > 1 && (
+                      <footer className="annual-reader-notifications-pagination">
+                        <button type="button" disabled={notificationPage <= 1} onClick={() => setNotificationPage((page) => page - 1)}>Trước</button>
+                        <span>{notificationPage}/{notificationTotalPages}</span>
+                        <button type="button" disabled={notificationPage >= notificationTotalPages} onClick={() => setNotificationPage((page) => page + 1)}>Sau</button>
+                      </footer>
+                    )}
                   </section>
                 )}
               </div>

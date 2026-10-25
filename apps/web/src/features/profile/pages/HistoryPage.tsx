@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -101,15 +102,22 @@ const statusLabel: Record<string, string> = {
 };
 
 const HistoryPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const token = useAuthStore((state) => state.accessToken);
   const { showToast } = useToast();
   const [loans, setLoans] = useState<LoanList | null>(null);
   const [fines, setFines] = useState<CirculationFine[]>([]);
-  const [tab, setTab] = useState<HistoryTab>('loans');
+  const tab: HistoryTab = searchParams.get('tab') === 'fines' ? 'fines' : 'loans';
   const [loanFilter, setLoanFilter] = useState<LoanFilter>('all');
   const [fineFilter, setFineFilter] = useState<FineFilter>('all');
   const [page, setPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const selectTab = (nextTab: HistoryTab) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', nextTab);
+    setSearchParams(next, { replace: true });
+  };
   const [renewingId, setRenewingId] = useState<string | null>(null);
   const renewalRequestInFlight = useRef(false);
   const [loading, setLoading] = useState(true);
@@ -251,7 +259,7 @@ const HistoryPage = () => {
         <div className="history-tabs" role="tablist" aria-label="Quản lý mượn trả">
           <button
             className={tab === 'loans' ? 'is-active' : ''}
-            onClick={() => setTab('loans')}
+            onClick={() => selectTab('loans')}
             role="tab"
             aria-selected={tab === 'loans'}
           >
@@ -259,7 +267,7 @@ const HistoryPage = () => {
           </button>
           <button
             className={tab === 'fines' ? 'is-active' : ''}
-            onClick={() => setTab('fines')}
+            onClick={() => selectTab('fines')}
             role="tab"
             aria-selected={tab === 'fines'}
           >
