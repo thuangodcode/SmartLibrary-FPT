@@ -452,8 +452,10 @@ public class AiSettingsService
         var testedAt = DateTime.UtcNow;
         try
         {
+            using var chatCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            chatCts.CancelAfter(TimeSpan.FromSeconds(12));
             var reply = await _gemini.GenerateAsync(
-                provider, apiKey, chatModel, "Reply with exactly: OK", baseUrl, ct);
+                provider, apiKey, chatModel, "Reply with exactly: OK", baseUrl, chatCts.Token);
             var ok = !string.IsNullOrWhiteSpace(reply);
             var message = ok
                 ? $"{DisplayName(provider)} phản hồi chat thành công."
@@ -461,15 +463,24 @@ public class AiSettingsService
 
             if (ok && SupportsEmbedding(provider))
             {
-                var vector = await _gemini.EmbedAsync(
-                    provider, apiKey, embeddingModel, "SmartLibrary connection test", baseUrl, ct);
-                if (vector.Length == 0)
+                try
                 {
-                    ok = false;
-                    message = $"{DisplayName(provider)} chat được nhưng embedding trống.";
+                    using var embedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    embedCts.CancelAfter(TimeSpan.FromSeconds(8));
+                    var vector = await _gemini.EmbedAsync(
+                        provider, apiKey, embeddingModel, "SmartLibrary connection test", baseUrl, embedCts.Token);
+                    if (vector.Length == 0)
+                    {
+                        ok = false;
+                        message = $"{DisplayName(provider)} chat được nhưng embedding trống.";
+                    }
+                    else
+                        message = $"{DisplayName(provider)} chat và embedding phản hồi thành công.";
                 }
-                else
-                    message = $"{DisplayName(provider)} chat và embedding phản hồi thành công.";
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    message = $"{DisplayName(provider)} chat thành công. Embedding quá thời gian chờ, thử lại sau.";
+                }
             }
             else if (ok)
             {
@@ -792,7 +803,7 @@ public class AiSettingsService
         };
     }
 
-    private static AiSettingsStatusDto MapLibrarian(
+    private AiSettingsStatusDto MapLibrarian(
         AiSetting policy,
         UserAiSetting? mine,
         UserAiSetting? libraryUser,
@@ -809,10 +820,14 @@ public class AiSettingsService
             bag.TryGetValue(id, out var state);
             var hasKey = !string.IsNullOrWhiteSpace(state?.EncryptedApiKey)
                          || (id == active && !string.IsNullOrWhiteSpace(mine?.EncryptedApiKey));
+            var revealed = string.Empty;
+            if (mine is not null)
+                TryUnlockProvider(mine, bag, id, out revealed, out _, out _);
             return new AiProviderStatusDto
             {
                 Id = id,
                 HasApiKey = hasKey,
+                ApiKey = string.IsNullOrWhiteSpace(revealed) ? null : revealed,
                 ApiKeyLast4 = canShowKeyMeta ? state?.ApiKeyLast4 ?? (id == active ? mine?.ApiKeyLast4 : null) : null,
                 ChatModel = state?.ChatModel ?? (id == active ? mine?.ChatModel : null),
                 EmbeddingModel = state?.EmbeddingModel ?? (id == active ? mine?.EmbeddingModel : null),
@@ -827,6 +842,7 @@ public class AiSettingsService
         return new AiSettingsStatusDto
         {
             HasApiKey = !string.IsNullOrWhiteSpace(mine?.EncryptedApiKey),
+            ApiKey = providers.FirstOrDefault(item => item.IsActive)?.ApiKey,
             ApiKeyLast4 = mine?.ApiKeyLast4,
             Provider = active,
             ChatModel = mine?.ChatModel ?? "gemini-3.8-flash",

@@ -12,6 +12,9 @@ public class CirculationStatsDto
     public decimal UnpaidFinesDelta { get; init; }
     public int DueSoon { get; init; }
     public int SuggestedFinePerDay { get; init; }
+    public int BorrowDays { get; set; }
+    public int DamageFee { get; set; }
+    public int LostFee { get; set; }
 }
 
 public record CirculationLoanDto
@@ -56,18 +59,21 @@ public record CirculationSettings
     public int? MaxBooks { get; init; }
     public int? MaxBooksStudent { get; init; }
     public int? MaxBooksLecturer { get; init; }
-    public int BorrowDays { get; init; } = 14;
-    public int BorrowDaysVi { get; init; } = 7;
-    public int BorrowDaysForeign { get; init; } = 14;
+    public int BorrowDays { get; init; }
+    public int BorrowDaysVi { get; init; }
+    public int BorrowDaysForeign { get; init; }
     public int? MaxRenewals { get; init; }
-    public int RenewalDaysVi { get; init; } = 7;
-    public int RenewalDaysForeign { get; init; } = 14;
+    public int RenewalDays { get; init; }
+    public int RenewalDaysVi { get; init; }
+    public int RenewalDaysForeign { get; init; }
     public bool BlockRenewIfOverdue { get; init; }
     public bool BlockRenewIfReserved { get; init; }
     public int SelfRenewBeforeDays { get; init; } = 1;
     public int SelfRenewAfterDays { get; init; } = 1;
     public bool TextbookRequiresApproval { get; init; }
     public int FinePerDay { get; init; }
+    public int DamageFee { get; init; }
+    public int LostFee { get; init; }
     public bool RestrictIfUnpaid { get; init; } = true;
     public bool AllowReservation { get; init; } = true;
     public int? HoldHours { get; init; }

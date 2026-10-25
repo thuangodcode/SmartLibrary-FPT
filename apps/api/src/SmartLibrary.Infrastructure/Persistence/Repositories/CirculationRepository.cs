@@ -432,16 +432,16 @@ public class CirculationRepository : ICirculationRepository
                 .ToArray();
             if (activeBookIds.Length > 0)
             {
-                var reservedIds = await _db.Reservations.AsNoTracking()
-                    .Where(x => activeBookIds.Contains(x.BookId)
-                        && x.ReaderId != readerId
-                        && (x.Status == CirculationRules.ReservationPending
-                            || (x.Status == CirculationRules.ReservationReady
-                                && (x.ExpiresAt == null || x.ExpiresAt >= now))))
-                    .Select(x => x.BookId)
-                    .Distinct()
+                var bookIdList = activeBookIds.ToList();
+                var rowsForBooks = await _db.Reservations.AsNoTracking()
+                    .Where(x => bookIdList.Contains(x.BookId) && x.ReaderId != readerId)
+                    .Select(x => new { x.BookId, x.Status, x.ExpiresAt })
                     .ToListAsync(ct);
-                reservedBookIds = reservedIds.ToHashSet();
+                reservedBookIds = rowsForBooks
+                    .Where(x => CirculationRules.IsUnexpiredReadyHold(x.Status, x.ExpiresAt, now)
+                        || x.Status == CirculationRules.ReservationPending)
+                    .Select(x => x.BookId)
+                    .ToHashSet();
             }
         }
 
@@ -682,24 +682,26 @@ public class CirculationRepository : ICirculationRepository
         var fine = parameters.GetValueOrDefault(PolicyRuleType.FineFee) ?? empty;
         var reservation = parameters.GetValueOrDefault(PolicyRuleType.Reservation) ?? empty;
         var category = parameters.GetValueOrDefault(PolicyRuleType.CategoryOverride) ?? empty;
-        var renewalDays = ReadInt(renewal, "renewal_days") ?? 7;
         return new CirculationSettings
         {
             MaxBooks = ReadInt(limit, "max_books"),
             MaxBooksStudent = ReadInt(limit, "max_books_student") ?? ReadInt(limit, "max_books"),
             MaxBooksLecturer = ReadInt(limit, "max_books_lecturer") ?? ReadInt(limit, "max_books"),
-            BorrowDays = ReadInt(duration, "max_days") ?? 14,
-            BorrowDaysVi = ReadInt(duration, "max_days_vi") ?? 7,
-            BorrowDaysForeign = ReadInt(duration, "max_days_foreign") ?? ReadInt(duration, "max_days_en") ?? 14,
+            BorrowDays = ReadInt(duration, "max_days") ?? 0,
+            BorrowDaysVi = ReadInt(duration, "max_days_vi") ?? 0,
+            BorrowDaysForeign = ReadInt(duration, "max_days_foreign") ?? ReadInt(duration, "max_days_en") ?? 0,
             MaxRenewals = ReadInt(renewal, "max_renewals"),
-            RenewalDaysVi = ReadInt(renewal, "renewal_days_vi") ?? renewalDays,
-            RenewalDaysForeign = ReadInt(renewal, "renewal_days_foreign") ?? ReadInt(renewal, "renewal_days_en") ?? 14,
+            RenewalDays = ReadInt(renewal, "renewal_days") ?? 0,
+            RenewalDaysVi = ReadInt(renewal, "renewal_days_vi") ?? 0,
+            RenewalDaysForeign = ReadInt(renewal, "renewal_days_foreign") ?? ReadInt(renewal, "renewal_days_en") ?? 0,
             BlockRenewIfOverdue = ReadBool(renewal, "block_if_overdue"),
             BlockRenewIfReserved = ReadBool(renewal, "block_if_reserved"),
             SelfRenewBeforeDays = ReadInt(renewal, "self_renew_before_days") ?? 1,
             SelfRenewAfterDays = ReadInt(renewal, "self_renew_after_days") ?? 1,
             TextbookRequiresApproval = ReadBool(renewal, "textbook_requires_approval") || ReadBool(category, "textbook_requires_approval"),
             FinePerDay = ReadInt(fine, "overdue_fee_per_day") ?? 0,
+            DamageFee = ReadInt(fine, "damage_fee") ?? ReadInt(fine, "damaged_book_fee") ?? 0,
+            LostFee = ReadInt(fine, "lost_book_fee") ?? ReadInt(fine, "lost_fee") ?? 0,
             RestrictIfUnpaid = !fine.ContainsKey("restrict_if_unpaid") || ReadBool(fine, "restrict_if_unpaid"),
             AllowReservation = !reservation.ContainsKey("allow_reservation") || ReadBool(reservation, "allow_reservation"),
             HoldHours = ReadInt(reservation, "hold_hours"),

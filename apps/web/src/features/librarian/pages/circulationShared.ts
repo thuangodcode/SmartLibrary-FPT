@@ -14,6 +14,9 @@ export interface CirculationStats {
   unpaidFinesDelta: number;
   dueSoon: number;
   suggestedFinePerDay: number;
+  borrowDays: number;
+  damageFee: number;
+  lostFee: number;
 }
 
 export interface CirculationLoan {
