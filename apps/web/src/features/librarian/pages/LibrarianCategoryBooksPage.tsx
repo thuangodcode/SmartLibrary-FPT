@@ -1261,7 +1261,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
 
                 {/* Cover Image Upload */}
                 <div className="lib-cat-form-group col-span-2">
-                  <label>Ảnh bìa sách (Tải lên Cloudinary)</label>
+                  <label>Ảnh bìa sách</label>
                   <div className="lib-cat-book-cover-row">
                     {bookCoverPreview ? (
                       <div className="lib-cat-book-cover-preview">

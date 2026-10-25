@@ -330,9 +330,11 @@ function PolicyView() {
   useEffect(() => {
     const state = location.state as { toast?: string; tab?: 'general' | 'rules' } | null;
     if (!state?.toast && state?.tab !== 'rules') return;
-    if (state.tab === 'rules') setTab('rules');
-    if (state.toast) showToast(state.toast, 'success');
-    navigate('.', { replace: true, state: {} });
+    void Promise.resolve().then(() => {
+      if (state.tab === 'rules') setTab('rules');
+      if (state.toast) showToast(state.toast, 'success');
+      navigate('.', { replace: true, state: {} });
+    });
   }, [location.state, navigate, showToast]);
 
   useEffect(() => {
