@@ -437,8 +437,8 @@ public class CirculationRepository : ICirculationRepository
                 .Where(x => x.Status is BorrowStatus.Borrowed or BorrowStatus.Overdue)
                 .Select(x => x.BookCopy.BookId)
                 .Distinct()
-                .ToArray();
-            if (activeBookIds.Length > 0)
+                .ToList();
+            if (activeBookIds.Count > 0)
             {
                 var reservedIds = await _db.Reservations.AsNoTracking()
                     .Where(x => activeBookIds.Contains(x.BookId)
