@@ -6,7 +6,8 @@ export type AiProviderId =
   | 'openrouter'
   | 'huggingface'
   | 'other'
-  | 'local';
+  | 'local'
+  | 'ollama';
 
 export interface AiModelOption {
   id: string;
@@ -121,6 +122,19 @@ export const AI_PROVIDERS: AiProviderDef[] = [
     embeddingModels: [
       { id: 'multilingual-e5-small-int8-v1', label: 'multilingual-e5-small (ONNX int8, 384 chiều)' },
     ],
+  },
+  {
+    id: 'ollama',
+    name: 'Ollama (local)',
+    hint: 'Chat chạy trên máy chủ của bạn, không cần API Key. Cài Ollama và tải model trước khi kết nối.',
+    keyPlaceholder: '',
+    needsBaseUrl: true,
+    chatModels: [
+      { id: 'qwen2.5:3b', label: 'Qwen 2.5 3B (nhẹ, khuyến nghị)' },
+      { id: 'qwen2.5:7b', label: 'Qwen 2.5 7B (chất lượng cao hơn)' },
+      { id: 'gemma3:4b', label: 'Gemma 3 4B' },
+    ],
+    embeddingModels: [],
   },
 ];
 

@@ -360,6 +360,61 @@ public class AiSettingsServiceTests
     }
 
     [Fact]
+    public async Task SaveMyProviderAsync_UsesOllamaAndLocalEmbeddingWithoutApiKey()
+    {
+        var librarianId = Guid.NewGuid();
+        _policy.IsEnabled = true;
+        _policy.ReaderAiEnabled = true;
+        _gemini.Setup(item => item.GenerateAsync(
+                "ollama",
+                string.Empty,
+                "qwen2.5:3b",
+                It.IsAny<string>(),
+                "http://localhost:11434",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("OK");
+        _gemini.Setup(item => item.EmbedAsync(
+                "local",
+                string.Empty,
+                AiRuntimeCredential.LocalEmbeddingModelId,
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([0.1f, 0.2f]);
+
+        var saved = await _sut.SaveMyProviderAsync(
+            new SaveAiSettingsRequest
+            {
+                Provider = "ollama",
+                ChatModel = AiRuntimeCredential.LocalChatModelId,
+                EmbeddingProvider = "local",
+                EmbeddingModel = AiRuntimeCredential.LocalEmbeddingModelId
+            },
+            "Librarian",
+            librarianId);
+
+        saved.IsSuccess.Should().BeTrue();
+        saved.Data!.Provider.Should().Be("ollama");
+        saved.Data.ChatModel.Should().Be(AiRuntimeCredential.LocalChatModelId);
+        saved.Data.EmbeddingProvider.Should().Be("local");
+        saved.Data.HasApiKey.Should().BeTrue();
+        saved.Data.ApiKey.Should().BeNull();
+        _users[librarianId].EncryptedApiKey.Should().BeNull();
+        _protector.Verify(item => item.Protect(It.IsAny<string>()), Times.Never);
+
+        var credential = await _sut.ResolveForAskAsync("Librarian", librarianId);
+        credential.IsSuccess.Should().BeTrue();
+        credential.Data!.Provider.Should().Be("ollama");
+        credential.Data.ApiKey.Should().BeEmpty();
+        credential.Data.EmbeddingProvider.Should().Be("local");
+
+        var tested = await _sut.TestConnectionAsync("Librarian", librarianId);
+        tested.IsSuccess.Should().BeTrue();
+        tested.Data!.Ok.Should().BeTrue();
+        tested.Data.Message.Should().Contain("embedding Embedding ONNX cục bộ");
+    }
+
+    [Fact]
     public async Task ResolveLibraryAsync_UsesDeepSeekForChatAndGeminiForEmbeddings()
     {
         var librarianId = Guid.NewGuid();

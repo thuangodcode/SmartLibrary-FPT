@@ -22,6 +22,7 @@ function keyFor(status: AiSettingsStatus, tab: AiProviderId): string {
 }
 
 function embeddingProviderFor(status: AiSettingsStatus, chatProvider: AiProviderId): AiProviderId {
+  if (chatProvider === 'ollama') return 'local';
   if (isProviderId(status.embeddingProvider) && supportsEmbedding(status.embeddingProvider))
     return status.embeddingProvider;
   if (supportsEmbedding(chatProvider)) return chatProvider;
@@ -75,7 +76,9 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
     isProviderId(status.provider) ? status.provider : 'gemini',
   ));
   const [embeddingModel, setEmbeddingModel] = useState(status.embeddingModel || 'gemini-embedding-001');
-  const [baseUrl, setBaseUrl] = useState(status.baseUrl || '');
+  const [baseUrl, setBaseUrl] = useState(
+    status.baseUrl || (status.provider === 'ollama' ? 'http://localhost:11434' : ''),
+  );
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -122,7 +125,7 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
       || embeddingDef.embeddingModels[0]?.id
       || '',
     );
-    setBaseUrl(item?.baseUrl || '');
+    setBaseUrl(item?.baseUrl || (tab === 'ollama' ? 'http://localhost:11434' : ''));
     setApiKey(keyFor(next, tab));
   };
 
@@ -170,7 +173,9 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
       showToast({
         type: 'success',
         title: 'Đã lưu cấu hình',
-        message: `${provider.name} đang dùng token trong ô nhập.`,
+        message: providerId === 'ollama'
+          ? `${provider.name} đã lưu. Chat chạy cục bộ, không dùng API Key.`
+          : `${provider.name} đang dùng token trong ô nhập.`,
       });
     } catch (saveError) {
       showToast({
@@ -221,10 +226,10 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
         </span>
       </div>
       <p>
-        API Key thuộc tài khoản thủ thư này và được mã hóa khi lưu.
-        Token đang lưu được điền vào ô và mặc định được ẩn. Hãy lưu mọi thay đổi trước khi kiểm tra kết nối. Admin không đọc được khóa.
+        Cấu hình nhà cung cấp thuộc tài khoản thủ thư này. API Key (nếu dùng) được mã hóa khi lưu; Admin không đọc được khóa.
+        Hãy lưu mọi thay đổi trước khi kiểm tra kết nối.
       </p>
-      <p>Nhà cung cấp đang chọn xử lý hội thoại; RAG dùng nhà cung cấp embedding riêng. ONNX cục bộ tải model khoảng 118 MB lần đầu và dùng RAM/CPU của máy chủ.</p>
+      <p>Nhà cung cấp đang chọn xử lý hội thoại; RAG dùng nhà cung cấp embedding riêng. Ollama và ONNX chạy trên máy chủ, không gửi nội dung tìm kiếm tới API AI bên ngoài.</p>
       {status.accountEnabled === false && (
         <p className="ai-cfg-warn">Admin đã tắt quyền AI của tài khoản này. Lưu khóa được nhưng không gọi được AI.</p>
       )}
@@ -245,7 +250,7 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
       </div>
 
       <div className="ai-cfg-provider">
-        {tabHasKey && (
+        {tabHasKey && providerId !== 'ollama' && (
           <p className="ai-cfg-token">Đang dùng token {tabLast4 ? `••••${tabLast4}` : 'đã lưu'}</p>
         )}
         {provider.needsBaseUrl && (
@@ -254,7 +259,7 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
             <input
               type="url"
               value={baseUrl}
-              placeholder="https://api.example.com/v1"
+              placeholder={providerId === 'ollama' ? 'http://localhost:11434' : 'https://api.example.com/v1'}
               onChange={(event) => {
                 setBaseUrl(event.target.value);
                 setKeyError(null);
@@ -262,31 +267,33 @@ const AiProviderKeyForm = ({ accessToken, status, onStatus }: Props) => {
             />
           </label>
         )}
-        <label>
-          API Key
-          <span className="ai-cfg-key">
-            <input
-              type={showKey ? 'text' : 'password'}
-              autoComplete="off"
-              value={apiKey}
-              placeholder={provider.keyPlaceholder}
-              onChange={(event) => {
-                setApiKey(event.target.value);
-                setKeyError(null);
-              }}
-              aria-invalid={Boolean(keyError)}
-            />
-            <button
-              type="button"
-              className="ai-cfg-eye"
-              onClick={() => setShowKey((value) => !value)}
-              aria-label={showKey ? 'Ẩn API Key' : 'Hiện API Key'}
-            >
-              {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </span>
-          {keyError && <em>{keyError}</em>}
-        </label>
+        {providerId !== 'ollama' && (
+          <label>
+            API Key
+            <span className="ai-cfg-key">
+              <input
+                type={showKey ? 'text' : 'password'}
+                autoComplete="off"
+                value={apiKey}
+                placeholder={provider.keyPlaceholder}
+                onChange={(event) => {
+                  setApiKey(event.target.value);
+                  setKeyError(null);
+                }}
+                aria-invalid={Boolean(keyError)}
+              />
+              <button
+                type="button"
+                className="ai-cfg-eye"
+                onClick={() => setShowKey((value) => !value)}
+                aria-label={showKey ? 'Ẩn API Key' : 'Hiện API Key'}
+              >
+                {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </span>
+            {keyError && <em>{keyError}</em>}
+          </label>
+        )}
         <div className="ai-cfg-fields">
           <label>
             Model hội thoại

@@ -88,7 +88,9 @@ public class AiSettingsRepository : IAiSettingsRepository
                 UserId = profile.Id,
                 FullName = profile.FullName,
                 Email = profile.Email,
-                HasApiKey = setting != null && setting.EncryptedApiKey != null && setting.EncryptedApiKey != "",
+                HasApiKey = setting != null
+                            && ((setting.EncryptedApiKey != null && setting.EncryptedApiKey != "")
+                                || (setting.Provider == "ollama" && setting.ChatModel != "")),
                 IsEnabled = setting == null || setting.IsEnabled,
                 Provider = setting != null ? setting.Provider : "gemini",
                 ChatModel = setting != null ? setting.ChatModel : "",

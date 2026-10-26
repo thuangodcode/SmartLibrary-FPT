@@ -22,7 +22,7 @@ public class AiSettingsService
 
     private static readonly string[] KnownProviders =
     [
-        "gemini", "openai", "anthropic", "deepseek", "openrouter", "huggingface", "other", "local"
+        "gemini", "openai", "anthropic", "deepseek", "openrouter", "huggingface", "other", "local", "ollama"
     ];
 
     private readonly IAiSettingsRepository _repository;
@@ -93,7 +93,7 @@ public class AiSettingsService
         if (ragOn && libraryUser is not null
             && !HasEmbeddingConfiguration(libraryUser, ReadBag(libraryUser), embeddingProvider))
             return Result<AiSettingsStatusDto>.Failure(
-                "Cấu hình thư viện chưa có nhà cung cấp embedding Gemini hoặc OpenAI với API Key đã lưu.");
+                "Cấu hình thư viện chưa chọn embedding ONNX cục bộ hoặc nhà cung cấp embedding có API Key.");
 
         settings.UpdatedBy = actorId;
         settings.UpdatedAt = DateTime.UtcNow;
@@ -158,14 +158,14 @@ public class AiSettingsService
         var isAlreadyLibrary = policy.ActiveLibrarianUserId == actorId;
         if (ragOn && (request.UseForLibrary == true || isAlreadyLibrary) && !hasEmbeddingCredential)
             return Result<AiSettingsStatusDto>.Failure(
-                "Cấu hình chat đã lưu, nhưng cần lưu API Key của nhà cung cấp embedding (Gemini hoặc OpenAI) trước khi dùng cho RAG.");
+                "Cấu hình chat đã lưu, nhưng cần chọn embedding ONNX cục bộ hoặc lưu API Key của nhà cung cấp embedding trước khi dùng cho RAG.");
 
         user.ProviderKeysJson = JsonSerializer.Serialize(bag, JsonOptions);
         user.UpdatedAt = DateTime.UtcNow;
         await _repository.SaveUserAsync(user, ct);
 
         var policyDirty = false;
-        if (!string.IsNullOrWhiteSpace(user.EncryptedApiKey)
+        if (HasChatConfiguration(user)
             && (request.UseForLibrary == true
                 || (policy.ActiveLibrarianUserId is null && hasEmbeddingCredential)))
         {
@@ -201,15 +201,15 @@ public class AiSettingsService
             return Result<AiSettingsStatusDto>.Failure("Không xác định được tài khoản.");
 
         var user = await _repository.GetUserAsync(actorId, ct);
-        if (user is null || string.IsNullOrWhiteSpace(user.EncryptedApiKey))
-            return Result<AiSettingsStatusDto>.Failure("Hãy lưu API Key trước khi dùng cấu hình này cho độc giả.");
+        if (user is null || !HasChatConfiguration(user))
+            return Result<AiSettingsStatusDto>.Failure("Hãy lưu cấu hình nhà cung cấp AI trước khi dùng cấu hình này cho độc giả.");
         if (!user.IsEnabled)
             return Result<AiSettingsStatusDto>.Failure("Admin đã tắt quyền AI của tài khoản này.");
         var bag = ReadBag(user);
         var embeddingProvider = SelectedEmbeddingProvider(user, bag);
         if (!HasEmbeddingConfiguration(user, bag, embeddingProvider))
             return Result<AiSettingsStatusDto>.Failure(
-                "Cần lưu API Key của Gemini hoặc OpenAI làm nhà cung cấp embedding trước khi dùng cấu hình cho độc giả.");
+                "Cần chọn embedding ONNX cục bộ hoặc cấu hình nhà cung cấp embedding trước khi dùng cho độc giả.");
 
         var policy = await _repository.GetOrCreateAsync(ct);
         policy.ActiveLibrarianUserId = actorId;
@@ -295,8 +295,8 @@ public class AiSettingsService
             return Result<AiConnectionTestDto>.Failure("Không xác định được tài khoản.");
 
         var user = await _repository.GetUserAsync(actorId, ct);
-        if (user is null || string.IsNullOrWhiteSpace(user.EncryptedApiKey))
-            return Result<AiConnectionTestDto>.Failure("Chưa cấu hình API Key.");
+        if (user is null)
+            return Result<AiConnectionTestDto>.Failure("Chưa cấu hình nhà cung cấp AI.");
         if (!user.IsEnabled)
             return Result<AiConnectionTestDto>.Failure("Admin đã tắt quyền AI của tài khoản này.");
 
@@ -304,11 +304,13 @@ public class AiSettingsService
         var target = string.IsNullOrWhiteSpace(provider)
             ? NormalizeProvider(user.Provider)
             : NormalizeProvider(provider);
+        if (!IsProviderConfigured(user, bag, target))
+            return Result<AiConnectionTestDto>.Failure("Chưa cấu hình nhà cung cấp AI.");
         if (!TryUnlockProvider(user, bag, target, out var apiKey, out var chatModel, out var baseUrl))
             return Result<AiConnectionTestDto>.Failure(
                 HasStoredProviderKey(user, bag, target)
                     ? CredentialEncryptionError
-                    : "Chưa lưu API Key cho nhà cung cấp này.");
+                    : "Chưa lưu cấu hình cho nhà cung cấp này.");
 
         var state = GetOrCreateState(bag, target);
         var embeddingProvider = SelectedEmbeddingProvider(user, bag);
@@ -348,8 +350,8 @@ public class AiSettingsService
         if (libraryUser is not null && libraryUser.IsEnabled)
         {
             var key = Unlock(libraryUser);
-            if (!string.IsNullOrWhiteSpace(key))
-                return ToCredential(libraryUser, key);
+            if (!string.IsNullOrWhiteSpace(key) || IsOllama(libraryUser.Provider))
+                return ToCredential(libraryUser, key ?? string.Empty);
             if (!string.IsNullOrWhiteSpace(libraryUser.EncryptedApiKey))
                 return Result<AiRuntimeCredential>.Failure(CredentialEncryptionError);
         }
@@ -381,7 +383,7 @@ public class AiSettingsService
             });
         }
 
-        return Result<AiRuntimeCredential>.Failure("Chưa cấu hình API Key.");
+        return Result<AiRuntimeCredential>.Failure("Chưa cấu hình nhà cung cấp AI.");
     }
 
     public async Task<Result<AiRuntimeCredential>> ResolveForAskAsync(
@@ -400,14 +402,14 @@ public class AiSettingsService
             if (user is not null && !user.IsEnabled)
                 return Result<AiRuntimeCredential>.Failure("Admin đã tắt quyền AI của tài khoản này.");
             var key = user is null ? null : Unlock(user);
-            if (string.IsNullOrWhiteSpace(key))
+            if (string.IsNullOrWhiteSpace(key) && !IsOllama(user?.Provider))
             {
                 if (!string.IsNullOrWhiteSpace(user?.EncryptedApiKey))
                     return Result<AiRuntimeCredential>.Failure(CredentialEncryptionError);
-                return Result<AiRuntimeCredential>.Failure("Chưa cấu hình API Key.");
+                return Result<AiRuntimeCredential>.Failure("Chưa cấu hình nhà cung cấp AI.");
             }
 
-            return ToCredential(user!, key);
+            return ToCredential(user!, key ?? string.Empty);
         }
 
         return await ResolveLibraryAsync(ct);
@@ -473,7 +475,7 @@ public class AiSettingsService
     {
         var resolved = await ResolveLibraryAsync(ct);
         if (!resolved.IsSuccess)
-            return Result<AiConnectionTestDto>.Failure(resolved.Error ?? "Chưa cấu hình API Key.");
+            return Result<AiConnectionTestDto>.Failure(resolved.Error ?? "Chưa cấu hình nhà cung cấp AI.");
 
         var cred = resolved.Data!;
         var target = string.IsNullOrWhiteSpace(provider) ? cred.Provider : NormalizeProvider(provider);
@@ -634,7 +636,7 @@ public class AiSettingsService
                 && !TryUnlockProvider(user, bag, embeddingProvider, out embeddingKey, out _, out embeddingBaseUrl)))
         {
             return Result<AiRuntimeCredential>.Failure(
-                "Cấu hình chat đã lưu nhưng chưa có nhà cung cấp embedding. Chọn ONNX cục bộ hoặc lưu API Key Gemini/OpenAI.");
+                "Cấu hình chat đã lưu nhưng chưa có nhà cung cấp embedding. Chọn ONNX cục bộ hoặc cấu hình nhà cung cấp embedding.");
         }
 
         var embeddingModel = bag.TryGetValue(embeddingProvider, out var embeddingState)
@@ -685,12 +687,20 @@ public class AiSettingsService
         SaveAiSettingsRequest request)
     {
         var state = GetOrCreateState(bag, provider);
-        var keyError = TryApplyApiKey(state, request.ApiKey);
-        if (keyError is not null)
-            return keyError;
+        if (IsOllama(provider))
+        {
+            state.EncryptedApiKey = null;
+            state.ApiKeyLast4 = null;
+        }
+        else
+        {
+            var keyError = TryApplyApiKey(state, request.ApiKey);
+            if (keyError is not null)
+                return keyError;
 
-        if (string.IsNullOrWhiteSpace(state.EncryptedApiKey))
-            return "Chưa có API Key cho nhà cung cấp này.";
+            if (string.IsNullOrWhiteSpace(state.EncryptedApiKey))
+                return "Chưa có API Key cho nhà cung cấp này.";
+        }
 
         if (provider == "other")
         {
@@ -706,6 +716,10 @@ public class AiSettingsService
 
         if (!string.IsNullOrWhiteSpace(request.ChatModel))
             state.ChatModel = request.ChatModel.Trim();
+        else if (IsOllama(provider) && string.IsNullOrWhiteSpace(state.ChatModel))
+            state.ChatModel = AiRuntimeCredential.LocalChatModelId;
+        if (IsOllama(provider) && string.IsNullOrWhiteSpace(state.BaseUrl))
+            state.BaseUrl = "http://localhost:11434";
         if (SupportsEmbedding(provider) && !string.IsNullOrWhiteSpace(request.EmbeddingModel))
             state.EmbeddingModel = request.EmbeddingModel.Trim();
 
@@ -814,6 +828,27 @@ public class AiSettingsService
         chatModel = settings.ChatModel;
         baseUrl = settings.BaseUrl;
 
+        if (IsOllama(provider))
+        {
+            if (bag.TryGetValue(provider, out var localState))
+            {
+                chatModel = string.IsNullOrWhiteSpace(localState.ChatModel)
+                    ? AiRuntimeCredential.LocalChatModelId
+                    : localState.ChatModel;
+                baseUrl = string.IsNullOrWhiteSpace(localState.BaseUrl)
+                    ? "http://localhost:11434"
+                    : localState.BaseUrl;
+                return !string.IsNullOrWhiteSpace(localState.ChatModel);
+            }
+
+            if (IsOllama(settings.Provider) && !string.IsNullOrWhiteSpace(settings.ChatModel))
+            {
+                chatModel = settings.ChatModel;
+                baseUrl = string.IsNullOrWhiteSpace(settings.BaseUrl) ? "http://localhost:11434" : settings.BaseUrl;
+                return true;
+            }
+        }
+
         if (bag.TryGetValue(provider, out var state) && !string.IsNullOrWhiteSpace(state.EncryptedApiKey))
         {
             try
@@ -864,6 +899,23 @@ public class AiSettingsService
         string provider)
         => string.Equals(provider, "local", StringComparison.OrdinalIgnoreCase)
            || (SupportsEmbedding(provider) && HasStoredProviderKey(settings, bag, provider));
+
+    private static bool IsOllama(string? provider)
+        => string.Equals(provider, "ollama", StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasChatConfiguration(UserAiSetting settings)
+        => IsOllama(settings.Provider)
+            ? !string.IsNullOrWhiteSpace(settings.ChatModel)
+            : !string.IsNullOrWhiteSpace(settings.EncryptedApiKey);
+
+    private static bool IsProviderConfigured(
+        UserAiSetting settings,
+        Dictionary<string, StoredProviderState> bag,
+        string provider)
+        => IsOllama(provider)
+            ? (bag.TryGetValue(provider, out var state) && !string.IsNullOrWhiteSpace(state.ChatModel))
+              || (IsOllama(settings.Provider) && !string.IsNullOrWhiteSpace(settings.ChatModel))
+            : HasStoredProviderKey(settings, bag, provider);
 
     private static void WriteTestResult(
         UserAiSetting settings,
@@ -941,7 +993,7 @@ public class AiSettingsService
         IReadOnlyList<LibrarianAiAccountRow> accounts)
     {
         var flags = ReadCriteria(policy);
-        var hasLibraryKey = !string.IsNullOrWhiteSpace(libraryUser?.EncryptedApiKey)
+        var hasLibraryKey = (libraryUser is not null && HasChatConfiguration(libraryUser))
                             || !string.IsNullOrWhiteSpace(policy.EncryptedApiKey);
         var provider = libraryUser?.Provider ?? policy.Provider;
         var chat = libraryUser?.ChatModel ?? policy.ChatModel;
@@ -1019,7 +1071,8 @@ public class AiSettingsService
         {
             bag.TryGetValue(id, out var state);
             var hasKey = !string.IsNullOrWhiteSpace(state?.EncryptedApiKey)
-                         || (id == active && !string.IsNullOrWhiteSpace(mine?.EncryptedApiKey));
+                         || (id == active && mine is not null && HasChatConfiguration(mine))
+                         || (IsOllama(id) && !string.IsNullOrWhiteSpace(state?.ChatModel));
             var revealed = string.Empty;
             if (mine is not null)
                 TryUnlockProvider(mine, bag, id, out revealed, out _, out _);
@@ -1041,7 +1094,7 @@ public class AiSettingsService
 
         return new AiSettingsStatusDto
         {
-            HasApiKey = !string.IsNullOrWhiteSpace(mine?.EncryptedApiKey),
+            HasApiKey = mine is not null && HasChatConfiguration(mine),
             ApiKey = providers.FirstOrDefault(item => item.IsActive)?.ApiKey,
             ApiKeyLast4 = mine?.ApiKeyLast4,
             Provider = active,
@@ -1124,6 +1177,7 @@ public class AiSettingsService
         "deepseek" => "DeepSeek",
         "openrouter" => "OpenRouter",
         "huggingface" => "Hugging Face",
+        "ollama" => "Ollama (local)",
         "local" => "Embedding ONNX cục bộ",
         "other" => "Nhà cung cấp khác",
         _ => "Google Gemini"

@@ -4,6 +4,7 @@ namespace SmartLibrary.Application.Features.Ai;
 public sealed class AiRuntimeCredential
 {
     public const string LocalEmbeddingModelId = "multilingual-e5-small-int8-v1";
+    public const string LocalChatModelId = "qwen2.5:3b";
 
     public Guid? OwnerUserId { get; init; }
     public required string ApiKey { get; init; }

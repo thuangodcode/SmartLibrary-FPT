@@ -105,12 +105,14 @@ const LibrarianAiPage = () => {
   const connectionText = status?.accountEnabled === false
     ? 'Admin đã tắt quyền AI của tài khoản này. Không thể tự bật lại.'
     : !status?.hasApiKey
-      ? 'Chưa cấu hình API Key. Nhập khóa bên dưới trước khi dùng tìm kiếm ngữ nghĩa, RAG và gợi ý sách.'
+      ? 'Chưa cấu hình AI. Chọn Ollama để chạy local không cần API Key, hoặc chọn một nhà cung cấp cloud.'
       : !status.isEnabled
         ? 'Hệ thống AI đang tắt. Liên hệ Admin để bật. Cấu hình cá nhân không ghi đè chính sách này.'
         : status.lastTestOk === false
           ? `Kết nối AI đang lỗi: ${status.lastTestMessage || 'không rõ nguyên nhân'}.`
-          : 'Đang dùng API Key và model của tài khoản thủ thư này.';
+          : status.provider === 'ollama'
+            ? 'Đang dùng Ollama và embedding ONNX cục bộ.'
+            : 'Đang dùng nhà cung cấp AI và model của tài khoản thủ thư này.';
 
   const applyStatus = (next: AiSettingsStatus) => {
     setStatus(next);
@@ -347,7 +349,7 @@ const LibrarianAiPage = () => {
         <div>
           <p>NGHIỆP VỤ THƯ VIỆN</p>
           <h1>Thiết lập AI nghiệp vụ</h1>
-          <span>Nhập API Key của bạn, chọn model, rồi dùng các chức năng AI được phân quyền.</span>
+          <span>Chọn nhà cung cấp AI, chọn model và cấu hình dịch vụ được phân quyền. Ollama chạy cục bộ, không cần API Key.</span>
         </div>
         <div className={`ai-biz-pulse ${connected && status?.lastTestOk !== false ? 'is-ok' : 'is-warn'}`}>
           {connected && status?.lastTestOk !== false ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}

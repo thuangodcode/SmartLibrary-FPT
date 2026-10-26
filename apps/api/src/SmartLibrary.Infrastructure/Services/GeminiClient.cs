@@ -36,6 +36,7 @@ public sealed class GeminiClient : IGeminiClient
         {
             "gemini" => GeminiGenerateAsync(apiKey, model, prompt, ct),
             "anthropic" => AnthropicGenerateAsync(apiKey, model, prompt, ct),
+            "ollama" => OllamaGenerateAsync(model, prompt, baseUrl, ct),
             _ => OpenAiGenerateAsync(kind, apiKey, model, prompt, baseUrl, ct)
         };
     }
@@ -228,6 +229,38 @@ public sealed class GeminiClient : IGeminiClient
         return content[0].TryGetProperty("text", out var text) ? text.GetString() ?? string.Empty : string.Empty;
     }
 
+    private async Task<string> OllamaGenerateAsync(
+        string model,
+        string prompt,
+        string? baseUrl,
+        CancellationToken ct)
+    {
+        var url = OllamaChatUrl(baseUrl);
+        using var response = await _http.PostAsJsonAsync(url, new
+        {
+            model,
+            messages = new[] { new { role = "user", content = prompt } },
+            stream = false,
+            options = new { temperature = 0.2, num_predict = 1024 }
+        }, ct);
+
+        var json = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException(ReadError(json, "Ollama", response.StatusCode.ToString()));
+
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.TryGetProperty("message", out var message)
+               && message.TryGetProperty("content", out var content)
+            ? content.GetString() ?? string.Empty
+            : string.Empty;
+    }
+
+    private static string OllamaChatUrl(string? baseUrl)
+    {
+        var value = string.IsNullOrWhiteSpace(baseUrl) ? "http://localhost:11434" : baseUrl.Trim();
+        return $"{value.TrimEnd('/')}/api/chat";
+    }
+
     private static void AddOpenAiExtraHeaders(HttpRequestMessage request, string provider)
     {
         if (provider != "openrouter")
@@ -272,7 +305,7 @@ public sealed class GeminiClient : IGeminiClient
         var value = string.IsNullOrWhiteSpace(provider) ? "gemini" : provider.Trim().ToLowerInvariant();
         return value switch
         {
-            "gemini" or "openai" or "anthropic" or "deepseek" or "openrouter" or "huggingface" or "other" or "local" => value,
+            "gemini" or "openai" or "anthropic" or "deepseek" or "openrouter" or "huggingface" or "other" or "local" or "ollama" => value,
             _ => "other"
         };
     }
@@ -284,6 +317,7 @@ public sealed class GeminiClient : IGeminiClient
         "deepseek" => "DeepSeek",
         "openrouter" => "OpenRouter",
         "huggingface" => "Hugging Face",
+        "ollama" => "Ollama",
         "other" => "Nhà cung cấp",
         _ => "Gemini"
     };

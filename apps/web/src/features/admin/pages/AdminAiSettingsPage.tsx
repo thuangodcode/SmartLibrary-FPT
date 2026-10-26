@@ -244,7 +244,7 @@ const AdminAiSettingsPage = () => {
 
           <section className="ai-cfg-card">
             <h2>Dịch vụ AI toàn hệ thống</h2>
-            <p>Admin bật/tắt dịch vụ. Thủ thư tự nhập API Key; không thể tự bật lại dịch vụ khi Admin tắt.</p>
+            <p>Admin bật/tắt dịch vụ. Thủ thư tự cấu hình nhà cung cấp; Ollama local không cần API Key.</p>
             <div className="ai-cfg-services">
               {AI_SERVICES.map((service) => (
                 <ServiceRow

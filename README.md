@@ -64,6 +64,22 @@ npm run dev:api
 # Health check: http://localhost:5278/api/health-check
 ```
 
+### AI tìm kiếm sách local (không cần API Key)
+
+SmartLibrary hỗ trợ chạy chat bằng Ollama và embedding bằng ONNX trên máy chạy API. Gợi ý cấu hình mặc định là **Qwen 2.5 3B** (`qwen2.5:3b`) cho máy phổ thông; dùng `qwen2.5:7b` nếu máy có nhiều RAM/GPU và ưu tiên câu trả lời tốt hơn.
+
+1. Cài Ollama từ [ollama.com](https://ollama.com/) và tải model:
+
+   ```bash
+   ollama pull qwen2.5:3b
+   ```
+
+2. Đảm bảo Ollama đang chạy tại `http://localhost:11434` trên cùng máy với API. Nếu API chạy trong container hoặc trên máy khác, nhập địa chỉ Ollama mà **máy chạy API** có thể truy cập (ví dụ `http://host.docker.internal:11434` trong Docker Desktop).
+3. Trong trang cấu hình AI của thủ thư, chọn **Ollama (local)**, model `qwen2.5:3b`, URL Ollama và **ONNX cục bộ** làm embedding; lưu rồi kiểm tra kết nối.
+4. Chọn dùng cấu hình cho thư viện, bật dịch vụ AI theo quyền Admin và chạy **Đồng bộ dữ liệu RAG** để tạo lại chỉ mục sách.
+
+Embedding `multilingual-e5-small` ONNX được tải một lần (khoảng 118 MB) vào máy chủ API; Ollama cũng cần tải model một lần. Sau đó suy luận chat và embedding chạy local, không gửi câu hỏi/nội dung sách tới dịch vụ AI bên ngoài và không cần API Key. Dữ liệu tài khoản/kho sách vẫn sử dụng cơ sở dữ liệu đã cấu hình (Supabase/PostgreSQL).
+
 ### Thanh toán phí phạt PayOS
 
 Luồng phí phạt hỗ trợ tiền mặt tại quầy và PayOS. Chỉ webhook PayOS đã xác thực chữ ký mới xác nhận giao dịch trực tuyến; URL chuyển hướng không được dùng làm bằng chứng thanh toán. Cấu hình `PayOS__ClientId`, `PayOS__ApiKey`, `PayOS__ChecksumKey`, `PayOS__ReturnUrl` và `PayOS__CancelUrl` qua biến môi trường (Render) hoặc `.env` local. Không đưa credentials vào Git/chat.

@@ -55,7 +55,7 @@ public class RagService
 
         var credential = await _settings.ResolveForAskAsync(role, userId, ct);
         if (!credential.IsSuccess)
-            return Result<RagAskResultDto>.Failure(credential.Error ?? "Chưa cấu hình API Key.");
+            return Result<RagAskResultDto>.Failure(credential.Error ?? "Chưa cấu hình nhà cung cấp AI.");
 
         var cred = credential.Data!;
         var isReader = !AiSettingsService.IsStaff(role);
@@ -98,7 +98,7 @@ public class RagService
 
         var credential = await _settings.ResolveLibraryAsync(ct);
         if (!credential.IsSuccess)
-            return Result<RagReindexResultDto>.Failure("Chưa cấu hình API Key nên không tạo được embedding.");
+            return Result<RagReindexResultDto>.Failure("Chưa cấu hình nhà cung cấp embedding nên không tạo được embedding.");
 
         try
         {
