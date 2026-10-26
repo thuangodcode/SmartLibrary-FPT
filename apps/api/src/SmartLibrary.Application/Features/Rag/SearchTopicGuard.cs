@@ -252,7 +252,21 @@ public static class SearchTopicGuard
     {
         if (intent.DistinctiveTerms.Count == 0)
             return false;
-        return intent.DistinctiveTerms.Any(term => hay.Contains(term, StringComparison.Ordinal));
+
+        // 1. Direct term match
+        if (intent.DistinctiveTerms.Any(term => hay.Contains(term, StringComparison.Ordinal)))
+            return true;
+
+        // 2. Individual term synonym expansion
+        if (intent.DistinctiveTerms.Any(term =>
+            SemanticSynonyms.Expand(term).Any(synonym => hay.Contains(synonym, StringComparison.Ordinal))))
+            return true;
+
+        // 3. Multi-word phrase synonym match between query and hay
+        if (SemanticSynonyms.HasSynonymMatch(intent.Folded, hay))
+            return true;
+
+        return false;
     }
 
     private static bool HasSearchableIntent(string part)
@@ -420,12 +434,12 @@ public static class SearchTopicGuard
         => ContainsAny(fold, "tu vung", "tuvung", "vocabulary", "kanji", "tu dien", "tudien");
 
     private static bool HasBusiness(string fold)
-        => ContainsAny(fold, "thuong mai", "thuongmai", "business", "kinh te", "kinhte");
+        => ContainsAny(fold, "thuong mai", "thuongmai", "business", "kinh te", "kinhte", "marketing", "quan tri", "tai chinh");
 
     private static bool HasLiterature(string fold)
         => ContainsAny(fold,
             "van hoc", "vanhoc", "literature", "literary",
-            "tieu thuyet", "tieuthuyet", "truyen ngan", "truyenngan", "novel");
+            "tieu thuyet", "tieuthuyet", "truyen ngan", "truyenngan", "novel", "fiction", "prose");
 
     private static bool HasIt(string fold)
         => ContainsAny(fold,

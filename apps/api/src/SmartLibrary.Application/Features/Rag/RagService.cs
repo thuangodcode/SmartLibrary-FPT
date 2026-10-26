@@ -12,7 +12,7 @@ public class RagService
     public const int MinQuestionLength = 3;
     public const int MaxQuestionLength = 4000;
     private const int MaxEmbedChars = 3000;
-    private const double MinRelevantScore = 0.55;
+    private const double MinRelevantScore = 0.40;
     private const double ExactMatchScore = 0.9;
 
     private readonly AiSettingsService _settings;
@@ -208,7 +208,7 @@ public class RagService
                     embeddingText,
                     cred.EmbeddingBaseUrl,
                     ct);
-                semantic.AddRange((await _documents.SearchAsync(embedding, 8, ct))
+                semantic.AddRange((await _documents.SearchAsync(embedding, 12, ct))
                     .Where(hit => hit.Score >= MinRelevantScore)
                     .Where(hit => !readerBookSearch
                                   || string.Equals(hit.SourceType, "book", StringComparison.OrdinalIgnoreCase)));
@@ -305,11 +305,7 @@ public class RagService
 
     private static string EmbedText(string question, bool bookSearch)
     {
-        var text = bookSearch
-            ? $"Tìm sách trong thư viện phù hợp với nhu cầu sau: {question}"
-            : question;
-        if (SearchTopicGuard.Parse(question).Topics.Contains("csharp", StringComparer.Ordinal))
-            text += " C# (C Sharp) programming language and .NET software development.";
+        var text = QueryExpander.Expand(question, bookSearch);
         return text.Length <= MaxEmbedChars ? text : text[..MaxEmbedChars];
     }
 

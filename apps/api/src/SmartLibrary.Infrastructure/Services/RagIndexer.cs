@@ -8,6 +8,7 @@ using SmartLibrary.Application.Features.Rag.DTOs;
 using SmartLibrary.Domain.Entities;
 using SmartLibrary.Domain.Enums;
 using SmartLibrary.Infrastructure.Persistence;
+using SmartLibrary.Infrastructure.Text;
 
 namespace SmartLibrary.Infrastructure.Services;
 
@@ -204,18 +205,57 @@ public class RagIndexer : IRagIndexer
     {
         var authors = string.Join(", ", book.Authors.Select(author => author.Name));
         var categories = string.Join(", ", book.Categories.Select(category => category.Name));
-        var content = $"""
-            Loại: sách
-            Mã: {book.Code}
-            Tên: {book.Title}
-            Tác giả: {authors}
-            Danh mục: {categories}
-            ISBN: {book.Isbn}
-            Năm: {book.PublishedYear}
-            Ngôn ngữ: {book.Language}
-            Mô tả: {book.Description}
-            """;
-        return (book.Title, content);
+        var majors = book.Majors.Count > 0
+            ? string.Join(", ", book.Majors.Select(major => $"{major.Name} ({major.Code})"))
+            : string.Empty;
+        var languageLabel = BookLanguageText.SearchAliases(book.Language);
+
+        var builder = new StringBuilder();
+
+        // 1. Structured metadata
+        builder.AppendLine($"Loại: sách");
+        builder.AppendLine($"Mã: {book.Code}");
+        builder.AppendLine($"Tên: {book.Title}");
+        builder.AppendLine($"Tác giả: {authors}");
+        builder.AppendLine($"Danh mục: {categories}");
+        builder.AppendLine($"ISBN: {book.Isbn}");
+        builder.AppendLine($"Năm xuất bản: {book.PublishedYear}");
+        builder.AppendLine($"Ngôn ngữ: {languageLabel}");
+        if (!string.IsNullOrWhiteSpace(majors))
+            builder.AppendLine($"Ngành học liên quan: {majors}");
+
+        // 2. Natural language description
+        builder.AppendLine();
+        if (!string.IsNullOrWhiteSpace(book.Description))
+        {
+            builder.AppendLine($"Mô tả: {book.Description}");
+        }
+        else
+        {
+            // Generate a minimal semantic description from metadata
+            builder.AppendLine($"Cuốn sách \"{book.Title}\" của tác giả {authors} thuộc thể loại {categories}.");
+        }
+
+        // 3. Semantic enrichment: add cross-lingual synonyms & keywords
+        var foldedContent = VietnameseText.Fold(builder.ToString());
+        var enrichment = SemanticSynonyms.EnrichForEmbedding(foldedContent);
+        if (!string.IsNullOrWhiteSpace(enrichment))
+        {
+            builder.AppendLine();
+            builder.AppendLine($"Từ khóa ngữ nghĩa: {enrichment}");
+        }
+
+        // 4. Category-specific keywords for better cross-lingual matching
+        foreach (var category in book.Categories)
+        {
+            var catKeywords = SemanticSynonyms.CategoryKeywords(category.Name);
+            if (!string.IsNullOrWhiteSpace(catKeywords))
+            {
+                builder.AppendLine($"Chủ đề liên quan ({category.Name}): {catKeywords}");
+            }
+        }
+
+        return (book.Title, builder.ToString().Trim());
     }
 
     private async Task<(string Title, string Content)?> BuildPolicyTextAsync(Guid policyId, CancellationToken ct)
@@ -235,15 +275,22 @@ public class RagIndexer : IRagIndexer
             "; ",
             policy.Parameters.Select(param => $"{param.DisplayLabel ?? param.ParamKey}={param.ParamValue}"));
         var title = $"{policy.Code} · {policy.Name}";
-        var content = $"""
-            Loại: chính sách
-            Mã: {policy.Code}
-            Tên: {policy.Name}
-            Nhóm: {policy.PolicyType}
-            Mô tả: {policy.Description}
-            Tham số: {parameters}
-            """;
-        return (title, content);
+
+        var builder = new StringBuilder();
+        builder.AppendLine($"Loại: chính sách thư viện (policy)");
+        builder.AppendLine($"Mã: {policy.Code}");
+        builder.AppendLine($"Tên: {policy.Name}");
+        builder.AppendLine($"Nhóm: {policy.PolicyType}");
+        builder.AppendLine($"Mô tả: {policy.Description}");
+        builder.AppendLine($"Tham số: {parameters}");
+
+        // Thêm context tự nhiên cho embedding hiểu rõ hơn
+        builder.AppendLine();
+        builder.AppendLine($"Chính sách \"{policy.Name}\" quy định về {policy.Description}");
+        builder.AppendLine("Từ khóa: chính sách, quy định, thư viện, mượn sách, trả sách, gia hạn, phí phạt, "
+            + "policy, library rules, borrowing, returning, renewal, fine, overdue");
+
+        return (title, builder.ToString().Trim());
     }
 
     private static void Apply(RagReindexResultDto result, string status, bool isBook)

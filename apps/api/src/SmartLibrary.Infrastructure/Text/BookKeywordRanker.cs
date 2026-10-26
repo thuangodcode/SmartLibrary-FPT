@@ -83,9 +83,16 @@ internal static class BookKeywordRanker
                 return 0.68;
         }
 
-        var tokenHits = terms.Count(hayTokens.Contains);
+        var hayFold = VietnameseText.Fold($"{title} {description} {code} {authorText} {categoryText} {languageText}");
+        var hasSynonymMatch = SemanticSynonyms.HasSynonymMatch(queryFold, hayFold);
+        var tokenHits = terms.Count(t => hayTokens.Contains(t) || SemanticSynonyms.Expand(t).Any(hayTokens.Contains));
         var distinctive = Distinctive(terms);
-        var distinctiveHits = distinctive.Count(hayTokens.Contains);
+        var distinctiveHits = distinctive.Count(t => hayTokens.Contains(t) || SemanticSynonyms.Expand(t).Any(hayTokens.Contains));
+        if (hasSynonymMatch)
+        {
+            tokenHits = Math.Max(tokenHits, 2);
+            distinctiveHits = Math.Max(distinctiveHits, 1);
+        }
 
         if (isbnDigits.Length >= 10 && queryDigits.Contains(isbnDigits, StringComparison.Ordinal))
             return 1;
