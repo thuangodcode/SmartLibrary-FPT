@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { HubConnectionBuilder, HubConnectionState, LogLevel, type HubConnection } from '@microsoft/signalr';
-import { Bell, BookOpen, ChevronDown, CircleHelp, Heart, History, LogOut, Menu, Search, ShieldCheck, UserRound, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Bell, BookOpen, ChevronDown, CircleHelp, Heart, History, LoaderCircle, LogOut, Menu, Search, ShieldCheck, UserRound, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import smartLibraryLogo from '../../../assets/figma/smartlibrary-logo.png';
 import { useToast } from '../../../components/ui/useToast';
 import { API_BASE_URL } from '../../../config';
@@ -12,7 +12,7 @@ import {
   markAllInboxNoticesRead,
   type InboxNotice,
 } from '../../librarian/notificationsApi';
-import { useHomeCategories } from '../hooks/useHomeData';
+import { useHomeBookSuggestions, useHomeCategories, type HomeBook } from '../hooks/useHomeData';
 import './HomeNavbar.css';
 
 type HomeNavSection = 'catalog' | 'news' | 'policies';
@@ -21,6 +21,132 @@ interface ApiEnvelope<T> {
   success?: boolean;
   data?: T;
 }
+
+const BookSearch: React.FC = () => {
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const suggestionsQuery = useHomeBookSuggestions(debouncedSearch);
+  const suggestions = suggestionsQuery.data ?? [];
+  const showSuggestions = isFocused && search.trim().length > 0;
+  const isSearchSettled = debouncedSearch === search.trim();
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 180);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  useEffect(() => {
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsFocused(false);
+        setActiveIndex(-1);
+      }
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick);
+  }, []);
+
+  const openBook = (book: HomeBook) => {
+    setIsFocused(false);
+    setActiveIndex(-1);
+    navigate(`/books/${book.id}`);
+  };
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = search.trim();
+    if (!query) return;
+    setIsFocused(false);
+    navigate(`/books?q=${encodeURIComponent(query)}`);
+  };
+
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      setIsFocused(false);
+      setActiveIndex(-1);
+      return;
+    }
+    if (!showSuggestions || suggestions.length === 0) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActiveIndex((index) => (index + 1) % suggestions.length);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveIndex((index) => (index <= 0 ? suggestions.length - 1 : index - 1));
+    } else if (event.key === 'Enter' && activeIndex >= 0) {
+      event.preventDefault();
+      openBook(suggestions[activeIndex]);
+    }
+  };
+
+  return (
+    <div className="annual-search-container" ref={searchRef}>
+      <form className="annual-search" onSubmit={submitSearch} role="search" aria-label="Tìm sách trong thư viện">
+        <Search size={22} aria-hidden="true" />
+        <label className="sr-only" htmlFor="annual-navbar-book-search">Tìm sách</label>
+        <input
+          id="annual-navbar-book-search"
+          name="q"
+          placeholder="Tên sách, tác giả, ISBN hoặc điều bạn muốn học"
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setActiveIndex(-1);
+          }}
+          onFocus={() => setIsFocused(true)}
+          onKeyDown={handleSearchKeyDown}
+          autoComplete="off"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={showSuggestions && (suggestions.length > 0 || !isSearchSettled || suggestionsQuery.isFetching)}
+          aria-controls="annual-book-search-suggestions"
+          aria-activedescendant={activeIndex >= 0 ? `annual-book-suggestion-${activeIndex}` : undefined}
+        />
+        <button type="submit">Tìm trong thư viện</button>
+      </form>
+      {showSuggestions && (
+        <div className="annual-search-suggestions" id="annual-book-search-suggestions" role="listbox" aria-label="Gợi ý sách">
+          {search.trim().length < 2 ? (
+            <p className="annual-search-suggestions-state">Nhập thêm ít nhất 1 ký tự để xem gợi ý.</p>
+          ) : !isSearchSettled || suggestionsQuery.isFetching ? (
+            <p className="annual-search-suggestions-state"><LoaderCircle size={15} className="annual-search-spinner" /> Đang tìm sách…</p>
+          ) : suggestionsQuery.isError ? (
+            <p className="annual-search-suggestions-state is-error" role="alert">Không tải được gợi ý. Nhấn “Tìm trong thư viện” để thử lại.</p>
+          ) : suggestions.length > 0 ? (
+            suggestions.map((book, index) => (
+              <button
+                type="button"
+                role="option"
+                aria-selected={activeIndex === index}
+                id={`annual-book-suggestion-${index}`}
+                className={`annual-search-suggestion${activeIndex === index ? ' is-active' : ''}`}
+                key={book.id}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => openBook(book)}
+              >
+                {book.coverImageUrl ? (
+                  <img src={book.coverImageUrl} alt="" loading="lazy" />
+                ) : (
+                  <span className="annual-search-suggestion-cover"><BookOpen size={17} aria-hidden="true" /></span>
+                )}
+                <span className="annual-search-suggestion-copy">
+                  <strong>{book.title}</strong>
+                  <small>{book.authorNames.join(', ') || 'Chưa rõ tác giả'}{book.categoryNames.length ? ` · ${book.categoryNames.slice(0, 2).join(', ')}` : ''}</small>
+                </span>
+              </button>
+            ))
+          ) : (
+            <p className="annual-search-suggestions-state">Chưa tìm thấy sách phù hợp.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactNode }> = ({ activeSection, searchSlot }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -258,14 +384,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
     setIsCategoriesOpen(false);
     setIsUserMenuOpen(false);
   };
-  const defaultSearch = (
-    <form className="annual-search" action="/books" method="get" role="search" aria-label="Tìm sách trong thư viện">
-      <Search size={22} aria-hidden="true" />
-      <label className="sr-only" htmlFor="annual-navbar-book-search">Tìm sách</label>
-      <input id="annual-navbar-book-search" name="q" placeholder="Tên sách, tác giả, ISBN hoặc điều bạn muốn học" />
-      <button type="submit">Tìm trong thư viện</button>
-    </form>
-  );
+  const defaultSearch = <BookSearch />;
 
   const handleLogout = () => {
     setSupportUnreadCount(0);

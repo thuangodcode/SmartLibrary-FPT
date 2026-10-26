@@ -49,13 +49,17 @@ internal static class BookKeywordRanker
         IEnumerable<string> categories,
         string? language)
     {
+        var queryFold = VietnameseText.Fold(query);
+        var isShortPrefixQuery = queryFold.Length is > 0 and <= 3
+            && !queryFold.Any(char.IsWhiteSpace)
+            && !Stopwords.Contains(queryFold);
         var named = SearchTopicGuard.IsNamedInQuery(query, title, authors, isbn, code)
                     && SearchTopicGuard.Parse(query).Topics.Count <= 1
                     && query.Trim().Length < 160;
-        if (!named && !SearchTopicGuard.Allows(query, title, description, authors, categories, isbn, code, language))
+        if (!named && !isShortPrefixQuery
+            && !SearchTopicGuard.Allows(query, title, description, authors, categories, isbn, code, language))
             return 0;
 
-        var queryFold = VietnameseText.Fold(query);
         var queryDigits = VietnameseText.Digits(query);
         var terms = Tokenize(query);
         var intent = SearchTopicGuard.Parse(query);
@@ -69,6 +73,16 @@ internal static class BookKeywordRanker
         var hayTokens = new HashSet<string>(
             Tokenize($"{title} {description} {code} {authorText} {categoryText} {languageText}"),
             StringComparer.Ordinal);
+        if (isShortPrefixQuery)
+        {
+            if (HasTokenPrefix(title, queryFold))
+                return 0.88;
+            if (HasTokenPrefix(authorText, queryFold))
+                return 0.78;
+            if (HasTokenPrefix(categoryText, queryFold) || codeFold.StartsWith(queryFold, StringComparison.Ordinal))
+                return 0.68;
+        }
+
         var tokenHits = terms.Count(hayTokens.Contains);
         var distinctive = Distinctive(terms);
         var distinctiveHits = distinctive.Count(hayTokens.Contains);
@@ -125,6 +139,26 @@ internal static class BookKeywordRanker
 
         FlushToken(current, terms, seen);
         return terms;
+    }
+
+    private static bool HasTokenPrefix(string value, string prefix)
+    {
+        var folded = VietnameseText.Fold(value);
+        var current = new StringBuilder();
+        foreach (var ch in folded)
+        {
+            if (char.IsLetterOrDigit(ch))
+            {
+                current.Append(ch);
+                continue;
+            }
+
+            if (current.Length > 0 && current.ToString().StartsWith(prefix, StringComparison.Ordinal))
+                return true;
+            current.Clear();
+        }
+
+        return current.Length > 0 && current.ToString().StartsWith(prefix, StringComparison.Ordinal);
     }
 
     private static void FlushToken(StringBuilder current, List<string> terms, HashSet<string> seen)

@@ -99,6 +99,22 @@ export function useHomeBooks(categoryId: string, search: string, page: number) {
   });
 }
 
+export function useHomeBookSuggestions(search: string) {
+  const query = search.trim();
+  return useQuery({
+    queryKey: ['public-home-book-suggestions', query],
+    enabled: query.length >= 2,
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({ page: '1', pageSize: '8', search: query });
+      const response = await fetch(`${API_BASE_URL}/api/v1/books?${params}`, { signal });
+      const result = await getApiData<HomeBook[]>(response, 'Không tải được gợi ý sách');
+      if (!Array.isArray(result.data)) throw new Error('Dữ liệu gợi ý sách không hợp lệ.');
+      return result.data;
+    },
+    staleTime: 30_000,
+  });
+}
+
 export function useHomeBook(bookId: string) {
   return useQuery({
     queryKey: ['public-book-detail', bookId],

@@ -30,4 +30,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="SmartLibrary.UnitTests" />
+  </ItemGroup>
+
 </Project>
