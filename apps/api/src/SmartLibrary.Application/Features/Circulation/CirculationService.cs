@@ -45,9 +45,9 @@ public class CirculationService
         string? search, CancellationToken ct = default)
     {
         var query = search?.Trim();
-        return string.IsNullOrWhiteSpace(query)
+        return string.IsNullOrWhiteSpace(query) || query.Length < 2
             ? Task.FromResult<IReadOnlyList<CirculationReaderOptionDto>>([])
-            : _repository.SearchReaderOptionsAsync(query, 15, ct);
+            : _repository.SearchReaderOptionsAsync(query, 8, ct);
     }
 
     public Task<IReadOnlyList<CirculationBookOptionDto>> SearchBookOptionsAsync(
@@ -56,7 +56,7 @@ public class CirculationService
         var query = search?.Trim();
         return string.IsNullOrWhiteSpace(query)
             ? Task.FromResult<IReadOnlyList<CirculationBookOptionDto>>([])
-            : _repository.SearchBookOptionsAsync(query, 15, ct);
+            : _repository.SearchBookOptionsAsync(query, 8, ct);
     }
 
     public async Task<IReadOnlyList<CirculationLoanDto>> GetActiveLoansForReaderKeyAsync(

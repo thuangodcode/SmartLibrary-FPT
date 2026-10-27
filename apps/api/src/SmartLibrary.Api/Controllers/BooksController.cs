@@ -76,6 +76,61 @@ public class BooksController : ControllerBase
         }));
     }
 
+    [HttpGet("highlights")]
+    public async Task<IActionResult> GetHighlights(CancellationToken ct = default)
+    {
+        var books = await _db.Books.AsNoTracking()
+            .Where(book => !book.IsDeleted)
+            .Select(book => new
+            {
+                book.Id,
+                book.Code,
+                book.Title,
+                book.Isbn,
+                book.Description,
+                book.CoverImageUrl,
+                book.PublishedYear,
+                book.Language,
+                book.TotalCopies,
+                book.AvailableCopies,
+                book.AverageRating,
+                AuthorNames = book.Authors.OrderBy(author => author.Name).Select(author => author.Name).ToList(),
+                CategoryNames = book.Categories.OrderBy(category => category.Name).Select(category => category.Name).ToList(),
+                ReviewCount = _db.Reviews.Count(review => review.BookId == book.Id && !review.IsDeleted),
+                BorrowCount = _db.BorrowRecords.Count(record => record.BookCopy.BookId == book.Id
+                    && !record.IsDeleted
+                    && (record.Status == SmartLibrary.Domain.Enums.BorrowStatus.Borrowed
+                        || record.Status == SmartLibrary.Domain.Enums.BorrowStatus.Returned
+                        || record.Status == SmartLibrary.Domain.Enums.BorrowStatus.Overdue))
+            })
+            .ToListAsync(ct);
+
+        var topRated = books.Where(book => book.ReviewCount > 0)
+            .OrderByDescending(book => book.AverageRating)
+            .ThenByDescending(book => book.ReviewCount)
+            .ThenByDescending(book => book.BorrowCount)
+            .Take(8).Select(book => new
+            {
+                book.Id, book.Code, book.Title, book.Isbn, book.Description,
+                CustomFields = new Dictionary<string, string>(), book.CoverImageUrl,
+                book.PublishedYear, book.Language, book.TotalCopies, book.AvailableCopies,
+                book.AverageRating, book.AuthorNames, book.CategoryNames, book.ReviewCount, book.BorrowCount
+            }).ToList();
+        var mostBorrowed = books.Where(book => book.BorrowCount > 0)
+            .OrderByDescending(book => book.BorrowCount)
+            .ThenByDescending(book => book.AverageRating)
+            .ThenByDescending(book => book.ReviewCount)
+            .Take(8).Select(book => new
+            {
+                book.Id, book.Code, book.Title, book.Isbn, book.Description,
+                CustomFields = new Dictionary<string, string>(), book.CoverImageUrl,
+                book.PublishedYear, book.Language, book.TotalCopies, book.AvailableCopies,
+                book.AverageRating, book.AuthorNames, book.CategoryNames, book.ReviewCount, book.BorrowCount
+            }).ToList();
+
+        return Ok(ApiResponse<object>.Ok(new { topRated, mostBorrowed }));
+    }
+
     [HttpGet("code-availability")]
     [Authorize(Policy = "LibrarianOnly")]
     public async Task<IActionResult> CheckCodeAvailability([FromQuery] string? code, CancellationToken ct = default)

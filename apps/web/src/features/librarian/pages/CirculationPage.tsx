@@ -115,10 +115,7 @@ function ReservationAutocomplete({
   const query = value.trim();
 
   useEffect(() => {
-    if (!query) {
-      setResult({ query: '', options: [], error: null });
-      return undefined;
-    }
+    if (!query) return undefined;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       void (async () => {
@@ -987,14 +984,18 @@ function ReturnView() {
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
-  useEffect(() => {
-    if (selectedReader) {
-      void fetchReaderLoans(selectedReader.id);
-    } else {
-      setActiveLoans([]);
-      setLoansError(null);
-    }
-  }, [selectedReader, fetchReaderLoans]);
+  const handleReaderSelect = (reader: ReservationOption) => {
+    setSelectedReader(reader);
+    setActiveLoans([]);
+    setLoansError(null);
+    void fetchReaderLoans(reader.id);
+  };
+
+  const handleReaderClear = () => {
+    setSelectedReader(null);
+    setActiveLoans([]);
+    setLoansError(null);
+  };
 
   const returnBook = async (barcode: string, condition: string) => {
     setBusy(true);
@@ -1083,13 +1084,12 @@ function ReturnView() {
                   selected={selectedReader}
                   onChange={setReaderSearch}
                   onSelect={(opt) => {
-                    setSelectedReader(opt);
+                    handleReaderSelect(opt);
                     setReaderSearch(opt.label);
                   }}
                   onClear={() => {
-                    setSelectedReader(null);
+                    handleReaderClear();
                     setReaderSearch('');
-                    setActiveLoans([]);
                   }}
                 />
               </div>

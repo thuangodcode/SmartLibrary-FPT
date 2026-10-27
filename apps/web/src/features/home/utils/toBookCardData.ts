@@ -12,6 +12,8 @@ const card = (input: {
   coverImageUrl?: string | null;
   coverGradient?: string;
   rating?: number;
+  reviewCount?: number;
+  borrowCount?: number;
   availableCopies?: number;
   totalCopies?: number;
   description?: string;
@@ -32,7 +34,7 @@ const card = (input: {
     coverImageUrl: input.coverImageUrl ?? undefined,
     coverGradient: input.coverGradient ?? 'from-orange-700 to-slate-900',
     rating: input.rating ?? 0,
-    reviewCount: 0,
+    reviewCount: input.reviewCount ?? 0,
     availableCopies: available,
     totalCopies: input.totalCopies ?? 0,
     status: available > 0 ? 'available' : 'reserved_only',
@@ -40,6 +42,7 @@ const card = (input: {
     matchScore: input.matchScore,
     matchLabel: input.matchLabel,
     recommendReason: input.recommendReason,
+    borrowCount: input.borrowCount,
   };
 };
 
@@ -53,6 +56,8 @@ export const toBookCardData = (book: HomeBook): Book => card({
   coverImageUrl: book.coverImageUrl,
   coverGradient: 'from-slate-700 to-indigo-950',
   rating: book.averageRating ?? 0,
+  reviewCount: book.reviewCount,
+  borrowCount: book.borrowCount,
   availableCopies: book.availableCopies,
   totalCopies: book.totalCopies,
   description: book.description || '',

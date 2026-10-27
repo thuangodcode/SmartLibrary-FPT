@@ -78,7 +78,8 @@ public sealed class ReportService(IReportRepository repository)
                     report.Id,
                     report.Id,
                     report.IsApproved ? "Approved" : report.Status,
-                    null)));
+                    null,
+                    IsSelfSubmitted: true)));
         }
 
         return mappedRequests.OrderByDescending(request => request.CreatedAt).ToList();

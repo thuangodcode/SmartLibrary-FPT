@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { LoaderCircle, RotateCcw, Sparkles } from 'lucide-react';
+import { ArrowUp, LoaderCircle, RotateCcw, Sparkles, X } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { askRag, type RagAskResult } from '../../ai/aiApi';
 import { toBookFromRag } from '../utils/toBookCardData';
@@ -31,6 +31,18 @@ const RagAskPanel = () => {
   const [result, setResult] = useState<RagAskResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const questionRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    questionRef.current?.focus();
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   const runAsk = async () => {
     if (!accessToken || !question.trim()) return;
@@ -70,10 +82,16 @@ const RagAskPanel = () => {
   const empty = Boolean(result && result.sources.length === 0 && !loading);
 
   return (
-    <section className="rag-ask" aria-label="Hỏi trợ lý thư viện">
+    <>
+      <button type="button" className="rag-ask-launcher" onClick={() => setIsOpen(true)} aria-label="Mở trợ lý AI thư viện" title="Hỏi trợ lý AI">
+        <Sparkles size={22} aria-hidden="true" />
+      </button>
+      {isOpen && <div className="rag-ask-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsOpen(false); }}>
+      <section className="rag-ask" aria-label="Hỏi trợ lý thư viện" role="dialog" aria-modal="true" aria-labelledby="rag-ask-title">
       <div className="rag-ask-heading">
-        <Sparkles size={16} />
-        <strong>Tìm sách & hỏi chính sách bằng AI</strong>
+        <span className="rag-ask-heading-icon"><Sparkles size={16} /></span>
+        <div><strong id="rag-ask-title">Tìm sách & hỏi chính sách bằng AI</strong><small>Trợ lý thư viện SmartLibrary</small></div>
+        <button type="button" className="rag-ask-close" onClick={() => setIsOpen(false)} aria-label="Đóng trợ lý AI"><X size={18}/></button>
       </div>
       {!isAuthenticated || !accessToken ? (
         <p className="rag-ask-hint">
@@ -86,18 +104,18 @@ const RagAskPanel = () => {
             Mô tả nhu cầu bằng câu tự nhiên. Khi tìm sách, kết quả chỉ lấy từ danh mục thư viện và có thống kê số lượng, tình trạng bản sách.
           </p>
           <textarea
-            rows={6}
+            ref={questionRef}
+            rows={3}
             value={question}
             maxLength={4000}
-            placeholder="Ví dụ: Bây giờ tôi muốn học về ngôn ngữ Anh. Hãy tìm sách phù hợp đang có trong thư viện."
+            placeholder="Hỏi về sách, cách tìm tài liệu hoặc chính sách thư viện..."
             onChange={(event) => setQuestion(event.target.value)}
           />
-          <div className="rag-ask-actions">
-            <button type="submit" disabled={loading || question.trim().length < 3}>
-              {loading ? <LoaderCircle size={14} className="ai-spin" /> : <Sparkles size={14} />}
-              {loading ? 'Đang tìm…' : 'Hỏi AI'}
-            </button>
+          <div className="rag-prompt-controls">
             <span className="rag-ask-count">{question.length}/4000</span>
+            <button type="submit" aria-label="Gửi câu hỏi" disabled={loading || question.trim().length < 3}>
+              {loading ? <LoaderCircle size={17} className="ai-spin" /> : <ArrowUp size={17} />}
+            </button>
           </div>
         </form>
       )}
@@ -165,7 +183,9 @@ const RagAskPanel = () => {
           </ul>
         </div>
       )}
-    </section>
+      </section>
+      </div>}
+    </>
   );
 };
 

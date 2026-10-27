@@ -81,6 +81,14 @@
   gap: 14px;
 }
 
+.reports-self-submissions {
+  border-top: 3px solid #ef8754;
+}
+
+.reports-self-submissions .reports-panel-title > div > span {
+  color: #df6d34;
+}
+
 .admin-assignment-metric {
   display: grid;
   grid-template-columns: auto 1fr;

@@ -723,10 +723,6 @@ const LibrarianCategoryBooksPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (isAddBookRoute) setIsFieldConfigModalOpen(false);
-  }, [isAddBookRoute]);
-
   if (initialLoading) {
     return (
       <div className="lib-cat-initial-loading" role="status" aria-live="polite">
@@ -1439,7 +1435,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
         </div>
       )}
 
-      {isFieldConfigModalOpen && (
+      {isFieldConfigModalOpen && !isAddBookRoute && (
         <div className="lib-cat-modal-overlay lib-cat-field-config-overlay" onClick={() => setIsFieldConfigModalOpen(false)}>
           <section className="lib-cat-modal-content lib-cat-field-config-modal" role="dialog" aria-modal="true" aria-labelledby="book-field-config-title" onClick={(event) => event.stopPropagation()}>
             <header className="lib-cat-field-config-header">

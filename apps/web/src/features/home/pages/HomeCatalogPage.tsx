@@ -1,14 +1,11 @@
-import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, LibraryBig, X } from "lucide-react";
-import { getPersonalizedRecommendations, type AiBookSuggestion } from "../../ai/aiApi";
-import { useAuthStore } from "../../auth/store/useAuthStore";
 import { BookCard } from "../components/BookCard";
 import HomeFooter from "../components/HomeFooter";
 import HomeNavbar from "../components/HomeNavbar";
 import RagAskPanel from "../components/RagAskPanel";
-import { useHomeBooks, useHomeCategories } from "../hooks/useHomeData";
-import { toBookCardData, toBookFromSuggestion } from "../utils/toBookCardData";
+import { useHomeBookHighlights, useHomeBooks, useHomeCategories, type HomeBook } from "../hooks/useHomeData";
+import { toBookCardData } from "../utils/toBookCardData";
 import "./HomePage.css";
 import "./HomeCatalogPage.css";
 
@@ -17,23 +14,13 @@ const HomeCatalogPage = () => {
   const navigate = useNavigate();
   const activeCategory = searchParams.get("category") ?? "";
   const search = searchParams.get("q") ?? "";
+  const isRecommendations = searchParams.get("view") === "recommended";
   const requestedPage = Number(searchParams.get("page") ?? 1);
   const page =
     Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const categoriesQuery = useHomeCategories();
-  const booksQuery = useHomeBooks(activeCategory, search, page);
-  const accessToken = useAuthStore((state) => state.accessToken);
-  const [recommendations, setRecommendations] = useState<{
-    accessToken: string;
-    items: AiBookSuggestion[];
-    note: string | null;
-  } | null>(null);
-  const personalized = recommendations?.accessToken === accessToken
-    ? recommendations.items
-    : [];
-  const personalizedNote = recommendations?.accessToken === accessToken
-    ? recommendations.note
-    : null;
+  const booksQuery = useHomeBooks(activeCategory, search, page, !isRecommendations);
+  const highlightsQuery = useHomeBookHighlights(isRecommendations);
   const categories = categoriesQuery.data ?? [];
   const categoryName = categories.find(
     (category) => category.id === activeCategory,
@@ -50,37 +37,6 @@ const HomeCatalogPage = () => {
 
   const clearFilters = () => setSearchParams({});
 
-  useEffect(() => {
-    if (!accessToken) return;
-
-    let cancelled = false;
-    void getPersonalizedRecommendations(accessToken)
-      .then((items) => {
-        if (cancelled) return;
-        setRecommendations({
-          accessToken,
-          items,
-          note: items.length === 0
-            ? 'Chưa có đủ dữ liệu cá nhân hóa. Gợi ý sẽ xuất hiện khi có sở thích đọc, đánh giá hoặc lịch sử mượn.'
-            : null,
-        });
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        const message = error instanceof Error ? error.message : '';
-        setRecommendations({
-          accessToken,
-          items: [],
-          note: /tắt/i.test(message)
-            ? 'Gợi ý sách cá nhân hóa đang tắt. Liên hệ Admin nếu cần bật.'
-            : null,
-        });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken]);
-
   const setPage = (nextPage: number) => {
     const nextParams = new URLSearchParams(searchParams);
     if (nextPage > 1) nextParams.set("page", String(nextPage));
@@ -91,8 +47,26 @@ const HomeCatalogPage = () => {
 
   return (
     <div className="annual-home annual-catalog-page">
-      <HomeNavbar activeSection="catalog" />
+      <HomeNavbar activeSection={isRecommendations ? "recommendations" : "catalog"} />
       <main className="catalog-main">
+        {isRecommendations ? (
+          <section className="catalog-featured-page" aria-labelledby="featured-books-title">
+            <span className="catalog-results-eyebrow">ĐƯỢC ĐỘC GIẢ YÊU THÍCH</span>
+            <h1 id="featured-books-title">Gợi ý sách nổi bật</h1>
+            <p className="catalog-featured-intro">Khám phá sách được đánh giá cao và những tựa sách có nhiều lượt mượn trong thư viện.</p>
+            {highlightsQuery.isPending ? (
+              <div className="catalog-featured-section"><h2>Đang tải sách nổi bật…</h2><div className="catalog-book-grid">{Array.from({ length: 4 }, (_, index) => <div className="catalog-book-skeleton" key={index}/>)}</div></div>
+            ) : highlightsQuery.isError ? (
+              <div className="catalog-message catalog-message--error" role="alert">Không tải được sách nổi bật. {highlightsQuery.error.message}</div>
+            ) : (
+              <>
+                <FeaturedBookGroup title="Được đánh giá cao" description="Xếp theo điểm đánh giá và số lượt nhận xét." books={highlightsQuery.data?.topRated ?? []} empty="Chưa có sách được đánh giá." onSelect={(id) => navigate(`/books/${id}`)} />
+                <FeaturedBookGroup title="Được mượn nhiều" description="Xếp theo tổng lượt mượn đã ghi nhận." books={highlightsQuery.data?.mostBorrowed ?? []} empty="Chưa có dữ liệu lượt mượn." onSelect={(id) => navigate(`/books/${id}`)} />
+              </>
+            )}
+          </section>
+        ) : (
+          <>
         <section
           className="catalog-mobile-categories"
           aria-label="Danh mục sách nổi bật"
@@ -178,35 +152,11 @@ const HomeCatalogPage = () => {
           </aside>
 
           <section className="catalog-results" aria-label="Danh sách đầu sách">
-            <RagAskPanel />
-            {!search && (personalized.length > 0 || personalizedNote) && (
-              <section className="catalog-personalized" aria-label="Gợi ý sách cá nhân hóa">
-                <div className="catalog-results-heading">
-                  <div>
-                    <span className="catalog-results-eyebrow">GỢI Ý CÁ NHÂN HÓA</span>
-                    <h2>Sách phù hợp với bạn</h2>
-                    <p>Tách riêng khỏi tìm kiếm. Chỉ dùng sách thật và dữ liệu đọc được phép truy cập.</p>
-                  </div>
-                </div>
-                {personalizedNote && <p className="catalog-message">{personalizedNote}</p>}
-                {personalized.length > 0 && (
-                  <div className="catalog-book-grid">
-                    {personalized.slice(0, 4).map((item) => (
-                      <BookCard
-                        key={item.id}
-                        book={toBookFromSuggestion(item)}
-                        onSelect={() => navigate(`/books/${item.id}`)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
-            )}
             <div className="catalog-results-heading">
               <div>
                 <h2>
                   {categoryName ||
-                    (search ? "Sách phù hợp với bạn" : "Tất cả đầu sách")}
+                    (search ? "Kết quả tìm kiếm" : "Tất cả đầu sách")}
                 </h2>
                 <p>
                   {search
@@ -302,10 +252,26 @@ const HomeCatalogPage = () => {
             )}
           </section>
         </div>
+          </>
+        )}
       </main>
+      <RagAskPanel />
       <HomeFooter />
     </div>
   );
 };
+
+const FeaturedBookGroup: React.FC<{
+  title: string;
+  description: string;
+  books: HomeBook[];
+  empty: string;
+  onSelect: (id: string) => void;
+}> = ({ title, description, books, empty, onSelect }) => (
+  <section className="catalog-featured-section">
+    <div className="catalog-featured-section-heading"><div><h2>{title}</h2><p>{description}</p></div><span>{books.length} sách</span></div>
+    {books.length ? <div className="catalog-book-grid">{books.map((book) => <BookCard key={book.id} book={toBookCardData(book)} onSelect={() => onSelect(book.id)}/>)}</div> : <p className="catalog-featured-empty">{empty}</p>}
+  </section>
+);
 
 export default HomeCatalogPage;

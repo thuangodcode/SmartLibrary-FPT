@@ -16,7 +16,7 @@ interface ReportList { items: ReportItem[]; totalCount: number; page: number; pa
 interface Librarian { id: string; fullName: string; status: string; isActive: boolean }
 interface LibrarianList { items: Librarian[] }
 interface ReportTemplate { id: string; name: string; reportType: string; isEnabled: boolean }
-interface ReportRequest { id: string; librarianId: string; librarianName: string; templateId: string; templateName: string; reportType: string; periodStart: string; periodEnd: string; name: string; status: string; createdAt: string; reportId?: string | null; lastReportStatus?: string | null; lastReviewComment?: string | null }
+interface ReportRequest { id: string; librarianId: string; librarianName: string; templateId: string; templateName: string; reportType: string; periodStart: string; periodEnd: string; name: string; status: string; createdAt: string; reportId?: string | null; lastReportId?: string | null; lastReportStatus?: string | null; lastReviewComment?: string | null; isSelfSubmitted?: boolean }
 interface FinanceFine { id: string; code: string; readerName: string; bookTitle: string; barcode: string; amount: number; reason: string; status: string; createdAt: string; paidAt?: string | null; paymentMethod?: string | null; paymentReference?: string | null; reconciliationRequired?: boolean }
 
 const number = (value: number) => value.toLocaleString('vi-VN');
@@ -207,18 +207,20 @@ const AdminReportsPage: React.FC = () => {
   };
 
   const selectedRequestTemplate = templates.find((template) => template.id === requestTemplateId);
+  const assignedRequests = useMemo(() => requests.filter((request) => !request.isSelfSubmitted), [requests]);
+  const selfSubmittedReports = useMemo(() => requests.filter((request) => request.isSelfSubmitted), [requests]);
   const assignmentCounts = useMemo(() => ({
-    all: requests.length,
-    waiting: requests.filter((request) => request.status !== 'Submitted' || request.lastReportStatus === 'Rejected').length,
-    review: requests.filter((request) => request.status === 'Submitted' && !['Approved', 'Rejected'].includes(request.lastReportStatus ?? '')).length,
-    approved: requests.filter((request) => request.lastReportStatus === 'Approved').length,
-  }), [requests]);
-  const visibleRequests = useMemo(() => requests.filter((request) => {
+    all: assignedRequests.length,
+    waiting: assignedRequests.filter((request) => request.status !== 'Submitted' || request.lastReportStatus === 'Rejected').length,
+    review: assignedRequests.filter((request) => request.status === 'Submitted' && !['Approved', 'Rejected'].includes(request.lastReportStatus ?? '')).length,
+    approved: assignedRequests.filter((request) => request.lastReportStatus === 'Approved').length,
+  }), [assignedRequests]);
+  const visibleRequests = useMemo(() => assignedRequests.filter((request) => {
     if (assignmentFilter === 'waiting') return request.status !== 'Submitted' || request.lastReportStatus === 'Rejected';
     if (assignmentFilter === 'review') return request.status === 'Submitted' && !['Approved', 'Rejected'].includes(request.lastReportStatus ?? '');
     if (assignmentFilter === 'approved') return request.lastReportStatus === 'Approved';
     return true;
-  }), [assignmentFilter, requests]);
+  }), [assignmentFilter, assignedRequests]);
 
   const exportCsv = async (reportId?: string) => {
     try {
@@ -365,9 +367,32 @@ const AdminReportsPage: React.FC = () => {
             <div className="admin-assignment-row-action">{request.reportId ? <Link className="reports-assignment-link" to={`/admin/reports/${request.reportId}`}><Eye size={15}/> Mở báo cáo</Link> : <span className="reports-assignment-date">Giao {date(request.createdAt)}</span>}</div>
             {request.lastReviewComment && rejected && <p className="admin-assignment-feedback"><strong>Phản hồi gần nhất:</strong> {request.lastReviewComment}</p>}
           </article>;
-        })}</div> : <div className="reports-assignment-empty"><ClipboardList size={22}/><strong>{requests.length ? 'Không có yêu cầu trong trạng thái này' : 'Chưa có yêu cầu báo cáo'}</strong><span>{requests.length ? 'Chọn một trạng thái khác để xem thêm yêu cầu.' : 'Tạo yêu cầu để giao báo cáo cho Thủ thư và theo dõi tiến độ tại đây.'}</span></div>}
+        })}</div> : <div className="reports-assignment-empty"><ClipboardList size={22}/><strong>{assignedRequests.length ? 'Không có yêu cầu trong trạng thái này' : 'Chưa có yêu cầu báo cáo'}</strong><span>{assignedRequests.length ? 'Chọn một trạng thái khác để xem thêm yêu cầu.' : 'Tạo yêu cầu để giao báo cáo cho Thủ thư và theo dõi tiến độ tại đây.'}</span></div>}
     </section>}
     {sectionCards.length > 0 && <section className={`reports-kpis reports-kpis-section${activeSection === 'finance' ? ' reports-finance-kpis' : ''}`} aria-label="Chỉ số báo cáo">{loading && !summary ? Array.from({ length: 3 }, (_, i) => <div className="reports-card skeleton" key={i}/>) : (activeSection === 'finance' ? financeCards : sectionCards).map(({ label, value, note, icon: Icon, tone }) => <article className="reports-card" key={label}><span className={`reports-icon ${tone}`}><Icon size={19}/></span><div className="reports-card-value">{value}</div><h2>{label}</h2><p>{note}</p></article>)}</section>}
+    {activeSection === 'assignments' && <section className="reports-panel reports-self-submissions">
+      <div className="reports-panel-title admin-assignment-panel-heading">
+        <div><span>BÁO CÁO CHỦ ĐỘNG</span><h2>Báo cáo Thủ thư tự gửi</h2><p>Báo cáo do Thủ thư tạo và gửi Admin, không cần yêu cầu phân công.</p></div>
+        <span className="reports-assignment-count"><Send size={15}/>{selfSubmittedReports.length} báo cáo</span>
+      </div>
+      {requestError ? <div className="reports-error" role="alert"><AlertCircle size={17}/><span>{requestError}</span><button type="button" onClick={() => void loadAssignmentData()}>Thử lại</button></div>
+        : selfSubmittedReports.length ? <div className="reports-assignment-list">{selfSubmittedReports.map((report) => {
+          const approved = report.lastReportStatus === 'Approved';
+          const rejected = report.lastReportStatus === 'Rejected';
+          return <article key={report.id}>
+            <div className="reports-assignment-person"><span className="admin-assignment-avatar"><UsersRound size={17}/></span><div><strong>{report.librarianName}</strong><span>Thủ thư tự gửi</span></div></div>
+            <div className="reports-assignment-summary"><strong>{report.name || report.templateName}</strong><span>{reportTypeLabel(report.reportType)} · {report.templateName}</span></div>
+            <div className="reports-assignment-period"><strong><CalendarDays size={14}/>{date(report.periodStart)} – {date(requestedEndDate(report.periodEnd))}</strong><span>Kỳ báo cáo</span></div>
+            <div className="admin-assignment-statuses">{approved
+              ? <span className="reports-assignment-status is-approved"><BadgeCheck size={13}/>Đã duyệt</span>
+              : rejected
+                ? <span className="reports-assignment-status is-rejected"><AlertCircle size={13}/>Cần chỉnh sửa</span>
+                : <><span className="reports-assignment-status is-submitted"><Send size={13}/>Đã gửi</span><span className="reports-assignment-status is-review"><Clock3 size={13}/>Chờ duyệt</span></>}
+            </div>
+            <div className="admin-assignment-row-action"><Link className="reports-assignment-link" to={`/admin/reports/${report.reportId}`}><Eye size={15}/> Mở báo cáo</Link></div>
+          </article>;
+        })}</div> : <div className="reports-assignment-empty"><Send size={22}/><strong>Chưa có báo cáo tự gửi</strong><span>Báo cáo Thủ thư gửi chủ động sẽ hiển thị riêng tại đây.</span></div>}
+    </section>}
     {activeSection === 'finance' && <section className="reports-panel reports-finance-panel">
       <div className="reports-panel-title"><div><span>CHI TIẾT PHÍ PHẠT</span><h2>Các khoản phạt gần đây</h2></div><div className="reports-finance-heading-meta"><span>{number(financeFines.length)} khoản ghi nhận</span><button type="button" onClick={() => void loadFinanceFines()} disabled={financeLoading}>{financeLoading ? <LoaderCircle className="reports-spin" size={15}/> : 'Làm mới'}</button></div></div>
       {financeError ? <div className="reports-error" role="alert"><AlertCircle size={17}/><span>{financeError}</span><button type="button" onClick={() => void loadFinanceFines()}>Thử lại</button></div>

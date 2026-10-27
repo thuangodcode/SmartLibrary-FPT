@@ -141,15 +141,10 @@ const ReadersManagementPage: React.FC = () => {
 
   useEffect(() => {
     const trimmed = search.trim();
-    if (!trimmed) {
-      setSuggestions([]);
-      setSuggestionsLoading(false);
-      return;
-    }
-
-    setSuggestionsLoading(true);
+    if (!trimmed) return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
+      setSuggestionsLoading(true);
       try {
         const token = useAuthStore.getState().accessToken;
         const headers: Record<string, string> = {};
@@ -347,7 +342,12 @@ const ReadersManagementPage: React.FC = () => {
                   placeholder="Tìm theo họ tên, email, MSSV, SĐT..."
                   value={search}
                   onChange={(e) => {
-                    setSearch(e.target.value);
+                    const nextSearch = e.target.value;
+                    setSearch(nextSearch);
+                    if (!nextSearch.trim()) {
+                      setSuggestions([]);
+                      setSuggestionsLoading(false);
+                    }
                     setPage(1);
                     setSearchFocused(true);
                   }}

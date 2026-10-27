@@ -18,5 +18,5 @@ public sealed record CreateTemplateRequest(string Name, string ReportType, strin
 public sealed record UpdateTemplateRequest(string Name, string ReportType, string? Description, string Configuration, bool IsEnabled);
 public sealed record TemplateWriteRequest(string Name, string ReportType, string? Description, string Configuration, bool IsEnabled);
 public sealed record TemplateDto(Guid Id, string Name, string ReportType, string? Description, string Configuration, bool IsEnabled, DateTime CreatedAt);
-public sealed record ReportRequestDto(Guid Id, Guid LibrarianId, string LibrarianName, Guid TemplateId, string TemplateName, string ReportType, DateTime PeriodStart, DateTime PeriodEnd, string? Name, string Status, DateTime CreatedAt, Guid? ReportId, Guid? LastReportId = null, string? LastReportStatus = null, string? LastReviewComment = null);
+public sealed record ReportRequestDto(Guid Id, Guid LibrarianId, string LibrarianName, Guid TemplateId, string TemplateName, string ReportType, DateTime PeriodStart, DateTime PeriodEnd, string? Name, string Status, DateTime CreatedAt, Guid? ReportId, Guid? LastReportId = null, string? LastReportStatus = null, string? LastReviewComment = null, bool IsSelfSubmitted = false);
 public sealed record CreateReportRequestAssignment(Guid LibrarianId, Guid TemplateId, DateTime PeriodStart, DateTime PeriodEnd, string? Name = null);

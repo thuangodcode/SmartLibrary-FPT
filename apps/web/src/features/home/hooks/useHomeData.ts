@@ -24,9 +24,16 @@ export interface HomeBook {
   totalCopies: number;
   availableCopies: number;
   averageRating?: number;
+  reviewCount?: number;
+  borrowCount?: number;
   authorNames: string[];
   categoryNames: string[];
   copyLocations?: string[];
+}
+
+export interface HomeBookHighlights {
+  topRated: HomeBook[];
+  mostBorrowed: HomeBook[];
 }
 
 export interface BookReview {
@@ -76,9 +83,10 @@ export function useHomeCategories() {
   });
 }
 
-export function useHomeBooks(categoryId: string, search: string, page: number) {
+export function useHomeBooks(categoryId: string, search: string, page: number, enabled = true) {
   return useQuery({
     queryKey: ['public-home-books', categoryId, search, page],
+    enabled,
     queryFn: async ({ signal }) => {
       const params = new URLSearchParams({
         page: String(page),
@@ -114,6 +122,22 @@ export function useHomeBookSuggestions(search: string) {
       return result.data;
     },
     staleTime: 30_000,
+  });
+}
+
+export function useHomeBookHighlights(enabled: boolean) {
+  return useQuery({
+    queryKey: ['public-home-book-highlights'],
+    enabled,
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`${API_BASE_URL}/api/v1/books/highlights`, { signal });
+      const result = await getApiData<HomeBookHighlights>(response, 'Không tải được sách nổi bật');
+      if (!Array.isArray(result.data.topRated) || !Array.isArray(result.data.mostBorrowed)) {
+        throw new Error('Dữ liệu sách nổi bật không hợp lệ.');
+      }
+      return result.data;
+    },
+    staleTime: 60_000,
   });
 }
 

@@ -1,9 +1,51 @@
 .rag-ask {
-  margin-bottom: 22px;
+  width: min(720px, 100%);
+  max-height: min(86vh, 820px);
+  overflow: auto;
   padding: 18px;
-  border: 1px solid #edd9cc;
+  border: 1px solid #e8e9e5;
   border-radius: 18px;
-  background: #fff8f4;
+  background: #fff;
+  box-shadow: 0 24px 80px rgb(23 35 29 / 24%);
+}
+
+.rag-ask-launcher {
+  position: fixed;
+  z-index: 90;
+  right: max(22px, env(safe-area-inset-right));
+  bottom: max(22px, env(safe-area-inset-bottom));
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #244d39;
+  color: #fff;
+  box-shadow: 0 8px 26px rgb(22 51 35 / 28%);
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.rag-ask-launcher:hover { transform: translateY(-3px); background: #f36f21; }
+.rag-ask-launcher:focus-visible { outline: 3px solid rgb(243 111 33 / 42%); outline-offset: 3px; }
+.rag-ask-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: end; padding: 24px; background: rgb(18 31 24 / 28%); }
+.rag-ask-heading-icon { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border-radius: 10px; background: #fff0e7; }
+.rag-ask-heading > div { display: grid; gap: 3px; min-width: 0; }
+.rag-ask-heading > div > strong { color: #25352b; font-size: 16px; }
+.rag-ask-heading > div > small { color: #788078; font-size: 12px; }
+.rag-ask-close { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; margin-left: auto; border: 1px solid #e6e9e5; border-radius: 9px; background: #fff; color: #68746c; cursor: pointer; }
+.rag-ask-close:hover { background: #f4f6f3; color: #25352b; }
+.rag-ask-heading { padding-bottom: 14px; border-bottom: 1px solid #edf0ed; }
+.rag-ask-hint { color: #5e6b62; }
+.rag-ask textarea { box-sizing: border-box; min-height: 120px; border-color: #dfe5df; background: #fbfcfb; color: #26372c; }
+.rag-ask textarea:focus { outline: 3px solid rgb(36 77 57 / 12%); border-color: #789582; }
+.rag-ask-result { max-height: 42vh; overflow: auto; }
+
+@media (max-width: 600px) {
+  .rag-ask-backdrop { align-items: end; padding: 10px; }
+  .rag-ask { max-height: 88vh; padding: 15px; border-radius: 16px; }
+  .rag-ask-launcher { right: 16px; bottom: 16px; width: 52px; height: 52px; }
 }
 
 .rag-ask-heading {
@@ -167,6 +209,13 @@
 .ai-spin {
   animation: ai-spin 1s linear infinite;
 }
+
+.rag-ask form { gap: 0; }
+.rag-ask textarea { display: block; min-height: 112px; padding: 14px 15px 10px; border-radius: 13px 13px 0 0; resize: vertical; }
+.rag-prompt-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid #dfe5df; border-top: 0; border-radius: 0 0 13px 13px; background: #fbfcfb; }
+.rag-prompt-controls .rag-ask-count { margin-right: auto; color: #849087; font-size: 11px; }
+.rag-ask .rag-prompt-controls button[type='submit'] { display: grid; width: 38px; min-height: 38px; place-items: center; padding: 0; border-radius: 11px; background: #244d39; }
+.rag-ask .rag-prompt-controls button[type='submit']:not(:disabled):hover { background: #f36f21; }
 
 @keyframes ai-spin {
   to { transform: rotate(360deg); }

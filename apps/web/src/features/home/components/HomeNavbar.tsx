@@ -15,7 +15,7 @@ import {
 import { useHomeBookSuggestions, useHomeCategories, type HomeBook } from '../hooks/useHomeData';
 import './HomeNavbar.css';
 
-type HomeNavSection = 'catalog' | 'news' | 'policies';
+type HomeNavSection = 'catalog' | 'recommendations' | 'news' | 'policies';
 
 interface ApiEnvelope<T> {
   success?: boolean;
@@ -556,7 +556,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
           </div>
           <Link to="/books" aria-current={activeSection === 'catalog' ? 'page' : undefined} onClick={closeMenu}>Khám phá sách</Link>
           <Link to="/news" aria-current={activeSection === 'news' ? 'page' : undefined} onClick={closeMenu}>Tin tức</Link>
-          <a href="/#library" onClick={closeMenu}>Thư viện</a>
+          <Link to="/books?view=recommended" aria-current={activeSection === 'recommendations' ? 'page' : undefined} onClick={closeMenu}>Gợi ý sách</Link>
         </nav>
       </div>
     </header>
