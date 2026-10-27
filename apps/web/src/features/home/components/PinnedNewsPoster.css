@@ -1,0 +1,84 @@
+.pinned-poster-backdrop {
+  position: fixed;
+  z-index: 3000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(9 17 13 / 66%);
+  backdrop-filter: blur(7px);
+  animation: pinned-poster-fade 180ms ease-out both;
+}
+
+.pinned-poster-dialog {
+  position: relative;
+  width: min(760px, 100%);
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 28px 90px rgb(0 0 0 / 34%);
+  animation: pinned-poster-rise 260ms cubic-bezier(.2,.8,.2,1) both;
+}
+
+.pinned-poster-close {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 45%);
+  border-radius: 50%;
+  background: rgb(18 32 24 / 72%);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.pinned-poster-close:hover { background: #e96820; }
+
+.pinned-poster-artwork {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: #16281e;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pinned-poster-artwork > img { width: 100%; height: 100%; object-fit: cover; transition: transform 500ms cubic-bezier(.2,.8,.2,1); }
+.pinned-poster-artwork:hover > img { transform: scale(1.035); }
+.pinned-poster-shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgb(9 22 15 / 84%) 0%, rgb(9 22 15 / 53%) 50%, rgb(9 22 15 / 8%) 100%), linear-gradient(0deg, rgb(9 22 15 / 50%), transparent 55%); }
+.pinned-poster-tag { position: absolute; top: 22px; left: 24px; display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border: 1px solid rgb(255 255 255 / 24%); border-radius: 999px; background: rgb(233 104 32 / 94%); color: #fff; font-size: 12px; font-weight: 750; }
+.pinned-poster-copy { position: absolute; right: 28px; bottom: 28px; left: 30px; display: grid; justify-items: start; gap: 13px; max-width: 540px; }
+.pinned-poster-kicker { color: #ffc18f; font-size: 11px; font-weight: 850; letter-spacing: .16em; }
+.pinned-poster-copy strong { max-width: 16ch; color: #fff; font-family: Newsreader, Georgia, serif; font-size: clamp(30px, 5vw, 48px); font-weight: 700; line-height: 1.05; text-wrap: balance; }
+.pinned-poster-summary { display: -webkit-box; max-width: 60ch; overflow: hidden; color: rgb(255 255 255 / 87%); font-size: 14px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.pinned-poster-cta { display: inline-flex; min-height: 42px; align-items: center; gap: 9px; margin-top: 3px; padding: 0 15px; border-radius: 10px; background: #fff; color: #173c2b; font-size: 13px; font-weight: 800; }
+.pinned-poster-artwork:hover .pinned-poster-cta { background: #f36f21; color: #fff; }
+
+@keyframes pinned-poster-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pinned-poster-rise { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+@media (max-width: 600px) {
+  .pinned-poster-backdrop { padding: 14px; }
+  .pinned-poster-dialog { border-radius: 16px; }
+  .pinned-poster-artwork { aspect-ratio: 4 / 5; }
+  .pinned-poster-shade { background: linear-gradient(0deg, rgb(9 22 15 / 88%) 0%, rgb(9 22 15 / 42%) 65%, rgb(9 22 15 / 8%) 100%); }
+  .pinned-poster-tag { top: 16px; left: 16px; }
+  .pinned-poster-copy { right: 18px; bottom: 20px; left: 18px; gap: 11px; }
+  .pinned-poster-copy strong { font-size: clamp(29px, 9vw, 40px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pinned-poster-backdrop, .pinned-poster-dialog { animation: none; }
+  .pinned-poster-artwork > img { transition: none; }
+}

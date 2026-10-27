@@ -315,6 +315,13 @@ public class NewsController : ControllerBase
             UpdatedAt = DateTime.UtcNow
         };
 
+        if (article.IsPinned)
+        {
+            await _db.NewsArticles
+                .Where(existing => existing.IsPinned && existing.IsPublished)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(existing => existing.IsPinned, false), ct);
+        }
+
         await _db.NewsArticles.AddAsync(article, ct);
 
         // Add notification for readers so their inbox badge updates
@@ -402,6 +409,12 @@ public class NewsController : ControllerBase
         if (!string.IsNullOrWhiteSpace(form.Content))
             article.Content = form.Content.Trim();
 
+        if (form.IsPinned)
+        {
+            await _db.NewsArticles
+                .Where(existing => existing.Id != article.Id && existing.IsPinned && existing.IsPublished)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(existing => existing.IsPinned, false), ct);
+        }
         article.IsPinned = form.IsPinned;
 
         if (!string.IsNullOrWhiteSpace(form.AuthorName))

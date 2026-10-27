@@ -47,6 +47,7 @@ import ReaderFavoritesPage from './features/home/pages/ReaderFavoritesPage';
 import SupportPage from './features/profile/pages/SupportPage';
 import LibrarianSupportPage from './features/librarian/pages/LibrarianSupportPage';
 import { useAuthStore } from './features/auth/store/useAuthStore';
+import PinnedNewsPoster from './features/home/components/PinnedNewsPoster';
 
 function ProfileEntry() {
   const role = useAuthStore((state) => state.user?.role);
@@ -65,6 +66,7 @@ function App() {
 
   return (
     <>
+    <PinnedNewsPoster />
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<HomePage />} />

@@ -393,6 +393,9 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Category).HasMaxLength(100).IsRequired();
             entity.Property(x => x.Summary).HasMaxLength(1000).IsRequired();
             entity.Property(x => x.AuthorName).HasMaxLength(150);
+            entity.HasIndex(x => x.IsPinned)
+                .IsUnique()
+                .HasFilter("is_pinned = TRUE AND is_published = TRUE");
         });
 
         modelBuilder.Entity<NewsComment>(entity =>

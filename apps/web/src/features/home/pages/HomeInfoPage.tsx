@@ -67,7 +67,7 @@ export const FALLBACK_NEWS: NewsArticleItem[] = [
     summary: 'Sinh viên FPT giờ đây có thể tìm kiếm sách bằng các câu hỏi tự nhiên như "Sách học vẽ sơ đồ tư duy cho dân IT" mà không cần nhớ chính xác tên tác giả hoặc mã sách.',
     content: `Chào đón học kỳ mới 2026, SmartLibrary trân trọng thông báo ra mắt tính năng Tìm kiếm Ngữ nghĩa (Semantic AI Search) và Trợ lý ảo gợi ý sách tự động.\n\nVới công nghệ Vector Database và Embedding tiên tiến, hệ thống có khả năng hiểu ngữ cảnh câu hỏi, gợi ý sách dựa trên chuyên ngành, môn học đang theo học và hành vi đọc của từng sinh viên.\n\nCác bạn sinh viên chỉ cần gõ nội dung muốn tìm kiếm vào thanh tìm kiếm AI tại trang chủ để nhận được các đầu sách phù hợp nhất kèm tỷ lệ độ khớp (Match Score).`,
     imageUrl: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?q=80&w=1200&auto=format&fit=crop',
-    isPinned: true,
+    isPinned: false,
     authorName: 'Thủ thư Trưởng',
     createdAt: '2026-10-24T08:30:00Z',
   },

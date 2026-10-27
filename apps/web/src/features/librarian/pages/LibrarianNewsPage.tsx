@@ -480,14 +480,14 @@ const LibrarianNewsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="lib-news-checkbox-row" onClick={() => setIsPinned(!isPinned)}>
+              <label className="lib-news-checkbox-row">
                 <input
                   type="checkbox"
                   checked={isPinned}
                   onChange={(e) => setIsPinned(e.target.checked)}
                 />
-                <span>Ghim bài viết này lên vị trí nổi bật đầu trang tin tức của độc giả</span>
-              </div>
+                <span>Ghim bài viết này lên vị trí nổi bật đầu trang tin tức của độc giả (chỉ được ghim một bài; bài đang ghim sẽ được thay thế).</span>
+              </label>
 
               <div className="lib-news-form-group">
                 <label>Tóm tắt ngắn (1-2 câu)</label>
