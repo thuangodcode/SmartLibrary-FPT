@@ -14,25 +14,19 @@ export const HomePage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeCategory = searchParams.get('category') ?? '';
-  const requestedPage = Number(searchParams.get('page') ?? 1);
-  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const categoriesQuery = useHomeCategories();
-  const booksQuery = useHomeBooks(activeCategory, '', page);
+  const booksQuery = useHomeBooks(activeCategory, '', 1);
   const categories = categoriesQuery.data ?? [];
   const books = booksQuery.data?.books ?? [];
+  const splitIndex = Math.ceil(books.length / 2);
+  const firstRailBooks = books.slice(0, splitIndex);
+  const secondRailBooks = books.slice(splitIndex);
   const activeCategoryName = categories.find((category) => category.id === activeCategory)?.name;
   const selectCategory = (categoryId: string) => {
     const nextParams = new URLSearchParams(searchParams);
     if (categoryId) nextParams.set('category', categoryId);
     else nextParams.delete('category');
     nextParams.delete('page');
-    setSearchParams(nextParams);
-  };
-
-  const setPage = (nextPage: number) => {
-    const nextParams = new URLSearchParams(searchParams);
-    if (nextPage > 1) nextParams.set('page', String(nextPage));
-    else nextParams.delete('page');
     setSearchParams(nextParams);
   };
 
@@ -118,12 +112,12 @@ export const HomePage = () => {
               <>
                 <Marquee
                   className="annual-live-book-marquee"
-                  aria-label="Gợi ý sách dành cho bạn"
+                  aria-label="Hàng sách thứ nhất trong bộ sưu tập"
                   pauseOnHover
                   repeat={3}
                   speed={28}
                 >
-                  {books.map((book) => (
+                  {firstRailBooks.map((book) => (
                     <BookCard
                       key={book.id}
                       book={toBookCardData(book)}
@@ -131,19 +125,23 @@ export const HomePage = () => {
                     />
                   ))}
                 </Marquee>
-                {booksQuery.data && booksQuery.data.totalPages > 1 && (
-                  <div className="annual-live-pagination" aria-label="Phân trang đầu sách">
-                    <button type="button" disabled={page <= 1 || booksQuery.isFetching} onClick={() => setPage(page - 1)}>Trang trước</button>
-                    <span>Trang {page} / {booksQuery.data.totalPages}</span>
-                    <button
-                      type="button"
-                      disabled={page >= booksQuery.data.totalPages || booksQuery.isFetching}
-                      onClick={() => setPage(page + 1)}
-                    >
-                      Trang sau
-                    </button>
-                  </div>
-                )}
+                {secondRailBooks.length > 0 && <Marquee
+                  className="annual-live-book-marquee annual-live-book-marquee--reverse"
+                  aria-label="Hàng sách thứ hai trong bộ sưu tập"
+                  pauseOnHover
+                  repeat={3}
+                  speed={24}
+                  reverse
+                >
+                  {secondRailBooks.map((book) => (
+                    <BookCard
+                      key={book.id}
+                      book={toBookCardData(book)}
+                      onSelect={() => navigate(`/books/${book.id}`)}
+                    />
+                  ))}
+                </Marquee>}
+
               </>
             ) : (
               <div className="annual-live-empty">

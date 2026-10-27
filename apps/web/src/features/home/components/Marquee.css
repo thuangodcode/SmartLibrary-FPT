@@ -5,7 +5,11 @@
   overflow: hidden;
   padding: 4px 0 18px;
   touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
 }
+
+.marquee-viewport.is-dragging { cursor: grabbing; }
 
 .marquee-viewport.is-vertical {
   height: 100%;

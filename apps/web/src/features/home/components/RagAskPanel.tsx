@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowUp, LoaderCircle, RotateCcw, Sparkles, X } from 'lucide-react';
+import { ArrowUp, LoaderCircle, RotateCcw, X } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { askRag, type RagAskResult } from '../../ai/aiApi';
 import { toBookFromRag } from '../utils/toBookCardData';
 import { BookCard } from './BookCard';
 import robotLogo from '../../../assets/figma/friendly-humanoid-ai-robot.jpg';
+import talkingRobotLogo from '../../../assets/figma/thumb-robot-noi-chuyen-pika-robot-ai.png';
 import './RagAskPanel.css';
 
 function friendlyAskError(error: unknown): string {
@@ -90,7 +91,7 @@ const RagAskPanel = () => {
       {isOpen && <div className="rag-ask-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsOpen(false); }}>
       <section className="rag-ask" aria-label="Hỏi trợ lý thư viện" role="dialog" aria-modal="true" aria-labelledby="rag-ask-title">
       <div className="rag-ask-heading">
-        <span className="rag-ask-heading-icon"><Sparkles size={16} /></span>
+        <span className="rag-ask-heading-icon"><img src={talkingRobotLogo} alt="" /></span>
         <div><strong id="rag-ask-title">Tìm sách & hỏi chính sách bằng AI</strong><small>Trợ lý thư viện SmartLibrary</small></div>
         <button type="button" className="rag-ask-close" onClick={() => setIsOpen(false)} aria-label="Đóng trợ lý AI"><X size={18}/></button>
       </div>

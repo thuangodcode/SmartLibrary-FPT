@@ -501,6 +501,7 @@
   margin: 0;
   padding: 4px 0 18px;
 }
+.annual-books .annual-live-book-marquee--reverse { margin-top: 10px; }
 .annual-books .marquee-group > .book-card {
   width: clamp(252px, 22vw, 304px);
   min-width: 0;
