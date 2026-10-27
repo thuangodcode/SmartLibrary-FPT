@@ -1020,8 +1020,8 @@
 .lib-cat-add-field-row button { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 8px; background: #fff1e7; padding: 0 11px; color: #c2410c; font-size: 11px; font-weight: 700; cursor: pointer; }
 .lib-cat-add-field-row button:disabled { opacity: .5; cursor: not-allowed; }
 
-.lib-cat-add-book-page { position: fixed; z-index: 90; inset: 0; overflow-y: auto; background: #f4f7fb; padding: clamp(20px, 4vh, 48px) 20px; }
-.lib-cat-add-book-card { width: min(100%, 850px); margin: 0 auto; border: 1px solid #e6ebf2; border-radius: 18px; background: #fff; padding: clamp(22px, 4vw, 38px); box-shadow: 0 18px 50px rgb(15 23 42 / 9%); }
+.lib-cat-add-book-page { position: fixed; z-index: 90; inset: 0; overflow-y: auto; background: #f4f7fb; padding: clamp(24px, 5vh, 56px) clamp(18px, 4vw, 56px); }
+.lib-cat-add-book-card { width: min(100%, 1180px); margin: 0 auto; border: 1px solid #e6ebf2; border-radius: 20px; background: #fff; padding: clamp(28px, 4vw, 48px); box-shadow: 0 22px 60px rgb(15 23 42 / 9%); }
 .lib-cat-add-book-card .lib-cat-modal-header { border-bottom: 1px solid #edf1f5; padding-bottom: 20px; }
 .lib-cat-add-book-card .lib-cat-modal-header h3 { font-size: clamp(20px, 3vw, 26px); }
 .lib-cat-add-book-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 20px 0 4px; }
@@ -1029,22 +1029,35 @@
 .lib-cat-manage-fields-button { display: inline-flex; min-height: 42px; flex: 0 0 auto; align-items: center; gap: 8px; border: 1px solid #fed7aa; border-radius: 10px; background: #fff7ed; padding: 0 14px; color: #c2410c; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
 .lib-cat-manage-fields-button:hover { border-color: #fdba74; background: #ffedd5; }
 .lib-cat-add-book-card .lib-cat-book-form { gap: 20px; }
-.lib-cat-add-book-card .lib-cat-form-grid-2 { gap: 18px; }
-.lib-cat-field-config-modal { width: min(100%, 620px); max-height: min(86vh, 760px); overflow-y: auto; border-radius: 18px; padding: 26px; }
-.lib-cat-field-config-header { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid #edf1f5; padding-bottom: 18px; }
-.lib-cat-field-config-header h2 { margin: 12px 0 5px; color: #172033; font-size: 21px; }
-.lib-cat-field-config-header p { margin: 0; color: #64748b; font-size: 13px; line-height: 1.5; }
-.lib-cat-field-config-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 18px 0; }
-.lib-cat-field-config-list .lib-cat-field-manager-row { min-height: 42px; border: 1px solid #edf1f5; border-radius: 9px; background: #fbfcfe; padding: 7px 9px; }
+.lib-cat-add-book-card .lib-cat-form-grid-2 { gap: 22px 24px; }
+.lib-cat-add-book-card .lib-cat-form-group label { margin-bottom: 8px; font-size: 13px; }
+.lib-cat-add-book-card .lib-cat-form-group input,
+.lib-cat-add-book-card .lib-cat-form-group select { min-height: 46px; font-size: 14px; }
+.lib-cat-add-book-card .lib-cat-form-group textarea { min-height: 112px; font-size: 14px; }
+.lib-cat-add-book-card .lib-cat-modal-actions { position: sticky; bottom: -48px; margin: 8px -48px -48px; border-top: 1px solid #edf1f5; background: rgb(255 255 255 / 96%); padding: 16px 48px; backdrop-filter: blur(10px); }
+.lib-cat-field-config-overlay { padding: 24px; backdrop-filter: blur(5px); }
+.lib-cat-field-config-modal { width: min(100%, 760px); max-height: min(88vh, 820px); overflow-y: auto; border: 1px solid #e6ebf2; border-radius: 20px; padding: 32px; box-shadow: 0 24px 80px rgb(15 23 42 / 24%); }
+.lib-cat-field-config-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; border-bottom: 1px solid #edf1f5; padding-bottom: 22px; }
+.lib-cat-field-config-header h2 { margin: 14px 0 7px; color: #172033; font-size: 25px; letter-spacing: -.02em; }
+.lib-cat-field-config-header p { max-width: 560px; margin: 0; color: #64748b; font-size: 14px; line-height: 1.55; }
+.lib-cat-field-config-header .lib-cat-modal-close { width: 40px; height: 40px; flex: 0 0 auto; border-radius: 10px; background: #f3f6f9; }
+.lib-cat-field-config-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 24px 0; }
+.lib-cat-field-config-list .lib-cat-field-manager-row { min-height: 52px; border: 1px solid #edf1f5; border-radius: 11px; background: #fbfcfe; padding: 10px 12px; font-size: 13px; }
+.lib-cat-field-config-list .lib-cat-field-manager-row:hover { border-color: #fed7aa; background: #fffaf5; }
+.lib-cat-field-config-list .lib-cat-field-manager-row label { gap: 10px; }
+.lib-cat-field-config-list .lib-cat-field-manager-row label input { width: 16px; height: 16px; flex: 0 0 auto; }
 .lib-cat-field-config-list .lib-cat-field-manager-row button { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-.lib-cat-field-config-modal .lib-cat-add-field-row { border-top: 1px solid #edf1f5; padding-top: 16px; }
-.lib-cat-field-config-modal .lib-cat-add-field-row input { min-height: 42px; border: 1px solid #d7dee8; border-radius: 9px; padding: 0 12px; }
-.lib-cat-field-config-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; color: #64748b; font-size: 12px; }
-.lib-cat-field-config-footer button { min-height: 40px; border: 0; border-radius: 9px; background: #ea580c; padding: 0 18px; color: #fff; font-weight: 700; cursor: pointer; }
+.lib-cat-field-config-modal .lib-cat-add-field-row { border-top: 1px solid #edf1f5; padding-top: 22px; }
+.lib-cat-field-config-modal .lib-cat-add-field-row input { min-height: 46px; border: 1px solid #d7dee8; border-radius: 10px; padding: 0 14px; font-size: 14px; }
+.lib-cat-field-config-modal .lib-cat-add-field-row button { min-height: 46px; border-radius: 10px; padding: 0 16px; font-size: 13px; }
+.lib-cat-field-config-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 22px; color: #64748b; font-size: 13px; }
+.lib-cat-field-config-footer button { min-height: 44px; border: 0; border-radius: 10px; background: #ea580c; padding: 0 22px; color: #fff; font-weight: 700; cursor: pointer; transition: background .16s ease, transform .16s ease; }
+.lib-cat-field-config-footer button:hover { transform: translateY(-1px); background: #c2410c; }
 
 @media (max-width: 640px) {
   .lib-cat-add-book-page { padding: 12px; }
   .lib-cat-add-book-card { padding: 20px 16px; }
+  .lib-cat-add-book-card .lib-cat-modal-actions { bottom: -20px; margin: 8px -16px -20px; padding: 14px 16px; }
   .lib-cat-add-book-toolbar { align-items: stretch; flex-direction: column; }
   .lib-cat-manage-fields-button { justify-content: center; }
   .lib-cat-field-config-modal { padding: 20px 16px; }
