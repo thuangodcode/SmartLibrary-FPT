@@ -458,7 +458,10 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
     <div className="librarian-support">
       <header className="librarian-support-heading">
         <div>
-          <p>HỖ TRỢ ĐỘC GIẢ</p>
+          <div className="lib-support-eyebrow">
+            <CircleHelp size={14} />
+            <span>KHÔNG GIAN THỦ THƯ • HỖ TRỢ ĐỘC GIẢ</span>
+          </div>
           <h1>{view === 'requests' ? 'Đơn tiếp nhận' : 'Phản hồi đơn'}</h1>
           <span>{view === 'requests'
             ? 'Quản lý loại đơn và tiếp nhận yêu cầu từ độc giả.'

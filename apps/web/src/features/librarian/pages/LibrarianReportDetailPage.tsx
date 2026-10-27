@@ -3,6 +3,7 @@ import {
   AlertCircle,
   ArrowDownToLine,
   ArrowLeft,
+  ChartNoAxesCombined,
   CheckCircle2,
   Clock,
   Eye,
@@ -133,7 +134,10 @@ const LibrarianReportDetailPage: React.FC = () => {
 
       <header className="lib-reports-header">
         <div>
-          <p className="lib-reports-eyebrow">CHI TIẾT BÁO CÁO ĐÃ GỬI</p>
+          <div className="lib-reports-eyebrow">
+            <ChartNoAxesCombined size={14} />
+            <span>KHÔNG GIAN THỦ THƯ • CHI TIẾT BÁO CÁO</span>
+          </div>
           <h1>{report?.name ?? 'Chi tiết báo cáo'}</h1>
           <p>
             Mã: <code style={{ color: '#eb753c', fontWeight: 700 }}>{report?.code ?? '—'}</code>

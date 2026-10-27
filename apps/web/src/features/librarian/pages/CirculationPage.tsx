@@ -324,8 +324,11 @@ function Chrome({ tab, stats, loading }: { tab: CirculationTab; stats: Circulati
         <strong>{current.crumb}</strong>
       </nav>
       <header className="circ-hero">
-        <span className="circ-hero-icon"><HeroIcon size={20} /></span>
         <div>
+          <div className="lib-circ-eyebrow">
+            <HeroIcon size={14} />
+            <span>KHÔNG GIAN THỦ THƯ • QUẢN LÝ DỊCH VỤ</span>
+          </div>
           <h1>{current.label}</h1>
           <p>{current.description}</p>
         </div>

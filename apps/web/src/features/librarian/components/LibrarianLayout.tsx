@@ -31,6 +31,7 @@ import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { listInboxNotices, markInboxNoticeRead, type InboxNotice } from '../notificationsApi';
 import './LibrarianLayout.css';
+import './LibrarianPageTypography.css';
 
 const circulationChildren = [
   { label: 'Mượn sách', to: '/librarian/circulation/loans', icon: BookOpen, end: false },
@@ -47,14 +48,14 @@ const supportChildren = [
 
 const navigation = [
   { label: 'Tổng quan', to: '/librarian', icon: LayoutDashboard, end: true },
-  { label: 'Sách & Biên mục', to: '/librarian/books', icon: BookOpen, end: false },
   { label: 'Quản lý dịch vụ', to: '/librarian/circulation', icon: RotateCcw, end: false, children: circulationChildren },
+  { label: 'Sách & Biên mục', to: '/librarian/books', icon: BookOpen, end: false },
   { label: 'Duyệt người đọc', to: '/librarian/registrations', icon: FileCheck, end: false },
   { label: 'Độc giả', to: '/librarian/readers', icon: Users, end: false },
-  { label: 'Thiết lập AI nghiệp vụ', to: '/librarian/ai-settings', icon: Sparkles, end: false },
-  { label: 'Thống kê & báo cáo', to: '/librarian/reports', icon: ChartNoAxesCombined, end: false },
-  { label: 'Tin tức & Thông báo', to: '/librarian/news', icon: Bell, end: false },
   { label: 'Hỗ trợ độc giả', to: '/librarian/support', icon: CircleHelp, end: false, children: supportChildren },
+  { label: 'Tin tức & Thông báo', to: '/librarian/news', icon: Bell, end: false },
+  { label: 'Thống kê & báo cáo', to: '/librarian/reports', icon: ChartNoAxesCombined, end: false },
+  { label: 'Thiết lập AI nghiệp vụ', to: '/librarian/ai-settings', icon: Sparkles, end: false },
 ];
 
 const EXPAND_DELAY_MS = 140;

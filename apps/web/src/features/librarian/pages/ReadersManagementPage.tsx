@@ -183,7 +183,10 @@ const ReadersManagementPage: React.FC = () => {
       {/* ─── Page Heading ─── */}
       <header className="lib-readers-heading">
         <div>
-          <p className="lib-readers-eyebrow">THỦ THƯ / QUẢN LÝ ĐỘC GIẢ</p>
+          <div className="lib-readers-eyebrow">
+            <Users size={14} />
+            <span>KHÔNG GIAN THỦ THƯ • QUẢN LÝ ĐỘC GIẢ</span>
+          </div>
           <h1>Quản Lý Thông Tin Bạn Đọc</h1>
           <p className="lib-readers-description">
             Tra cứu, theo dõi hồ sơ thông tin và trạng thái thẻ của toàn bộ bạn đọc trong hệ thống thư viện.

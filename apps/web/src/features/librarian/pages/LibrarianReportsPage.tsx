@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowDownToLine,
   CalendarDays,
+  ChartNoAxesCombined,
   CheckCircle2,
   ClipboardList,
   ChevronLeft,
@@ -520,7 +521,10 @@ export const LibrarianReportsPage: React.FC = () => {
       {/* ── Header ── */}
       <header className="lib-reports-header">
         <div>
-          <p className="lib-reports-eyebrow">NGHIỆP VỤ THỦ THƯ · BÁO CÁO HOẠT ĐỘNG</p>
+          <div className="lib-reports-eyebrow">
+            <ChartNoAxesCombined size={14} />
+            <span>KHÔNG GIAN THỦ THƯ • THỐNG KÊ & BÁO CÁO</span>
+          </div>
           <h1>Quản lý báo cáo</h1>
           <p>Lập báo cáo định kỳ theo mẫu chuẩn quy định và gửi Admin xét duyệt, theo dõi phản hồi.</p>
         </div>

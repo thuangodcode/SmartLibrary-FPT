@@ -1,0 +1,227 @@
+/* ==========================================================================
+   SmartLibrary FPT - Librarian Unified Page Typography & Header Design System
+   Standardizes headers, title sizes, eyebrows, descriptions and action buttons
+   across all Librarian pages to match the polished modern standard.
+   ========================================================================== */
+
+/* ─── Global Header Container Across All Librarian Pages ─── */
+.lib-content .lib-cat-header,
+.lib-content .reg-heading,
+.lib-content .lib-readers-heading,
+.lib-content .circ-hero,
+.lib-content .lib-news-header,
+.lib-content .lib-reports-header,
+.lib-content .librarian-support-heading,
+.lib-content .ai-biz-head,
+.lib-content .lib-page-heading {
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: space-between !important;
+  gap: 20px !important;
+  padding-bottom: 18px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  margin-bottom: 24px !important;
+  background: transparent !important;
+}
+
+/* ─── Header Info Block (Left side) ─── */
+.lib-content .lib-cat-header-info,
+.lib-content .reg-heading > div:first-child,
+.lib-content .lib-readers-heading > div:first-child,
+.lib-content .circ-hero > div,
+.lib-content .lib-news-header > div:first-child,
+.lib-content .lib-reports-header > div:first-child,
+.lib-content .librarian-support-heading > div:first-child,
+.lib-content .ai-biz-head > div:first-child,
+.lib-content .lib-page-heading > div:first-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+/* ─── Eyebrow (Category Badge above Title) ─── */
+.lib-content .lib-cat-eyebrow,
+.lib-content .reg-eyebrow,
+.lib-content .lib-readers-eyebrow,
+.lib-content .circ-eyebrow,
+.lib-content .lib-circ-eyebrow,
+.lib-content .lib-news-eyebrow,
+.lib-content .lib-reports-eyebrow,
+.lib-content .lib-support-eyebrow,
+.lib-content .ai-biz-head p,
+.lib-content .lib-eyebrow,
+.lib-content .librarian-support-heading > div > p {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin: 0 0 6px 0 !important;
+  color: #ea580c !important;
+  font-size: 11px !important;
+  font-weight: 750 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  line-height: 1.4 !important;
+}
+
+.lib-content .lib-cat-eyebrow svg,
+.lib-content .reg-eyebrow svg,
+.lib-content .lib-readers-eyebrow svg,
+.lib-content .circ-eyebrow svg,
+.lib-content .lib-circ-eyebrow svg,
+.lib-content .lib-news-eyebrow svg,
+.lib-content .lib-reports-eyebrow svg,
+.lib-content .lib-support-eyebrow svg,
+.lib-content .lib-eyebrow svg {
+  flex-shrink: 0;
+  color: #ea580c;
+}
+
+/* ─── Primary Title h1 (Unified 28px, Bold 800, Color #0f172a) ─── */
+.lib-content .lib-cat-header h1,
+.lib-content .reg-heading h1,
+.lib-content .lib-readers-heading h1,
+.lib-content .circ-hero h1,
+.lib-content .lib-news-header h1,
+.lib-content .lib-reports-header h1,
+.lib-content .librarian-support-heading h1,
+.lib-content .ai-biz-head h1,
+.lib-content .lib-page-heading h1 {
+  margin: 0 0 6px 0 !important;
+  font-size: clamp(24px, 2.4vw, 28px) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+  color: #0f172a !important;
+  line-height: 1.25 !important;
+}
+
+/* ─── Subtitle / Description (Unified 14px, Color #64748b) ─── */
+.lib-content .lib-cat-desc,
+.lib-content .reg-description,
+.lib-content .lib-readers-description,
+.lib-content .circ-hero p,
+.lib-content .lib-news-desc,
+.lib-content .lib-reports-header p:not(.lib-reports-eyebrow),
+.lib-content .librarian-support-heading > div > span,
+.lib-content .ai-biz-head > div > span,
+.lib-content .lib-page-description {
+  margin: 0 !important;
+  font-size: 14px !important;
+  font-weight: 450 !important;
+  color: #64748b !important;
+  line-height: 1.55 !important;
+  max-width: 760px !important;
+}
+
+/* ─── Actions Wrapper (Right side) ─── */
+.lib-content .lib-cat-actions,
+.lib-content .reg-actions,
+.lib-content .lib-readers-actions,
+.lib-content .lib-news-header > button,
+.lib-content .lib-reports-actions,
+.lib-content .ai-biz-pulse,
+.lib-content .lib-refresh-state {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-shrink: 0 !important;
+}
+
+/* ─── Primary Buttons in Header ─── */
+.lib-content .lib-cat-btn-add,
+.lib-content .reg-button--primary,
+.lib-content .lib-btn-primary,
+.lib-content .lib-news-btn-add {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 40px !important;
+  padding: 0 16px !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: #d96835 !important;
+  color: #fff !important;
+  font: inherit !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap !important;
+  box-shadow: 0 2px 6px rgb(217 104 53 / 20%) !important;
+}
+
+.lib-content .lib-cat-btn-add:hover,
+.lib-content .reg-button--primary:hover,
+.lib-content .lib-btn-primary:hover,
+.lib-content .lib-news-btn-add:hover {
+  background: #c35a29 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgb(217 104 53 / 28%) !important;
+}
+
+/* ─── Secondary / Outline Buttons in Header ─── */
+.lib-content .reg-button--secondary,
+.lib-content .lib-readers-button--secondary,
+.lib-content .lib-btn-secondary {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  min-height: 40px !important;
+  padding: 0 14px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  color: #475569 !important;
+  font: inherit !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap !important;
+}
+
+.lib-content .reg-button--secondary:hover,
+.lib-content .lib-readers-button--secondary:hover,
+.lib-content .lib-btn-secondary:hover {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+/* ─── Mobile Responsiveness for Page Headers ─── */
+@media (max-width: 768px) {
+  .lib-content .lib-cat-header,
+  .lib-content .reg-heading,
+  .lib-content .lib-readers-heading,
+  .lib-content .circ-hero,
+  .lib-content .lib-news-header,
+  .lib-content .lib-reports-header,
+  .lib-content .librarian-support-heading,
+  .lib-content .ai-biz-head,
+  .lib-content .lib-page-heading {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 14px !important;
+    padding-bottom: 14px !important;
+    margin-bottom: 18px !important;
+  }
+
+  .lib-content .lib-cat-actions,
+  .lib-content .reg-actions,
+  .lib-content .lib-readers-actions,
+  .lib-content .lib-news-header > button,
+  .lib-content .lib-reports-actions {
+    width: 100% !important;
+  }
+
+  .lib-content .lib-cat-btn-add,
+  .lib-content .reg-button,
+  .lib-content .lib-readers-button,
+  .lib-content .lib-btn-primary,
+  .lib-content .lib-news-btn-add {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}

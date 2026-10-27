@@ -347,7 +347,10 @@ const LibrarianAiPage = () => {
 
       <header className="ai-biz-head">
         <div>
-          <p>NGHIỆP VỤ THƯ VIỆN</p>
+          <div className="lib-cat-eyebrow">
+            <Sparkles size={14} />
+            <span>KHÔNG GIAN THỦ THƯ • THIẾT LẬP AI NGHIỆP VỤ</span>
+          </div>
           <h1>Thiết lập AI nghiệp vụ</h1>
           <span>Chọn nhà cung cấp AI, chọn model và cấu hình dịch vụ được phân quyền. Ollama chạy cục bộ, không cần API Key.</span>
         </div>

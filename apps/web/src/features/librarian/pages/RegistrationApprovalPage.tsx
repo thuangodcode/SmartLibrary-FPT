@@ -7,6 +7,7 @@ import {
   Clock,
   Download,
   Eye,
+  FileCheck,
   FileSpreadsheet,
   FileText,
   LoaderCircle,
@@ -341,7 +342,10 @@ export const RegistrationApprovalPage: React.FC = () => {
           {/* Header */}
           <header className="reg-heading">
             <div>
-              <p className="reg-eyebrow">THỦ THƯ / DUYỆT TÀI KHOẢN</p>
+              <div className="reg-eyebrow">
+                <FileCheck size={14} />
+                <span>KHÔNG GIAN THỦ THƯ • DUYỆT NGƯỜI ĐỌC</span>
+              </div>
               <h1>Duyệt Đăng Ký Độc Giả</h1>
               <p className="reg-description">
                 Xét duyệt tài khoản bạn đọc đăng ký từ bên ngoài và nhập danh sách sinh viên/giảng viên hàng loạt.
