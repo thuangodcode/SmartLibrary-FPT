@@ -69,10 +69,10 @@ interface ApiResult<T> {
 }
 
 interface ReaderHistoryData {
-  loans: Array<{ id: string; bookTitle: string; barcode: string; status: string; displayStatus: string; borrowDate: string | null; dueDate: string | null; returnDate: string | null; overdueDays: number; hasFine: boolean }>;
+  loans: Array<{ id: string; readerId: string; bookTitle: string; barcode: string; status: string; displayStatus: string; borrowDate: string | null; dueDate: string | null; returnDate: string | null; overdueDays: number; hasFine: boolean }>;
   loanTotalCount: number;
-  fines: Array<{ id: string; code: string; bookTitle: string; amount: number; reason: string; status: string; createdAt: string; paidAt: string | null }>;
-  reservations: Array<{ id: string; bookTitle: string; status: string; reservedAt: string; expiresAt: string | null }>;
+  fines: Array<{ id: string; readerId: string; code: string; bookTitle: string; amount: number; reason: string; status: string; createdAt: string; paidAt: string | null }>;
+  reservations: Array<{ id: string; readerId: string; bookTitle: string; status: string; reservedAt: string; expiresAt: string | null }>;
 }
 
 const readerTypeLabels: Record<ReaderType, string> = {
@@ -122,19 +122,37 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
   const [readerHistoryLoading, setReaderHistoryLoading] = useState(false);
   const [readerHistoryError, setReaderHistoryError] = useState<string | null>(null);
 
-  const toggleReaderHistory = async () => {
-    if (showReaderHistory && !readerHistoryError) {
-      setShowReaderHistory(false);
-      return;
-    }
-    setShowReaderHistory(true);
-      if ((readerHistory && !readerHistoryError) || readerHistoryLoading || !userId || !accessToken) return;
+  const loadReaderHistory = async () => {
+    if (readerHistoryLoading || !userId || !accessToken) return;
     setReaderHistoryLoading(true);
     setReaderHistoryError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/librarian/users/${userId}/history`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const headers = { Authorization: `Bearer ${accessToken}` };
+      const response = await fetch(`${API_BASE_URL}/api/v1/librarian/users/${userId}/history`, { headers });
+      if (response.status === 404) {
+        // Older deployed APIs may not have the aggregate history endpoint yet.
+        const params = new URLSearchParams({ search: user?.fullName || '', page: '1', pageSize: '50' });
+        const [loansResponse, finesResponse, reservationsResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/v1/circulation/loans?${params}`, { headers }),
+          fetch(`${API_BASE_URL}/api/v1/circulation/fines?search=${encodeURIComponent(user?.fullName || '')}`, { headers }),
+          fetch(`${API_BASE_URL}/api/v1/circulation/reservations`, { headers }),
+        ]);
+        const [loansResult, finesResult, reservationsResult] = await Promise.all([
+          parseApiResponse<ApiResult<{ items?: ReaderHistoryData['loans']; totalCount?: number }>>(loansResponse),
+          parseApiResponse<ApiResult<ReaderHistoryData['fines']>>(finesResponse),
+          parseApiResponse<ApiResult<ReaderHistoryData['reservations']>>(reservationsResponse),
+        ]);
+        if (!loansResponse.ok || !loansResult?.success || !finesResponse.ok || !finesResult?.success || !reservationsResponse.ok || !reservationsResult?.success) {
+          throw new Error('Không tải được lịch sử qua các mục lưu thông hiện có.');
+        }
+        setReaderHistory({
+          loans: (loansResult.data?.items ?? []).filter((item) => item.readerId === userId),
+          loanTotalCount: loansResult.data?.totalCount ?? 0,
+          fines: (finesResult.data ?? []).filter((item) => item.readerId === userId),
+          reservations: (reservationsResult.data ?? []).filter((item) => item.readerId === userId),
+        });
+        return;
+      }
       const result = await parseApiResponse<ApiResult<ReaderHistoryData>>(response);
       if (!response.ok || !result?.success || !result.data) throw new Error(result?.error || 'Không tải được lịch sử độc giả.');
       setReaderHistory(result.data);
@@ -143,6 +161,15 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
     } finally {
       setReaderHistoryLoading(false);
     }
+  };
+
+  const toggleReaderHistory = () => {
+    if (showReaderHistory) {
+      setShowReaderHistory(false);
+      return;
+    }
+    setShowReaderHistory(true);
+    if (!readerHistory || readerHistoryError) void loadReaderHistory();
   };
 
   const loadUser = useCallback(async (signal?: AbortSignal) => {
@@ -481,7 +508,7 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
             {readerHistoryLoading ? (
               <div className="admin-user-history-state"><LoaderCircle className="admin-users-spin" size={22} /> Đang tải lịch sử hoạt động...</div>
             ) : readerHistoryError ? (
-              <div className="admin-user-form-error" role="alert"><AlertCircle size={17} />{readerHistoryError}<button type="button" onClick={() => { setReaderHistory(null); void toggleReaderHistory(); }}>Thử lại</button></div>
+              <div className="admin-user-form-error" role="alert"><AlertCircle size={17} />{readerHistoryError}<button type="button" onClick={() => { setReaderHistory(null); void loadReaderHistory(); }}>Thử lại</button></div>
             ) : readerHistory ? (
               <>
                 <div className="admin-user-history-summary">
