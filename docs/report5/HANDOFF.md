@@ -1,5 +1,24 @@
 # Report 5 checkpoint
 
+## Latest attempt — blocked before test bodies (2026-10-27)
+
+Checkpoint commit `da3e0ca` preserved the previous work. Current three deliverables still match **42 Passed / 3 Failed / 42 Not Tested = 45/87 Executed (51.72%)**. Read-only `check_artifacts.py` completed with `AUDIT ISSUES: []` before this attempt. No new functional verdicts were added.
+
+Added `Report5AdditionalTests.cs` with 16 candidate API scenarios. The first command stopped at compilation because the test used Key/Value instead of ParamKey/ParamValue; that test-only typo was corrected. The next invocation of the same single filter compiled successfully but all 16 results failed in `WorkflowFixture.InitializeAsync`, before test bodies: **connection refused at 127.0.0.1:55437**. These are infrastructure failures, NOT 16 product defects or executed business scenarios. Preserve their Not Tested report statuses. No PostgreSQL start/stop, full-suite rerun, business fix or push was performed.
+
+Evidence: `evidence/planned-api/additional-api.trx`. Candidate IDs: ST-01-2, ST-02-1, ST-05-1, ST-05-2, ST-06-1, ST-06-2, ST-08-1, ST-08-2, ST-09-1, ST-10-1, ST-10-2, ST-11-2, ST-12-2, ST-13-2, ST-14-2, ST-16-2. Each remains blocked by the same unavailable test DB; their assertions have not yet been exercised. The existing data builder intentionally does not ingest this new failed-setup TRX.
+
+The workbook build dependency path `/private/tmp/smartlibrary-report5-work/node_modules` is also **missing**. Do not rebuild only some artifacts or recreate dependencies silently. No artifacts were rebuilt or rendered in this attempt. Before continuing, HuyLong must authorize restoring the test DB/build dependencies (or provide them running/available). Then run the scoped candidate batch, classify failures as product/test/environment issues, update builders and all three deliverables together, and rerun the text/numeric audit. Do not treat the raw fixture-failure count as additional Executed cases.
+
+Targeted command used (from repository root; do not run until DB is available):
+```sh
+SMARTLIBRARY_TEST_POSTGRES='Host=127.0.0.1;Port=55437;Username=report5;Database=postgres' dotnet test apps/api/tests/SmartLibrary.IntegrationTests/SmartLibrary.IntegrationTests.csproj --filter FullyQualifiedName~Report5AdditionalTests --logger 'trx;LogFileName=additional-api.trx' --results-directory docs/report5/evidence/planned-api --nologo
+```
+
+Scope notes for the pending cases: reader renewal is immediate, with a separate librarian renewal operation; it is not a pending approval workflow. Provider credentials belong to Librarian via `my-settings`, while Admin manages AI policy. Update these draft case descriptions if/when execution becomes possible; requirements reconciliation remains separate from implemented-behavior testing. Known product defects remain R5-DEF-001 and R5-DEF-002 only.
+
+All sections below are historical context where they conflict with this latest attempt, especially old PostgreSQL-running and dependency-link statements.
+
 ## Latest checkpoint — planned API execution (2026-10-27)
 
 This section supersedes older counts and authorization wording below. Current deliverables and JSON contain **87 cases: 42 Passed / 3 Failed / 42 Not Tested; 45 Executed (51.72%)**. Unit evidence remains 203 Passed / 93 function groups; no full-suite rerun.
