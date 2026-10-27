@@ -4,6 +4,8 @@ import {
   AlertCircle,
   ArrowLeft,
   Ban,
+  BookOpen,
+  Bookmark,
   CalendarDays,
   Check,
   Clock3,
@@ -11,6 +13,7 @@ import {
   FileText,
   Image as ImageIcon,
   LoaderCircle,
+  History,
   Mail,
   MapPin,
   Pencil,
@@ -19,6 +22,7 @@ import {
   Save,
   UserRound,
   X,
+  Wallet,
   ZoomIn,
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
@@ -64,6 +68,13 @@ interface ApiResult<T> {
   error?: string;
 }
 
+interface ReaderHistoryData {
+  loans: Array<{ id: string; bookTitle: string; barcode: string; status: string; displayStatus: string; borrowDate: string | null; dueDate: string | null; returnDate: string | null; overdueDays: number; hasFine: boolean }>;
+  loanTotalCount: number;
+  fines: Array<{ id: string; code: string; bookTitle: string; amount: number; reason: string; status: string; createdAt: string; paidAt: string | null }>;
+  reservations: Array<{ id: string; bookTitle: string; status: string; reservedAt: string; expiresAt: string | null }>;
+}
+
 const readerTypeLabels: Record<ReaderType, string> = {
   Student: 'Sinh viên trong trường',
   Lecturer: 'Giảng viên trong trường',
@@ -106,6 +117,33 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
   const [identityDocumentsError, setIdentityDocumentsError] = useState<string | null>(null);
   const [identityDocumentUrls, setIdentityDocumentUrls] = useState<Record<string, string>>({});
   const [lightboxDocument, setLightboxDocument] = useState<{ url: string; label: string } | null>(null);
+  const [showReaderHistory, setShowReaderHistory] = useState(false);
+  const [readerHistory, setReaderHistory] = useState<ReaderHistoryData | null>(null);
+  const [readerHistoryLoading, setReaderHistoryLoading] = useState(false);
+  const [readerHistoryError, setReaderHistoryError] = useState<string | null>(null);
+
+  const toggleReaderHistory = async () => {
+    if (showReaderHistory && !readerHistoryError) {
+      setShowReaderHistory(false);
+      return;
+    }
+    setShowReaderHistory(true);
+      if ((readerHistory && !readerHistoryError) || readerHistoryLoading || !userId || !accessToken) return;
+    setReaderHistoryLoading(true);
+    setReaderHistoryError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/librarian/users/${userId}/history`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const result = await parseApiResponse<ApiResult<ReaderHistoryData>>(response);
+      if (!response.ok || !result?.success || !result.data) throw new Error(result?.error || 'Không tải được lịch sử độc giả.');
+      setReaderHistory(result.data);
+    } catch (error) {
+      setReaderHistoryError(error instanceof Error ? error.message : 'Không tải được lịch sử độc giả.');
+    } finally {
+      setReaderHistoryLoading(false);
+    }
+  };
 
   const loadUser = useCallback(async (signal?: AbortSignal) => {
     if (!userId || !accessToken) {
@@ -345,6 +383,12 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
             <p>{isReader ? (user.studentId || 'Chưa có mã độc giả') : user.email.split('@')[0]} <span>·</span> {user.email}</p>
           </div>
           <div className="admin-user-profile-actions">
+            {isLibrarianView && isReader && (
+              <button className="admin-user-detail-button admin-user-detail-button--history" onClick={() => void toggleReaderHistory()} type="button" aria-expanded={showReaderHistory}>
+                {readerHistoryLoading ? <LoaderCircle className="admin-users-spin" size={18} /> : <History size={19} />}
+                {showReaderHistory ? 'Ẩn lịch sử hoạt động' : 'Xem lịch sử hoạt động'}
+              </button>
+            )}
             {!isLibrarianView && (
               isAccountEnabled ? (
                 <button className="admin-user-detail-button admin-user-detail-button--danger" disabled={busy} onClick={() => { setFormError(null); setEditing(false); setDeactivating(true); }} type="button">
@@ -428,6 +472,58 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
           </section>
         )}
 
+        {isLibrarianView && isReader && showReaderHistory && (
+          <section className="admin-user-history-section" aria-labelledby="admin-user-history-title">
+            <div className="admin-user-section-heading">
+              <div><span>HOẠT ĐỘNG THƯ VIỆN</span><h3 id="admin-user-history-title">Lịch sử mượn, trả và phí phạt</h3></div>
+              <History size={20} />
+            </div>
+            {readerHistoryLoading ? (
+              <div className="admin-user-history-state"><LoaderCircle className="admin-users-spin" size={22} /> Đang tải lịch sử hoạt động...</div>
+            ) : readerHistoryError ? (
+              <div className="admin-user-form-error" role="alert"><AlertCircle size={17} />{readerHistoryError}<button type="button" onClick={() => { setReaderHistory(null); void toggleReaderHistory(); }}>Thử lại</button></div>
+            ) : readerHistory ? (
+              <>
+                <div className="admin-user-history-summary">
+                  <div><BookOpen size={19} /><span>Tổng lượt mượn/trả</span><strong>{readerHistory.loanTotalCount}</strong></div>
+                  <div><Wallet size={19} /><span>Khoản phí</span><strong>{readerHistory.fines.length}</strong></div>
+                  <div><Bookmark size={19} /><span>Lượt đặt trước</span><strong>{readerHistory.reservations.length}</strong></div>
+                </div>
+                <div className="admin-user-history-grid">
+                  <section className="admin-user-history-panel">
+                    <h4><BookOpen size={17} /> Mượn và trả sách</h4>
+                    {readerHistory.loans.length ? readerHistory.loans.map((loan) => (
+                      <article className="admin-user-history-item" key={loan.id}>
+                        <div><strong>{loan.bookTitle}</strong><span>{loan.barcode} · {loan.displayStatus || loan.status}</span></div>
+                        <div><span>Mượn: {formatDate(loan.borrowDate, true)}</span><span>{loan.returnDate ? `Trả: ${formatDate(loan.returnDate, true)}` : `Hạn trả: ${formatDate(loan.dueDate, true)}`}</span></div>
+                        {loan.overdueDays > 0 && <small className="admin-user-history-warning">Trễ hạn {loan.overdueDays} ngày</small>}
+                      </article>
+                    )) : <p className="admin-user-history-empty">Chưa có lịch sử mượn hoặc trả sách.</p>}
+                  </section>
+                  <section className="admin-user-history-panel">
+                    <h4><Wallet size={17} /> Phí phạt</h4>
+                    {readerHistory.fines.length ? readerHistory.fines.map((fine) => (
+                      <article className="admin-user-history-item" key={fine.id}>
+                        <div><strong>{fine.reason || fine.bookTitle}</strong><span>{fine.code} · {fine.bookTitle}</span></div>
+                        <div><strong>{fine.amount.toLocaleString('vi-VN')} ₫</strong><span>{fine.status}{fine.paidAt ? ` · Đã thanh toán ${formatDate(fine.paidAt, true)}` : ` · ${formatDate(fine.createdAt, true)}`}</span></div>
+                      </article>
+                    )) : <p className="admin-user-history-empty">Không có khoản phí phạt.</p>}
+                  </section>
+                  <section className="admin-user-history-panel admin-user-history-panel--wide">
+                    <h4><Bookmark size={17} /> Đặt trước sách</h4>
+                    {readerHistory.reservations.length ? readerHistory.reservations.map((reservation) => (
+                      <article className="admin-user-history-item" key={reservation.id}>
+                        <div><strong>{reservation.bookTitle}</strong><span>Đặt lúc {formatDate(reservation.reservedAt, true)}</span></div>
+                        <div><span className="admin-user-history-status">{reservation.status}</span>{reservation.expiresAt && <span>Hết hạn {formatDate(reservation.expiresAt, true)}</span>}</div>
+                      </article>
+                    )) : <p className="admin-user-history-empty">Chưa có lịch sử đặt trước.</p>}
+                  </section>
+                </div>
+              </>
+            ) : null}
+          </section>
+        )}
+
         {deactivating && (
           <form className="admin-user-deactivation-form" onSubmit={updateStatus}>
             <label htmlFor="admin-user-deactivation-reason">Lý do ngừng hoạt động <span>Bắt buộc · từ 5 đến 500 ký tự</span></label>
@@ -468,8 +564,6 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
               {isReader && <InfoItem icon={<CalendarDays size={15} />} label="Ngày sinh" value={formatDate(user.dateOfBirth)} />}
               {isReader && <InfoItem icon={<MapPin size={15} />} label="Địa chỉ thường trú" value={user.address} wide />}
               <InfoItem icon={<Clock3 size={15} />} label="Ngày tạo tài khoản" value={formatDate(user.createdAt, true)} />
-              <InfoItem icon={<Clock3 size={15} />} label="Đăng nhập gần nhất" value={formatDate(user.lastLoginAt, true)} />
-              {isReader && <InfoItem icon={<CalendarDays size={15} />} label="Thẻ thành viên hết hạn" value={formatDate(user.membershipExpiresAt)} />}
             </div>
           )}
         </section>

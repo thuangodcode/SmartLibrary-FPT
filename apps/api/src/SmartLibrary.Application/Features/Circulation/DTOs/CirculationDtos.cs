@@ -199,6 +199,14 @@ public class CirculationReservationDto
     public DateTime? ExpiresAt { get; init; }
 }
 
+public sealed class ReaderCirculationHistoryDto
+{
+    public IReadOnlyList<CirculationLoanDto> Loans { get; init; } = [];
+    public int LoanTotalCount { get; init; }
+    public IReadOnlyList<CirculationFineDto> Fines { get; init; } = [];
+    public IReadOnlyList<CirculationReservationDto> Reservations { get; init; } = [];
+}
+
 public class CirculationActivityDto
 {
     public Guid Id { get; init; }

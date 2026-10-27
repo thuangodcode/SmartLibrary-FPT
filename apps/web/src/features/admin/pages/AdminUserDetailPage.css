@@ -60,6 +60,8 @@
 .admin-user-detail-button--danger:hover:not(:disabled) { background: #ffefed; }
 .admin-user-detail-button--success { color: #287b5c; border-color: #cee9dc; background: #f0faf5; }
 .admin-user-detail-button--success:hover:not(:disabled) { background: #e5f6ed; }
+.admin-user-detail-button--history { min-height: 48px; padding: 0 18px; border: 1px solid #fed7aa; border-radius: 10px; background: linear-gradient(135deg, #fff7ed, #fff); color: #b94f1d; font-size: 14px; font-weight: 750; box-shadow: 0 4px 12px rgb(217 95 39 / 8%); }
+.admin-user-detail-button--history:hover:not(:disabled) { border-color: #fdba74; background: #fff1e6; }
 
 .admin-user-detail-card {
   display: grid;
@@ -117,6 +119,30 @@
 .admin-user-profile-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 
 .admin-user-information { padding: 22px 25px 26px; }
+.admin-user-history-section { border-top: 1px solid #edf0f5; padding: 24px 25px 28px; }
+.admin-user-history-section > .admin-user-section-heading { margin-bottom: 20px; }
+.admin-user-history-section .admin-user-section-heading h3 { font-size: 19px; }
+.admin-user-history-state { display: flex; min-height: 150px; align-items: center; justify-content: center; gap: 12px; color: #667287; font-size: 15px; }
+.admin-user-history-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.admin-user-history-summary > div { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 12px; min-height: 88px; border: 1px solid #e8ecf2; border-radius: 13px; background: linear-gradient(135deg, #fff, #fffaf6); padding: 15px 18px; }
+.admin-user-history-summary svg { grid-row: span 2; color: #dc672e; }
+.admin-user-history-summary span { color: #748096; font-size: 13px; }
+.admin-user-history-summary strong { color: #172238; font-size: 23px; line-height: 1; }
+.admin-user-history-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
+.admin-user-history-panel { min-width: 0; border: 1px solid #e8ecf2; border-radius: 14px; background: #fff; padding: 18px; }
+.admin-user-history-panel--wide { grid-column: 1 / -1; }
+.admin-user-history-panel h4 { display: flex; align-items: center; gap: 9px; margin: 0 0 12px; color: #243149; font-size: 16px; }
+.admin-user-history-panel h4 svg { color: #d95f27; }
+.admin-user-history-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-top: 1px solid #eef1f5; padding: 14px 2px; }
+.admin-user-history-item > div { display: grid; min-width: 0; gap: 5px; }
+.admin-user-history-item > div:last-of-type { text-align: right; }
+.admin-user-history-item strong { overflow-wrap: anywhere; color: #263247; font-size: 14px; }
+.admin-user-history-item span { color: #748096; font-size: 12px; line-height: 1.45; }
+.admin-user-history-item small { font-size: 12px; }
+.admin-user-history-warning { color: #b54708; }
+.admin-user-history-status { display: inline-flex; justify-self: end; border-radius: 999px; background: #fff3e8; padding: 5px 10px; color: #a34a1d !important; font-weight: 700; }
+.admin-user-history-empty { margin: 0; border-top: 1px solid #eef1f5; padding: 18px 2px 4px; color: #7b8595; font-size: 14px; }
+.admin-user-form-error button { margin-left: 12px; border: 0; background: transparent; color: #b54708; font-weight: 750; text-decoration: underline; cursor: pointer; }
 .admin-user-documents-section { padding: 22px 25px 25px; border-bottom: 1px solid #edf0f4; background: #fffdfb; }
 .admin-user-documents-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .admin-user-document-card { min-width: 0; padding: 11px; border: 1px solid #edf0f4; border-radius: 10px; background: #fff; }
@@ -195,6 +221,15 @@
   .admin-user-profile-intro p { max-width: calc(100vw - 120px); }
   .admin-user-profile-actions { padding-left: 0; }
   .admin-user-information { padding: 18px 15px 20px; }
+  .admin-user-history-section { padding: 20px 15px; }
+  .admin-user-history-summary { grid-template-columns: 1fr; gap: 9px; }
+  .admin-user-history-summary > div { min-height: 72px; }
+  .admin-user-history-grid { grid-template-columns: 1fr; }
+  .admin-user-history-panel--wide { grid-column: auto; }
+  .admin-user-history-item { flex-direction: column; gap: 7px; }
+  .admin-user-history-item > div:last-of-type { text-align: left; }
+  .admin-user-history-status { justify-self: start; }
+  .admin-user-detail-button--history { width: 100%; min-height: 48px; font-size: 14px; }
   .admin-user-info-grid, .admin-user-edit-form { grid-template-columns: 1fr; }
   .admin-user-documents-section { padding: 18px 15px; }
   .admin-user-documents-grid { grid-template-columns: 1fr; }

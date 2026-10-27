@@ -129,6 +129,21 @@ public class CirculationService
         return Result<IReadOnlyList<CirculationFineDto>>.Success(await _repository.GetFinesForReaderAsync(readerId, ct));
     }
 
+    public async Task<ReaderCirculationHistoryDto> GetReaderHistoryAsync(Guid readerId, CancellationToken ct = default)
+    {
+        var settings = await _repository.GetSettingsAsync(ct);
+        var (loans, loanCount) = await _repository.GetLoansForReaderAsync(readerId, 1, 100, settings, ct);
+        var reservations = await _repository.GetReservationsForReaderAsync(readerId, ct);
+        var fines = await _repository.GetFinesForReaderAsync(readerId, ct);
+        return new ReaderCirculationHistoryDto
+        {
+            Loans = loans,
+            LoanTotalCount = loanCount,
+            Reservations = reservations,
+            Fines = fines
+        };
+    }
+
     public async Task<IReadOnlyList<PickupSlotDto>> GetPickupSlotsAsync(CancellationToken ct = default)
     {
         await ExpireUncollectedPickupsAsync(ct);
