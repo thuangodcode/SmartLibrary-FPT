@@ -163,6 +163,8 @@ public static class SearchTopicGuard
 
     public static bool IsBookSearch(string query)
     {
+        if (IsPolicyQuestion(query))
+            return false;
         var fold = Fold(query);
         var intent = Parse(query);
         return intent.Language is not null
@@ -192,6 +194,50 @@ public static class SearchTopicGuard
                 "due date",
                 "overdue",
                 "fine");
+    }
+
+    public static bool IsPolicyQuestion(string query)
+    {
+        var fold = Fold(query);
+        return ContainsAny(
+            fold,
+            "chinh sach",
+            "quy dinh",
+            "thu tuc",
+            "quy trinh",
+            "lam sao de muon",
+            "cach muon",
+            "muon sach",
+            "muon duoc bao nhieu",
+            "duoc muon toi da",
+            "toi duoc muon",
+            "so sach duoc muon",
+            "so luong sach duoc muon",
+            "moi doc gia duoc muon",
+            "bao nhieu quyen",
+            "bao nhieu cuon",
+            "bao nhieu sach",
+            "gioi han muon",
+            "han muc muon",
+            "phi gi",
+            "ton phi",
+            "mat phi",
+            "phi phat",
+            "phat qua han",
+            "han muon",
+            "thoi han muon",
+            "gia han",
+            "tra sach",
+            "dat truoc",
+            "the thu vien",
+            "dang ky the",
+            "mat sach",
+            "sach hong",
+            "borrow policy",
+            "loan policy",
+            "return policy",
+            "renewal policy",
+            "library rules");
     }
 
     public static SearchIntent Parse(string query)

@@ -25,6 +25,18 @@ public class AiSettingsService
         "gemini", "openai", "anthropic", "deepseek", "openrouter", "huggingface", "other", "local", "ollama"
     ];
 
+    private static readonly string[] DefaultReaderSuggestedQuestions =
+    [
+        "Tôi có thể mượn tối đa bao nhiêu cuốn sách?",
+        "Thời hạn mượn sách là bao lâu và có thể gia hạn không?",
+        "Làm thế nào để mượn sách tại thư viện?",
+        "Mượn sách có mất phí không? Phí quá hạn được tính thế nào?",
+        "Làm sao để đặt trước một cuốn sách đang được mượn?",
+        "Tôi cần làm gì nếu làm mất hoặc hư hỏng sách?",
+        "Làm thế nào để tìm sách và kiểm tra số bản còn mượn được?",
+        "Thư viện mở cửa vào những ngày và khung giờ nào?"
+    ];
+
     private readonly IAiSettingsRepository _repository;
     private readonly ISecretProtector _protector;
     private readonly IGeminiClient _gemini;
@@ -40,6 +52,47 @@ public class AiSettingsService
         _protector = protector;
         _gemini = gemini;
         _inbox = inbox;
+    }
+
+    public async Task<IReadOnlyList<string>> GetReaderSuggestedQuestionsAsync(CancellationToken ct = default)
+    {
+        var settings = await _repository.GetOrCreateAsync(ct);
+        if (string.IsNullOrWhiteSpace(settings.ReaderSuggestedQuestionsJson))
+            return DefaultReaderSuggestedQuestions;
+
+        try
+        {
+            var questions = JsonSerializer.Deserialize<List<string>>(settings.ReaderSuggestedQuestionsJson, JsonOptions);
+            return questions is null ? DefaultReaderSuggestedQuestions : questions;
+        }
+        catch (JsonException)
+        {
+            return DefaultReaderSuggestedQuestions;
+        }
+    }
+
+    public async Task<Result<IReadOnlyList<string>>> SaveReaderSuggestedQuestionsAsync(
+        IReadOnlyList<string> questions,
+        string role,
+        CancellationToken ct = default)
+    {
+        if (!IsStaff(role))
+            return Result<IReadOnlyList<string>>.Failure("Chỉ Thủ thư hoặc Admin được quản lý câu hỏi gợi ý.");
+
+        var cleaned = questions
+            .Where(question => !string.IsNullOrWhiteSpace(question))
+            .Select(question => question.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (cleaned.Count > 12)
+            return Result<IReadOnlyList<string>>.Failure("Chỉ có thể hiển thị tối đa 12 câu hỏi gợi ý.");
+        if (cleaned.Any(question => question.Length < 3 || question.Length > 180))
+            return Result<IReadOnlyList<string>>.Failure("Mỗi câu hỏi cần từ 3 đến 180 ký tự.");
+
+        var settings = await _repository.GetOrCreateAsync(ct);
+        settings.ReaderSuggestedQuestionsJson = JsonSerializer.Serialize(cleaned, JsonOptions);
+        await _repository.SaveAsync(settings, ct);
+        return Result<IReadOnlyList<string>>.Success(cleaned);
     }
 
     public Task<AiSettingsStatusDto> GetStatusAsync(string role, CancellationToken ct = default)

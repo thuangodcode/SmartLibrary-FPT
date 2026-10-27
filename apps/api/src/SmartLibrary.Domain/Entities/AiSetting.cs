@@ -13,6 +13,7 @@ public class AiSetting : BaseEntity
     public string? BaseUrl { get; set; }
     public string? ProviderKeysJson { get; set; }
     public string? LibrarianCriteriaJson { get; set; }
+    public string? ReaderSuggestedQuestionsJson { get; set; }
     public bool IsEnabled { get; set; }
     public bool ReaderAiEnabled { get; set; }
     public bool LibrarianAiEnabled { get; set; }

@@ -38,6 +38,7 @@ public record CirculationLoanDto
     public Guid BookCopyId { get; init; }
     public string Barcode { get; init; } = string.Empty;
     public string BookTitle { get; init; } = string.Empty;
+    public string? CoverImageUrl { get; init; }
     public string? CopyCondition { get; init; }
     public decimal? SuggestedFine { get; init; }
     public bool HasOpenFine { get; init; }
@@ -159,6 +160,7 @@ public class CirculationFineDto
     public Guid ReaderId { get; init; }
     public string ReaderName { get; init; } = string.Empty;
     public string BookTitle { get; init; } = string.Empty;
+    public string? CoverImageUrl { get; init; }
     public string Barcode { get; init; } = string.Empty;
     public decimal Amount { get; init; }
     public string Reason { get; init; } = string.Empty;

@@ -11,6 +11,8 @@ import {
   Clock3,
   LoaderCircle,
   RefreshCw,
+  Sun,
+  Moon,
   Wallet,
 } from 'lucide-react';
 import HomeNavbar from '../../home/components/HomeNavbar';
@@ -25,6 +27,7 @@ interface CirculationLoan {
   id: string;
   code: string;
   bookTitle: string;
+  coverImageUrl: string | null;
   barcode: string;
   status: string;
   displayStatus: string;
@@ -46,6 +49,7 @@ interface CirculationFine {
   code: string;
   borrowRecordId: string;
   bookTitle: string;
+  coverImageUrl: string | null;
   barcode: string;
   amount: number;
   reason: string;
@@ -84,8 +88,8 @@ interface ApiEnvelope<T> {
 }
 
 type HistoryTab = 'loans' | 'fines';
-type LoanFilter = 'all' | 'active' | 'history';
-type FineFilter = 'all' | 'pending' | 'paid';
+type LoanFilter = 'all' | 'Pending' | 'Approved' | 'Borrowed' | 'Overdue' | 'Returned' | 'Rejected' | 'Cancelled';
+type FineFilter = 'all' | 'Pending' | 'Paid' | 'Waived';
 
 const PAGE_SIZE = 20;
 
@@ -101,9 +105,6 @@ const formatDateTime = (value: string | null) => value
   }).format(new Date(value))
   : '—';
 
-const isActiveLoan = (loan: CirculationLoan) =>
-  ['Pending', 'Approved', 'Borrowed', 'Overdue'].includes(loan.status);
-
 const statusLabel: Record<string, string> = {
   Pending: 'Chờ tiếp nhận',
   Approved: 'Đã tiếp nhận',
@@ -117,6 +118,17 @@ const statusLabel: Record<string, string> = {
   Waived: 'Đã miễn',
 };
 
+const LOAN_FILTERS: Array<{ value: LoanFilter; label: string }> = [
+  { value: 'all', label: 'Tất cả phiếu' },
+  { value: 'Pending', label: 'Đang tiếp nhận' },
+  { value: 'Approved', label: 'Đã tiếp nhận' },
+  { value: 'Borrowed', label: 'Đang mượn' },
+  { value: 'Overdue', label: 'Quá hạn' },
+  { value: 'Returned', label: 'Đã trả' },
+  { value: 'Rejected', label: 'Từ chối' },
+  { value: 'Cancelled', label: 'Đã hủy' },
+];
+
 const HistoryPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const returnFineId = searchParams.get('fineId');
@@ -128,6 +140,7 @@ const HistoryPage = () => {
   const tab: HistoryTab = searchParams.get('tab') === 'fines' ? 'fines' : 'loans';
   const [loanFilter, setLoanFilter] = useState<LoanFilter>('all');
   const [fineFilter, setFineFilter] = useState<FineFilter>('all');
+  const [darkTheme, setDarkTheme] = useState(() => window.localStorage.getItem('smartlibrary.reader-theme') === 'dark');
   const [page, setPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -147,6 +160,10 @@ const HistoryPage = () => {
   const paymentRedirectKey = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    window.localStorage.setItem('smartlibrary.reader-theme', darkTheme ? 'dark' : 'light');
+  }, [darkTheme]);
 
   useEffect(() => {
     const refreshFromRealtime = () => setRefreshKey((current) => current + 1);
@@ -204,14 +221,12 @@ const HistoryPage = () => {
 
   const visibleLoans = useMemo(() => {
     const records = loans?.items ?? [];
-    if (loanFilter === 'active') return records.filter(isActiveLoan);
-    if (loanFilter === 'history') return records.filter((loan) => !isActiveLoan(loan));
+    if (loanFilter !== 'all') return records.filter((loan) => loan.displayStatus === loanFilter);
     return records;
   }, [loanFilter, loans]);
 
   const visibleFines = useMemo(() => {
-    if (fineFilter === 'pending') return fines.filter((fine) => fine.status === 'Pending');
-    if (fineFilter === 'paid') return fines.filter((fine) => fine.status === 'Paid');
+    if (fineFilter !== 'all') return fines.filter((fine) => fine.status === fineFilter);
     return fines;
   }, [fineFilter, fines]);
 
@@ -371,13 +386,26 @@ const HistoryPage = () => {
   }, [fines, loading, paymentRedirect, returnFineId, searchParams, setSearchParams, showToast]);
 
   return (
-    <div className="annual-home history-page">
+    <div className={`annual-home history-page${darkTheme ? ' theme-dark' : ''}`} data-theme={darkTheme ? 'dark' : 'light'}>
       <HomeNavbar />
       <main className="history-main">
         <header className="history-heading">
-          <p>SMARTLIBRARY · TÀI KHOẢN</p>
-          <h1>Mượn & trả của tôi</h1>
-          <span>Quản lý phiếu mượn, theo dõi hạn trả, gia hạn và kiểm tra phí phạt.</span>
+          <div className="history-heading-copy">
+            <p>SMARTLIBRARY · DỊCH VỤ BẠN ĐỌC</p>
+            <h1>Mượn & trả</h1>
+            <span>Theo dõi phiếu mượn, hạn trả và các khoản phí trong một nơi.</span>
+          </div>
+          <button
+            type="button"
+            className="history-theme-toggle"
+            role="switch"
+            aria-checked={darkTheme}
+            aria-label={darkTheme ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
+            onClick={() => setDarkTheme((current) => !current)}
+          >
+            <span className="history-theme-toggle-icon">{darkTheme ? <Moon size={16} /> : <Sun size={16} />}</span>
+            <span>{darkTheme ? 'Giao diện tối' : 'Giao diện sáng'}</span>
+          </button>
         </header>
 
         <section className="history-summary" aria-label="Tổng quan mượn trả">
@@ -427,23 +455,41 @@ const HistoryPage = () => {
             <strong>{tab === 'loans' ? 'Danh sách phiếu mượn' : 'Danh sách phí phạt'}</strong>
             <span>Dữ liệu được cập nhật trực tiếp từ hồ sơ thư viện của bạn.</span>
           </div>
-          <label>
-            <span className="sr-only">Lọc trạng thái</span>
-            {tab === 'loans' ? (
-              <select value={loanFilter} onChange={(event) => setLoanFilter(event.target.value as LoanFilter)}>
-                <option value="all">Tất cả phiếu</option>
-                <option value="active">Đang xử lý / mượn</option>
-                <option value="history">Đã hoàn tất / từ chối</option>
-              </select>
-            ) : (
-              <select value={fineFilter} onChange={(event) => setFineFilter(event.target.value as FineFilter)}>
-                <option value="all">Tất cả phí phạt</option>
-                <option value="pending">Chưa thanh toán</option>
-                <option value="paid">Đã thanh toán</option>
-              </select>
-            )}
-          </label>
         </div>
+
+        <nav className="history-filter-bar" aria-label={tab === 'loans' ? 'Lọc trạng thái phiếu mượn' : 'Lọc trạng thái phí phạt'}>
+          {tab === 'loans' ? LOAN_FILTERS.map((filter) => {
+            const count = filter.value === 'all'
+              ? loans?.items.length ?? 0
+              : (loans?.items ?? []).filter((loan) => loan.displayStatus === filter.value).length;
+            return (
+              <button
+                type="button"
+                key={filter.value}
+                className={loanFilter === filter.value ? 'is-active' : ''}
+                aria-pressed={loanFilter === filter.value}
+                onClick={() => setLoanFilter(filter.value)}
+              >
+                {filter.label}<span>{count}</span>
+              </button>
+            );
+          }) : ([
+            { value: 'all', label: 'Tất cả phí phạt' },
+            { value: 'Pending', label: 'Chưa thanh toán' },
+            { value: 'Paid', label: 'Đã thanh toán' },
+            { value: 'Waived', label: 'Đã miễn' },
+          ] as Array<{ value: FineFilter; label: string }>).map((filter) => (
+            <button
+              type="button"
+              key={filter.value}
+              className={fineFilter === filter.value ? 'is-active' : ''}
+              aria-pressed={fineFilter === filter.value}
+              onClick={() => setFineFilter(filter.value)}
+            >
+              {filter.label}<span>{filter.value === 'all' ? fines.length : fines.filter((fine) => fine.status === filter.value).length}</span>
+            </button>
+          ))}
+        </nav>
 
         {error && <div className="history-alert" role="alert"><AlertCircle size={17} />{error}</div>}
         {loading ? (
@@ -452,7 +498,9 @@ const HistoryPage = () => {
           <section className="history-list" aria-label="Danh sách mượn và trả">
             {visibleLoans.length ? visibleLoans.map((loan) => (
               <article className="history-record" key={loan.id}>
-                <div className="history-record-icon"><BookOpen size={19} /></div>
+                <div className="history-record-cover">
+                  {loan.coverImageUrl ? <img src={loan.coverImageUrl} alt={`Bìa sách ${loan.bookTitle}`} loading="lazy" /> : <BookOpen size={24} />}
+                </div>
                 <div className="history-record-main">
                   <div className="history-record-title">
                     <strong>{loan.bookTitle}</strong>
@@ -522,15 +570,16 @@ const HistoryPage = () => {
           <section className="history-list" aria-label="Danh sách phí phạt">
             {visibleFines.length ? visibleFines.map((fine) => (
               <article className="history-record" key={fine.id}>
-                <div className="history-record-icon history-record-icon--fine">
-                  {fine.status === 'Paid' ? <CheckCircle2 size={19} /> : <Wallet size={19} />}
+                <div className="history-record-cover history-record-cover--fine">
+                  {fine.coverImageUrl ? <img src={fine.coverImageUrl} alt={`Bìa sách ${fine.bookTitle}`} loading="lazy" /> : (fine.status === 'Paid' ? <CheckCircle2 size={24} /> : <Wallet size={24} />)}
                 </div>
                 <div className="history-record-main">
                   <div className="history-record-title">
                     <strong>{fine.reason}</strong>
                     <span>{fine.code}</span>
                   </div>
-                  <span>{fine.bookTitle} · Mã bản sao: {fine.barcode}</span>
+                  <span>Sách: {fine.bookTitle}</span>
+                  <span>Mã bản sao: {fine.barcode}</span>
                   <div className="history-record-dates">
                     <span>Ghi nhận: {formatDate(fine.createdAt)}</span>
                     <span>Thanh toán: {formatDate(fine.paidAt)}</span>

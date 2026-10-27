@@ -3,6 +3,7 @@ namespace SmartLibrary.Application.Features.Rag.DTOs;
 public class RagAskRequest
 {
     public string Question { get; set; } = string.Empty;
+    public string? ConversationContext { get; set; }
 }
 
 public class RagSourceDto

@@ -59,7 +59,17 @@ public class RagDocumentRepository : IRagDocumentRepository
             """, ct);
     }
 
-    public async Task<IReadOnlyList<RagSearchHit>> SearchAsync(float[] embedding, int limit, CancellationToken ct = default)
+    public Task<IReadOnlyList<RagSearchHit>> SearchAsync(float[] embedding, int limit, CancellationToken ct = default)
+        => SearchBySourceAsync(embedding, limit, null, ct);
+
+    public Task<IReadOnlyList<RagSearchHit>> SearchPoliciesAsync(float[] embedding, int limit, CancellationToken ct = default)
+        => SearchBySourceAsync(embedding, limit, "policy", ct);
+
+    private async Task<IReadOnlyList<RagSearchHit>> SearchBySourceAsync(
+        float[] embedding,
+        int limit,
+        string? sourceType,
+        CancellationToken ct)
     {
         var vector = ToVectorLiteral(embedding);
         var safeLimit = Math.Clamp(limit, 1, 20);
@@ -71,16 +81,20 @@ public class RagDocumentRepository : IRagDocumentRepository
         try
         {
             await using var command = connection.CreateCommand();
-            command.CommandText = """
+            var sourceFilter = sourceType is null ? string.Empty : "AND source_type = @sourceType";
+            command.CommandText = $"""
                 SELECT id, source_type, source_id, title, left(content, 900) AS content,
                        (1 - (embedding <=> CAST(@vector AS extensions.vector)))::float8 AS score
                 FROM rag_documents
                 WHERE embedding IS NOT NULL
+                  {sourceFilter}
                 ORDER BY embedding <=> CAST(@vector AS extensions.vector)
                 LIMIT @limit
                 """;
             AddParameter(command, "vector", vector);
             AddParameter(command, "limit", safeLimit);
+            if (sourceType is not null)
+                AddParameter(command, "sourceType", sourceType);
 
             var hits = new List<RagSearchHit>();
             await using var reader = await command.ExecuteReaderAsync(ct);

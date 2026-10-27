@@ -270,5 +270,14 @@ export const getLibrarianWorkspace = (token: string, days = 30) =>
 export const getPersonalizedRecommendations = (token: string) =>
   callApi<AiBookSuggestion[]>(token, '/api/v1/rag/recommendations', { method: 'GET' });
 
-export const askRag = (token: string, question: string) =>
-  callApi<RagAskResult>(token, '/api/v1/rag/ask', json({ question }));
+export const askRag = (token: string, question: string, conversationContext?: string) =>
+  callApi<RagAskResult>(token, '/api/v1/rag/ask', json({ question, conversationContext }));
+
+export const getReaderAiSuggestedQuestions = (token: string) =>
+  callApi<string[]>(token, '/api/v1/rag/suggested-questions', { method: 'GET' });
+
+export const saveReaderAiSuggestedQuestions = (token: string, questions: string[]) =>
+  callApi<string[]>(token, '/api/v1/rag/suggested-questions', {
+    method: 'PUT',
+    body: JSON.stringify(questions),
+  });

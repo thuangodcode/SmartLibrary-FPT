@@ -229,6 +229,33 @@
 .rag-ask .rag-prompt-controls button[type='submit']:disabled { background: #edf1ee; color: #9aa49d; opacity: 1; }
 .rag-ask-login { margin-top: 16px; }
 
+.rag-ask { display: flex; flex-direction: column; gap: 12px; }
+.rag-ask-heading { flex: 0 0 auto; margin: 0; }
+.rag-ask-conversation { display: grid; gap: 14px; max-height: min(44vh, 430px); min-height: 120px; overflow-y: auto; padding: 2px 4px 8px 0; overscroll-behavior: contain; scroll-behavior: smooth; }
+.rag-ask-welcome { display: flex; align-items: flex-start; gap: 10px; padding: 14px; border: 1px solid #e6ece7; border-radius: 14px; background: #f8faf8; color: #34483a; }
+.rag-ask-welcome-mark { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 10px; background: #fff0e7; color: #d95f27; }
+.rag-ask-welcome strong { font-size: 14px; }
+.rag-ask-welcome p { margin: 4px 0 0; color: #78857c; font-size: 12px; }
+.rag-chat-turn { display: grid; gap: 9px; min-width: 0; }
+.rag-chat-user-message { justify-self: end; max-width: min(88%, 540px); padding: 11px 14px; border-radius: 15px 15px 4px 15px; background: #244d39; color: #fff; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+.rag-chat-assistant-message { justify-self: start; width: min(100%, 620px); padding: 12px 14px; border: 1px solid #e6ece7; border-radius: 4px 15px 15px; background: #f8faf8; color: #29382f; font-size: 14px; line-height: 1.6; }
+.rag-chat-assistant-message > p { margin: 0; white-space: pre-wrap; }
+.rag-chat-assistant-message.is-loading { display: flex; align-items: center; gap: 8px; color: #68796e; }
+.rag-chat-assistant-message.is-error { color: #b42318; background: #fff6f5; }
+.rag-chat-assistant-message.is-error p { margin-bottom: 7px; }
+.rag-chat-no-source { margin-top: 8px !important; color: #7d8981; font-size: 11px; }
+.rag-ask-suggestions { display: grid; gap: 7px; }
+.rag-ask-suggestions > span { color: #77847b; font-size: 11px; font-weight: 700; }
+.rag-ask-suggestions > div { display: flex; flex-wrap: wrap; gap: 7px; max-height: 112px; overflow-y: auto; }
+.rag-ask-suggestions button { min-height: 34px; padding: 7px 11px; border: 1px solid #dce6df; border-radius: 999px; background: #fff; color: #385443; font: inherit; font-size: 12px; text-align: left; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease; }
+.rag-ask-suggestions button:hover:not(:disabled) { border-color: #244d39; background: #f1f7f2; color: #244d39; }
+.rag-ask-suggestions button:disabled { opacity: .55; cursor: wait; }
+.rag-ask .rag-prompt-composer textarea { min-height: 66px; max-height: 150px; resize: vertical; }
+.rag-ask .rag-prompt-controls .rag-ask-count { font-size: 11px; }
+.rag-chat-assistant-message .rag-ask-stats { margin-top: 12px; }
+.rag-chat-assistant-message .rag-ask-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.rag-chat-assistant-message .rag-ask-grid .book-card { max-width: 100%; }
+
 @keyframes ai-spin {
   to { transform: rotate(360deg); }
 }

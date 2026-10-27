@@ -8,9 +8,11 @@ import {
   LoaderCircle,
   MapPin,
   PackageCheck,
+  Plus,
   Save,
   Search,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
@@ -21,10 +23,12 @@ import {
   askRag,
   getAcquisitionSuggestions,
   getAiSettings,
+  getReaderAiSuggestedQuestions,
   getLibrarianWorkspace,
   markMyAiForLibrary,
   runRagReindex,
   saveLibrarianAiSettings,
+  saveReaderAiSuggestedQuestions,
   type AiCriterion,
   type AiLibrarianWorkspace,
   type AiSettingsStatus,
@@ -366,6 +370,7 @@ const LibrarianAiPage = () => {
         <div className="ai-biz-empty" role="alert">{error}</div>
       ) : (
         <>
+          {accessToken && <ReaderAiQuestionsManager accessToken={accessToken} />}
           <section className="ai-biz-status" aria-live="polite">
             <p>{connectionText}</p>
             <dl>
@@ -632,6 +637,113 @@ const LibrarianAiPage = () => {
     </section>
   );
 };
+
+function ReaderAiQuestionsManager({ accessToken }: { accessToken: string }) {
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [initialQuestions, setInitialQuestions] = useState<string[]>([]);
+  const [newQuestion, setNewQuestion] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedMessage, setSavedMessage] = useState('');
+  const dirty = questions.length !== initialQuestions.length
+    || questions.some((question, index) => question !== initialQuestions[index]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getReaderAiSuggestedQuestions(accessToken)
+      .then((items) => {
+        if (cancelled) return;
+        setQuestions(items);
+        setInitialQuestions(items);
+        setError(null);
+        setSavedMessage('');
+      })
+      .catch((loadError: unknown) => {
+        if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Không tải được câu hỏi gợi ý.');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [accessToken]);
+
+  const addQuestion = () => {
+    const trimmed = newQuestion.trim();
+    if (trimmed.length < 3 || trimmed.length > 180 || questions.length >= 12) return;
+    setQuestions((current) => [...current, trimmed]);
+    setNewQuestion('');
+    setError(null);
+    setSavedMessage('');
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    setSavedMessage('');
+    try {
+      const saved = await saveReaderAiSuggestedQuestions(accessToken, questions);
+      setQuestions(saved);
+      setInitialQuestions(saved);
+      setSavedMessage('Đã cập nhật danh sách hiển thị cho độc giả.');
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Không lưu được câu hỏi gợi ý.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="ai-biz-card ai-reader-questions" aria-labelledby="reader-ai-questions-title">
+      <div className="ai-reader-questions-heading">
+        <div>
+          <h2 id="reader-ai-questions-title"><Sparkles size={17} /> Câu hỏi gợi ý cho độc giả</h2>
+          <p>Quản lý các câu hỏi nhanh hiển thị trong trợ lý AI. Câu trả lời được tạo từ dữ liệu thư viện và chính sách đang áp dụng.</p>
+        </div>
+        <span>{questions.length} / 12 câu hỏi</span>
+      </div>
+      {loading ? <p className="ai-biz-muted">Đang tải danh sách câu hỏi…</p> : (
+        <div className="ai-reader-question-list">
+          {questions.map((item, index) => (
+            <div className="ai-reader-question-row" key={`${index}-${item}`}>
+              <input
+                aria-label={`Câu hỏi gợi ý ${index + 1}`}
+                maxLength={180}
+                value={item}
+                onChange={(event) => {
+                  setSavedMessage('');
+                  setQuestions((current) => current.map((question, itemIndex) => itemIndex === index ? event.target.value : question));
+                }}
+              />
+              <button type="button" className="ai-reader-question-delete" onClick={() => {
+                setSavedMessage('');
+                setQuestions((current) => current.filter((_, itemIndex) => itemIndex !== index));
+              }} aria-label={`Xóa câu hỏi ${index + 1}`}>
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <form className="ai-reader-question-add" onSubmit={(event) => { event.preventDefault(); addQuestion(); }}>
+        <input
+          value={newQuestion}
+          maxLength={180}
+          placeholder="Thêm câu hỏi độc giả thường quan tâm…"
+          onChange={(event) => setNewQuestion(event.target.value)}
+        />
+        <button type="submit" className="ai-btn" disabled={newQuestion.trim().length < 3 || questions.length >= 12}>
+          <Plus size={15} /> Thêm câu hỏi
+        </button>
+      </form>
+      <div className="ai-reader-question-footer">
+        <span className={error ? 'is-error' : ''}>{error || savedMessage || 'Chỉnh sửa trực tiếp nội dung; tối đa 12 câu hỏi.'}</span>
+        <button type="button" className="ai-btn ai-btn--primary" disabled={!dirty || saving || loading} onClick={() => void save()}>
+          {saving ? <LoaderCircle className="ai-spin" size={15} /> : <Save size={15} />}
+          {saving ? 'Đang lưu…' : 'Lưu câu hỏi'}
+        </button>
+      </div>
+    </section>
+  );
+}
 
 function BookSourceList({ sources, empty }: { sources: RagSource[]; empty?: string }) {
   const books = sources.filter((item) => item.sourceType === 'book');

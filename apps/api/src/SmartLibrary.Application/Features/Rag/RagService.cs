@@ -46,6 +46,14 @@ public class RagService
         string role,
         Guid? userId,
         CancellationToken ct = default)
+        => await AskAsync(question, role, userId, null, ct);
+
+    public async Task<Result<RagAskResultDto>> AskAsync(
+        string question,
+        string role,
+        Guid? userId,
+        string? conversationContext,
+        CancellationToken ct = default)
     {
         var query = question?.Trim() ?? string.Empty;
         if (query.Length < MinQuestionLength)
@@ -58,24 +66,25 @@ public class RagService
             return Result<RagAskResultDto>.Failure(credential.Error ?? "Chưa cấu hình nhà cung cấp AI.");
 
         var cred = credential.Data!;
+        var searchQuery = BuildContextualQuery(conversationContext, query);
         var isReader = !AiSettingsService.IsStaff(role);
-        var readerBookSearch = isReader && SearchTopicGuard.IsBookSearch(query);
-        var parts = SearchTopicGuard.SplitIntents(query);
+        var readerBookSearch = isReader && SearchTopicGuard.IsBookSearch(searchQuery);
+        var parts = SearchTopicGuard.SplitIntents(searchQuery);
         if (parts.All(part => SearchTopicGuard.Parse(part).NeedsClarification))
-            return Ok(SearchTopicGuard.ClarifyMessage(SearchTopicGuard.Parse(query)), []);
+            return Ok(SearchTopicGuard.ClarifyMessage(SearchTopicGuard.Parse(searchQuery)), []);
 
         try
         {
-            var (hits, exact) = await RetrieveAsync(cred, query, isReader, ct);
+            var (hits, exact) = await RetrieveAsync(cred, searchQuery, isReader, ct);
             if (hits.Count == 0)
-                return Ok(EmptyAnswer(query), []);
+                return Ok(EmptyAnswer(searchQuery), []);
 
-            var listing = ExplainLocally(query, hits);
+            var listing = ExplainLocally(searchQuery, hits);
             var exactBookOnlyResult = exact && hits.All(hit => string.Equals(
                 hit.SourceType, "book", StringComparison.OrdinalIgnoreCase));
             var answer = readerBookSearch || exactBookOnlyResult
                 ? listing
-                : await ExplainWithAiAsync(cred, query, hits, listing, ct);
+                : await ExplainWithAiAsync(cred, query, conversationContext, hits, listing, ct);
 
             return Ok(string.IsNullOrWhiteSpace(answer) ? listing : answer.Trim(), hits.Select(MapSource).ToList());
         }
@@ -187,8 +196,11 @@ public class RagService
         bool isReader,
         CancellationToken ct)
     {
+        var policyQuestion = SearchTopicGuard.IsPolicyQuestion(query);
         var readerBookSearch = isReader && SearchTopicGuard.IsBookSearch(query);
-        var catalog = await _documents.SearchCatalogAsync(query, 15, ct);
+        var catalog = policyQuestion
+            ? Array.Empty<RagSearchHit>()
+            : await _documents.SearchCatalogAsync(query, 15, ct);
         var catalogOnTopic = SearchTopicGuard.Filter(query, catalog);
         var exact = catalogOnTopic.Any(hit => hit.Score >= ExactMatchScore);
         var semantic = new List<RagSearchHit>();
@@ -208,7 +220,10 @@ public class RagService
                     embeddingText,
                     cred.EmbeddingBaseUrl,
                     ct);
-                semantic.AddRange((await _documents.SearchAsync(embedding, 12, ct))
+                var semanticHits = policyQuestion
+                    ? await _documents.SearchPoliciesAsync(embedding, 20, ct)
+                    : await _documents.SearchAsync(embedding, 12, ct);
+                semantic.AddRange(semanticHits
                     .Where(hit => hit.Score >= MinRelevantScore)
                     .Where(hit => !readerBookSearch
                                   || string.Equals(hit.SourceType, "book", StringComparison.OrdinalIgnoreCase)));
@@ -240,6 +255,7 @@ public class RagService
     private async Task<string> ExplainWithAiAsync(
         AiRuntimeCredential cred,
         string query,
+        string? conversationContext,
         IReadOnlyList<RagSearchHit> hits,
         string listing,
         CancellationToken ct)
@@ -248,16 +264,21 @@ public class RagService
         {
             using var generateCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             generateCts.CancelAfter(TimeSpan.FromSeconds(6));
+            var policyQuestion = SearchTopicGuard.IsPolicyQuestion(query);
             var prompt = $"""
                 Bạn là trợ lý thư viện SmartLibrary của FPT University TP. Hồ Chí Minh.
-                Chỉ giải thích các đầu sách/chính sách đã truy xuất bên dưới.
-                Không thêm sách khác. Không bịa tên sách, tác giả, ISBN, mã sách, số lượng hoặc tình trạng mượn.
+                {(policyQuestion
+                    ? "Đây là câu hỏi về dịch vụ hoặc quy định thư viện. Chỉ dùng các chính sách đang áp dụng được truy xuất bên dưới để trả lời. Không đề xuất hoặc liệt kê sách. Nếu dữ liệu không nêu rõ, hãy nói chưa có thông tin và hướng dẫn liên hệ Thủ thư."
+                    : "Chỉ giải thích các đầu sách/chính sách đã truy xuất bên dưới. Không thêm sách khác. Không bịa tên sách, tác giả, ISBN, mã sách, số lượng hoặc tình trạng mượn.")}
                 Trả lời tiếng Việt, tối đa 80 từ.
 
-                Sách đã truy xuất:
+                Dữ liệu thư viện đã truy xuất:
                 {BuildContext(hits)}
 
-                Câu hỏi: {query}
+                Các lượt trao đổi gần đây:
+                {conversationContext ?? "Chưa có trao đổi trước đó."}
+
+                Câu hỏi hiện tại: {query}
                 """;
             return await _gemini.GenerateAsync(
                 cred.Provider, cred.ApiKey, cred.ChatModel, prompt, cred.BaseUrl, generateCts.Token);
@@ -309,8 +330,21 @@ public class RagService
         return text.Length <= MaxEmbedChars ? text : text[..MaxEmbedChars];
     }
 
+    private static string BuildContextualQuery(string? context, string query)
+    {
+        var trimmed = context?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+            return query;
+        if (trimmed.Length > 2000)
+            trimmed = trimmed[^2000..];
+        return $"{trimmed}\nCâu hỏi hiện tại: {query}";
+    }
+
     private static string EmptyAnswer(string query)
     {
+        if (SearchTopicGuard.IsPolicyQuestion(query))
+            return "Chưa tìm thấy chính sách đang áp dụng phù hợp với câu hỏi. Vui lòng liên hệ Thủ thư để được hỗ trợ chính xác.";
+
         var intent = SearchTopicGuard.Parse(query);
         if (intent.Topics.Count > 0)
         {
@@ -330,6 +364,19 @@ public class RagService
 
     private static string ExplainLocally(string query, IReadOnlyList<RagSearchHit> hits)
     {
+        var policies = hits.Where(hit => hit.SourceType == "policy").ToList();
+        if (policies.Count > 0 && SearchTopicGuard.IsPolicyQuestion(query))
+        {
+            var policyAnswer = new StringBuilder("Thông tin từ chính sách thư viện đang áp dụng: ");
+            foreach (var policy in policies.Take(3))
+            {
+                policyAnswer.Append(policy.Title).Append(". ");
+                if (!string.IsNullOrWhiteSpace(policy.Content))
+                    policyAnswer.Append(policy.Content.Trim()).Append(' ');
+            }
+            return policyAnswer.ToString().Trim();
+        }
+
         var books = hits.Where(hit => hit.SourceType == "book").ToList();
         var intent = SearchTopicGuard.Parse(query);
         if (books.Count == 0)

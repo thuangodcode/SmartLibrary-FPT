@@ -300,6 +300,7 @@ public class AppDbContext : DbContext
             entity.Property(x => x.BaseUrl).HasMaxLength(500);
             entity.Property(x => x.ProviderKeysJson).HasColumnName("provider_keys_json");
             entity.Property(x => x.LibrarianCriteriaJson).HasColumnName("librarian_criteria_json");
+            entity.Property(x => x.ReaderSuggestedQuestionsJson).HasColumnName("reader_suggested_questions_json");
             entity.Property(x => x.IndexEmbeddingModel).HasMaxLength(100);
             entity.Property(x => x.LastTestMessage).HasMaxLength(500);
         });

@@ -9,6 +9,7 @@ public interface IRagDocumentRepository
     Task UpsertAsync(RagDocument document, float[] embedding, CancellationToken ct = default);
     Task DeleteBySourceAsync(string sourceType, Guid sourceId, CancellationToken ct = default);
     Task<IReadOnlyList<RagSearchHit>> SearchAsync(float[] embedding, int limit, CancellationToken ct = default);
+    Task<IReadOnlyList<RagSearchHit>> SearchPoliciesAsync(float[] embedding, int limit, CancellationToken ct = default);
     Task<IReadOnlyList<RagSearchHit>> SearchCatalogAsync(string question, int limit, CancellationToken ct = default);
     Task<IReadOnlyList<RagSearchHit>> AttachBookFactsAsync(IReadOnlyList<RagSearchHit> hits, CancellationToken ct = default);
     Task<int> CountAsync(CancellationToken ct = default);
