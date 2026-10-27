@@ -23,7 +23,6 @@ import {
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import smartLibraryLogo from '../../../assets/figma/auth-logo-fpt.png';
-import { LanguageSwitcher } from '../../../components/ui/LanguageSwitcher';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import './AdminLayout.css';
@@ -246,7 +245,6 @@ export const AdminLayout: React.FC = () => {
             <Menu size={21} />
           </button>
           <div className="admin-topbar-actions">
-            <LanguageSwitcher />
             <button
               type="button"
               className="admin-icon-button"

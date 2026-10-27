@@ -5,7 +5,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import smartLibraryLogo from '../../../assets/figma/smartlibrary-logo.png';
 import { useToast } from '../../../components/ui/useToast';
-import { LanguageSwitcher } from '../../../components/ui/LanguageSwitcher';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
@@ -435,7 +434,6 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
         <div className="annual-header-search">{searchSlot ?? defaultSearch}</div>
         {isAuthenticated && user ? (
           <div className="annual-account annual-header-actions">
-            <LanguageSwitcher />
             <button
               type="button"
               className="annual-theme-toggle"
@@ -563,7 +561,6 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
           </div>
         ) : (
           <div className="annual-auth annual-header-actions">
-            <LanguageSwitcher />
             <button
               type="button"
               className="annual-theme-toggle"

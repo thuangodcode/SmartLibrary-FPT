@@ -72,22 +72,25 @@ const resources = {
   },
 } as const;
 
-const storedLanguage = window.localStorage.getItem('smartlibrary.language');
+window.localStorage.setItem('smartlibrary.language', 'vi');
 
 void i18n.use(initReactI18next).init({
   resources,
-  lng: storedLanguage === 'en' ? 'en' : 'vi',
+  lng: 'vi',
   fallbackLng: 'vi',
   interpolation: { escapeValue: false },
   returnNull: false,
 });
 
 i18n.on('languageChanged', (language) => {
-  const supportedLanguage = language === 'en' ? 'en' : 'vi';
-  window.localStorage.setItem('smartlibrary.language', supportedLanguage);
-  document.documentElement.lang = supportedLanguage;
+  if (language !== 'vi') {
+    void i18n.changeLanguage('vi');
+    return;
+  }
+  window.localStorage.setItem('smartlibrary.language', 'vi');
+  document.documentElement.lang = 'vi';
 });
 
-document.documentElement.lang = storedLanguage === 'en' ? 'en' : 'vi';
+document.documentElement.lang = 'vi';
 
 export default i18n;

@@ -25,7 +25,6 @@ import {
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import smartLibraryLogo from '../../../assets/figma/auth-logo-fpt.png';
-import { LanguageSwitcher } from '../../../components/ui/LanguageSwitcher';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { API_BASE_URL } from '../../../config';
@@ -392,7 +391,6 @@ export const LibrarianLayout: React.FC = () => {
             <strong>{translateLabel(currentPage)}</strong>
           </div>
           <div className="lib-topbar-actions">
-            <LanguageSwitcher />
             <details className="lib-notification-menu">
               <summary className="lib-icon-button" aria-label={`Thông báo${unreadCount ? `, ${unreadCount} thông báo chưa xem` : ''}`}>
                 <Bell size={19} />
