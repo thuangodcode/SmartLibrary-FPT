@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Camera, Check, LoaderCircle, Mail, UserRound, X } from 'lucide-react';
+import { AlertCircle, Camera, Check, LoaderCircle, Mail, Pencil, UserRound, X } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
@@ -46,6 +46,11 @@ const ProfilePage: React.FC = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [clearAvatar, setClearAvatar] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [address, setAddress] = useState('');
   const [emailVerificationEmail, setEmailVerificationEmail] = useState('');
   const [emailVerificationOtp, setEmailVerificationOtp] = useState('');
   const [emailOtpSent, setEmailOtpSent] = useState(false);
@@ -79,6 +84,10 @@ const ProfilePage: React.FC = () => {
         }
         if (!cancelled) {
           setProfile(result.data);
+          setFullName(result.data.fullName || '');
+          setPhone(result.data.phone || '');
+          setDateOfBirth(result.data.dateOfBirth || '');
+          setAddress(result.data.address || '');
           if (!result.data.email.toLowerCase().endsWith('@smartlibrary.local')) {
             setEmailVerificationEmail(result.data.email);
           }
@@ -95,6 +104,26 @@ const ProfilePage: React.FC = () => {
     };
   }, [accessToken]);
 
+  const handleStartEdit = () => {
+    setIsEditing(true);
+    setError(null);
+    setNotice(null);
+  };
+
+  const handleCancel = () => {
+    if (profile) {
+      setFullName(profile.fullName || '');
+      setPhone(profile.phone || '');
+      setDateOfBirth(profile.dateOfBirth || '');
+      setAddress(profile.address || '');
+    }
+    setAvatarFile(null);
+    setClearAvatar(false);
+    if (avatarInputRef.current) avatarInputRef.current.value = '';
+    setIsEditing(false);
+    setError(null);
+  };
+
   const updateProfile = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!accessToken || !currentUser) {
@@ -106,7 +135,11 @@ const ProfilePage: React.FC = () => {
     setError(null);
     setNotice(null);
     try {
-      const form = new FormData(event.currentTarget);
+      const form = new FormData();
+      form.set('FullName', fullName.trim());
+      form.set('Phone', phone.trim());
+      form.set('DateOfBirth', dateOfBirth);
+      form.set('Address', address.trim());
       form.set('ClearAvatar', String(clearAvatar));
       if (avatarFile) form.set('Avatar', avatarFile);
       const response = await fetch(`${API_BASE_URL}/api/v1/profile`, {
@@ -120,8 +153,13 @@ const ProfilePage: React.FC = () => {
       }
 
       setProfile(result.data);
+      setFullName(result.data.fullName || '');
+      setPhone(result.data.phone || '');
+      setDateOfBirth(result.data.dateOfBirth || '');
+      setAddress(result.data.address || '');
       setAvatarFile(null);
       setClearAvatar(false);
+      setIsEditing(false);
       if (avatarInputRef.current) avatarInputRef.current.value = '';
       setAuth(
         { ...currentUser, fullName: result.data.fullName, avatarUrl: result.data.avatarUrl ?? undefined },
@@ -302,15 +340,36 @@ const ProfilePage: React.FC = () => {
       {loading && accessToken ? (
         <div className="profile-loading"><LoaderCircle size={20} className="profile-spinner" /> Đang tải hồ sơ...</div>
       ) : profile ? (
-        <form className="profile-card" onSubmit={(event) => void updateProfile(event)}>
+        <form className={`profile-card${isEditing ? ' profile-card--editing' : ''}`} onSubmit={(event) => void updateProfile(event)}>
           <section className="profile-card-main">
-            <h2>Thông tin cá nhân</h2>
-            <p className="profile-card-description">Thông tin này được dùng trong tài khoản SmartLibrary của bạn.</p>
+            <div className="profile-card-header">
+              <div>
+                <h2>Thông tin cá nhân</h2>
+                <p className="profile-card-description">Thông tin này được dùng trong tài khoản SmartLibrary của bạn.</p>
+              </div>
+              {!isEditing && (
+                <button
+                  className="profile-btn-edit-header"
+                  onClick={handleStartEdit}
+                  type="button"
+                >
+                  <Pencil size={14} /> Chỉnh sửa
+                </button>
+              )}
+            </div>
 
             <div className="profile-fields">
               <label>
                 Họ và tên
-                <input autoComplete="name" maxLength={255} name="FullName" defaultValue={profile.fullName} required />
+                <input
+                  autoComplete="name"
+                  maxLength={255}
+                  name="FullName"
+                  onChange={(event) => setFullName(event.target.value)}
+                  readOnly={!isEditing}
+                  required
+                  value={fullName}
+                />
               </label>
               <label>
                 Email
@@ -318,15 +377,40 @@ const ProfilePage: React.FC = () => {
               </label>
               <label>
                 Số điện thoại
-                <input autoComplete="tel" maxLength={30} name="Phone" defaultValue={profile.phone ?? ''} type="tel" />
+                <input
+                  autoComplete="tel"
+                  maxLength={30}
+                  name="Phone"
+                  onChange={(event) => setPhone(event.target.value)}
+                  placeholder={isEditing ? 'Nhập số điện thoại' : ''}
+                  readOnly={!isEditing}
+                  type="tel"
+                  value={phone}
+                />
               </label>
               <label>
                 Ngày sinh
-                <input name="DateOfBirth" type="date" defaultValue={profile.dateOfBirth ?? ''} />
+                <input
+                  disabled={!isEditing}
+                  name="DateOfBirth"
+                  onChange={(event) => setDateOfBirth(event.target.value)}
+                  readOnly={!isEditing}
+                  type="date"
+                  value={dateOfBirth}
+                />
               </label>
               <label className="profile-field-wide">
                 Địa chỉ
-                <textarea autoComplete="street-address" maxLength={500} name="Address" defaultValue={profile.address ?? ''} rows={3} />
+                <textarea
+                  autoComplete="street-address"
+                  maxLength={500}
+                  name="Address"
+                  onChange={(event) => setAddress(event.target.value)}
+                  placeholder={isEditing ? 'Nhập địa chỉ' : ''}
+                  readOnly={!isEditing}
+                  rows={3}
+                  value={address}
+                />
               </label>
             </div>
           </section>
@@ -339,33 +423,37 @@ const ProfilePage: React.FC = () => {
             </div>
             <strong>Ảnh đại diện</strong>
             <span>{avatarFile?.name ?? 'Ảnh hiển thị trên hồ sơ và thanh điều hướng.'}</span>
-            <label className="profile-avatar-upload">
-              <Camera size={15} /> {visibleAvatar ? 'Đổi ảnh' : 'Tải ảnh lên'}
-              <input
-                accept="image/jpeg,image/png,image/webp"
-                ref={avatarInputRef}
-                onChange={(event) => selectAvatar(event.currentTarget.files?.[0], event.currentTarget)}
-                type="file"
-              />
-            </label>
-            <small>JPG, PNG hoặc WebP · tối đa 5 MB</small>
-            {(avatarFile || profile.avatarUrl) && (
-              <button
-                className="profile-avatar-remove"
-                onClick={() => {
-                  if (avatarFile) {
-                    setAvatarFile(null);
-                    setClearAvatar(false);
-                    if (avatarInputRef.current) avatarInputRef.current.value = '';
-                  } else {
-                    setClearAvatar(!clearAvatar);
-                  }
-                }}
-                type="button"
-              >
-                <X size={14} /> {clearAvatar ? 'Giữ ảnh hiện tại' : 'Xóa ảnh'}
-              </button>
-            )}
+            {isEditing ? (
+              <>
+                <label className="profile-avatar-upload">
+                  <Camera size={15} /> {visibleAvatar ? 'Đổi ảnh' : 'Tải ảnh lên'}
+                  <input
+                    accept="image/jpeg,image/png,image/webp"
+                    ref={avatarInputRef}
+                    onChange={(event) => selectAvatar(event.currentTarget.files?.[0], event.currentTarget)}
+                    type="file"
+                  />
+                </label>
+                <small>JPG, PNG hoặc WebP · tối đa 5 MB</small>
+                {(avatarFile || profile.avatarUrl) && (
+                  <button
+                    className="profile-avatar-remove"
+                    onClick={() => {
+                      if (avatarFile) {
+                        setAvatarFile(null);
+                        setClearAvatar(false);
+                        if (avatarInputRef.current) avatarInputRef.current.value = '';
+                      } else {
+                        setClearAvatar(!clearAvatar);
+                      }
+                    }}
+                    type="button"
+                  >
+                    <X size={14} /> {clearAvatar ? 'Giữ ảnh hiện tại' : 'Xóa ảnh'}
+                  </button>
+                )}
+              </>
+            ) : null}
           </aside>
 
           <section className="profile-account-details">
@@ -379,10 +467,30 @@ const ProfilePage: React.FC = () => {
           </section>
 
           <footer className="profile-card-actions">
-            <button disabled={busy} type="submit">
-              {busy ? <LoaderCircle size={16} className="profile-spinner" /> : <Check size={16} />}
-              Lưu thay đổi
-            </button>
+            {!isEditing ? (
+              <button
+                className="profile-btn-edit"
+                onClick={handleStartEdit}
+                type="button"
+              >
+                <Pencil size={15} /> Chỉnh sửa
+              </button>
+            ) : (
+              <>
+                <button
+                  className="profile-btn-cancel"
+                  disabled={busy}
+                  onClick={handleCancel}
+                  type="button"
+                >
+                  <X size={15} /> Hủy
+                </button>
+                <button className="profile-btn-save" disabled={busy} type="submit">
+                  {busy ? <LoaderCircle size={16} className="profile-spinner" /> : <Check size={16} />}
+                  Lưu thay đổi
+                </button>
+              </>
+            )}
           </footer>
         </form>
       ) : null}
