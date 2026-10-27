@@ -25,7 +25,7 @@ public sealed class ReportService(IReportRepository repository)
             requests = requests.Where(x => x.LibrarianId == userId);
 
         var results = await requests.OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
-        return results.Select(x =>
+        var mappedRequests = results.Select(x =>
         {
             var lastReport = x.Reports.OrderByDescending(report => report.CreatedAt).FirstOrDefault();
             var lastReviewComment = lastReport?.Reviews
@@ -50,6 +50,38 @@ public sealed class ReportService(IReportRepository repository)
                 lastReport is null ? null : lastReport.IsApproved ? "Approved" : lastReport.Status,
                 lastReviewComment);
         }).ToList();
+
+        if (isAdmin)
+        {
+            var linkedReportIds = results.SelectMany(request => request.Reports).Select(report => report.Id).ToHashSet();
+            var directReports = await repository.Reports.AsNoTracking().IgnoreQueryFilters()
+                .Include(report => report.Submitter)
+                .Include(report => report.Template)
+                .Where(report => report.RequestId == null && !report.IsDeleted)
+                .OrderByDescending(report => report.CreatedAt)
+                .ToListAsync(ct);
+
+            mappedRequests.AddRange(directReports
+                .Where(report => !linkedReportIds.Contains(report.Id))
+                .Select(report => new ReportRequestDto(
+                    report.Id,
+                    report.SubmittedBy,
+                    GetDisplayName(report.Submitter?.FullName, "Không xác định"),
+                    report.TemplateId,
+                    GetDisplayName(report.Template?.Name, "Báo cáo"),
+                    report.Template?.ReportType ?? "Periodic",
+                    report.PeriodStart,
+                    report.PeriodEnd.AddDays(1),
+                    report.Name,
+                    "Submitted",
+                    report.CreatedAt,
+                    report.Id,
+                    report.Id,
+                    report.IsApproved ? "Approved" : report.Status,
+                    null)));
+        }
+
+        return mappedRequests.OrderByDescending(request => request.CreatedAt).ToList();
     }
 
     public async Task<ReportRequestDto> CreateReportRequestAsync(CreateReportRequestAssignment request, Guid adminId, CancellationToken ct)
