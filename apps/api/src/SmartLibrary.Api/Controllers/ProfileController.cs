@@ -131,7 +131,7 @@ public sealed class ProfileController(
             void UpdateOrAddDoc(DocumentSide side, string? url, IFormFile? file)
             {
                 if (url is null || file is null) return;
-                var existing = reg.Documents.FirstOrDefault(d => d.Side == side && !d.IsDeleted);
+                var existing = reg.Documents.FirstOrDefault(d => d.Side == side);
                 if (existing is not null)
                 {
                     existing.StoragePath = url;

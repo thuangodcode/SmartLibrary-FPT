@@ -33,9 +33,9 @@ public sealed class UserProfileService(
             .Select(r => new
             {
                 r.DocumentType,
-                FrontDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Front && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
-                BackDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Back && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
-                SelfieDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Selfie && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
+                FrontDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Front).Select(d => d.StoragePath).FirstOrDefault(),
+                BackDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Back).Select(d => d.StoragePath).FirstOrDefault(),
+                SelfieDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Selfie).Select(d => d.StoragePath).FirstOrDefault(),
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -82,9 +82,9 @@ public sealed class UserProfileService(
             .Select(r => new
             {
                 r.DocumentType,
-                FrontDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Front && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
-                BackDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Back && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
-                SelfieDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Selfie && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
+                FrontDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Front).Select(d => d.StoragePath).FirstOrDefault(),
+                BackDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Back).Select(d => d.StoragePath).FirstOrDefault(),
+                SelfieDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Selfie).Select(d => d.StoragePath).FirstOrDefault(),
             })
             .FirstOrDefaultAsync(cancellationToken);
 

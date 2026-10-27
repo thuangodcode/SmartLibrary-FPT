@@ -334,9 +334,9 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
                 request.Id,
                 DocumentType = request.DocumentType.ToString(),
                 Status = request.Status.ToString(),
-                FrontDocUrl = request.Documents.Where(d => d.Side == DocumentSide.Front && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
-                BackDocUrl = request.Documents.Where(d => d.Side == DocumentSide.Back && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
-                SelfieDocUrl = request.Documents.Where(d => d.Side == DocumentSide.Selfie && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
+                FrontDocUrl = request.Documents.Where(d => d.Side == DocumentSide.Front).Select(d => d.StoragePath).FirstOrDefault(),
+                BackDocUrl = request.Documents.Where(d => d.Side == DocumentSide.Back).Select(d => d.StoragePath).FirstOrDefault(),
+                SelfieDocUrl = request.Documents.Where(d => d.Side == DocumentSide.Selfie).Select(d => d.StoragePath).FirstOrDefault(),
             })
             .FirstOrDefaultAsync(cancellationToken);
         var documents = registration is null
@@ -344,7 +344,6 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
             : await _dbContext.RegistrationRequests
                 .Where(request => request.Id == registration.Id)
                 .SelectMany(request => request.Documents)
-                .Where(document => !document.IsDeleted)
                 .Select(document => new IdentityDocumentSummary(
                     document.Id,
                     document.Side.ToString(),
