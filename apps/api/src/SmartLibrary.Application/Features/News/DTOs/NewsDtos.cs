@@ -39,3 +39,18 @@ public class UpdateNewsForm
     public IFormFile? Image { get; set; }
     public bool RemoveImage { get; set; }
 }
+
+public sealed record NewsCommentDto(
+    Guid Id,
+    Guid? ParentCommentId,
+    Guid AuthorId,
+    string AuthorName,
+    string? AuthorAvatarUrl,
+    string AuthorRole,
+    string Content,
+    bool IsDeleted,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+public sealed record CreateNewsCommentRequest(string? Content, Guid? ParentCommentId);
+public sealed record UpdateNewsCommentRequest(string? Content);

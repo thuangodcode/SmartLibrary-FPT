@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   Plus,
@@ -45,6 +46,7 @@ const errorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
 
 const LibrarianNewsPage: React.FC = () => {
+  const navigate = useNavigate();
   const accessToken = useAuthStore((s) => s.accessToken);
   const user = useAuthStore((s) => s.user);
   const { showToast } = useToast();
@@ -364,7 +366,7 @@ const LibrarianNewsPage: React.FC = () => {
       ) : (
         <div className="lib-news-grid">
           {filteredArticles.map((art) => (
-            <article key={art.id} className="lib-news-card">
+            <article key={art.id} className="lib-news-card lib-news-card--clickable" onClick={() => navigate(`/librarian/news/${art.id}`)}>
               <div className="lib-news-card-image">
                 {art.imageUrl ? (
                   <img src={art.imageUrl} alt={art.title} loading="lazy" />
@@ -390,7 +392,7 @@ const LibrarianNewsPage: React.FC = () => {
                 </div>
 
                 <h3 className="lib-news-card-title" title={art.title}>
-                  {art.title}
+                  <button type="button" className="lib-news-card-open" onClick={() => navigate(`/librarian/news/${art.id}`)}>{art.title}</button>
                 </h3>
 
                 <p className="lib-news-card-summary">{art.summary}</p>
@@ -405,7 +407,7 @@ const LibrarianNewsPage: React.FC = () => {
                     <button
                       type="button"
                       className="lib-news-btn-icon"
-                      onClick={() => handleOpenEdit(art)}
+                      onClick={(event) => { event.stopPropagation(); handleOpenEdit(art); }}
                       title="Chỉnh sửa thông báo"
                     >
                       <Pencil size={15} />
@@ -413,7 +415,7 @@ const LibrarianNewsPage: React.FC = () => {
                     <button
                       type="button"
                       className="lib-news-btn-icon danger"
-                      onClick={() => setDeletingArticle(art)}
+                      onClick={(event) => { event.stopPropagation(); setDeletingArticle(art); }}
                       title="Xóa thông báo"
                     >
                       <Trash2 size={15} />

@@ -21,7 +21,9 @@ import {
   X,
 } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import smartLibraryLogo from '../../../assets/figma/auth-logo-fpt.png';
+import { LanguageSwitcher } from '../../../components/ui/LanguageSwitcher';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import './AdminLayout.css';
@@ -49,6 +51,15 @@ const reportNavigation = [
 const EXPAND_DELAY_MS = 140;
 
 export const AdminLayout: React.FC = () => {
+  const { t } = useTranslation();
+  const translatedLabels: Record<string, string> = {
+    'Tổng quan': 'shell.adminOverview', 'Quản lý người dùng': 'shell.users', 'Quản lý chính sách': 'shell.policies',
+    'Quản lý quy định': 'shell.regulations', 'Thống kê & báo cáo': 'shell.reports', 'Cấu hình AI': 'shell.aiSettings',
+    'Theo dõi giao việc': 'shell.reportAssignments', 'Hoạt động thư viện': 'shell.reportActivity', 'Tài chính': 'shell.reportFinance',
+    'Kho sách': 'shell.reportCollection', 'Báo cáo định kỳ': 'shell.reportPeriodic', 'Thư viện báo cáo': 'shell.reportLibrary',
+    'Quản lý mẫu báo cáo': 'shell.reportTemplates',
+  };
+  const translateLabel = (label: string) => translatedLabels[label] ? t(translatedLabels[label]) : label;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [railExpanded, setRailExpanded] = useState(false);
   const [hoverCapable, setHoverCapable] = useState(true);
@@ -89,7 +100,7 @@ export const AdminLayout: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    showToast({ type: 'success', title: 'Đăng xuất thành công', message: 'Bạn đã đăng xuất khỏi SmartLibrary.' });
+    showToast({ type: 'success', title: t('header.logoutSuccess'), message: t('header.logoutMessage') });
     navigate('/login');
   };
 
@@ -170,15 +181,15 @@ export const AdminLayout: React.FC = () => {
               {to === '/admin/reports' ? (
                 <button
                   type="button"
-                  title={showTooltips ? label : undefined}
-                  data-tooltip={label}
+                  title={showTooltips ? translateLabel(label) : undefined}
+                  data-tooltip={translateLabel(label)}
                   aria-expanded={reportsMenuOpen}
                   aria-controls="admin-report-subnavigation"
                   onClick={() => setReportsMenuOpen((open) => !open)}
                   className={`admin-nav-link admin-nav-toggle${active ? ' admin-nav-link-active' : ''}`}
                 >
                   <Icon size={20} strokeWidth={1.9} className="admin-nav-icon" />
-                  <span className="admin-nav-label">{label}</span>
+                  <span className="admin-nav-label">{translateLabel(label)}</span>
                   <ChevronDown size={16} className={`admin-nav-chevron${reportsMenuOpen ? ' admin-nav-chevron-open' : ''}`} />
                 </button>
               ) : (
@@ -186,26 +197,26 @@ export const AdminLayout: React.FC = () => {
                   to={to}
                   end={end}
                   title={showTooltips ? label : undefined}
-                  data-tooltip={label}
+                  data-tooltip={translateLabel(label)}
                   onClick={() => setMobileOpen(false)}
                   className={`admin-nav-link${active ? ' admin-nav-link-active' : ''}`}
                 >
                   <Icon size={20} strokeWidth={1.9} className="admin-nav-icon" />
-                  <span className="admin-nav-label">{label}</span>
+                  <span className="admin-nav-label">{translateLabel(label)}</span>
                 </NavLink>
               )}
-              {to === '/admin/reports' && <div id="admin-report-subnavigation" className={`admin-subnavigation${reportsMenuOpen ? ' admin-subnavigation-open' : ''}`} aria-label="Các mục thống kê và báo cáo">
+              {to === '/admin/reports' && <div id="admin-report-subnavigation" className={`admin-subnavigation${reportsMenuOpen ? ' admin-subnavigation-open' : ''}`} aria-label={translateLabel('Thống kê & báo cáo')}>
                 {reportNavigation.map(({ label: reportLabel, to: reportTo, icon: ReportIcon }) => (
                   <NavLink
                     key={reportTo}
                     to={reportTo}
                     title={showTooltips ? reportLabel : undefined}
-                    data-tooltip={reportLabel}
+                    data-tooltip={translateLabel(reportLabel)}
                     onClick={() => setMobileOpen(false)}
                     className={({ isActive: reportActive }) => `admin-subnav-link${reportActive ? ' admin-subnav-link-active' : ''}`}
                   >
                     <ReportIcon size={16} strokeWidth={1.9} className="admin-subnav-icon" />
-                    <span className="admin-nav-label">{reportLabel}</span>
+                    <span className="admin-nav-label">{translateLabel(reportLabel)}</span>
                   </NavLink>
                 ))}
               </div>}
@@ -218,7 +229,7 @@ export const AdminLayout: React.FC = () => {
             <span className="admin-help-icon"><BookOpen size={18} /></span>
             <div className="admin-help-copy">
               <strong>SmartLibrary</strong>
-              <p>Quản lý thư viện trong một không gian thống nhất.</p>
+              <p>{t('shell.libraryManagement')}</p>
             </div>
           </div>
         </div>
@@ -229,12 +240,13 @@ export const AdminLayout: React.FC = () => {
           <button
             type="button"
             className="admin-menu-button"
-            aria-label="Mở menu"
+            aria-label={t('header.openMenu')}
             onClick={() => setMobileOpen(true)}
           >
             <Menu size={21} />
           </button>
           <div className="admin-topbar-actions">
+            <LanguageSwitcher />
             <button
               type="button"
               className="admin-icon-button"
@@ -246,22 +258,22 @@ export const AdminLayout: React.FC = () => {
             </button>
             <span className="admin-topbar-divider" />
             <details className="admin-profile-menu" ref={profileMenuRef}>
-              <summary className="admin-profile" aria-label="Mở menu tài khoản">
+              <summary className="admin-profile" aria-label={t('header.accountMenu')}>
               {user?.avatarUrl
                 ? <img className="admin-avatar admin-avatar-image" src={user.avatarUrl} alt="" />
                 : <div className="admin-avatar">{user?.fullName?.trim().charAt(0).toUpperCase() || 'A'}</div>}
               <div className="admin-profile-copy">
-                <strong>{user?.fullName || 'Quản trị viên'}</strong>
-                <span>Quản trị viên</span>
+                <strong>{user?.fullName || t('shell.administrator')}</strong>
+                <span>{t('shell.administrator')}</span>
               </div>
               <ChevronDown size={16} className="admin-profile-chevron" />
               </summary>
               <div className="admin-profile-dropdown">
                 <Link to="/admin/profile" onClick={() => { if (profileMenuRef.current) profileMenuRef.current.open = false; }}>
-                  <UsersRound size={16} /> Hồ sơ cá nhân
+                  <UsersRound size={16} /> {t('shell.profile')}
                 </Link>
                 <button type="button" onClick={handleLogout}>
-                  <LogOut size={16} /> Đăng xuất
+                  <LogOut size={16} /> {t('header.logout')}
                 </button>
               </div>
             </details>

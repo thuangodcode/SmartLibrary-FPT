@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -114,6 +115,162 @@ public class NewsController : ControllerBase
         };
 
         return Ok(ApiResponse<NewsArticleDto>.Ok(dto));
+    }
+
+    [HttpGet("{id:guid}/comments")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetComments(Guid id, CancellationToken ct = default)
+    {
+        var articleExists = await _db.NewsArticles.AsNoTracking()
+            .AnyAsync(article => article.Id == id && article.IsPublished, ct);
+        if (!articleExists)
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy bài viết tin tức."));
+
+        var comments = await _db.NewsComments.AsNoTracking()
+            .Where(comment => comment.NewsArticleId == id)
+            .OrderBy(comment => comment.CreatedAt)
+            .Take(500)
+            .Select(comment => new NewsCommentDto(
+                comment.Id,
+                comment.ParentCommentId,
+                comment.AuthorId,
+                comment.Author.FullName,
+                comment.Author.AvatarUrl,
+                comment.Author.Role.Name,
+                comment.IsDeleted ? "Bình luận đã được ẩn bởi thư viện." : comment.Content,
+                comment.IsDeleted,
+                comment.CreatedAt,
+                comment.UpdatedAt))
+            .ToListAsync(ct);
+
+        return Ok(ApiResponse<IReadOnlyList<NewsCommentDto>>.Ok(comments));
+    }
+
+    [HttpPost("{id:guid}/comments")]
+    [Authorize]
+    public async Task<IActionResult> CreateComment(
+        Guid id,
+        [FromBody] CreateNewsCommentRequest request,
+        CancellationToken ct = default)
+    {
+        var isReader = User.IsInRole("Reader");
+        var isLibraryStaff = User.IsInRole("Librarian") || User.IsInRole("Admin");
+        if (!isReader && !isLibraryStaff)
+            return Forbid();
+
+        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var authorId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản độc giả."));
+
+        var articleExists = await _db.NewsArticles.AnyAsync(article => article.Id == id && article.IsPublished, ct);
+        if (!articleExists)
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy bài viết tin tức."));
+
+        var content = request.Content?.Trim();
+        if (string.IsNullOrWhiteSpace(content) || content.Length > 2000)
+            return BadRequest(ApiResponse<object>.Fail("Bình luận phải có từ 1 đến 2.000 ký tự."));
+
+        if (request.ParentCommentId.HasValue)
+        {
+            if (!isLibraryStaff)
+                return Forbid();
+            var parentExists = await _db.NewsComments.AnyAsync(comment =>
+                comment.Id == request.ParentCommentId.Value
+                && comment.NewsArticleId == id
+                && comment.ParentCommentId == null
+                && !comment.IsDeleted
+                && comment.Author.Role.Name == "Reader", ct);
+            if (!parentExists)
+                return BadRequest(ApiResponse<object>.Fail("Không tìm thấy bình luận cần phản hồi."));
+        }
+        else if (!isReader)
+        {
+            return BadRequest(ApiResponse<object>.Fail("Thủ thư cần chọn bình luận độc giả để trả lời."));
+        }
+
+        var now = DateTime.UtcNow;
+        var comment = new NewsComment
+        {
+            Id = Guid.NewGuid(),
+            NewsArticleId = id,
+            AuthorId = authorId,
+            ParentCommentId = request.ParentCommentId,
+            Content = content,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        _db.NewsComments.Add(comment);
+        await _db.SaveChangesAsync(ct);
+
+        var dto = await _db.NewsComments.AsNoTracking()
+            .Where(item => item.Id == comment.Id)
+            .Select(item => new NewsCommentDto(
+                item.Id,
+                item.ParentCommentId,
+                item.AuthorId,
+                item.Author.FullName,
+                item.Author.AvatarUrl,
+                item.Author.Role.Name,
+                item.Content,
+                item.IsDeleted,
+                item.CreatedAt,
+                item.UpdatedAt))
+            .SingleAsync(ct);
+
+        return CreatedAtAction(nameof(GetComments), new { id }, ApiResponse<NewsCommentDto>.Ok(dto));
+    }
+
+    [HttpPut("{id:guid}/comments/{commentId:guid}")]
+    [Authorize(Policy = "LibrarianOnly")]
+    public async Task<IActionResult> UpdateComment(
+        Guid id,
+        Guid commentId,
+        [FromBody] UpdateNewsCommentRequest request,
+        CancellationToken ct = default)
+    {
+        var comment = await _db.NewsComments.FirstOrDefaultAsync(item =>
+            item.Id == commentId && item.NewsArticleId == id && !item.IsDeleted, ct);
+        if (comment is null)
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy bình luận."));
+
+        var content = request.Content?.Trim();
+        if (string.IsNullOrWhiteSpace(content) || content.Length > 2000)
+            return BadRequest(ApiResponse<object>.Fail("Bình luận phải có từ 1 đến 2.000 ký tự."));
+
+        comment.Content = content;
+        comment.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        var dto = await _db.NewsComments.AsNoTracking()
+            .Where(item => item.Id == comment.Id)
+            .Select(item => new NewsCommentDto(
+                item.Id,
+                item.ParentCommentId,
+                item.AuthorId,
+                item.Author.FullName,
+                item.Author.AvatarUrl,
+                item.Author.Role.Name,
+                item.Content,
+                item.IsDeleted,
+                item.CreatedAt,
+                item.UpdatedAt))
+            .SingleAsync(ct);
+        return Ok(ApiResponse<NewsCommentDto>.Ok(dto));
+    }
+
+    [HttpDelete("{id:guid}/comments/{commentId:guid}")]
+    [Authorize(Policy = "LibrarianOnly")]
+    public async Task<IActionResult> DeleteComment(Guid id, Guid commentId, CancellationToken ct = default)
+    {
+        var comment = await _db.NewsComments.FirstOrDefaultAsync(item =>
+            item.Id == commentId && item.NewsArticleId == id && !item.IsDeleted, ct);
+        if (comment is null)
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy bình luận."));
+
+        comment.Content = string.Empty;
+        comment.IsDeleted = true;
+        comment.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
     }
 
     /// <summary>

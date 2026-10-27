@@ -205,6 +205,20 @@
   position: relative;
 }
 
+.lib-news-card--clickable { cursor: pointer; }
+.lib-news-card-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lib-news-card-open:focus-visible { outline: 2px solid #f36f21; outline-offset: 3px; border-radius: 3px; }
+
 .lib-news-card:hover {
   transform: translateY(-3px);
   box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.08);

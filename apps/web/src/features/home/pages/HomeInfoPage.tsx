@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Calendar,
@@ -7,11 +8,9 @@ import {
   Pin,
   Sparkles,
   ArrowRight,
-  X,
-  Share2,
   BookOpen,
-  CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  X,
 } from 'lucide-react';
 import HomeFooter from '../components/HomeFooter';
 import HomeNavbar from '../components/HomeNavbar';
@@ -60,7 +59,7 @@ const CATEGORIES = [
 ];
 
 // Curated default news to ensure the user news section is NEVER empty
-const FALLBACK_NEWS: NewsArticleItem[] = [
+export const FALLBACK_NEWS: NewsArticleItem[] = [
   {
     id: 'seed-1',
     title: 'Thư viện SmartLibrary chính thức tích hợp AI Tìm kiếm Ngữ Nghĩa & Đề xuất sách thông minh',
@@ -142,14 +141,13 @@ const pageCopy: Record<HomeInfoSection, { title: string; description: string }> 
 
 const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
   const { title, description } = pageCopy[section];
+  const navigate = useNavigate();
 
   // News states
   const [articles, setArticles] = useState<NewsArticleItem[]>(FALLBACK_NEWS);
   const [selectedCategory, setSelectedCategory] = useState<string>('Tất cả');
   const [searchInput, setSearchInput] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeArticle, setActiveArticle] = useState<NewsArticleItem | null>(null);
-  const [isCopied, setIsCopied] = useState<boolean>(false);
   const [liveUpdatedToast, setLiveUpdatedToast] = useState<string | null>(null);
 
   // Fetch news from API with fallback
@@ -192,20 +190,6 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
       void Promise.resolve().then(() => fetchNews());
     }
   }, [section, fetchNews]);
-
-  useEffect(() => {
-    if (!activeArticle) return undefined;
-    const previousOverflow = document.body.style.overflow;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setActiveArticle(null);
-    };
-    document.body.style.overflow = 'hidden';
-    window.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [activeArticle]);
 
   // Real-time synchronization: listen for SignalR broadcast event dispatched by HomeNavbar
   useEffect(() => {
@@ -285,14 +269,7 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
     return `${minutes} phút đọc`;
   };
 
-  const handleShare = (article: NewsArticleItem) => {
-    const shareUrl = window.location.origin + `/news?id=${article.id}`;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
-    }
-  };
+  const openArticle = (article: NewsArticleItem) => navigate(`/news/${encodeURIComponent(article.id)}`);
 
   return (
     <div className="annual-home annual-info-page">
@@ -385,11 +362,11 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
               <section className="news-hero-section" aria-label="Tin tức nổi bật">
                 <article
                   className="news-hero-card"
-                  onClick={() => setActiveArticle(heroArticle)}
+                  onClick={() => openArticle(heroArticle)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
-                      setActiveArticle(heroArticle);
+                      openArticle(heroArticle);
                     }
                   }}
                   role="button"
@@ -441,7 +418,7 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
                     <p className="news-hero-summary">{heroArticle.summary}</p>
 
                     <div className="news-hero-footer">
-                      <button className="news-read-hero-btn">
+                      <button type="button" className="news-read-hero-btn" onClick={() => openArticle(heroArticle)}>
                         <span>Đọc bài viết chi tiết</span>
                         <ArrowRight size={16} />
                       </button>
@@ -459,11 +436,11 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
                     <article
                       key={item.id}
                       className="news-card"
-                      onClick={() => setActiveArticle(item)}
+                      onClick={() => openArticle(item)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
-                          setActiveArticle(item);
+                          openArticle(item);
                         }
                       }}
                       role="button"
@@ -556,117 +533,6 @@ const HomeInfoPage: React.FC<{ section: HomeInfoSection }> = ({ section }) => {
           </section>
         )}
       </main>
-
-      {/* Full Article Reading Modal */}
-      {activeArticle && (
-        <div
-          className="news-modal-overlay"
-          onClick={() => setActiveArticle(null)}
-        >
-          <div
-            className="news-modal-content"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="news-article-title"
-          >
-            {/* Modal Header Bar */}
-            <div className="news-modal-bar">
-              <div className="news-modal-chips">
-                <span className="news-cat-badge">{activeArticle.category}</span>
-                {activeArticle.isPinned && (
-                  <span className="news-pinned-badge">
-                    <Pin size={11} /> Ghim nổi bật
-                  </span>
-                )}
-              </div>
-              <div className="news-modal-actions">
-                <button
-                  className="news-icon-btn"
-                  onClick={() => handleShare(activeArticle)}
-                  title="Sao chép liên kết"
-                >
-                  {isCopied ? <CheckCircle2 size={16} className="text-emerald-500" /> : <Share2 size={16} />}
-                  <span className="text-xs">{isCopied ? 'Đã chép' : 'Chia sẻ'}</span>
-                </button>
-                <button
-                  className="news-icon-btn close-btn"
-                  onClick={() => setActiveArticle(null)}
-                  title="Đóng cửa sổ"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="news-modal-scroll">
-              {activeArticle.imageUrl && (
-                <div className="news-modal-hero-cover">
-                  <img
-                    src={activeArticle.imageUrl}
-                    alt={activeArticle.title}
-                  />
-                </div>
-              )}
-
-              <header className="news-modal-header">
-                <div className="news-modal-meta">
-                  <span className="meta-item">
-                    <Calendar size={14} />
-                    <time>{formatDate(activeArticle.createdAt)}</time>
-                  </span>
-                  <span className="meta-separator">•</span>
-                  <span className="meta-item">
-                    <User size={14} />
-                    {activeArticle.authorName}
-                  </span>
-                  <span className="meta-separator">•</span>
-                  <span className="meta-item">
-                    <Clock size={14} />
-                    {getReadTime(activeArticle.content, activeArticle.summary)}
-                  </span>
-                </div>
-                <h2 id="news-article-title" className="news-modal-title">{activeArticle.title}</h2>
-              </header>
-
-              {activeArticle.summary && (
-                <div className="news-modal-lead-summary">
-                  <p>{activeArticle.summary}</p>
-                </div>
-              )}
-
-              <div className="news-modal-article-body">
-                {activeArticle.content ? (
-                  activeArticle.content.split('\n\n').map((paragraph, idx) => (
-                    <p key={idx}>{paragraph}</p>
-                  ))
-                ) : (
-                  <p>{activeArticle.summary}</p>
-                )}
-              </div>
-
-              <footer className="news-modal-footer">
-                <div className="news-modal-author-card">
-                  <div className="news-author-avatar">
-                    <User size={20} />
-                  </div>
-                  <div>
-                    <h4>{activeArticle.authorName}</h4>
-                    <p>Ban Quản trị Thư viện SmartLibrary - FPT University</p>
-                  </div>
-                </div>
-                <button
-                  className="news-close-modal-bottom-btn"
-                  onClick={() => setActiveArticle(null)}
-                >
-                  Đóng bài viết
-                </button>
-              </footer>
-            </div>
-          </div>
-        </div>
-      )}
 
       <HomeFooter />
     </div>

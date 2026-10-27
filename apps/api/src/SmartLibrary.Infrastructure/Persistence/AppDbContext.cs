@@ -50,6 +50,7 @@ public class AppDbContext : DbContext
     public DbSet<SupportComplaintReply> SupportComplaintReplies => Set<SupportComplaintReply>();
     public DbSet<SupportChatMessage> SupportChatMessages => Set<SupportChatMessage>();
     public DbSet<NewsArticle> NewsArticles => Set<NewsArticle>();
+    public DbSet<NewsComment> NewsComments => Set<NewsComment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -392,6 +393,19 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Category).HasMaxLength(100).IsRequired();
             entity.Property(x => x.Summary).HasMaxLength(1000).IsRequired();
             entity.Property(x => x.AuthorName).HasMaxLength(150);
+        });
+
+        modelBuilder.Entity<NewsComment>(entity =>
+        {
+            entity.ToTable("news_comments");
+            entity.HasKey(comment => comment.Id);
+            entity.Property(comment => comment.Content).HasMaxLength(2000).IsRequired();
+            entity.Property(comment => comment.IsDeleted).HasDefaultValue(false);
+            entity.HasIndex(comment => new { comment.NewsArticleId, comment.CreatedAt });
+            entity.HasIndex(comment => comment.ParentCommentId);
+            entity.HasOne(comment => comment.NewsArticle).WithMany().HasForeignKey(comment => comment.NewsArticleId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(comment => comment.Author).WithMany().HasForeignKey(comment => comment.AuthorId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(comment => comment.ParentComment).WithMany(comment => comment.Replies).HasForeignKey(comment => comment.ParentCommentId).OnDelete(DeleteBehavior.Cascade);
         });
 
         // Global query filter for soft delete

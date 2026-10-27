@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type Keyboard
 import { HubConnectionBuilder, HubConnectionState, LogLevel, type HubConnection } from '@microsoft/signalr';
 import { Bell, BookOpen, ChevronDown, CircleHelp, Heart, History, LoaderCircle, LogOut, Menu, Moon, Search, ShieldCheck, Sun, UserRound, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import smartLibraryLogo from '../../../assets/figma/smartlibrary-logo.png';
 import { useToast } from '../../../components/ui/useToast';
+import { LanguageSwitcher } from '../../../components/ui/LanguageSwitcher';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
@@ -23,6 +25,7 @@ interface ApiEnvelope<T> {
 }
 
 const BookSearch: React.FC = () => {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -85,13 +88,13 @@ const BookSearch: React.FC = () => {
 
   return (
     <div className="annual-search-container" ref={searchRef}>
-      <form className="annual-search" onSubmit={submitSearch} role="search" aria-label="Tìm sách trong thư viện">
+      <form className="annual-search" onSubmit={submitSearch} role="search" aria-label={t('header.searchLabel')}>
         <Search size={22} aria-hidden="true" />
-        <label className="sr-only" htmlFor="annual-navbar-book-search">Tìm sách</label>
+        <label className="sr-only" htmlFor="annual-navbar-book-search">{t('header.searchBook')}</label>
         <input
           id="annual-navbar-book-search"
           name="q"
-          placeholder="Tên sách, tác giả, ISBN hoặc điều bạn muốn học"
+          placeholder={t('header.searchPlaceholder')}
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
@@ -106,16 +109,16 @@ const BookSearch: React.FC = () => {
           aria-controls="annual-book-search-suggestions"
           aria-activedescendant={activeIndex >= 0 ? `annual-book-suggestion-${activeIndex}` : undefined}
         />
-        <button type="submit">Tìm trong thư viện</button>
+        <button type="submit">{t('header.searchButton')}</button>
       </form>
       {showSuggestions && (
-        <div className="annual-search-suggestions" id="annual-book-search-suggestions" role="listbox" aria-label="Gợi ý sách">
+        <div className="annual-search-suggestions" id="annual-book-search-suggestions" role="listbox" aria-label={t('header.searchSuggestions')}>
           {search.trim().length < 2 ? (
-            <p className="annual-search-suggestions-state">Nhập thêm ít nhất 1 ký tự để xem gợi ý.</p>
+            <p className="annual-search-suggestions-state">{t('header.searchMore')}</p>
           ) : !isSearchSettled || suggestionsQuery.isFetching ? (
-            <p className="annual-search-suggestions-state"><LoaderCircle size={15} className="annual-search-spinner" /> Đang tìm sách…</p>
+            <p className="annual-search-suggestions-state"><LoaderCircle size={15} className="annual-search-spinner" /> {t('header.searchLoading')}</p>
           ) : suggestionsQuery.isError ? (
-            <p className="annual-search-suggestions-state is-error" role="alert">Không tải được gợi ý. Nhấn “Tìm trong thư viện” để thử lại.</p>
+            <p className="annual-search-suggestions-state is-error" role="alert">{t('header.searchError')}</p>
           ) : suggestions.length > 0 ? (
             suggestions.map((book, index) => (
               <button
@@ -135,12 +138,12 @@ const BookSearch: React.FC = () => {
                 )}
                 <span className="annual-search-suggestion-copy">
                   <strong>{book.title}</strong>
-                  <small>{book.authorNames.join(', ') || 'Chưa rõ tác giả'}{book.categoryNames.length ? ` · ${book.categoryNames.slice(0, 2).join(', ')}` : ''}</small>
+                  <small>{book.authorNames.join(', ') || t('header.unknownAuthor')}{book.categoryNames.length ? ` · ${book.categoryNames.slice(0, 2).join(', ')}` : ''}</small>
                 </span>
               </button>
             ))
           ) : (
-            <p className="annual-search-suggestions-state">Chưa tìm thấy sách phù hợp.</p>
+            <p className="annual-search-suggestions-state">{t('header.searchEmpty')}</p>
           )}
         </div>
       )}
@@ -149,6 +152,7 @@ const BookSearch: React.FC = () => {
 };
 
 const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactNode }> = ({ activeSection, searchSlot }) => {
+  const { t } = useTranslation();
   const location = useLocation();
   const isHistoryPage = location.pathname === '/history';
   const [darkTheme, setDarkTheme] = useState(() => window.localStorage.getItem('smartlibrary.reader-theme') === 'dark');
@@ -418,38 +422,39 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
   const handleLogout = () => {
     setSupportUnreadCount(0);
     logout();
-    showToast({ type: 'success', title: 'Đăng xuất thành công', message: 'Bạn đã đăng xuất khỏi SmartLibrary.' });
+    showToast({ type: 'success', title: t('header.logoutSuccess'), message: t('header.logoutMessage') });
     closeMenu();
   };
 
   return (
     <header className={`annual-header${isHistoryPage ? ' annual-header--history' : ''}`}>
       <div className="annual-frame annual-header-inner">
-        <Link to="/" className="annual-brand" aria-label="SmartLibrary - Trang chủ">
+        <Link to="/" className="annual-brand" aria-label={t('header.home')}>
           <img src={smartLibraryLogo} alt="SmartLibrary" />
         </Link>
         <div className="annual-header-search">{searchSlot ?? defaultSearch}</div>
         {isAuthenticated && user ? (
           <div className="annual-account annual-header-actions">
+            <LanguageSwitcher />
             <button
               type="button"
               className="annual-theme-toggle"
               onClick={toggleReaderTheme}
               aria-pressed={darkTheme}
-              aria-label={darkTheme ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
-              title={darkTheme ? 'Giao diện sáng' : 'Giao diện tối'}
+              aria-label={darkTheme ? t('header.lightTheme') : t('header.darkTheme')}
+              title={darkTheme ? t('header.lightThemeTitle') : t('header.darkThemeTitle')}
             >
               {darkTheme ? <Moon size={18} /> : <Sun size={18} />}
             </button>
-            {user.role === 'Admin' && <Link to="/admin" onClick={closeMenu}><ShieldCheck size={16} /> Quản trị</Link>}
-            {user.role === 'Librarian' && <Link to="/librarian" onClick={closeMenu}><BookOpen size={16} /> Thủ thư</Link>}
+            {user.role === 'Admin' && <Link to="/admin" onClick={closeMenu}><ShieldCheck size={16} /> {t('header.admin')}</Link>}
+            {user.role === 'Librarian' && <Link to="/librarian" onClick={closeMenu}><BookOpen size={16} /> {t('header.librarian')}</Link>}
             {user.role === 'Reader' && (
               <>
               <div ref={notificationsRef} className={`annual-reader-notifications${notificationsOpen ? ' is-open' : ''}`}>
                 <button
                   type="button"
                   className="annual-reader-notifications-trigger"
-                  aria-label="Thông báo"
+                  aria-label={t('header.notifications')}
                   aria-expanded={notificationsOpen}
                   onClick={toggleNotifications}
                 >
@@ -461,16 +466,16 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
                   )}
                 </button>
                 {notificationsOpen && (
-                  <section className="annual-reader-notifications-popover" aria-label="Thông báo độc giả">
+                  <section className="annual-reader-notifications-popover" aria-label={t('header.notifications')}>
                     <header>
-                      <strong>Thông báo</strong>
-                      <span>Cập nhật gần đây</span>
+                      <strong>{t('header.notifications')}</strong>
+                      <span>{t('header.recentUpdates')}</span>
                     </header>
                     {notificationError && <p className="annual-reader-notifications-error" role="alert">{notificationError}</p>}
                     {notificationsLoading && !readerNotifications.length ? (
-                      <p className="annual-reader-notifications-empty">Đang tải thông báo...</p>
+                      <p className="annual-reader-notifications-empty">{t('header.loadingNotifications')}</p>
                     ) : !readerNotifications.length ? (
-                      <p className="annual-reader-notifications-empty">Chưa có thông báo.</p>
+                      <p className="annual-reader-notifications-empty">{t('header.noNotifications')}</p>
                     ) : readerNotifications.map((notice) => {
                       const wasUnread = newlySeenNotificationIds.has(notice.id);
                       const content = (
@@ -500,9 +505,9 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
                     })}
                     {notificationTotalPages > 1 && (
                       <footer className="annual-reader-notifications-pagination">
-                        <button type="button" disabled={notificationPage <= 1} onClick={() => setNotificationPage((page) => page - 1)}>Trước</button>
+                        <button type="button" disabled={notificationPage <= 1} onClick={() => setNotificationPage((page) => page - 1)}>{t('header.previous')}</button>
                         <span>{notificationPage}/{notificationTotalPages}</span>
-                        <button type="button" disabled={notificationPage >= notificationTotalPages} onClick={() => setNotificationPage((page) => page + 1)}>Sau</button>
+                        <button type="button" disabled={notificationPage >= notificationTotalPages} onClick={() => setNotificationPage((page) => page + 1)}>{t('header.next')}</button>
                       </footer>
                     )}
                   </section>
@@ -535,48 +540,49 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
                 <span className="annual-user-name">{user.fullName || user.email}</span>
                 <ChevronDown size={14} aria-hidden="true" />
               </button>
-              <div className="annual-user-popover" role="menu" aria-label="Menu tài khoản">
-                <Link to="/profile" role="menuitem" onClick={closeMenu}><UserRound size={16} /> Hồ sơ cá nhân</Link>
+              <div className="annual-user-popover" role="menu" aria-label={t('header.accountMenu')}>
+                <Link to="/profile" role="menuitem" onClick={closeMenu}><UserRound size={16} /> {t('header.profile')}</Link>
                 {user.role === 'Reader' && (
                   <>
                     <Link to="/support" role="menuitem" onClick={closeMenu}>
                       <CircleHelp size={16} />
-                      <span className="annual-support-menu-label">Hỗ trợ</span>
+                      <span className="annual-support-menu-label">{t('header.support')}</span>
                       {supportUnreadCount > 0 && (
                         <span className="annual-support-unread" aria-label={`${supportUnreadCount} tin nhắn hỗ trợ chưa đọc`}>
                           {supportUnreadCount > 99 ? '99+' : supportUnreadCount}
                         </span>
                       )}
                     </Link>
-                    <Link to="/history" role="menuitem" onClick={closeMenu}><History size={16} /> Mượn & trả của tôi</Link>
-                    <Link to="/favorites" role="menuitem" onClick={closeMenu}><Heart size={16} /> Sách yêu thích</Link>
+                    <Link to="/history" role="menuitem" onClick={closeMenu}><History size={16} /> {t('header.history')}</Link>
+                    <Link to="/favorites" role="menuitem" onClick={closeMenu}><Heart size={16} /> {t('header.favorites')}</Link>
                   </>
                 )}
-                <button type="button" role="menuitem" onClick={handleLogout}><LogOut size={16} /> Đăng xuất</button>
+                <button type="button" role="menuitem" onClick={handleLogout}><LogOut size={16} /> {t('header.logout')}</button>
               </div>
             </div>
           </div>
         ) : (
           <div className="annual-auth annual-header-actions">
+            <LanguageSwitcher />
             <button
               type="button"
               className="annual-theme-toggle"
               onClick={toggleReaderTheme}
               aria-pressed={darkTheme}
-              aria-label={darkTheme ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
-              title={darkTheme ? 'Giao diện sáng' : 'Giao diện tối'}
+              aria-label={darkTheme ? t('header.lightTheme') : t('header.darkTheme')}
+              title={darkTheme ? t('header.lightThemeTitle') : t('header.darkThemeTitle')}
             >
               {darkTheme ? <Moon size={18} /> : <Sun size={18} />}
             </button>
-            <Link to="/login" onClick={closeMenu}>Đăng nhập</Link>
-            <Link to="/register" className="annual-action" onClick={closeMenu}>Đăng ký</Link>
+            <Link to="/login" onClick={closeMenu}>{t('header.login')}</Link>
+            <Link to="/register" className="annual-action" onClick={closeMenu}>{t('header.register')}</Link>
           </div>
         )}
         <button
           type="button"
           className="annual-menu-toggle"
           aria-expanded={isMenuOpen}
-          aria-label={isMenuOpen ? 'Đóng menu' : 'Mở menu'}
+          aria-label={isMenuOpen ? t('header.closeMenu') : t('header.openMenu')}
           onClick={() => setIsMenuOpen((open) => !open)}
         >
           {isMenuOpen ? <X /> : <Menu />}
@@ -590,24 +596,24 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
               aria-expanded={isCategoriesOpen}
               onClick={() => setIsCategoriesOpen((open) => !open)}
             >
-              Danh mục <ChevronDown size={15} aria-hidden="true" />
+              {t('header.categories')} <ChevronDown size={15} aria-hidden="true" />
             </button>
             <div className="annual-nav-submenu">
-              {categoriesQuery.isPending && <span className="annual-nav-feedback">Đang tải danh mục…</span>}
-              {categoriesQuery.isError && <span className="annual-nav-feedback" role="alert">Không tải được danh mục.</span>}
+              {categoriesQuery.isPending && <span className="annual-nav-feedback">{t('header.loadingCategories')}</span>}
+              {categoriesQuery.isError && <span className="annual-nav-feedback" role="alert">{t('header.categoriesError')}</span>}
               {!categoriesQuery.isPending && !categoriesQuery.isError && categories.map((category) => (
                 <Link key={category.id} to={`/books?category=${encodeURIComponent(category.id)}`} onClick={closeMenu}>
                   {category.name}
                 </Link>
               ))}
               {!categoriesQuery.isPending && !categoriesQuery.isError && categories.length === 0 && (
-                <span className="annual-nav-feedback">Chưa có danh mục sách.</span>
+                <span className="annual-nav-feedback">{t('header.noCategories')}</span>
               )}
             </div>
           </div>
-          <Link to="/books" aria-current={activeSection === 'catalog' ? 'page' : undefined} onClick={closeMenu}>Khám phá sách</Link>
-          <Link to="/news" aria-current={activeSection === 'news' ? 'page' : undefined} onClick={closeMenu}>Tin tức</Link>
-          <Link to="/books?view=recommended" aria-current={activeSection === 'recommendations' ? 'page' : undefined} onClick={closeMenu}>Gợi ý sách</Link>
+          <Link to="/books" aria-current={activeSection === 'catalog' ? 'page' : undefined} onClick={closeMenu}>{t('header.catalog')}</Link>
+          <Link to="/news" aria-current={activeSection === 'news' ? 'page' : undefined} onClick={closeMenu}>{t('header.news')}</Link>
+          <Link to="/books?view=recommended" aria-current={activeSection === 'recommendations' ? 'page' : undefined} onClick={closeMenu}>{t('header.recommendations')}</Link>
         </nav>
       </div>
     </header>

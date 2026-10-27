@@ -4,6 +4,7 @@ import HomePage from './features/home/pages/HomePage';
 import HomeCatalogPage from './features/home/pages/HomeCatalogPage';
 import BookDetailPage from './features/home/pages/BookDetailPage';
 import HomeInfoPage from './features/home/pages/HomeInfoPage';
+import NewsArticleDetailPage from './features/home/pages/NewsArticleDetailPage';
 import RagAskPanel from './features/home/components/RagAskPanel';
 import LoginPage from './features/auth/pages/LoginPage';
 import RegisterPage from './features/auth/pages/RegisterPage';
@@ -71,6 +72,7 @@ function App() {
       <Route path="/books/:bookId" element={<BookDetailPage />} />
       <Route path="/services" element={<Navigate to="/books" replace />} />
       <Route path="/news" element={<HomeInfoPage section="news" />} />
+      <Route path="/news/:articleId" element={<NewsArticleDetailPage />} />
       <Route path="/policies" element={<HomeInfoPage section="policies" />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
@@ -126,6 +128,7 @@ function App() {
         <Route path="reports/new" element={<LibrarianReportsPage />} />
         <Route path="reports/:id" element={<LibrarianReportDetailPage />} />
         <Route path="news" element={<LibrarianNewsPage />} />
+        <Route path="news/:articleId" element={<NewsArticleDetailPage librarianMode />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="support/requests" element={<LibrarianSupportPage view="requests" />} />
         <Route path="support/replies" element={<LibrarianSupportPage view="replies" />} />

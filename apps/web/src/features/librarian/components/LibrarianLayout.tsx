@@ -23,7 +23,9 @@ import {
   MessagesSquare,
 } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import smartLibraryLogo from '../../../assets/figma/auth-logo-fpt.png';
+import { LanguageSwitcher } from '../../../components/ui/LanguageSwitcher';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { API_BASE_URL } from '../../../config';
@@ -75,6 +77,16 @@ interface ReportDecisionNotice {
 }
 
 export const LibrarianLayout: React.FC = () => {
+  const { t } = useTranslation();
+  const translatedLabels: Record<string, string> = {
+    'Tổng quan': 'shell.librarianOverview', 'Quản lý dịch vụ': 'shell.services', 'Sách & Biên mục': 'shell.books',
+    'Duyệt người đọc': 'shell.approvals', 'Độc giả': 'shell.readers', 'Hỗ trợ độc giả': 'shell.readerSupport',
+    'Tin tức & Thông báo': 'shell.news', 'Thống kê & báo cáo': 'shell.librarianReports', 'Thiết lập AI nghiệp vụ': 'shell.librarianAi',
+    'Mượn sách': 'shell.circulationLoans', 'Trả sách': 'shell.circulationReturn', 'Đặt chỗ': 'shell.reservations',
+    'Quá hạn & Sự cố': 'shell.overdue', 'Phí phạt': 'shell.fines', 'Đơn tiếp nhận': 'shell.supportRequests',
+    'Phản hồi đơn': 'shell.supportReplies', 'Hồ sơ cá nhân': 'shell.profile',
+  };
+  const translateLabel = (label: string) => translatedLabels[label] ? t(translatedLabels[label]) : label;
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [railExpanded, setRailExpanded] = useState(false);
@@ -235,7 +247,7 @@ export const LibrarianLayout: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    showToast({ type: 'success', title: 'Đăng xuất thành công', message: 'Bạn đã đăng xuất khỏi SmartLibrary.' });
+    showToast({ type: 'success', title: t('header.logoutSuccess'), message: t('header.logoutMessage') });
     navigate('/login');
   };
 
@@ -300,6 +312,7 @@ export const LibrarianLayout: React.FC = () => {
         <nav className="lib-navigation" aria-label="Điều hướng thủ thư">
           {navigation.map((item) => {
             const { label, to, icon: Icon, end, children } = item;
+            const displayLabel = translateLabel(label);
             const isSupportGroup = to === '/librarian/support';
             const groupOpen = isSupportGroup ? supportOpen : circulationOpen;
             const setGroupOpen = isSupportGroup ? setSupportOpen : setCirculationOpen;
@@ -308,14 +321,14 @@ export const LibrarianLayout: React.FC = () => {
               <div className="lib-nav-group" key={to}>
                 <button
                   type="button"
-                  title={showTooltips ? label : undefined}
-                  data-tooltip={label}
+                  title={showTooltips ? displayLabel : undefined}
+                  data-tooltip={displayLabel}
                   aria-expanded={groupOpen}
                   className={`lib-nav-link lib-nav-parent${groupActive ? ' lib-nav-link-active' : ''}`}
                   onClick={() => setGroupOpen((open) => !open)}
                 >
                   <Icon size={20} strokeWidth={1.9} className="lib-nav-icon" />
-                  <span className="lib-nav-label">{label}</span>
+                  <span className="lib-nav-label">{displayLabel}</span>
                   <ChevronDown size={16} className={`lib-nav-chevron${groupOpen ? ' lib-nav-chevron-open' : ''}`} />
                 </button>
                 <div className={`lib-subnavigation${groupOpen ? ' lib-subnavigation-open' : ''}`}>
@@ -324,13 +337,13 @@ export const LibrarianLayout: React.FC = () => {
                       key={child.to}
                       to={child.to}
                       end={child.end}
-                      title={showTooltips ? child.label : undefined}
-                      data-tooltip={child.label}
+                      title={showTooltips ? translateLabel(child.label) : undefined}
+                      data-tooltip={translateLabel(child.label)}
                       onClick={() => setSidebarOpen(false)}
                       className={({ isActive }) => `lib-nav-link lib-nav-child${isActive ? ' lib-nav-link-active' : ''}`}
                     >
                       <child.icon size={16} strokeWidth={1.9} className="lib-nav-icon" />
-                      <span className="lib-nav-label">{child.label}</span>
+                      <span className="lib-nav-label">{translateLabel(child.label)}</span>
                     </NavLink>
                   ))}
                 </div>
@@ -340,13 +353,13 @@ export const LibrarianLayout: React.FC = () => {
                 key={to}
                 to={to}
                 end={end}
-                title={showTooltips ? label : undefined}
-                data-tooltip={label}
+                title={showTooltips ? displayLabel : undefined}
+                data-tooltip={displayLabel}
                 onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) => `lib-nav-link${isActive ? ' lib-nav-link-active' : ''}`}
               >
                 <Icon size={20} strokeWidth={1.9} className="lib-nav-icon" />
-                <span className="lib-nav-label">{label}</span>
+                <span className="lib-nav-label">{displayLabel}</span>
               </NavLink>
             );
           })}
@@ -357,7 +370,7 @@ export const LibrarianLayout: React.FC = () => {
             <span className="lib-help-icon"><BookOpen size={18} /></span>
             <div className="lib-help-copy">
               <strong>SmartLibrary</strong>
-              <p>Quản lý thư viện trong một không gian thống nhất.</p>
+              <p>{t('shell.libraryManagement')}</p>
             </div>
           </div>
         </div>
@@ -368,7 +381,7 @@ export const LibrarianLayout: React.FC = () => {
           <button
             type="button"
             className="lib-menu-button"
-            aria-label="Mở menu"
+            aria-label={t('header.openMenu')}
             onClick={() => setSidebarOpen(true)}
           >
             <Menu size={21} />
@@ -376,9 +389,10 @@ export const LibrarianLayout: React.FC = () => {
           <div className="lib-breadcrumb">
             <span>Thủ thư</span>
             <span className="lib-breadcrumb-separator">/</span>
-            <strong>{currentPage}</strong>
+            <strong>{translateLabel(currentPage)}</strong>
           </div>
           <div className="lib-topbar-actions">
+            <LanguageSwitcher />
             <details className="lib-notification-menu">
               <summary className="lib-icon-button" aria-label={`Thông báo${unreadCount ? `, ${unreadCount} thông báo chưa xem` : ''}`}>
                 <Bell size={19} />
@@ -394,7 +408,7 @@ export const LibrarianLayout: React.FC = () => {
                       <strong>{notice.title}</strong>
                       <span>{notice.message}</span>
                       <Link to={notice.href || '/librarian/ai-settings'} onClick={() => { if (!notice.isRead) void dismissInbox(notice.id); }}>
-                        Cập nhật API Key
+                        {t('shell.updateApiKey')}
                       </Link>
                     </div>
                     {!notice.isRead && (
@@ -408,38 +422,38 @@ export const LibrarianLayout: React.FC = () => {
                       {notice.lastReportStatus === 'Approved' ? <Check size={15}/> : <X size={15}/>}
                     </div>
                     <div className="lib-notification-copy">
-                      <strong>{notice.lastReportStatus === 'Approved' ? 'Báo cáo đã được duyệt' : 'Admin yêu cầu chỉnh sửa'}</strong>
+                      <strong>{notice.lastReportStatus === 'Approved' ? t('shell.reportApproved') : t('shell.reportRevision')}</strong>
                       <span>{notice.name || notice.templateName}</span>
                       {notice.lastReportStatus === 'Rejected' && notice.lastReviewComment && <p>{notice.lastReviewComment}</p>}
-                      {notice.reportId && <Link to={`/librarian/reports/${notice.reportId}`}>Xem báo cáo</Link>}
+                      {notice.reportId && <Link to={`/librarian/reports/${notice.reportId}`}>{t('shell.viewReport')}</Link>}
                     </div>
                     {!dismissedNoticeIds.includes(notice.id) && (
                       <button type="button" onClick={() => dismissDecision(notice.id)} aria-label="Đánh dấu đã xem"><Check size={15}/></button>
                     )}
                   </article>
                 )) : !notificationError && inboxNotices.length === 0 ? (
-                  <p className="lib-notification-empty">Chưa có thông báo.</p>
+                  <p className="lib-notification-empty">{t('shell.noNotifications')}</p>
                 ) : null}
               </section>
             </details>
             <span className="lib-topbar-divider" />
             <details className="lib-profile-menu" ref={profileMenuRef}>
-              <summary className="lib-profile" aria-label="Mở menu tài khoản">
+              <summary className="lib-profile" aria-label={t('header.accountMenu')}>
                 {user?.avatarUrl
                   ? <img className="lib-avatar lib-avatar-image" src={user.avatarUrl} alt="" />
                   : <div className="lib-avatar">{user?.fullName?.trim().charAt(0).toUpperCase() || 'T'}</div>}
                 <div className="lib-profile-copy">
                   <strong>{user?.fullName || 'Thủ thư SmartLibrary'}</strong>
-                  <span>Quản lý thư viện</span>
+                  <span>{t('shell.libraryManagement')}</span>
                 </div>
                 <ChevronDown size={16} className="lib-profile-chevron" />
               </summary>
               <div className="lib-profile-dropdown">
                 <Link to="/librarian/profile" onClick={() => { if (profileMenuRef.current) profileMenuRef.current.open = false; }}>
-                  <Users size={16} /> Hồ sơ cá nhân
+                  <Users size={16} /> {t('shell.profile')}
                 </Link>
                 <button type="button" onClick={handleLogout}>
-                  <LogOut size={16} /> Đăng xuất
+                  <LogOut size={16} /> {t('header.logout')}
                 </button>
               </div>
             </details>
