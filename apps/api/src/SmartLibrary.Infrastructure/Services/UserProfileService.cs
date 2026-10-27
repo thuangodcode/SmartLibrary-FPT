@@ -24,7 +24,22 @@ public sealed class UserProfileService(
             .Include(user => user.Role)
             .FirstOrDefaultAsync(user => user.Id == userId, cancellationToken);
 
-        return profile is null ? null : Map(profile);
+        if (profile is null) return null;
+
+        var reg = await dbContext.RegistrationRequests
+            .AsNoTracking()
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.SubmittedAt)
+            .Select(r => new
+            {
+                r.DocumentType,
+                FrontDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Front && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
+                BackDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Back && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
+                SelfieDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Selfie && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return Map(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl, reg?.DocumentType.ToString());
     }
 
     public async Task<UserProfileResponse?> UpdateAsync(
@@ -59,7 +74,21 @@ public sealed class UserProfileService(
             profile.AvatarUrl = request.AvatarUrl;
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return Map(profile);
+
+        var reg = await dbContext.RegistrationRequests
+            .AsNoTracking()
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.SubmittedAt)
+            .Select(r => new
+            {
+                r.DocumentType,
+                FrontDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Front && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
+                BackDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Back && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
+                SelfieDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Selfie && !d.IsDeleted).Select(d => d.StoragePath).FirstOrDefault(),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return Map(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl, reg?.DocumentType.ToString());
     }
 
     public async Task<string> SendEmailVerificationOtpAsync(
@@ -181,7 +210,12 @@ public sealed class UserProfileService(
         }
     }
 
-    private static UserProfileResponse Map(UserProfile profile) => new(
+    private static UserProfileResponse Map(
+        UserProfile profile,
+        string? frontDocUrl = null,
+        string? backDocUrl = null,
+        string? selfieDocUrl = null,
+        string? documentType = null) => new(
         profile.Id,
         profile.Email,
         profile.FullName,
@@ -192,7 +226,11 @@ public sealed class UserProfileService(
         profile.EmployeeId,
         profile.Address,
         profile.DateOfBirth,
-        profile.Role.Name);
+        profile.Role.Name,
+        frontDocUrl,
+        backDocUrl,
+        selfieDocUrl,
+        documentType);
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

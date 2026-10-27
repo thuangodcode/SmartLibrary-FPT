@@ -2,9 +2,13 @@ using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Interfaces;
+using SmartLibrary.Domain.Entities;
+using SmartLibrary.Domain.Enums;
 using SmartLibrary.Domain.Exceptions;
+using SmartLibrary.Infrastructure.Persistence;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -13,7 +17,8 @@ namespace SmartLibrary.Api.Controllers;
 [Authorize]
 public sealed class ProfileController(
     IUserProfileService profileService,
-    IStorageService storageService) : ControllerBase
+    IStorageService storageService,
+    AppDbContext dbContext) : ControllerBase
 {
     private const long MaximumAvatarFileSize = 5 * 1024 * 1024;
 
@@ -36,7 +41,7 @@ public sealed class ProfileController(
     /// <summary>Updates editable profile fields for the authenticated user.</summary>
     [HttpPut]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(MaximumAvatarFileSize + 1024 * 1024)]
+    [RequestSizeLimit(30 * 1024 * 1024)]
     [ProducesResponseType(typeof(ApiResponse<UserProfileResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
@@ -85,6 +90,74 @@ public sealed class ProfileController(
             stream.Position = 0;
             avatarUrl = await storageService.UploadFileAsync(
                 stream, $"{Guid.NewGuid():N}{extension}", "profile-avatars", cancellationToken);
+        }
+
+        async Task<string?> UploadDocumentAsync(IFormFile file, string suffix)
+        {
+            if (file.Length == 0 || file.Length > MaximumAvatarFileSize) return null;
+            var ext = GetAvatarExtension(file.ContentType);
+            if (ext is null) return null;
+            await using var s = file.OpenReadStream();
+            if (!await HasValidImageSignatureAsync(s, file.ContentType, cancellationToken)) return null;
+            s.Position = 0;
+            return await storageService.UploadFileAsync(s, $"{userId}_{suffix}_{Guid.NewGuid():N}{ext}", "identity-documents", cancellationToken);
+        }
+
+        string? frontDocUrl = form.FrontDoc is not null ? await UploadDocumentAsync(form.FrontDoc, "front") : null;
+        string? backDocUrl = form.BackDoc is not null ? await UploadDocumentAsync(form.BackDoc, "back") : null;
+        string? selfieDocUrl = form.SelfieDoc is not null ? await UploadDocumentAsync(form.SelfieDoc, "selfie") : null;
+
+        if (frontDocUrl is not null || backDocUrl is not null || selfieDocUrl is not null)
+        {
+            var reg = await dbContext.RegistrationRequests
+                .Include(r => r.Documents)
+                .Where(r => r.UserId == userId)
+                .OrderByDescending(r => r.SubmittedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (reg is null)
+            {
+                reg = new RegistrationRequest
+                {
+                    UserId = userId,
+                    DocumentType = DocumentType.NationalId,
+                    Status = RegistrationRequestStatus.Approved,
+                    SubmittedAt = DateTime.UtcNow
+                };
+                dbContext.RegistrationRequests.Add(reg);
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            void UpdateOrAddDoc(DocumentSide side, string? url, IFormFile? file)
+            {
+                if (url is null || file is null) return;
+                var existing = reg.Documents.FirstOrDefault(d => d.Side == side && !d.IsDeleted);
+                if (existing is not null)
+                {
+                    existing.StoragePath = url;
+                    existing.MimeType = file.ContentType ?? "image/jpeg";
+                    existing.SizeBytes = file.Length;
+                    existing.UpdatedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    reg.Documents.Add(new IdentityDocument
+                    {
+                        RequestId = reg.Id,
+                        Side = side,
+                        StoragePath = url,
+                        MimeType = file.ContentType ?? "image/jpeg",
+                        SizeBytes = file.Length,
+                        Sha256 = "profile_upload"
+                    });
+                }
+            }
+
+            UpdateOrAddDoc(DocumentSide.Front, frontDocUrl, form.FrontDoc);
+            UpdateOrAddDoc(DocumentSide.Back, backDocUrl, form.BackDoc);
+            UpdateOrAddDoc(DocumentSide.Selfie, selfieDocUrl, form.SelfieDoc);
+
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
         try
@@ -178,6 +251,9 @@ public sealed class ProfileController(
         public string? DateOfBirth { get; set; }
         public bool ClearAvatar { get; set; }
         public IFormFile? Avatar { get; set; }
+        public IFormFile? FrontDoc { get; set; }
+        public IFormFile? BackDoc { get; set; }
+        public IFormFile? SelfieDoc { get; set; }
     }
 
     private bool TryGetCurrentUserId(out Guid userId)

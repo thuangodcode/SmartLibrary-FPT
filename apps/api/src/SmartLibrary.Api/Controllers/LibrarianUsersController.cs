@@ -31,6 +31,20 @@ public sealed class LibrarianUsersController : ControllerBase
             : Ok(ApiResponse<object>.Ok(reader));
     }
 
+    [HttpGet("{userId:guid}/registrations/{registrationId:guid}/documents/{documentId:guid}/url")]
+    public async Task<IActionResult> GetIdentityDocumentUrl(
+        Guid userId,
+        Guid registrationId,
+        Guid documentId,
+        CancellationToken cancellationToken)
+    {
+        var url = await _userManagementService.GetUserIdentityDocumentUrlAsync(
+            userId, registrationId, documentId, cancellationToken);
+        return url is null
+            ? NotFound(ApiResponse<object>.Fail("Không tìm thấy giấy tờ xác minh của tài khoản này."))
+            : Ok(ApiResponse<object>.Ok(new { url }));
+    }
+
     [HttpPost("import")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaximumImportFileSize)]

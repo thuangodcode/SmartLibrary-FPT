@@ -223,6 +223,17 @@ public class CirculationController : ControllerBase
         => Ok(ApiResponse<IReadOnlyList<CirculationBookOptionDto>>.Ok(
             await _circulation.SearchBookOptionsAsync(search, ct)));
 
+    /// <summary>Get active borrowed/overdue books for a specific reader for returning books.</summary>
+    [HttpGet("reader-active-loans")]
+    public async Task<IActionResult> ReaderActiveLoans(
+        [FromQuery] string readerKey, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(readerKey))
+            return BadRequest(ApiResponse<object>.Fail("Vui lòng cung cấp thông tin độc giả."));
+        var loans = await _circulation.GetActiveLoansForReaderKeyAsync(readerKey, ct);
+        return Ok(ApiResponse<IReadOnlyList<CirculationLoanDto>>.Ok(loans));
+    }
+
     [HttpPost("reservations")]
     public async Task<IActionResult> CreateReservation([FromBody] CreateReservationRequest request, CancellationToken ct)
     {

@@ -150,14 +150,14 @@ public class CirculationRepository : ICirculationRepository
         string search, int limit, CancellationToken ct)
     {
         var query = search.Trim().ToLower();
-        if (query.Length < 2) return [];
+        if (string.IsNullOrWhiteSpace(query)) return [];
         return await _db.UserProfiles.AsNoTracking()
             .Where(x => !x.IsDeleted && x.Role.Name == "Reader"
                 && (x.FullName.ToLower().Contains(query)
                     || (x.StudentId != null && x.StudentId.ToLower().Contains(query))
                     || x.Email.ToLower().Contains(query)))
             .OrderBy(x => x.FullName)
-            .Take(Math.Clamp(limit, 1, 10))
+            .Take(Math.Clamp(limit, 1, 15))
             .Select(x => new CirculationReaderOptionDto(x.Id, x.FullName, x.StudentId, x.Email))
             .ToListAsync(ct);
     }
@@ -166,15 +166,22 @@ public class CirculationRepository : ICirculationRepository
         string search, int limit, CancellationToken ct)
     {
         var query = search.Trim().ToLower();
-        if (query.Length < 2) return [];
+        if (string.IsNullOrWhiteSpace(query)) return [];
         return await _db.Books.AsNoTracking()
             .Where(x => !x.IsDeleted
                 && (x.Title.ToLower().Contains(query)
                     || x.Code.ToLower().Contains(query)
                     || (x.Isbn != null && x.Isbn.ToLower().Contains(query))))
             .OrderBy(x => x.Title)
-            .Take(Math.Clamp(limit, 1, 10))
-            .Select(x => new CirculationBookOptionDto(x.Id, x.Title, x.Code))
+            .Take(Math.Clamp(limit, 1, 15))
+            .Select(x => new CirculationBookOptionDto(
+                x.Id,
+                x.Title,
+                x.Code,
+                x.Copies.Count(c => c.IsAvailable && c.Condition != BookCondition.Damaged && c.Condition != BookCondition.Lost),
+                x.Copies.Where(c => c.IsAvailable && c.Condition != BookCondition.Damaged && c.Condition != BookCondition.Lost)
+                    .Select(c => c.Barcode)
+                    .FirstOrDefault()))
             .ToListAsync(ct);
     }
 

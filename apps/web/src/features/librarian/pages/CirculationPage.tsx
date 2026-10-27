@@ -75,6 +75,11 @@ interface ReservationOption {
   id: string;
   label: string;
   detail: string;
+  studentId?: string | null;
+  email?: string;
+  code?: string;
+  sampleBarcode?: string | null;
+  availableCopies?: number;
 }
 
 function ReservationAutocomplete({
@@ -89,7 +94,7 @@ function ReservationAutocomplete({
   onClear,
 }: {
   label: string;
-  step: string;
+  step?: string;
   value: string;
   selected: ReservationOption | null;
   placeholder: string;
@@ -111,7 +116,10 @@ function ReservationAutocomplete({
   const query = value.trim();
 
   useEffect(() => {
-    if (query.length < 2) return undefined;
+    if (!query) {
+      setResult({ query: '', options: [], error: null });
+      return undefined;
+    }
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       void (async () => {
@@ -133,6 +141,8 @@ function ReservationAutocomplete({
             email?: string;
             title?: string;
             code?: string;
+            availableCopies?: number;
+            sampleBarcode?: string | null;
           }>>>(response);
           if (!response.ok || !result?.success || !result.data) {
             throw new Error(result?.error || 'Không tải được danh sách gợi ý.');
@@ -144,11 +154,23 @@ function ReservationAutocomplete({
                 id: item.id,
                 label: item.fullName || '',
                 detail: [item.studentId, item.email].filter(Boolean).join(' · '),
+                studentId: item.studentId,
+                email: item.email,
               }
               : {
                 id: item.id,
                 label: item.title || '',
-                detail: item.code || '',
+                detail: [
+                  item.code,
+                  item.availableCopies !== undefined
+                    ? item.availableCopies > 0
+                      ? `${item.availableCopies} bản sao sẵn sàng`
+                      : 'Hết bản sao'
+                    : null,
+                ].filter(Boolean).join(' · '),
+                code: item.code,
+                sampleBarcode: item.sampleBarcode,
+                availableCopies: item.availableCopies,
               }),
             error: null,
           });
@@ -161,7 +183,7 @@ function ReservationAutocomplete({
           });
         }
       })();
-    }, 250);
+    }, 180);
     return () => {
       controller.abort();
       window.clearTimeout(timer);
@@ -170,8 +192,8 @@ function ReservationAutocomplete({
 
   const isCurrentResult = result.query === query;
   const suggestions = isCurrentResult ? result.options : [];
-  const isSearching = query.length >= 2 && !isCurrentResult;
-  const showFeedback = focused && query.length >= 2;
+  const isSearching = Boolean(query) && !isCurrentResult;
+  const showFeedback = focused && Boolean(query);
   const FieldIcon = endpoint === 'reader' ? UserRound : BookOpen;
 
   const selectOption = (option: ReservationOption) => {
@@ -211,7 +233,7 @@ function ReservationAutocomplete({
         <>
           <label className="circ-field" htmlFor={listboxId}>
             <span className="circ-reservation-label">
-              <span className="circ-reservation-step">{step}</span>
+              {step && <span className="circ-reservation-step">{step}</span>}
               {label}
             </span>
             <span className="circ-autocomplete-control">
@@ -750,8 +772,10 @@ export function DirectCheckoutPage() {
   const headers = useCirculationAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const [readerKey, setReaderKey] = useState('');
-  const [barcode, setBarcode] = useState('');
+  const [readerOption, setReaderOption] = useState<ReservationOption | null>(null);
+  const [readerSearch, setReaderSearch] = useState('');
+  const [bookOption, setBookOption] = useState<ReservationOption | null>(null);
+  const [bookSearch, setBookSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -773,6 +797,19 @@ export function DirectCheckoutPage() {
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const finalReaderKey = readerOption?.studentId || readerOption?.email || readerOption?.id || readerSearch.trim();
+    if (!finalReaderKey) {
+      setError('Vui lòng chọn hoặc nhập mã thẻ / thông tin độc giả.');
+      return;
+    }
+    const finalBarcode = bookOption?.sampleBarcode || '';
+    const finalBookId = bookOption?.id;
+
+    if (!finalBarcode && !finalBookId && !bookSearch.trim()) {
+      setError('Vui lòng chọn hoặc nhập tên đầu sách cần mượn.');
+      return;
+    }
+
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -780,21 +817,27 @@ export function DirectCheckoutPage() {
       const response = await fetch(`${API_BASE_URL}/api/v1/circulation/checkout`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ readerKey, barcode }),
+        body: JSON.stringify({
+          readerKey: finalReaderKey,
+          barcode: finalBarcode || bookSearch.trim(),
+          bookId: finalBookId,
+        }),
       });
       const result = await parseApiResponse<ApiResult<unknown>>(response);
       if (!response.ok || !result?.success) {
         throw new Error(result?.error || 'Không thể hoàn tất mượn sách.');
       }
-      const message = result.meta?.message || 'Đã lập phiếu mượn.';
-      setMessage(message);
-      showToast({ type: 'success', title: 'Mượn sách thành công', message });
-      setReaderKey('');
-      setBarcode('');
+      const msg = result.meta?.message || 'Đã lập phiếu mượn thành công.';
+      setMessage(msg);
+      showToast({ type: 'success', title: 'Mượn sách thành công', message: msg });
+      setReaderOption(null);
+      setReaderSearch('');
+      setBookOption(null);
+      setBookSearch('');
     } catch (caught) {
-      const message = errorMessage(caught, 'Không thể hoàn tất mượn sách.');
-      setError(message);
-      showToast({ type: 'error', title: 'Không thể mượn sách', message });
+      const msg = errorMessage(caught, 'Không thể hoàn tất mượn sách.');
+      setError(msg);
+      showToast({ type: 'error', title: 'Không thể mượn sách', message: msg });
     } finally {
       setBusy(false);
     }
@@ -817,27 +860,61 @@ export function DirectCheckoutPage() {
       {message && (
         <div className="circ-banner is-ok">
           <p>{message}</p>
-          <button type="button" className="circ-btn" onClick={() => navigate('/librarian/circulation/loans')}>Xem danh sách mượn</button>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+            <button type="button" className="circ-btn" onClick={() => setMessage(null)}>Tiếp tục mượn sách</button>
+            <button type="button" className="circ-btn circ-btn--primary" onClick={() => navigate('/librarian/circulation/loans')}>Xem danh sách mượn</button>
+          </div>
         </div>
       )}
       {error && <p className="circ-banner is-err">{error}</p>}
       <form className="circ-card circ-direct-form" onSubmit={(event) => void submit(event)}>
-        <label className="circ-field">
-          Mã thẻ hoặc thông tin độc giả
-          <input required value={readerKey} onChange={(event) => setReaderKey(event.target.value)}
-            placeholder="Mã thẻ, email hoặc mã sinh viên" />
-        </label>
-        <label className="circ-field">
-          Mã vạch bản sao sách
-          <input required value={barcode} onChange={(event) => setBarcode(event.target.value)}
-            placeholder="Quét hoặc nhập mã bản sao" />
-        </label>
+        <ReservationAutocomplete
+          label="Mã thẻ hoặc thông tin độc giả"
+          step="BƯỚC 1"
+          placeholder="Nhập mã thẻ, email, họ tên hoặc MSSV (ví dụ SE1...)"
+          endpoint="reader"
+          value={readerSearch}
+          selected={readerOption}
+          onChange={setReaderSearch}
+          onSelect={(opt) => {
+            setReaderOption(opt);
+            setReaderSearch(opt.label);
+          }}
+          onClear={() => {
+            setReaderOption(null);
+            setReaderSearch('');
+          }}
+        />
+
+        <ReservationAutocomplete
+          label="Tên đầu sách"
+          step="BƯỚC 2"
+          placeholder="Nhập tên đầu sách, mã sách hoặc quét mã vạch bản sao..."
+          endpoint="book"
+          value={bookSearch}
+          selected={bookOption}
+          onChange={setBookSearch}
+          onSelect={(opt) => {
+            setBookOption(opt);
+            setBookSearch(opt.label);
+          }}
+          onClear={() => {
+            setBookOption(null);
+            setBookSearch('');
+          }}
+        />
+
         <p className="circ-checkout-hint">
           {borrowDays && borrowDays > 0
             ? `Thời hạn mượn theo chính sách Admin: ${borrowDays} ngày. Hệ thống tự tính ngày đến hạn khi xác nhận.`
             : 'Thời hạn mượn và ngày đến hạn do Backend lấy từ chính sách Admin. Thủ thư không nhập số ngày riêng.'}
         </p>
-        <button type="submit" className="circ-btn circ-btn--primary" disabled={busy}>
+        <button
+          type="submit"
+          className="circ-btn circ-btn--primary"
+          disabled={busy || (!readerOption && !readerSearch.trim()) || (!bookOption && !bookSearch.trim())}
+        >
+          {busy ? <LoaderCircle className="spin" size={14} /> : null}
           {busy ? 'Đang xử lý...' : 'Xác nhận mượn sách'}
         </button>
       </form>
@@ -851,8 +928,15 @@ function ReturnView() {
   const { showToast } = useToast();
   const [stats, setStats] = useState<CirculationStats | null>(null);
   const [activity, setActivity] = useState<CirculationActivity[]>([]);
-  const [returnBarcode, setReturnBarcode] = useState(params.get('barcode') ?? '');
-  const [condition, setCondition] = useState('Good');
+  const [selectedReader, setSelectedReader] = useState<ReservationOption | null>(null);
+  const [readerSearch, setReaderSearch] = useState('');
+  const [activeLoans, setActiveLoans] = useState<CirculationLoan[]>([]);
+  const [loadingLoans, setLoadingLoans] = useState(false);
+  const [loansError, setLoansError] = useState<string | null>(null);
+  const [conditions, setConditions] = useState<Record<string, string>>({});
+  const [returningBarcode, setReturningBarcode] = useState<string | null>(null);
+  const [manualBarcode, setManualBarcode] = useState(params.get('barcode') ?? '');
+  const [manualCondition, setManualCondition] = useState('Good');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -881,30 +965,60 @@ function ReturnView() {
     }
   }, [headers, showToast]);
 
+  const fetchReaderLoans = useCallback(async (readerId: string) => {
+    setLoadingLoans(true);
+    setLoansError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/circulation/reader-active-loans?readerKey=${encodeURIComponent(readerId)}`, { headers });
+      const json = await parseApiResponse<ApiResult<CirculationLoan[]>>(res);
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Không tải được danh sách sách đang mượn.');
+      setActiveLoans(json.data || []);
+    } catch (err) {
+      setLoansError(errorMessage(err, 'Không tải được danh sách sách đang mượn.'));
+    } finally {
+      setLoadingLoans(false);
+    }
+  }, [headers]);
+
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
-  const post = async (url: string, body?: object) => {
+  useEffect(() => {
+    if (selectedReader) {
+      void fetchReaderLoans(selectedReader.id);
+    } else {
+      setActiveLoans([]);
+      setLoansError(null);
+    }
+  }, [selectedReader, fetchReaderLoans]);
+
+  const returnBook = async (barcode: string, condition: string) => {
     setBusy(true);
+    setReturningBarcode(barcode);
     setError(null);
     setMessage(null);
     try {
-      const res = await fetch(`${API_BASE_URL}${url}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/circulation/return`, {
         method: 'POST',
         headers,
-        body: body ? JSON.stringify(body) : undefined,
+        body: JSON.stringify({ barcode, condition }),
       });
       const json = await parseApiResponse<ApiResult<unknown>>(res);
-      if (!res.ok || !json?.success) throw new Error(json?.error || 'Thao tác thất bại.');
-      const message = json.meta?.message || 'Đã cập nhật.';
-      setMessage(message);
-      showToast({ type: 'success', title: 'Cập nhật thành công', message });
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Thao tác trả sách thất bại.');
+      const msg = json.meta?.message || 'Đã ghi nhận trả sách thành công.';
+      setMessage(msg);
+      showToast({ type: 'success', title: 'Trả sách thành công', message: msg });
       await load();
+      if (selectedReader) {
+        await fetchReaderLoans(selectedReader.id);
+      }
+      setManualBarcode('');
     } catch (err) {
-      const message = errorMessage(err, 'Thao tác thất bại.');
-      setError(message);
-      showToast({ type: 'error', title: 'Thao tác thất bại', message });
+      const msg = errorMessage(err, 'Thao tác trả sách thất bại.');
+      setError(msg);
+      showToast({ type: 'error', title: 'Thao tác thất bại', message: msg });
     } finally {
       setBusy(false);
+      setReturningBarcode(null);
     }
   };
 
@@ -920,34 +1034,151 @@ function ReturnView() {
       </div>
       {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
-      <div className="circ-form-grid">
-        <form
-          className="circ-card"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void post('/api/v1/circulation/return', { barcode: returnBarcode, condition });
-          }}
-        >
-          <h2>Trả sách</h2>
-          <label className="circ-field">
-            Mã vạch sách
-            <input value={returnBarcode} onChange={(e) => setReturnBarcode(e.target.value)} placeholder="Quét hoặc nhập mã bản sao, ví dụ py01-01" />
-          </label>
-          <label className="circ-field">
-            Tình trạng khi trả
-            <select value={condition} onChange={(e) => setCondition(e.target.value)}>
-              <option value="Good">Bình thường</option>
-              <option value="Fair">Hơi cũ</option>
-              <option value="Damaged">Hư hỏng</option>
-              <option value="Lost">Thất lạc</option>
-            </select>
-          </label>
-          <p className="circ-hint">Hư hỏng hoặc thất lạc chỉ lập hồ sơ chờ xác minh. Thủ thư xác nhận ở mục Quá hạn rồi mới tính bồi thường.</p>
-          <button type="submit" className="circ-btn circ-btn--primary" disabled={loading || busy}>
-            {busy ? <LoaderCircle className="spin" size={14} /> : null}
-            {busy ? 'Đang ghi nhận...' : 'Ghi nhận trả sách'}
-          </button>
-        </form>
+
+      <div className="circ-card circ-return-panel">
+        <div className="circ-return-section-header">
+          <div>
+            <h2>Trả sách</h2>
+            <p>Nhập thông tin độc giả để kiểm tra các cuốn sách đang mượn và chọn cuốn muốn trả, hoặc quét nhanh mã vạch.</p>
+          </div>
+        </div>
+
+        {/* Bước 1: Chọn độc giả */}
+        <div className="circ-return-reader-search">
+          <ReservationAutocomplete
+            label="Nhập tên độc giả, mã thẻ hoặc MSSV"
+            step="BƯỚC 1"
+            placeholder="Tìm theo họ tên, mã sinh viên (ví dụ SE1...), email..."
+            endpoint="reader"
+            value={readerSearch}
+            selected={selectedReader}
+            onChange={setReaderSearch}
+            onSelect={(opt) => {
+              setSelectedReader(opt);
+              setReaderSearch(opt.label);
+            }}
+            onClear={() => {
+              setSelectedReader(null);
+              setReaderSearch('');
+              setActiveLoans([]);
+            }}
+          />
+        </div>
+
+        {/* Bước 2: Danh sách sách độc giả đang mượn */}
+        {selectedReader && (
+          <div className="circ-reader-loans-panel">
+            <div className="circ-reader-loans-header">
+              <h3>
+                <BookOpen size={16} />
+                Sách đang mượn ({activeLoans.length})
+              </h3>
+              <span>Độc giả: <strong>{selectedReader.label}</strong> {selectedReader.detail && `· ${selectedReader.detail}`}</span>
+            </div>
+
+            {loadingLoans ? (
+              <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang kiểm tra sách độc giả đang mượn...</p>
+            ) : loansError ? (
+              <p className="circ-banner is-err">{loansError}</p>
+            ) : activeLoans.length === 0 ? (
+              <div className="circ-no-loans-box">
+                <Check size={18} />
+                <div>
+                  <strong>Độc giả hiện không có sách nào đang mượn.</strong>
+                  <p>Tất cả sách trước đó đã được hoàn trả đầy đủ vào thư viện.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="circ-active-loans-grid">
+                {activeLoans.map((loan) => {
+                  const cond = conditions[loan.id] || 'Good';
+                  const isProcessing = busy && returningBarcode === loan.barcode;
+                  return (
+                    <article className="circ-active-loan-card" key={loan.id}>
+                      <div className="circ-loan-card-info">
+                        <h4>{loan.bookTitle}</h4>
+                        <div className="circ-loan-card-meta">
+                          <span>Mã vạch: <strong>{loan.barcode}</strong></span>
+                          <span>Mượn: {formatDate(loan.borrowDate)}</span>
+                          <span>Hạn trả: <strong>{formatDate(loan.dueDate)}</strong></span>
+                        </div>
+                        <div className="circ-loan-card-status">
+                          <span className={`circ-badge is-${loan.status.toLowerCase()}`}>
+                            {loan.status === 'Overdue' ? `Quá hạn ${loan.overdueDays} ngày` : 'Đang mượn'}
+                          </span>
+                          {loan.overdueDays > 0 && loan.createdFineAmount ? (
+                            <span className="circ-fine-tag">Phí dự kiến: {formatMoney(loan.createdFineAmount)}</span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="circ-loan-card-action">
+                        <label className="circ-condition-select">
+                          <span>Tình trạng khi trả:</span>
+                          <select
+                            value={cond}
+                            disabled={busy}
+                            onChange={(e) => setConditions((prev) => ({ ...prev, [loan.id]: e.target.value }))}
+                          >
+                            <option value="Good">Bình thường</option>
+                            <option value="Fair">Hơi cũ</option>
+                            <option value="Damaged">Hư hỏng</option>
+                            <option value="Lost">Thất lạc</option>
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          className="circ-btn circ-btn--primary"
+                          disabled={busy}
+                          onClick={() => void returnBook(loan.barcode, cond)}
+                        >
+                          {isProcessing ? <LoaderCircle className="spin" size={14} /> : <RotateCcw size={14} />}
+                          {isProcessing ? 'Đang ghi nhận...' : 'Ghi nhận trả sách'}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Quét mã vạch trực tiếp */}
+        <details className="circ-quick-barcode-accordion">
+          <summary>
+            <span>Hoặc quét nhanh mã vạch bản sao</span>
+          </summary>
+          <form
+            className="circ-quick-barcode-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (manualBarcode.trim()) void returnBook(manualBarcode.trim(), manualCondition);
+            }}
+          >
+            <label className="circ-field">
+              Mã vạch bản sao
+              <input
+                value={manualBarcode}
+                onChange={(e) => setManualBarcode(e.target.value)}
+                placeholder="Quét hoặc nhập mã bản sao (ví dụ py01-01)"
+              />
+            </label>
+            <label className="circ-field">
+              Tình trạng khi trả
+              <select value={manualCondition} onChange={(e) => setManualCondition(e.target.value)}>
+                <option value="Good">Bình thường</option>
+                <option value="Fair">Hơi cũ</option>
+                <option value="Damaged">Hư hỏng</option>
+                <option value="Lost">Thất lạc</option>
+              </select>
+            </label>
+            <button type="submit" className="circ-btn circ-btn--primary" disabled={busy || !manualBarcode.trim()}>
+              {busy ? <LoaderCircle className="spin" size={14} /> : null}
+              {busy ? 'Đang ghi nhận...' : 'Ghi nhận trả theo mã vạch'}
+            </button>
+          </form>
+        </details>
       </div>
       <div className="circ-card">
         <h2>Giao dịch gần đây</h2>

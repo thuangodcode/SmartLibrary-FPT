@@ -126,8 +126,9 @@
 .admin-user-document-preview:disabled { cursor: default; }
 .admin-user-document-preview:not(:disabled) { cursor: zoom-in; }
 .admin-user-document-preview img { width: 100%; height: 100%; object-fit: contain; }
-.admin-user-document-preview > span { position: absolute; inset: auto 0 0; display: flex; min-height: 36px; align-items: center; justify-content: center; gap: 6px; color: #fff; background: rgb(23 34 56 / 70%); font-size: 10px; opacity: 0; transition: opacity .15s ease; }
-.admin-user-document-preview:hover > span { opacity: 1; }
+.admin-user-document-preview > .admin-user-document-preview-overlay { position: absolute; inset: auto 0 0; display: flex; min-height: 36px; align-items: center; justify-content: center; gap: 6px; color: #fff; background: rgb(23 34 56 / 70%); font-size: 10px; opacity: 0; transition: opacity .15s ease; }
+.admin-user-document-preview:hover > .admin-user-document-preview-overlay { opacity: 1; }
+.admin-user-document-preview > .admin-user-document-empty { color: #94a3b8; font-size: 11px; font-style: italic; }
 .admin-user-document-lightbox { position: fixed; z-index: 1200; inset: 0; display: grid; place-items: center; padding: 28px; background: rgb(16 22 32 / 84%); }
 .admin-user-document-lightbox > div { position: relative; display: grid; justify-items: center; gap: 10px; width: min(100%, 1100px); max-height: calc(100vh - 56px); }
 .admin-user-document-lightbox img { max-width: 100%; max-height: calc(100vh - 110px); object-fit: contain; border-radius: 8px; }

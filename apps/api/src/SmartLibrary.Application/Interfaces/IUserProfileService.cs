@@ -30,7 +30,11 @@ public sealed record UserProfileResponse(
     string? EmployeeId,
     string? Address,
     DateOnly? DateOfBirth,
-    string Role);
+    string Role,
+    string? FrontDocUrl = null,
+    string? BackDocUrl = null,
+    string? SelfieDocUrl = null,
+    string? DocumentType = null);
 
 /// <summary>Editable profile information supplied by the authenticated user.</summary>
 public sealed record UpdateUserProfileRequest(

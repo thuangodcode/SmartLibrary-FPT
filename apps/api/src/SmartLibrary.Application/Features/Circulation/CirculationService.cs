@@ -45,18 +45,28 @@ public class CirculationService
         string? search, CancellationToken ct = default)
     {
         var query = search?.Trim();
-        return string.IsNullOrWhiteSpace(query) || query.Length < 2
+        return string.IsNullOrWhiteSpace(query)
             ? Task.FromResult<IReadOnlyList<CirculationReaderOptionDto>>([])
-            : _repository.SearchReaderOptionsAsync(query, 8, ct);
+            : _repository.SearchReaderOptionsAsync(query, 15, ct);
     }
 
     public Task<IReadOnlyList<CirculationBookOptionDto>> SearchBookOptionsAsync(
         string? search, CancellationToken ct = default)
     {
         var query = search?.Trim();
-        return string.IsNullOrWhiteSpace(query) || query.Length < 2
+        return string.IsNullOrWhiteSpace(query)
             ? Task.FromResult<IReadOnlyList<CirculationBookOptionDto>>([])
-            : _repository.SearchBookOptionsAsync(query, 8, ct);
+            : _repository.SearchBookOptionsAsync(query, 15, ct);
+    }
+
+    public async Task<IReadOnlyList<CirculationLoanDto>> GetActiveLoansForReaderKeyAsync(
+        string readerKey, CancellationToken ct = default)
+    {
+        var reader = await _repository.FindReaderAsync(readerKey, ct);
+        if (reader is null) return [];
+        var settings = await _repository.GetSettingsAsync(ct);
+        var (loans, _) = await _repository.GetLoansForReaderAsync(reader.Id, 1, 50, settings, ct);
+        return loans.Where(l => l.Status == "Borrowed" || l.Status == "Overdue").ToList();
     }
 
     public async Task<CirculationLoanListDto> GetLoansAsync(
@@ -139,7 +149,16 @@ public class CirculationService
     public async Task<Result<CirculationLoanDto>> CheckoutAsync(
         CheckoutRequest request, Guid librarianId, CancellationToken ct = default)
     {
-        var check = await PrepareBorrowAsync(request.ReaderKey, request.Barcode, "Nhập mã độc giả và mã vạch sách.", ct);
+        var barcode = request.Barcode?.Trim() ?? string.Empty;
+        if (barcode.Length == 0 && request.BookId.HasValue && request.BookId.Value != Guid.Empty)
+        {
+            var availableCopy = await _repository.FindAvailableCopyForBookAsync(request.BookId.Value, ct);
+            if (availableCopy is null)
+                return Result<CirculationLoanDto>.Failure("Đầu sách này hiện không còn bản sao nào sẵn sàng để mượn.");
+            barcode = availableCopy.Barcode;
+        }
+
+        var check = await PrepareBorrowAsync(request.ReaderKey, barcode, "Nhập thông tin độc giả và đầu sách hoặc mã vạch sách.", ct);
         if (!check.IsSuccess)
             return Result<CirculationLoanDto>.Failure(check.Error!);
 

@@ -51,7 +51,10 @@ interface ManagedUserDetail {
     id: string;
     documentType: string;
     status: string;
-    documents: Array<{ id: string; side: 'Front' | 'Back' | 'Selfie'; documentLast4: string | null }>;
+    frontDocUrl?: string | null;
+    backDocUrl?: string | null;
+    selfieDocUrl?: string | null;
+    documents: Array<{ id: string; side: 'Front' | 'Back' | 'Selfie'; documentLast4: string | null; storagePath?: string | null }>;
   } | null;
 }
 
@@ -124,6 +127,22 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
         throw new Error(result?.error || 'Không thể tải thông tin người dùng.');
       }
       setUser(result.data);
+      if (result.data.registration) {
+        const initialUrls: Record<string, string> = {};
+        if (result.data.registration.frontDocUrl) initialUrls['Front'] = result.data.registration.frontDocUrl;
+        if (result.data.registration.backDocUrl) initialUrls['Back'] = result.data.registration.backDocUrl;
+        if (result.data.registration.selfieDocUrl) initialUrls['Selfie'] = result.data.registration.selfieDocUrl;
+        result.data.registration.documents.forEach((d) => {
+          if (d.storagePath) {
+            initialUrls[d.id] = d.storagePath;
+            initialUrls[d.side] = d.storagePath;
+          }
+        });
+        setIdentityDocumentUrls((prev) => ({ ...initialUrls, ...prev }));
+        if (isLibrarianView && (result.data.registration.documents.length > 0 || result.data.registration.frontDocUrl)) {
+          setShowIdentityDocuments(true);
+        }
+      }
     } catch (error) {
       if (signal?.aborted) return;
       setLoadError(error instanceof Error ? error.message : 'Không thể tải thông tin người dùng.');
@@ -239,9 +258,10 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
     setIdentityDocumentsBusy(true);
     setIdentityDocumentsError(null);
     try {
+      const endpoint = isLibrarianView ? 'librarian/users' : 'admin/users';
       const results = await Promise.all(missingDocuments.map(async (document) => {
         const response = await fetch(
-          `${API_BASE_URL}/api/v1/admin/users/${user.id}/registrations/${user.registration!.id}/documents/${document.id}/url`,
+          `${API_BASE_URL}/api/v1/${endpoint}/${user.id}/registrations/${user.registration!.id}/documents/${document.id}/url`,
           { headers: { Authorization: `Bearer ${accessToken}` } },
         );
         const result = await parseApiResponse<ApiResult<{ url: string }>>(response);
@@ -324,53 +344,86 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
             <h2>{user.fullName}</h2>
             <p>{isReader ? (user.studentId || 'Chưa có mã độc giả') : user.email.split('@')[0]} <span>·</span> {user.email}</p>
           </div>
-          {!isLibrarianView && <div className="admin-user-profile-actions">
-            {isAccountEnabled ? (
-              <button className="admin-user-detail-button admin-user-detail-button--danger" disabled={busy} onClick={() => { setFormError(null); setEditing(false); setDeactivating(true); }} type="button">
-                <Ban size={15} /> Ngừng hoạt động
-              </button>
-            ) : (
-              <button className="admin-user-detail-button admin-user-detail-button--success" disabled={busy} onClick={() => void reactivate()} type="button">
-                {busy ? <LoaderCircle className="admin-users-spin" size={15} /> : <RotateCcw size={15} />} Kích hoạt tài khoản
-              </button>
+          <div className="admin-user-profile-actions">
+            {!isLibrarianView && (
+              isAccountEnabled ? (
+                <button className="admin-user-detail-button admin-user-detail-button--danger" disabled={busy} onClick={() => { setFormError(null); setEditing(false); setDeactivating(true); }} type="button">
+                  <Ban size={15} /> Ngừng hoạt động
+                </button>
+              ) : (
+                <button className="admin-user-detail-button admin-user-detail-button--success" disabled={busy} onClick={() => void reactivate()} type="button">
+                  {busy ? <LoaderCircle className="admin-users-spin" size={15} /> : <RotateCcw size={15} />} Kích hoạt tài khoản
+                </button>
+              )
             )}
-            {isReader && (user.registration?.documents.length ?? 0) > 0 && (
+            {isReader && (
               <button className="admin-user-detail-button admin-user-detail-button--secondary" disabled={identityDocumentsBusy} onClick={() => void toggleIdentityDocuments()} type="button">
                 {identityDocumentsBusy ? <LoaderCircle className="admin-users-spin" size={15} /> : <FileText size={15} />}
-                Giấy tờ xác minh danh tính
+                {showIdentityDocuments ? 'Ẩn giấy tờ tùy thân' : 'Giấy tờ tùy thân'}
               </button>
             )}
-            <button className="admin-user-detail-button admin-user-detail-button--primary" disabled={busy} onClick={() => { setEditing((current) => !current); setFormError(null); setDeactivating(false); }} type="button">
-              {editing ? <X size={15} /> : <Pencil size={15} />}{editing ? 'Hủy chỉnh sửa' : 'Chỉnh sửa'}
-            </button>
-          </div>}
+            {!isLibrarianView && (
+              <button className="admin-user-detail-button admin-user-detail-button--primary" disabled={busy} onClick={() => { setEditing((current) => !current); setFormError(null); setDeactivating(false); }} type="button">
+                {editing ? <X size={15} /> : <Pencil size={15} />}{editing ? 'Hủy chỉnh sửa' : 'Chỉnh sửa'}
+              </button>
+            )}
+          </div>
         </header>
 
         {!isAccountEnabled && user.statusReason && (
           <div className="admin-user-reason-note"><Ban size={16} /><div><strong>Lý do ngừng hoạt động</strong><p>{user.statusReason}</p></div></div>
         )}
 
-        {!isLibrarianView && (showIdentityDocuments || identityDocumentsError) && (
+        {(showIdentityDocuments || identityDocumentsError) && (
           <section className="admin-user-documents-section" aria-label="Giấy tờ xác minh danh tính">
             <div className="admin-user-section-heading">
-              <div><span>HỒ SƠ XÁC MINH</span><h3>Giấy tờ xác minh danh tính</h3></div>
+              <div><span>HỒ SƠ XÁC MINH</span><h3>Giấy tờ xác minh danh tính (Bấm vào ảnh để phóng to)</h3></div>
               <ImageIcon size={18} />
             </div>
             {identityDocumentsError && <div className="admin-user-form-error" role="alert"><AlertCircle size={15} />{identityDocumentsError}</div>}
             <div className="admin-user-documents-grid">
-              {user.registration?.documents.map((document) => {
-                const label = document.side === 'Front' ? 'Mặt trước giấy tờ' : document.side === 'Back' ? 'Mặt sau giấy tờ' : 'Ảnh chân dung / Selfie';
-                const imageUrl = identityDocumentUrls[document.id];
-                return (
-                  <article className="admin-user-document-card" key={document.id}>
-                    <h4>{label}</h4>
-                    <button className="admin-user-document-preview" disabled={!imageUrl} onClick={() => imageUrl && setLightboxDocument({ url: imageUrl, label })} type="button">
-                      {imageUrl ? <><img src={imageUrl} alt={label} /><span><ZoomIn size={18} /> Phóng to</span></> : identityDocumentsBusy ? <LoaderCircle className="admin-users-spin" size={20} /> : <span>Không có ảnh để hiển thị</span>}
-                    </button>
-                    {document.documentLast4 && <p>Ký tự cuối giấy tờ: ···· {document.documentLast4}</p>}
-                  </article>
-                );
-              })}
+              {[
+                {
+                  id: 'front',
+                  title: 'MẶT TRƯỚC GIẤY TỜ',
+                  url: identityDocumentUrls['Front'] || (user.registration?.documents.find((d) => d.side === 'Front') ? identityDocumentUrls[user.registration.documents.find((d) => d.side === 'Front')!.id] : '') || user.registration?.frontDocUrl || '',
+                  doc: user.registration?.documents.find((d) => d.side === 'Front'),
+                },
+                {
+                  id: 'back',
+                  title: 'MẶT SAU GIẤY TỜ',
+                  url: identityDocumentUrls['Back'] || (user.registration?.documents.find((d) => d.side === 'Back') ? identityDocumentUrls[user.registration.documents.find((d) => d.side === 'Back')!.id] : '') || user.registration?.backDocUrl || '',
+                  doc: user.registration?.documents.find((d) => d.side === 'Back'),
+                },
+                {
+                  id: 'selfie',
+                  title: 'ẢNH CHÂN DUNG / SELFIE',
+                  url: identityDocumentUrls['Selfie'] || (user.registration?.documents.find((d) => d.side === 'Selfie') ? identityDocumentUrls[user.registration.documents.find((d) => d.side === 'Selfie')!.id] : '') || user.registration?.selfieDocUrl || '',
+                  doc: user.registration?.documents.find((d) => d.side === 'Selfie'),
+                },
+              ].map((slot) => (
+                <article className="admin-user-document-card" key={slot.id}>
+                  <h4>{slot.title}</h4>
+                  <button
+                    className="admin-user-document-preview"
+                    disabled={!slot.url}
+                    onClick={() => slot.url && setLightboxDocument({ url: slot.url, label: slot.title })}
+                    type="button"
+                  >
+                    {slot.url ? (
+                      <>
+                        <img src={slot.url} alt={slot.title} />
+                        <span className="admin-user-document-preview-overlay"><ZoomIn size={18} /> Phóng to</span>
+                      </>
+                    ) : identityDocumentsBusy ? (
+                      <LoaderCircle className="admin-users-spin" size={20} />
+                    ) : (
+                      <span className="admin-user-document-empty">Không có ảnh</span>
+                    )}
+                  </button>
+                  {slot.doc?.documentLast4 && <p>Ký tự cuối giấy tờ: ···· {slot.doc.documentLast4}</p>}
+                </article>
+              ))}
             </div>
           </section>
         )}
