@@ -180,7 +180,7 @@
   transform: translateY(-50%);
 }
 
-.news-search-submit {
+.annual-info-page .news-search-submit {
   position: absolute;
   inset: 6px 6px 6px auto;
   min-width: 58px;
@@ -314,7 +314,7 @@
 
 .news-read-hero-btn,
 .news-clear-filter-btn,
-.news-close-modal-bottom-btn {
+.annual-info-page .news-close-modal-bottom-btn {
   min-height: 46px;
   padding: 11px 17px;
   border: 0;
