@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowUp, LoaderCircle, RotateCcw, Sparkles, X } from 'lucide-react';
+import { ArrowUp, BookOpen, CircleHelp, LibraryBig, LoaderCircle, RotateCcw, Sparkles, X } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import {
   askRag,
@@ -26,6 +26,17 @@ const DEFAULT_QUESTIONS = [
   'Mượn sách có mất phí không? Phí quá hạn được tính thế nào?',
 ];
 
+const TOPICS = [
+  { id: 'books', label: 'Thông tin & tìm sách', description: 'Tìm theo tên, tác giả, chủ đề, ngôn ngữ', icon: BookOpen, questions: ['Tìm sách tiếng Hàn cho người mới bắt đầu', 'Có sách nào về trí tuệ nhân tạo không?'] },
+  { id: 'borrowing', label: 'Mượn, trả & gia hạn', description: 'Cách mượn sách, thời hạn, gia hạn và trả sách', icon: LibraryBig, questions: DEFAULT_QUESTIONS.slice(0, 3) },
+  { id: 'fees', label: 'Phí phạt & bồi thường', description: 'Phí quá hạn, sách hỏng hoặc bị mất', icon: CircleHelp, questions: [DEFAULT_QUESTIONS[3], 'Tôi cần làm gì nếu làm mất hoặc hư hỏng sách?'] },
+  { id: 'account', label: 'Tài khoản & thẻ thư viện', description: 'Đăng ký, tài khoản và quyền sử dụng thư viện', icon: CircleHelp, questions: ['Làm thế nào để đăng ký thẻ thư viện?', 'Tôi cần làm gì nếu quên thông tin tài khoản?'] },
+  { id: 'services', label: 'Dịch vụ & tiện ích', description: 'Tra cứu, đặt trước và các dịch vụ khác', icon: LibraryBig, questions: ['Làm sao để đặt trước một cuốn sách đang được mượn?', 'Thư viện có những dịch vụ nào?'] },
+  { id: 'general', label: 'Câu hỏi chung', description: 'Thông tin thư viện hoặc chủ đề khác', icon: Sparkles, questions: DEFAULT_QUESTIONS },
+];
+
+type ChatTopic = typeof TOPICS[number];
+
 function friendlyAskError(error: unknown): string {
   const message = error instanceof Error ? error.message.trim() : '';
   if (/chưa cấu hình api key|hệ thống ai đang tắt|độc giả đang tắt/i.test(message)) return message;
@@ -46,6 +57,9 @@ const RagAskPanel = () => {
   const [suggestions, setSuggestions] = useState<string[]>(DEFAULT_QUESTIONS);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<ChatTopic | null>(null);
+  const [sessionActive, setSessionActive] = useState(false);
+  const [prefilledQuestion, setPrefilledQuestion] = useState(searchParams.get('q') ?? '');
   const nextIdRef = useRef(0);
   const questionRef = useRef<HTMLTextAreaElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
@@ -72,6 +86,23 @@ const RagAskPanel = () => {
     return () => { cancelled = true; };
   }, [isOpen, accessToken]);
 
+  const startSession = (initialQuestion?: string) => {
+    if (!selectedTopic) return;
+    setTurns([]);
+    const firstQuestion = initialQuestion ?? prefilledQuestion;
+    setQuestion(firstQuestion);
+    setPrefilledQuestion('');
+    setSessionActive(true);
+    if (firstQuestion.trim().length >= 3) void runAsk(firstQuestion);
+    else window.setTimeout(() => questionRef.current?.focus(), 0);
+  };
+
+  const endSession = () => {
+    setSessionActive(false);
+    setSelectedTopic(null);
+    setQuestion('');
+  };
+
   useEffect(() => {
     if (!isOpen) return;
     const conversation = conversationRef.current;
@@ -84,11 +115,15 @@ const RagAskPanel = () => {
     const previousTurns = retryId
       ? turns.filter((turn) => turn.id !== retryId)
       : turns;
-    const conversationContext = previousTurns
+    const topicScope = selectedTopic
+      ? `Phạm vi phiên: ${selectedTopic.label}. Ưu tiên trả lời trong phạm vi này. Nếu câu hỏi nằm ngoài phạm vi, hãy trả lời ngắn gọn và hướng người đọc sang chủ đề phù hợp.`
+      : '';
+    const recentContext = previousTurns
       .filter((turn) => turn.result)
       .slice(-4)
       .map((turn) => `Độc giả: ${turn.question}\nTrợ lý: ${turn.result?.answer}`)
       .join('\n\n');
+    const conversationContext = [topicScope, recentContext].filter(Boolean).join('\n\n');
     setTurns((current) => retryId
       ? current.map((turn) => turn.id === retryId ? { ...turn, loading: true, error: undefined } : turn)
       : [...current, { id, question: prompt.trim(), loading: true }]);
@@ -145,6 +180,30 @@ const RagAskPanel = () => {
             <p className="rag-ask-hint rag-ask-login">Đăng nhập để trò chuyện với trợ lý thư viện. <Link to="/login">Đăng nhập</Link></p>
           ) : (
             <>
+              {!sessionActive ? (
+                <div className="rag-session-setup">
+                  <div className="rag-session-intro">
+                    <span className="rag-ask-welcome-mark"><Sparkles size={17} /></span>
+                    <div><strong>Hôm nay bạn muốn tìm hiểu điều gì?</strong><p>Chọn một chủ đề để trợ lý tập trung vào đúng thông tin bạn cần.</p></div>
+                  </div>
+                  <div className="rag-topic-grid" role="radiogroup" aria-label="Chủ đề trò chuyện">
+                    {TOPICS.map((topic) => {
+                      const TopicIcon = topic.icon;
+                      return <button type="button" role="radio" aria-checked={selectedTopic?.id === topic.id} className={`rag-topic-option${selectedTopic?.id === topic.id ? ' is-selected' : ''}`} key={topic.id} onClick={() => setSelectedTopic(topic)}>
+                        <span><TopicIcon size={17} /></span><strong>{topic.label}</strong><small>{topic.description}</small>
+                      </button>;
+                    })}
+                  </div>
+                  <div className="rag-setup-suggestions">
+                    <strong>Câu hỏi gợi ý</strong>
+                    <div>{(selectedTopic?.questions ?? suggestions.slice(0, 4)).map((item) => <button type="button" key={item} onClick={() => { if (selectedTopic) startSession(item); }}>{item}</button>)}</div>
+                    {loadingSuggestions && <small>Đang cập nhật câu hỏi…</small>}
+                  </div>
+                  <button type="button" className="rag-session-start" disabled={!selectedTopic} onClick={() => startSession(prefilledQuestion || undefined)}>Bắt đầu trò chuyện <ArrowUp size={16} /></button>
+                </div>
+              ) : (
+              <>
+              <div className="rag-session-bar"><span>Chủ đề: <strong>{selectedTopic?.label}</strong></span><button type="button" onClick={endSession}>Kết thúc trò chuyện</button></div>
               <div className="rag-ask-conversation" ref={conversationRef} aria-live="polite">
                 {turns.length === 0 && (
                   <div className="rag-ask-welcome">
@@ -202,11 +261,11 @@ const RagAskPanel = () => {
                   );
                 })}
               </div>
-              {suggestions.length > 0 && (
+              {selectedTopic && selectedTopic.questions.length > 0 && (
                 <div className="rag-ask-suggestions">
                   <span>Câu hỏi gợi ý</span>
                   <div>
-                    {(turns.length === 0 ? suggestions : suggestions.slice(0, 4)).map((item) => (
+                    {selectedTopic.questions.slice(0, 4).map((item) => (
                       <button type="button" key={item} disabled={sending} onClick={() => submitQuestion(item)}>{item}</button>
                     ))}
                     {loadingSuggestions && <small>Đang cập nhật…</small>}
@@ -237,6 +296,8 @@ const RagAskPanel = () => {
                   </div>
                 </div>
               </form>
+              </>
+              )}
             </>
           )}
         </section>
