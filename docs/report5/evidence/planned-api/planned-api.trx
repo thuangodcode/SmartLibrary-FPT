@@ -1,0 +1,208 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="3e8c9c9b-10fe-4029-91d4-53b5e5437b15" name="@MacBook-Air-cua-Ngo-2 2026-10-27 15:44:57" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-27T15:44:57.9174420+07:00" queuing="2026-10-27T15:44:57.9174420+07:00" start="2026-10-27T15:44:53.3568300+07:00" finish="2026-10-27T15:44:59.0096110+07:00" />
+  <TestSettings name="default" id="ed1afb2b-5135-4317-996e-ad115ee6ccd3">
+    <Deployment runDeploymentRoot="_MacBook-Air-cua-Ngo-2_2026-10-27_15_44_57" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="8238d925-2b36-4a60-ba5b-1db1610bcfd9" testId="4c0179d7-5f57-d4fe-a91c-bbb4effe481f" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_01_3_ReaderCannotApprove" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0351540" startTime="2026-10-27T15:44:57.8715380+07:00" endTime="2026-10-27T15:44:57.9067700+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8238d925-2b36-4a60-ba5b-1db1610bcfd9" />
+    <UnitTestResult executionId="74acda40-c187-43f6-9023-97eb850045a3" testId="d8b25c49-5046-f35c-860a-e295cc163bf9" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_15_3_AiAnalyticsAuthorization" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0006370" startTime="2026-10-27T15:44:57.7922630+07:00" endTime="2026-10-27T15:44:57.7923060+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="74acda40-c187-43f6-9023-97eb850045a3" />
+    <UnitTestResult executionId="538001fa-d724-4a15-adb3-a3863e1907b5" testId="bf956f5e-6bdf-0388-2da8-bedab3f9cb59" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_04_3_ReaderCannotReturn" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0005241" startTime="2026-10-27T15:44:58.1165190+07:00" endTime="2026-10-27T15:44:58.1170370+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="538001fa-d724-4a15-adb3-a3863e1907b5" />
+    <UnitTestResult executionId="c21d0d95-aec7-475f-9aaf-b3efeb134974" testId="983b074d-94cc-50d1-ce71-e4ef35248337" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_03_2_PastSlotAndLastCopyRace" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0359882" startTime="2026-10-27T15:44:58.8113010+07:00" endTime="2026-10-27T15:44:58.8473550+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c21d0d95-aec7-475f-9aaf-b3efeb134974" />
+    <UnitTestResult executionId="df96bb48-aa06-4127-82a2-197d92b860ae" testId="bafdcf9f-c25e-b91d-4c4e-ce07337302d2" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_02_3_ReaderCannotMutateInventory" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.1972655" startTime="2026-10-27T15:44:58.6096550+07:00" endTime="2026-10-27T15:44:58.8073810+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="df96bb48-aa06-4127-82a2-197d92b860ae">
+      <Output>
+        <ErrorInfo>
+          <Message>Reader form-create: HTTP 201; persisted=True. Expected 403 and no new book.</Message>
+          <StackTrace>   at SmartLibrary.IntegrationTests.Report5PlannedTests.ST_02_3_ReaderCannotMutateInventory() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/Report5PlannedTests.cs:line 50
+   at SmartLibrary.IntegrationTests.Report5PlannedTests.ST_02_3_ReaderCannotMutateInventory() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/Report5PlannedTests.cs:line 50
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="30950a9a-18a3-42bb-9e65-074107a0c031" testId="fa2beda0-96e4-ed95-fdd8-e8f9f814cdbd" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_10_3_PrivateConversation" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0020307" startTime="2026-10-27T15:44:57.7915990+07:00" endTime="2026-10-27T15:44:57.7917170+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="30950a9a-18a3-42bb-9e65-074107a0c031" />
+    <UnitTestResult executionId="04acb617-cb03-4760-8ba8-6f27e0119d5f" testId="fdcae7dc-d9d8-96cc-eaf4-cb539d7b8730" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_04_2_DuplicateReturn" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:01.4103603" startTime="2026-10-27T15:44:56.3841810+07:00" endTime="2026-10-27T15:44:57.7845040+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="04acb617-cb03-4760-8ba8-6f27e0119d5f" />
+    <UnitTestResult executionId="b6baeb55-c73b-484d-9be0-286224b658d7" testId="743d16b5-d2ef-ae21-be53-3bf63020c58e" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_03_1_BorrowAndHandover" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0806559" startTime="2026-10-27T15:44:57.7925430+07:00" endTime="2026-10-27T15:44:57.8713540+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b6baeb55-c73b-484d-9be0-286224b658d7" />
+    <UnitTestResult executionId="ce11dd73-00fe-419c-81a7-8d13090fabee" testId="740d0034-b86a-027b-3976-6d10da10229e" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_10_2_InvalidSupportContent" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0242961" startTime="2026-10-27T15:44:58.3835090+07:00" endTime="2026-10-27T15:44:58.4078400+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ce11dd73-00fe-419c-81a7-8d13090fabee" />
+    <UnitTestResult executionId="0131a2e0-09c5-47a3-9f88-87b4cabdcf45" testId="ec5d2433-ed16-6e59-9465-f2bc20d8040c" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.SM_04_RegistrationLifecycle" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.1657197" startTime="2026-10-27T15:44:58.4080200+07:00" endTime="2026-10-27T15:44:58.5819100+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0131a2e0-09c5-47a3-9f88-87b4cabdcf45">
+      <Output>
+        <ErrorInfo>
+          <Message>An approved request must not be downgraded by a stale review action.</Message>
+          <StackTrace>   at SmartLibrary.IntegrationTests.WorkflowTests.Registration_ApprovedRequest_CannotBeReopenedForDocuments() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowTests.cs:line 293
+   at SmartLibrary.IntegrationTests.Report5PlannedTests.SM_04_RegistrationLifecycle() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/Report5PlannedTests.cs:line 212
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="b4bb47db-c58c-4002-8c1a-8fb004e365cf" testId="0e2a177b-0849-6f3e-0614-ea6008967557" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_08_3_PrivateReaderDetails" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0036503" startTime="2026-10-27T15:44:58.8079360+07:00" endTime="2026-10-27T15:44:58.8111320+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b4bb47db-c58c-4002-8c1a-8fb004e365cf" />
+    <UnitTestResult executionId="11da0f6a-8a97-43d9-b481-309bf7aa4bb4" testId="8211998f-8a37-0625-4e5d-2b594e5e1e09" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_13_3_AdminPolicyAuthorization" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0014916" startTime="2026-10-27T15:44:58.1171510+07:00" endTime="2026-10-27T15:44:58.1186890+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="11da0f6a-8a97-43d9-b481-309bf7aa4bb4" />
+    <UnitTestResult executionId="69c39ae7-26a5-473b-9173-f840f6f7950f" testId="4b3def41-287e-302e-7750-0a9603b1348e" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_09_3_ReviewOwnership" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.1013957" startTime="2026-10-27T15:44:57.9069700+07:00" endTime="2026-10-27T15:44:58.0084500+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="69c39ae7-26a5-473b-9173-f840f6f7950f" />
+    <UnitTestResult executionId="56bb381d-d5a5-4cd0-8cab-6668499e7cec" testId="84c67db5-f00e-d09b-432e-9fba72a16db3" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_06_3_CrossReaderReservation" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0567619" startTime="2026-10-27T15:44:58.0544270+07:00" endTime="2026-10-27T15:44:58.1112660+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="56bb381d-d5a5-4cd0-8cab-6668499e7cec" />
+    <UnitTestResult executionId="8df10ae5-9833-4ec5-b167-60a3c960315b" testId="20a34c81-8e21-a398-1f64-b18813a85566" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_05_3_CrossReaderRenewal" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0277111" startTime="2026-10-27T15:44:58.5862000+07:00" endTime="2026-10-27T15:44:58.6094730+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8df10ae5-9833-4ec5-b167-60a3c960315b" />
+    <UnitTestResult executionId="3b3b9c8c-13f5-4dfc-8a83-5e8875d637cb" testId="02d8c76e-4c6a-e918-88c1-a77459810a82" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_07_3_CrossReaderCheckout" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0804919" startTime="2026-10-27T15:44:58.1201350+07:00" endTime="2026-10-27T15:44:58.1994020+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3b3b9c8c-13f5-4dfc-8a83-5e8875d637cb" />
+    <UnitTestResult executionId="db86f5fd-6987-48a0-a561-78e91244e21e" testId="127f07d9-3290-c2ac-31c8-8b40621b2776" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_03_3_StaffLoansAuthorization" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0018462" startTime="2026-10-27T15:44:57.7924090+07:00" endTime="2026-10-27T15:44:57.7924470+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="db86f5fd-6987-48a0-a561-78e91244e21e" />
+    <UnitTestResult executionId="4bd07198-73a3-473f-abb7-96d98eb27b6f" testId="d696dd1b-c51c-9ba7-3108-2e2918d42d04" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_04_1_ReturnConditions" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.1557941" startTime="2026-10-27T15:44:58.1995940+07:00" endTime="2026-10-27T15:44:58.3554670+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="4bd07198-73a3-473f-abb7-96d98eb27b6f" />
+    <UnitTestResult executionId="9445854d-a670-459c-9556-5cbbc8ab8bf0" testId="0dea4724-407a-a16b-533a-cf7779b9b937" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_12_3_AdminUsersAuthorization" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010859" startTime="2026-10-27T15:44:58.1139060+07:00" endTime="2026-10-27T15:44:58.1150430+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9445854d-a670-459c-9556-5cbbc8ab8bf0" />
+    <UnitTestResult executionId="c3f5d0c1-5ade-4779-83b7-c114be2bb437" testId="57572886-d4f7-24ca-63b5-a20144568b4e" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_09_2_ReviewValidation" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0276686" startTime="2026-10-27T15:44:58.3556620+07:00" endTime="2026-10-27T15:44:58.3833160+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c3f5d0c1-5ade-4779-83b7-c114be2bb437" />
+    <UnitTestResult executionId="8f89d48f-f460-4013-b645-52b82397dfa9" testId="832ab712-b726-5f5f-98a5-0657c008c20a" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_16_3_ReportAuthorization" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0011680" startTime="2026-10-27T15:44:58.1151600+07:00" endTime="2026-10-27T15:44:58.1163720+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8f89d48f-f460-4013-b645-52b82397dfa9" />
+    <UnitTestResult executionId="0bb4b4f0-0229-43bf-9c84-96586178e77a" testId="b5a4a2f0-a46f-f906-e09b-f402d72a99d4" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_14_3_AiSettingsAuthorization" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0023434" startTime="2026-10-27T15:44:58.1114830+07:00" endTime="2026-10-27T15:44:58.1137630+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0bb4b4f0-0229-43bf-9c84-96586178e77a" />
+    <UnitTestResult executionId="09dc7f0c-e21a-4458-91c6-18510dfba932" testId="5a7bd344-c875-ac1c-c9cf-40ab61cf9efa" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_02_2_InvalidIntakeAndDuplicateCode" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0674203" startTime="2026-10-27T15:44:58.8483070+07:00" endTime="2026-10-27T15:44:58.9150120+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="09dc7f0c-e21a-4458-91c6-18510dfba932" />
+    <UnitTestResult executionId="653c9da1-c8e6-4541-85ff-baae9951cdf8" testId="b9c52dc4-7983-da67-33f8-6816ae09ff3f" testName="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_11_3_NewsAndNotificationOwnership" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0455555" startTime="2026-10-27T15:44:58.0086560+07:00" endTime="2026-10-27T15:44:58.0542330+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="653c9da1-c8e6-4541-85ff-baae9951cdf8" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_10_2_InvalidSupportContent" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="740d0034-b86a-027b-3976-6d10da10229e">
+      <Execution id="ce11dd73-00fe-419c-81a7-8d13090fabee" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_10_2_InvalidSupportContent" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_10_3_PrivateConversation" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="fa2beda0-96e4-ed95-fdd8-e8f9f814cdbd">
+      <Execution id="30950a9a-18a3-42bb-9e65-074107a0c031" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_10_3_PrivateConversation" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_02_2_InvalidIntakeAndDuplicateCode" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="5a7bd344-c875-ac1c-c9cf-40ab61cf9efa">
+      <Execution id="09dc7f0c-e21a-4458-91c6-18510dfba932" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_02_2_InvalidIntakeAndDuplicateCode" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_03_3_StaffLoansAuthorization" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="127f07d9-3290-c2ac-31c8-8b40621b2776">
+      <Execution id="db86f5fd-6987-48a0-a561-78e91244e21e" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_03_3_StaffLoansAuthorization" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_15_3_AiAnalyticsAuthorization" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="d8b25c49-5046-f35c-860a-e295cc163bf9">
+      <Execution id="74acda40-c187-43f6-9023-97eb850045a3" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_15_3_AiAnalyticsAuthorization" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_01_3_ReaderCannotApprove" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="4c0179d7-5f57-d4fe-a91c-bbb4effe481f">
+      <Execution id="8238d925-2b36-4a60-ba5b-1db1610bcfd9" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_01_3_ReaderCannotApprove" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_05_3_CrossReaderRenewal" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="20a34c81-8e21-a398-1f64-b18813a85566">
+      <Execution id="8df10ae5-9833-4ec5-b167-60a3c960315b" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_05_3_CrossReaderRenewal" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_13_3_AdminPolicyAuthorization" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="8211998f-8a37-0625-4e5d-2b594e5e1e09">
+      <Execution id="11da0f6a-8a97-43d9-b481-309bf7aa4bb4" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_13_3_AdminPolicyAuthorization" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_04_3_ReaderCannotReturn" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="bf956f5e-6bdf-0388-2da8-bedab3f9cb59">
+      <Execution id="538001fa-d724-4a15-adb3-a3863e1907b5" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_04_3_ReaderCannotReturn" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_06_3_CrossReaderReservation" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="84c67db5-f00e-d09b-432e-9fba72a16db3">
+      <Execution id="56bb381d-d5a5-4cd0-8cab-6668499e7cec" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_06_3_CrossReaderReservation" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_12_3_AdminUsersAuthorization" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="0dea4724-407a-a16b-533a-cf7779b9b937">
+      <Execution id="9445854d-a670-459c-9556-5cbbc8ab8bf0" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_12_3_AdminUsersAuthorization" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_11_3_NewsAndNotificationOwnership" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="b9c52dc4-7983-da67-33f8-6816ae09ff3f">
+      <Execution id="653c9da1-c8e6-4541-85ff-baae9951cdf8" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_11_3_NewsAndNotificationOwnership" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_04_1_ReturnConditions" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="d696dd1b-c51c-9ba7-3108-2e2918d42d04">
+      <Execution id="4bd07198-73a3-473f-abb7-96d98eb27b6f" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_04_1_ReturnConditions" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_07_3_CrossReaderCheckout" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="02d8c76e-4c6a-e918-88c1-a77459810a82">
+      <Execution id="3b3b9c8c-13f5-4dfc-8a83-5e8875d637cb" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_07_3_CrossReaderCheckout" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_09_3_ReviewOwnership" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="4b3def41-287e-302e-7750-0a9603b1348e">
+      <Execution id="69c39ae7-26a5-473b-9173-f840f6f7950f" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_09_3_ReviewOwnership" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_03_1_BorrowAndHandover" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="743d16b5-d2ef-ae21-be53-3bf63020c58e">
+      <Execution id="b6baeb55-c73b-484d-9be0-286224b658d7" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_03_1_BorrowAndHandover" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_14_3_AiSettingsAuthorization" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="b5a4a2f0-a46f-f906-e09b-f402d72a99d4">
+      <Execution id="0bb4b4f0-0229-43bf-9c84-96586178e77a" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_14_3_AiSettingsAuthorization" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_02_3_ReaderCannotMutateInventory" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="bafdcf9f-c25e-b91d-4c4e-ce07337302d2">
+      <Execution id="df96bb48-aa06-4127-82a2-197d92b860ae" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_02_3_ReaderCannotMutateInventory" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_09_2_ReviewValidation" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="57572886-d4f7-24ca-63b5-a20144568b4e">
+      <Execution id="c3f5d0c1-5ade-4779-83b7-c114be2bb437" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_09_2_ReviewValidation" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_16_3_ReportAuthorization" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="832ab712-b726-5f5f-98a5-0657c008c20a">
+      <Execution id="8f89d48f-f460-4013-b645-52b82397dfa9" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_16_3_ReportAuthorization" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_03_2_PastSlotAndLastCopyRace" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="983b074d-94cc-50d1-ce71-e4ef35248337">
+      <Execution id="c21d0d95-aec7-475f-9aaf-b3efeb134974" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_03_2_PastSlotAndLastCopyRace" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.SM_04_RegistrationLifecycle" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="ec5d2433-ed16-6e59-9465-f2bc20d8040c">
+      <Execution id="0131a2e0-09c5-47a3-9f88-87b4cabdcf45" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="SM_04_RegistrationLifecycle" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_04_2_DuplicateReturn" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="fdcae7dc-d9d8-96cc-eaf4-cb539d7b8730">
+      <Execution id="04acb617-cb03-4760-8ba8-6f27e0119d5f" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_04_2_DuplicateReturn" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5PlannedTests.ST_08_3_PrivateReaderDetails" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="0e2a177b-0849-6f3e-0614-ea6008967557">
+      <Execution id="b4bb47db-c58c-4002-8c1a-8fb004e365cf" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5PlannedTests" name="ST_08_3_PrivateReaderDetails" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="4c0179d7-5f57-d4fe-a91c-bbb4effe481f" executionId="8238d925-2b36-4a60-ba5b-1db1610bcfd9" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d8b25c49-5046-f35c-860a-e295cc163bf9" executionId="74acda40-c187-43f6-9023-97eb850045a3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="bf956f5e-6bdf-0388-2da8-bedab3f9cb59" executionId="538001fa-d724-4a15-adb3-a3863e1907b5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="983b074d-94cc-50d1-ce71-e4ef35248337" executionId="c21d0d95-aec7-475f-9aaf-b3efeb134974" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="bafdcf9f-c25e-b91d-4c4e-ce07337302d2" executionId="df96bb48-aa06-4127-82a2-197d92b860ae" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fa2beda0-96e4-ed95-fdd8-e8f9f814cdbd" executionId="30950a9a-18a3-42bb-9e65-074107a0c031" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fdcae7dc-d9d8-96cc-eaf4-cb539d7b8730" executionId="04acb617-cb03-4760-8ba8-6f27e0119d5f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="743d16b5-d2ef-ae21-be53-3bf63020c58e" executionId="b6baeb55-c73b-484d-9be0-286224b658d7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="740d0034-b86a-027b-3976-6d10da10229e" executionId="ce11dd73-00fe-419c-81a7-8d13090fabee" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ec5d2433-ed16-6e59-9465-f2bc20d8040c" executionId="0131a2e0-09c5-47a3-9f88-87b4cabdcf45" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0e2a177b-0849-6f3e-0614-ea6008967557" executionId="b4bb47db-c58c-4002-8c1a-8fb004e365cf" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8211998f-8a37-0625-4e5d-2b594e5e1e09" executionId="11da0f6a-8a97-43d9-b481-309bf7aa4bb4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4b3def41-287e-302e-7750-0a9603b1348e" executionId="69c39ae7-26a5-473b-9173-f840f6f7950f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="84c67db5-f00e-d09b-432e-9fba72a16db3" executionId="56bb381d-d5a5-4cd0-8cab-6668499e7cec" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="20a34c81-8e21-a398-1f64-b18813a85566" executionId="8df10ae5-9833-4ec5-b167-60a3c960315b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="02d8c76e-4c6a-e918-88c1-a77459810a82" executionId="3b3b9c8c-13f5-4dfc-8a83-5e8875d637cb" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="127f07d9-3290-c2ac-31c8-8b40621b2776" executionId="db86f5fd-6987-48a0-a561-78e91244e21e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d696dd1b-c51c-9ba7-3108-2e2918d42d04" executionId="4bd07198-73a3-473f-abb7-96d98eb27b6f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0dea4724-407a-a16b-533a-cf7779b9b937" executionId="9445854d-a670-459c-9556-5cbbc8ab8bf0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="57572886-d4f7-24ca-63b5-a20144568b4e" executionId="c3f5d0c1-5ade-4779-83b7-c114be2bb437" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="832ab712-b726-5f5f-98a5-0657c008c20a" executionId="8f89d48f-f460-4013-b645-52b82397dfa9" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b5a4a2f0-a46f-f906-e09b-f402d72a99d4" executionId="0bb4b4f0-0229-43bf-9c84-96586178e77a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5a7bd344-c875-ac1c-c9cf-40ab61cf9efa" executionId="09dc7f0c-e21a-4458-91c6-18510dfba932" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b9c52dc4-7983-da67-33f8-6816ae09ff3f" executionId="653c9da1-c8e6-4541-85ff-baae9951cdf8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="24" executed="24" passed="22" failed="2" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.13)
+[xUnit.net 00:00:00.09]   Discovering: SmartLibrary.IntegrationTests
+[xUnit.net 00:00:00.14]   Discovered:  SmartLibrary.IntegrationTests
+[xUnit.net 00:00:00.16]   Starting:    SmartLibrary.IntegrationTests
+[xUnit.net 00:00:04.56]       An approved request must not be downgraded by a stale review action.
+[xUnit.net 00:00:04.56]       Stack Trace:
+[xUnit.net 00:00:04.56]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowTests.cs(293,0): at SmartLibrary.IntegrationTests.WorkflowTests.Registration_ApprovedRequest_CannotBeReopenedForDocuments()
+[xUnit.net 00:00:04.56]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/Report5PlannedTests.cs(212,0): at SmartLibrary.IntegrationTests.Report5PlannedTests.SM_04_RegistrationLifecycle()
+[xUnit.net 00:00:04.56]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:04.78]       Reader form-create: HTTP 201; persisted=True. Expected 403 and no new book.
+[xUnit.net 00:00:04.78]       Stack Trace:
+[xUnit.net 00:00:04.78]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/Report5PlannedTests.cs(50,0): at SmartLibrary.IntegrationTests.Report5PlannedTests.ST_02_3_ReaderCannotMutateInventory()
+[xUnit.net 00:00:04.78]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/Report5PlannedTests.cs(50,0): at SmartLibrary.IntegrationTests.Report5PlannedTests.ST_02_3_ReaderCannotMutateInventory()
+[xUnit.net 00:00:04.78]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:04.94]   Finished:    SmartLibrary.IntegrationTests
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T15:44:58.5838820+07:00">
+        <Text>[xUnit.net 00:00:04.56]     SmartLibrary.IntegrationTests.Report5PlannedTests.SM_04_RegistrationLifecycle [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T15:44:58.8077850+07:00">
+        <Text>[xUnit.net 00:00:04.78]     SmartLibrary.IntegrationTests.Report5PlannedTests.ST_02_3_ReaderCannotMutateInventory [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

@@ -1,0 +1,1033 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="fab98bd5-3543-4691-bfb2-1124c48ab161" name="@MacBook-Air-cua-Ngo-2 2026-10-27 19:55:58" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-27T19:55:58.2203560+07:00" queuing="2026-10-27T19:55:58.2203560+07:00" start="2026-10-27T19:55:56.6495710+07:00" finish="2026-10-27T19:55:58.2561620+07:00" />
+  <TestSettings name="default" id="a666a06b-aa7e-4dcd-8c0a-0740ea0c91af">
+    <Deployment runDeploymentRoot="_MacBook-Air-cua-Ngo-2_2026-10-27_19_55_58" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="0f2a2b2f-11d1-44b9-82d0-bd2f350715ff" testId="cd4b831e-e423-6b39-6bee-8ae005d52479" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_14_2_MissingProviderCredential" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1204130+07:00" endTime="2026-10-27T19:55:58.1302600+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0f2a2b2f-11d1-44b9-82d0-bd2f350715ff">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="a7a631be-947d-4ad8-8119-d41805c0d960" testId="2baaf9e0-6648-f32e-7a69-aedd6826847a" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_10_2_InvalidContentAndConversationNoOrphans" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1514480+07:00" endTime="2026-10-27T19:55:58.1514630+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a7a631be-947d-4ad8-8119-d41805c0d960">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="32f7126b-4990-42a2-8f11-eb6ff740db49" testId="7bd81cdd-d534-9c96-daf1-c8aac63c7d8f" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_08_2_InvalidContactPreservesProfile" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1531730+07:00" endTime="2026-10-27T19:55:58.1531910+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="32f7126b-4990-42a2-8f11-eb6ff740db49">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="10fba59a-e0ef-426b-b0b7-3c6332ebffa2" testId="ae8d1c41-c536-02d2-9b59-65b3c66dbe09" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_05_1_ReaderAndLibrarianRenewal" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1821210+07:00" endTime="2026-10-27T19:55:58.1821380+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="10fba59a-e0ef-426b-b0b7-3c6332ebffa2">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="c6f1d9af-d05f-49e5-85d7-19a34d8a20bc" testId="77e32d50-0908-9cf6-6215-d3758f50ab93" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_01_2_MismatchedConfirmation" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1796820+07:00" endTime="2026-10-27T19:55:58.1797040+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c6f1d9af-d05f-49e5-85d7-19a34d8a20bc">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="fffd46ec-4889-4c6e-8f2b-1c75ed19814a" testId="84cb75b5-b0fe-7828-9fc8-a0b2790a905d" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_16_2_InvalidReportPeriod" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1475790+07:00" endTime="2026-10-27T19:55:58.1476350+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="fffd46ec-4889-4c6e-8f2b-1c75ed19814a">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="ac22bd20-b535-464b-ad13-bb2d56fcb511" testId="b57b6ca0-9b9c-6609-6f33-05d3ddd00a6b" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_11_2_MissingNotificationDoesNotMutateInbox" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1814570+07:00" endTime="2026-10-27T19:55:58.1814690+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ac22bd20-b535-464b-ad13-bb2d56fcb511">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="034c3a93-c6ef-4071-8fe5-793c6abea29d" testId="95c63e09-9d42-1cbf-377a-b6d97c1028b8" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_08_1_ProfileEditAndStaffHistory" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1808910+07:00" endTime="2026-10-27T19:55:58.1809030+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="034c3a93-c6ef-4071-8fe5-793c6abea29d">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="d131cada-c281-46d6-a61e-1a051f6305ac" testId="5065f28c-5993-f9f3-fa6f-4210d947f23f" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_12_2_DuplicateLibrarianAccount" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1828120+07:00" endTime="2026-10-27T19:55:58.1828280+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d131cada-c281-46d6-a61e-1a051f6305ac">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="9691ec07-4d72-4091-bb4e-f50c685a8dfe" testId="72890dcc-30e4-870d-ee68-a3a73b08d860" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_13_2_InvalidPolicyKeepsLastValidSettings" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1497420+07:00" endTime="2026-10-27T19:55:58.1497580+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9691ec07-4d72-4091-bb4e-f50c685a8dfe">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="0bffb8cb-77fc-49a9-adcd-7a43597b7a1e" testId="c1e86c98-1d1c-25c4-7d03-671881f7ca86" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_10_1_SupportReplyAndHistory" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1539960+07:00" endTime="2026-10-27T19:55:58.1540120+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0bffb8cb-77fc-49a9-adcd-7a43597b7a1e">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="43f804e4-d944-45e7-addd-8467181ca3aa" testId="e1dca693-215e-3ba9-1683-275baeddd7a2" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_05_2_RenewalLimitOverdueAndQueue" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1488690+07:00" endTime="2026-10-27T19:55:58.1488850+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="43f804e4-d944-45e7-addd-8467181ca3aa">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="4c36f768-a128-4f1d-a916-69fd98318476" testId="69eee8b8-2f7c-62f9-3584-e9a204f736e9" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_09_1_ReviewCreateEditDeleteAggregates" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1522700+07:00" endTime="2026-10-27T19:55:58.1522840+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="4c36f768-a128-4f1d-a916-69fd98318476">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="d24f2e73-6e36-43ea-9e2c-092078aa56db" testId="f03e96d5-41af-3041-b0a4-2a35de94c038" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_02_1_CatalogCreateIntakeSearchDetail" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1505670+07:00" endTime="2026-10-27T19:55:58.1505840+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d24f2e73-6e36-43ea-9e2c-092078aa56db">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="bbf8252b-7352-4ff7-97de-a37434ed1ef6" testId="e83a79dd-458d-2ace-198c-682aa3cec12a" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_06_2_DuplicateAndExpiredReadyHold" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1787490+07:00" endTime="2026-10-27T19:55:58.1787800+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bbf8252b-7352-4ff7-97de-a37434ed1ef6">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="ea08f183-97f1-4feb-8fc1-80fd31c09c36" testId="ed2ce9ac-6d41-d3a0-f7bd-34271ea94898" testName="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_06_1_ReservationReturnAndPickup" computerName="MacBook-Air-cua-Ngo-2" duration="00:00:00.0010000" startTime="2026-10-27T19:55:58.1803330+07:00" endTime="2026-10-27T19:55:58.1803470+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ea08f183-97f1-4feb-8fc1-80fd31c09c36">
+      <Output>
+        <ErrorInfo>
+          <Message>Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+---- System.Net.Sockets.SocketException : Connection refused</Message>
+          <StackTrace>   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+   at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 74
+   at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync() in /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs:line 91
+----- Inner Stack Trace -----
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+   at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_01_2_MismatchedConfirmation" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="77e32d50-0908-9cf6-6215-d3758f50ab93">
+      <Execution id="c6f1d9af-d05f-49e5-85d7-19a34d8a20bc" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_01_2_MismatchedConfirmation" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_06_2_DuplicateAndExpiredReadyHold" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="e83a79dd-458d-2ace-198c-682aa3cec12a">
+      <Execution id="bbf8252b-7352-4ff7-97de-a37434ed1ef6" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_06_2_DuplicateAndExpiredReadyHold" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_14_2_MissingProviderCredential" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="cd4b831e-e423-6b39-6bee-8ae005d52479">
+      <Execution id="0f2a2b2f-11d1-44b9-82d0-bd2f350715ff" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_14_2_MissingProviderCredential" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_05_2_RenewalLimitOverdueAndQueue" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="e1dca693-215e-3ba9-1683-275baeddd7a2">
+      <Execution id="43f804e4-d944-45e7-addd-8467181ca3aa" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_05_2_RenewalLimitOverdueAndQueue" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_12_2_DuplicateLibrarianAccount" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="5065f28c-5993-f9f3-fa6f-4210d947f23f">
+      <Execution id="d131cada-c281-46d6-a61e-1a051f6305ac" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_12_2_DuplicateLibrarianAccount" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_02_1_CatalogCreateIntakeSearchDetail" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="f03e96d5-41af-3041-b0a4-2a35de94c038">
+      <Execution id="d24f2e73-6e36-43ea-9e2c-092078aa56db" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_02_1_CatalogCreateIntakeSearchDetail" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_11_2_MissingNotificationDoesNotMutateInbox" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="b57b6ca0-9b9c-6609-6f33-05d3ddd00a6b">
+      <Execution id="ac22bd20-b535-464b-ad13-bb2d56fcb511" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_11_2_MissingNotificationDoesNotMutateInbox" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_16_2_InvalidReportPeriod" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="84cb75b5-b0fe-7828-9fc8-a0b2790a905d">
+      <Execution id="fffd46ec-4889-4c6e-8f2b-1c75ed19814a" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_16_2_InvalidReportPeriod" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_08_1_ProfileEditAndStaffHistory" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="95c63e09-9d42-1cbf-377a-b6d97c1028b8">
+      <Execution id="034c3a93-c6ef-4071-8fe5-793c6abea29d" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_08_1_ProfileEditAndStaffHistory" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_06_1_ReservationReturnAndPickup" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="ed2ce9ac-6d41-d3a0-f7bd-34271ea94898">
+      <Execution id="ea08f183-97f1-4feb-8fc1-80fd31c09c36" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_06_1_ReservationReturnAndPickup" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_08_2_InvalidContactPreservesProfile" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="7bd81cdd-d534-9c96-daf1-c8aac63c7d8f">
+      <Execution id="32f7126b-4990-42a2-8f11-eb6ff740db49" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_08_2_InvalidContactPreservesProfile" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_10_1_SupportReplyAndHistory" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="c1e86c98-1d1c-25c4-7d03-671881f7ca86">
+      <Execution id="0bffb8cb-77fc-49a9-adcd-7a43597b7a1e" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_10_1_SupportReplyAndHistory" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_10_2_InvalidContentAndConversationNoOrphans" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="2baaf9e0-6648-f32e-7a69-aedd6826847a">
+      <Execution id="a7a631be-947d-4ad8-8119-d41805c0d960" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_10_2_InvalidContentAndConversationNoOrphans" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_13_2_InvalidPolicyKeepsLastValidSettings" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="72890dcc-30e4-870d-ee68-a3a73b08d860">
+      <Execution id="9691ec07-4d72-4091-bb4e-f50c685a8dfe" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_13_2_InvalidPolicyKeepsLastValidSettings" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_05_1_ReaderAndLibrarianRenewal" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="ae8d1c41-c536-02d2-9b59-65b3c66dbe09">
+      <Execution id="10fba59a-e0ef-426b-b0b7-3c6332ebffa2" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_05_1_ReaderAndLibrarianRenewal" />
+    </UnitTest>
+    <UnitTest name="SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_09_1_ReviewCreateEditDeleteAggregates" storage="/users/haolongkakashi/workspace/do-an-2/smartlibrary-fpt/apps/api/tests/smartlibrary.integrationtests/bin/debug/net10.0/smartlibrary.integrationtests.dll" id="69eee8b8-2f7c-62f9-3584-e9a204f736e9">
+      <Execution id="4c36f768-a128-4f1d-a916-69fd98318476" />
+      <TestMethod codeBase="/Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/bin/Debug/net10.0/SmartLibrary.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SmartLibrary.IntegrationTests.Report5AdditionalTests" name="ST_09_1_ReviewCreateEditDeleteAggregates" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="cd4b831e-e423-6b39-6bee-8ae005d52479" executionId="0f2a2b2f-11d1-44b9-82d0-bd2f350715ff" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2baaf9e0-6648-f32e-7a69-aedd6826847a" executionId="a7a631be-947d-4ad8-8119-d41805c0d960" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7bd81cdd-d534-9c96-daf1-c8aac63c7d8f" executionId="32f7126b-4990-42a2-8f11-eb6ff740db49" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ae8d1c41-c536-02d2-9b59-65b3c66dbe09" executionId="10fba59a-e0ef-426b-b0b7-3c6332ebffa2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="77e32d50-0908-9cf6-6215-d3758f50ab93" executionId="c6f1d9af-d05f-49e5-85d7-19a34d8a20bc" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="84cb75b5-b0fe-7828-9fc8-a0b2790a905d" executionId="fffd46ec-4889-4c6e-8f2b-1c75ed19814a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b57b6ca0-9b9c-6609-6f33-05d3ddd00a6b" executionId="ac22bd20-b535-464b-ad13-bb2d56fcb511" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="95c63e09-9d42-1cbf-377a-b6d97c1028b8" executionId="034c3a93-c6ef-4071-8fe5-793c6abea29d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5065f28c-5993-f9f3-fa6f-4210d947f23f" executionId="d131cada-c281-46d6-a61e-1a051f6305ac" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="72890dcc-30e4-870d-ee68-a3a73b08d860" executionId="9691ec07-4d72-4091-bb4e-f50c685a8dfe" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c1e86c98-1d1c-25c4-7d03-671881f7ca86" executionId="0bffb8cb-77fc-49a9-adcd-7a43597b7a1e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e1dca693-215e-3ba9-1683-275baeddd7a2" executionId="43f804e4-d944-45e7-addd-8467181ca3aa" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="69eee8b8-2f7c-62f9-3584-e9a204f736e9" executionId="4c36f768-a128-4f1d-a916-69fd98318476" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f03e96d5-41af-3041-b0a4-2a35de94c038" executionId="d24f2e73-6e36-43ea-9e2c-092078aa56db" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e83a79dd-458d-2ace-198c-682aa3cec12a" executionId="bbf8252b-7352-4ff7-97de-a37434ed1ef6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ed2ce9ac-6d41-d3a0-f7bd-34271ea94898" executionId="ea08f183-97f1-4feb-8fc1-80fd31c09c36" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="16" executed="16" passed="0" failed="16" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.13)
+[xUnit.net 00:00:00.07]   Discovering: SmartLibrary.IntegrationTests
+[xUnit.net 00:00:00.13]   Discovered:  SmartLibrary.IntegrationTests
+[xUnit.net 00:00:00.14]   Starting:    SmartLibrary.IntegrationTests
+[xUnit.net 00:00:01.06]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.06]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.06]       Stack Trace:
+[xUnit.net 00:00:01.06]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.06]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.06]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.06]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.06]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.06]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.06]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.06]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.06]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.06]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.06]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.06]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.06]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.06]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.06]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.06]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.06]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.06]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.06]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.06]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.06]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.07]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.07]       Stack Trace:
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.07]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.07]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.07]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.07]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.07]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.07]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.07]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.07]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.07]       Stack Trace:
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.07]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.07]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.07]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.07]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.07]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.07]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.07]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.07]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.07]       Stack Trace:
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.07]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.07]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.07]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.07]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.07]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.07]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.07]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.07]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.07]       Stack Trace:
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.07]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.07]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.07]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.07]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.07]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.08]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.08]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.08]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.08]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.08]       Stack Trace:
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.08]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.08]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.08]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.08]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.08]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.08]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.08]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.08]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.08]       Stack Trace:
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.08]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.08]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.08]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.08]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.08]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.08]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.08]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.08]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.08]       Stack Trace:
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.08]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.08]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.08]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.08]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.08]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.08]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.08]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.08]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.08]       Stack Trace:
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.08]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.08]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.08]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.08]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.08]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.08]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.08]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.08]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.10]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.10]       Stack Trace:
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.10]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.10]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.10]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.10]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.10]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.10]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.10]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.10]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.10]       Stack Trace:
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.10]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.10]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.10]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.10]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.10]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.10]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.10]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.10]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.10]       Stack Trace:
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.10]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.10]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.10]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.10]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.10]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.10]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.10]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.10]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.10]       Stack Trace:
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.10]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.10]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.10]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.11]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.11]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.11]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.11]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.11]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.11]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.11]       Stack Trace:
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.11]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.11]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.11]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.11]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.11]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.11]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.11]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.11]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.11]       Stack Trace:
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.11]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.11]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.11]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.11]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.11]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.11]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.11]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.11]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.11]       Stack Trace:
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.11]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureCreatedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(74,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.11]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(91,0): at SmartLibrary.IntegrationTests.WorkflowFixture.InitializeAsync()
+[xUnit.net 00:00:01.11]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.11]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.11]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.11]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.11]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]       Npgsql.NpgsqlException : Failed to connect to 127.0.0.1:55437
+[xUnit.net 00:00:01.11]       ---- System.Net.Sockets.SocketException : Connection refused
+[xUnit.net 00:00:01.11]       Stack Trace:
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.RawOpen(SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.&lt;Open&gt;g__OpenCore|214_1(NpgsqlConnector conn, SslMode sslMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.UnpooledDataSource.Get(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.NpgsqlConnection.&lt;Open&gt;g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+[xUnit.net 00:00:01.11]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlDatabaseCreator.Exists(Boolean async, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator.EnsureDeletedAsync(CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(165,0): at SmartLibrary.IntegrationTests.WorkflowFixture.DisposeAsync()
+[xUnit.net 00:00:01.11]         /Users/haolongkakashi/Workspace/do-an-2/SmartLibrary-FPT/apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs(165,0): at SmartLibrary.IntegrationTests.WorkflowFixture.DisposeAsync()
+[xUnit.net 00:00:01.11]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:01.11]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+[xUnit.net 00:00:01.11]            at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.&lt;&gt;c.&lt;.cctor&gt;b__4_0(Object state)
+[xUnit.net 00:00:01.11]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.11]            at Npgsql.TaskTimeoutAndCancellation.ExecuteAsync(Func`2 getTaskFunc, NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]            at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+[xUnit.net 00:00:01.11]   Finished:    SmartLibrary.IntegrationTests
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.1325800+07:00">
+        <Text>[xUnit.net 00:00:01.06]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_14_2_MissingProviderCredential [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.1478840+07:00">
+        <Text>[xUnit.net 00:00:01.07]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_16_2_InvalidReportPeriod [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.1490590+07:00">
+        <Text>[xUnit.net 00:00:01.07]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_05_2_RenewalLimitOverdueAndQueue [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.1498820+07:00">
+        <Text>[xUnit.net 00:00:01.07]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_13_2_InvalidPolicyKeepsLastValidSettings [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.1507120+07:00">
+        <Text>[xUnit.net 00:00:01.07]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_02_1_CatalogCreateIntakeSearchDetail [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.1516070+07:00">
+        <Text>[xUnit.net 00:00:01.08]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_10_2_InvalidContentAndConversationNoOrphans [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.1524100+07:00">
+        <Text>[xUnit.net 00:00:01.08]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_09_1_ReviewCreateEditDeleteAggregates [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.1533190+07:00">
+        <Text>[xUnit.net 00:00:01.08]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_08_2_InvalidContactPreservesProfile [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.1541370+07:00">
+        <Text>[xUnit.net 00:00:01.08]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_10_1_SupportReplyAndHistory [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.2266300+07:00">
+        <Text>[xUnit.net 00:00:01.10]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_06_2_DuplicateAndExpiredReadyHold [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.2267000+07:00">
+        <Text>[xUnit.net 00:00:01.10]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_01_2_MismatchedConfirmation [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.2267850+07:00">
+        <Text>[xUnit.net 00:00:01.10]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_06_1_ReservationReturnAndPickup [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.2269600+07:00">
+        <Text>[xUnit.net 00:00:01.10]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_08_1_ProfileEditAndStaffHistory [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.2270650+07:00">
+        <Text>[xUnit.net 00:00:01.11]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_11_2_MissingNotificationDoesNotMutateInbox [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.2271550+07:00">
+        <Text>[xUnit.net 00:00:01.11]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_05_1_ReaderAndLibrarianRenewal [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.2272870+07:00">
+        <Text>[xUnit.net 00:00:01.11]     SmartLibrary.IntegrationTests.Report5AdditionalTests.ST_12_2_DuplicateLibrarianAccount [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="MacBook-Air-cua-Ngo-2" outcome="Error" timestamp="2026-10-27T19:55:58.2274160+07:00">
+        <Text>[xUnit.net 00:00:01.11]     [Test Collection Cleanup Failure (Workflow database)] Npgsql.NpgsqlException</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

@@ -1,0 +1,237 @@
+CAPSTONE PROJECT REPORT
+Report 1 – Project Introduction
+– Ho Chi Minh City, 2026 –
+Table of Contents
+I. Record of Changes
+*A - Added M - Modified D - Deleted
+II. Project Introduction
+1. Overview
+1.1 Project Information
+Project name: Smart Library Management System Integrated with AI to Recommend Books That Suit Readers' Needs 
+Project code: FA26SE226
+Group name: GFA26SE187
+Software type: Web Application and Mobile Application with a RESTful API backend 
+1.2 Project Team
+2. Product Background
+Libraries play an important role in supporting student learning and research. As the number of books and readers increases, the library needs to manage many different activities such as book management, borrowing and returning books, reservations, overdue books, fines and reader information.
+For librarians, handling these activities takes a long time and is prone to errors while working. For students, finding suitable books can also become more difficult when the library has many books related to the major. Typical searches based primarily on title, author, genre, or book code may not always reflect the current student's learning needs, interests, or previous reading activities anymore.
+Therefore, there is a need for a modern library system that can support both library activities and book discovery activities of students. SmartLibrary is proposed as a library management system for students, librarians and administrators, combining library services with AI-powered features to make library management and book searching more convenient.
+3. Existing Systems
+3.1 FPT Library
+Description: FPT Library is the online library system of FPT University. It helps students and teachers find and use books and other learning materials. Users can search for books, check their availability, borrow, return, renew, and reserve books. The system also supports library services across different FPT University campuses.
+Link: https://library.fpt.edu.vn/
+Advantages
+Simple and convenient book search:
+ Users can search for books and easily view basic book information.
+Book availability checking:
+ Users can check how many copies are available before deciding to borrow a book.
+Complete basic borrowing services:
+ The system supports borrowing, returning, renewing, reserving books, and viewing borrowing history.
+Support for multiple campuses:
+ The system supports library services across different FPT University campuses.
+Physical and electronic resources:
+ Users can access both physical books and electronic learning resources.
+Disadvantages
+Limited personalized recommendations:
+ The system does not focus on recommending books based on users' interests or learning needs.
+Limited meaning-based search:
+ Users mainly search based on keywords or available search criteria, rather than describing what they need in natural language.
+Manual book selection:
+ Users still need to search through the results and decide which books are suitable for them.
+Limited reading-habit analysis:
+ The system does not focus on analyzing users' reading or borrowing habits to help them discover suitable books.
+No dedicated mobile application:
+ The system does not provide a dedicated mobile application for users.
+Relevance to SmartLibrary
+FPT Library provides a useful reference for SmartLibrary's core functions, including book search, book information, availability checking, borrowing, returning, renewing, reserving books, and viewing borrowing history. SmartLibrary can retain these basic functions while adding AI-assisted services such as personalized book recommendations, meaning-based search, reading-habit analysis, and overdue reminders.
+3.2 HCMUE Library
+ Description: HCMUE Library is the online library system of Ho Chi Minh City University of Education. It supports students and teachers in searching for and using books and other learning resources. Users can search for books, view detailed information and availability, send and cancel book requests, renew borrowed books, and manage their accounts. The system also provides databases and electronic resources to support learning and research.
+Link: https://lib.hcmue.edu.vn/
+ Advantages
+Search using multiple criteria:
+ Users can search for books by title, author, subject, barcode, and other available criteria.
+Detailed book information:
+ Users can view detailed information about books and documents.
+Book availability checking:
+ Users can check whether a book is available before making a request.
+Online library services:
+ Users can manage their accounts, send or cancel book requests, and renew borrowed books online.
+Physical and electronic resources:
+ The system provides access to both physical library materials and electronic resources.
+Support for learning and research:
+ The system provides databases and electronic materials that support students' learning and research activities.
+- Disadvantages
+Limited personalized recommendations:
+ The system does not strongly focus on recommending books based on each user's interests or learning needs.
+Limited meaning-based search:
+ Users mainly search using specific criteria rather than describing their information needs naturally.
+Manual book selection:
+ Users still need to review search results and choose the books that they think are suitable.
+Limited reading-habit analysis:
+ The system does not strongly focus on using users' reading or borrowing behavior to help recommend suitable books.
+- Relevance to SmartLibrary
+HCMUE Library provides a useful reference for SmartLibrary's book search, multiple search criteria, book information, availability checking, account management, book requests, renewals, and electronic resources. SmartLibrary can keep these basic functions while improving the user experience with personalized book recommendations, meaning-based search, reading-habit analysis.
+4. Business Opportunity
+As the number of books and readers keeps growing, libraries need management software to track core activities like managing books, managing readers, borrowing and returning books, reservations, and fines, all in one place. As data keeps increasing, managing everything by hand or with several disconnected tools becomes less efficient, more prone to mistakes, and harder for both librarians and readers to keep track of.
+Besides the management problem, today's library systems are also limited in helping readers find books. The search function currently relies mainly on fixed fields like title, author, category, publisher, or publication year. This means readers need to know the exact keywords related to the book they want, while in reality, their need often comes from a topic, a learning goal, or a specific interest — something a normal keyword search cannot understand. As a result, readers can easily miss books that would actually suit them, simply because they didn't use the exact words the system expects.
+The rise of Artificial Intelligence (AI) offers a way to solve this problem. Thanks to AI's ability to understand language the way humans do, the system can understand the meaning behind a search query instead of just matching keywords. It can also look at a reader's information and reading history to suggest books that fit each person's needs and interests.
+Based on that, SmartLibrary is built to bring together basic library management functions and AI-powered features into one single system, making it easier to search for and discover books that truly fit each reader, while also helping librarians manage the library's main activities and workflows more efficiently.
+5. Software Product Vision
+For readers, librarians, and administrators who need a convenient and centralized way to access and manage library services, SmartLibrary is a web and mobile-supported library management system integrated with AI services. The system supports managing books, readers, borrowing and returning books, reservations, fines, book reviews, and notifications.
+Unlike current library systems that mainly focus on book catalogs, SmartLibrary uses AI to help readers find suitable books based on their interests, learning goals, and reading history. The system offers book recommendations based on reader preferences and intelligent search capabilities, while also helping librarians manage library operations more efficiently.
+The expected outcome is a modern and centralized library system where readers can easily find the right books, librarians can manage daily work more effectively, and administrators can uniformly manage library information and rules. SmartLibrary aims to improve library management and provide readers with a more convenient and personalized reading experience.
+6. Project Scope & Limitations
+The SmartLibrary project focuses on developing a centralized library management system that supports readers, librarians, and administrators. The system includes core library processes such as user and resource management, book and copy management, basic information search, borrowing and returning books, reservations, renewals, overdue book management, fines, evaluations, notifications, statistics, and library regulations. Additionally, the system integrates AI-powered services to suggest books based on needs and search by query meaning rather than just keywords. The project scope emphasizes practical library operations while utilizing AI to improve book search capabilities for readers. 
+6.1 Major Features
+6.1.1 Administrator
+Authentication and Account Management
+Log in and out.
+Create and manage Librarian accounts.
+View and manage Reader accounts and account status.
+Administer user roles and access.
+Library Collection Overview
+Browse the library collection by category and view catalog information.
+Full book management is not available from the Admin book-management page.
+Policy and Regulation Management
+Create and update borrowing policies, including applicable limits, loan periods, renewals, reservations, and fines.
+Manage library regulations.
+AI System Configuration
+Configure AI providers and services.
+Manage service availability and Librarian AI access.
+Test connections.
+Synchronize the RAG index.
+Reports and Statistics
+View library and circulation summaries, borrowing by category, and fine-related financial reports.
+Manage report templates and requests.
+Review and export reports.
+Personal Account Management
+View and update the administrator’s profile.
+Log out.
+6.1.2 Librarian
+Authentication and Personal Information
+Log in and out.
+View and update personal information.
+Reader and Registration Management
+Review Reader registrations.
+Manage Reader information and account status.
+View Reader details.
+Book and Category Management
+Create, update, and manage book records and book categories.
+Manage bibliographic details such as title, authors, publisher, ISBN, and publication information.
+Book Copy and Inventory Management
+Add book copies through the intake workflow.
+Manage copy identifiers, status, and recorded storage locations.
+Borrowing and Returning
+Review borrowing requests; approve or reject requests.
+Check out books and process returns.
+Record circulation activity.
+Reservations and Renewals
+View and process reservations.
+Manage renewal requests and related loan information.
+Overdue and Fine Management
+Monitor overdue loans.
+Record fines and payment status.
+Process fine payments, including cash and PayOS-supported payment flows.
+Lost and Damaged Book Cases
+Review Reader-reported book incidents; confirm or reject incident reports.
+Update related copy or loan records.
+Lost-book charges are supported where applicable.
+Reader Support and Library Notices
+Receive and respond to Reader support requests.
+Manage request handling and replies.
+Communicate with Readers through the support chat.
+Manage library news and notices.
+AI-Assisted Library Operations
+Configure available AI recommendation criteria.
+View AI-assisted acquisition suggestions and operational insights.
+Use semantic search for library materials.
+AI output supports staff decisions and does not make acquisition decisions automatically.
+Reports and Statistics
+View Librarian reports and operational statistics.
+Create and export reports.
+6.1.3 Reader
+Registration and Authentication
+Register, verify an account, log in, and log out.
+Use account recovery flows.
+Personal Information
+View and update personal profile information.
+Search and Discover Books
+Browse the catalog and categories.
+Search using keywords.
+View book details, availability, copy counts, and recorded locations.
+Favorites
+Add books to and remove books from a personal favorites list.
+Borrowing, Reservations, and Renewals
+Submit borrowing, reservation, and renewal requests.
+Track request and loan status.
+Loan History and Due-Date Tracking
+View borrowing and returning history.
+View relevant loan information, including due dates.
+Fines and Payments
+View fines or charges and their payment status.
+Pay eligible fines online through PayOS.
+Book Reviews and Ratings
+Rate books.
+Create, update, and delete personal reviews.
+View reviews from other Readers.
+Support Requests and Chat
+Submit support or complaint requests and view request history.
+Communicate with library staff through the support workflow.
+Notifications
+Receive system and library-service notifications.
+AI Book Discovery
+Receive personalized book recommendations.
+Search for books using natural-language questions or descriptions.
+6.1.4 AI Services
+Personalized Book Recommendations
+Recommend available library books using supported data such as Reader profile/major, saved reading preferences where available, borrowing history, and book ratings.
+Semantic Book and Policy Search
+Process natural-language queries.
+Search indexed library books and policy/regulation documents using RAG and semantic embeddings.
+Return relevant sources and catalog information.
+AI-Assisted Acquisition Suggestions
+Provide Librarians with suggestions based on indexed library information.
+Suggestions are advisory; Librarians make the final acquisition decisions.
+Library Operations Insights
+Present available operational signals, such as circulation totals, popular borrowed books, Reader majors/categories, and ratings, to support staff review.
+Overdue Status Indicators
+Show existing overdue loans and apply a simple overdue-duration risk label.
+This is not a predictive model that forecasts late returns before a book becomes overdue.
+AI Service Administration and Indexing
+Allow administrators to configure AI services, test provider connections, and manage access.
+Synchronize the RAG data index.
+6.2 Limitations & Exclusions
+The following limitations and exclusions define the realistic scope of the SmartLibrary project:
+Date
+A*
+M, D
+In charge
+Change Description
+2026
+M
+Project Team
+Adapted Report 1 template from Cafeteria Ordering System to SmartLibrary.
+Full Name
+Role
+Email
+  Mobile
+Nguyễn Trí Thông
+Lecturer
+ThongNT@fe.edu.vn
+0907973989
+Trần Văn Nhật
+Leader
+NhatTVSE172768@fpt.edu.vn
+0949997692
+Hoàng Nguyễn Thế Vinh
+Member
+vinhhntse180198@fpt.edu.vn
+0868609517
+Nguyễn Tân Thuận
+Member
+thuanntse183670@fpt.edu.vn
+0938386513
+Ngô Huy Long
+Member
+longnhde180230@fpt.edu.vn
+0982453124
