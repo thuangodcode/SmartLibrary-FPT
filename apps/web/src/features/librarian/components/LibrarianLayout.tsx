@@ -15,14 +15,12 @@ import {
   Sparkles,
   KeyRound,
   RotateCcw,
-  Search,
   Users,
   Wallet,
   X,
   Check,
   CircleHelp,
   MessagesSquare,
-  LoaderCircle,
 } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import smartLibraryLogo from '../../../assets/figma/auth-logo-fpt.png';
@@ -81,12 +79,6 @@ export const LibrarianLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [railExpanded, setRailExpanded] = useState(false);
   const [hoverCapable, setHoverCapable] = useState(true);
-  const [headerSearch, setHeaderSearch] = useState('');
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [readerSuggestions, setReaderSuggestions] = useState<Array<{ id: string; label: string; studentId?: string; email?: string }>>([]);
-  const [bookSuggestions, setBookSuggestions] = useState<Array<{ id: string; label: string; code?: string; availableCopies?: number; coverImageUrl?: string | null }>>([]);
-  const searchContainerRef = useRef<HTMLFormElement>(null);
   const [circulationOpen, setCirculationOpen] = useState(true);
   const [supportOpen, setSupportOpen] = useState(() => location.pathname.startsWith('/librarian/support'));
   const [pendingCount, setPendingCount] = useState<number | null>(null);
@@ -130,77 +122,6 @@ export const LibrarianLayout: React.FC = () => {
       expandTimerRef.current = null;
     }
   };
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
-        setSearchFocused(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    const trimmed = headerSearch.trim();
-    if (!trimmed) {
-      setReaderSuggestions([]);
-      setBookSuggestions([]);
-      setSearchLoading(false);
-      return;
-    }
-
-    setSearchLoading(true);
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      try {
-        const token = useAuthStore.getState().accessToken;
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
-        const [resReaders, resBooks] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/v1/circulation/reservation-reader-options?search=${encodeURIComponent(trimmed)}`, {
-            headers,
-            signal: controller.signal,
-          }),
-          fetch(`${API_BASE_URL}/api/v1/circulation/reservation-book-options?search=${encodeURIComponent(trimmed)}`, {
-            headers,
-            signal: controller.signal,
-          }),
-        ]);
-
-        if (resReaders.ok) {
-          const jsonR = await resReaders.json();
-          if (jsonR.success && Array.isArray(jsonR.data)) {
-            setReaderSuggestions(jsonR.data.slice(0, 5));
-          }
-        }
-        if (resBooks.ok) {
-          const jsonB = await resBooks.json();
-          if (jsonB.success && Array.isArray(jsonB.data)) {
-            setBookSuggestions(jsonB.data.slice(0, 5).map((book: { id: string; title?: string; code?: string; availableCopies?: number; coverImageUrl?: string | null }) => ({
-              id: book.id,
-              label: book.title || '',
-              code: book.code,
-              availableCopies: book.availableCopies,
-              coverImageUrl: book.coverImageUrl,
-            })));
-          }
-        }
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') {
-          // ignore
-        }
-      } finally {
-        setSearchLoading(false);
-      }
-    }, 180);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [headerSearch]);
 
   const currentPage = location.pathname === '/librarian/profile'
     ? 'Hồ sơ cá nhân'
@@ -457,123 +378,6 @@ export const LibrarianLayout: React.FC = () => {
             <span className="lib-breadcrumb-separator">/</span>
             <strong>{currentPage}</strong>
           </div>
-          <form
-            ref={searchContainerRef}
-            className="lib-header-search"
-            onSubmit={(event) => {
-              event.preventDefault();
-              setSearchFocused(false);
-              navigate(`/librarian/circulation/loans?q=${encodeURIComponent(headerSearch.trim())}`);
-            }}
-          >
-            <Search size={16} />
-            <input
-              value={headerSearch}
-              onChange={(event) => {
-                setHeaderSearch(event.target.value);
-                setSearchFocused(true);
-              }}
-              onFocus={() => setSearchFocused(true)}
-              placeholder="Tìm sách, mã phiếu, tên bạn đọc..."
-            />
-            {headerSearch.trim().length > 0 && searchFocused && (
-              <div className="lib-header-search-dropdown" role="listbox">
-                {searchLoading && (
-                  <div className="lib-header-search-state">
-                    <LoaderCircle className="lib-readers-spin" size={15} />
-                    <span>Đang tìm kiếm gợi ý...</span>
-                  </div>
-                )}
-
-                {!searchLoading && readerSuggestions.length === 0 && bookSuggestions.length === 0 && (
-                  <div className="lib-header-search-empty">
-                    Không tìm thấy độc giả hoặc đầu sách khớp với "<strong>{headerSearch}</strong>"
-                  </div>
-                )}
-
-                {readerSuggestions.length > 0 && (
-                  <div className="lib-header-search-group">
-                    <div className="lib-header-search-group-title">
-                      <Users size={13} />
-                      <span>ĐỘC GIẢ / BẠN ĐỌC</span>
-                    </div>
-                    {readerSuggestions.map((r) => (
-                      <div
-                        key={r.id}
-                        role="option"
-                        aria-selected={false}
-                        className="lib-header-search-item"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          setSearchFocused(false);
-                          navigate(`/librarian/readers/${r.id}`);
-                        }}
-                      >
-                        <div className="lib-header-search-item-main">
-                          <span className="lib-header-search-item-label">{r.label}</span>
-                          {r.studentId && <span className="lib-search-tag">{r.studentId}</span>}
-                        </div>
-                        {r.email && <span className="lib-header-search-item-sub">{r.email}</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {bookSuggestions.length > 0 && (
-                  <div className="lib-header-search-group">
-                    <div className="lib-header-search-group-title">
-                      <BookOpen size={13} />
-                      <span>ĐẦU SÁCH</span>
-                    </div>
-                    {bookSuggestions.map((b) => (
-                      <div
-                        key={b.id}
-                        role="option"
-                        aria-selected={false}
-                        className="lib-header-search-item"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          setSearchFocused(false);
-                          navigate(`/librarian/books?search=${encodeURIComponent(b.label)}`);
-                        }}
-                      >
-                        {b.coverImageUrl
-                          ? <img className="lib-search-book-cover" src={b.coverImageUrl} alt="" loading="lazy" />
-                          : <span className="lib-search-book-cover lib-search-book-cover--empty"><BookOpen size={17} aria-hidden="true" /></span>}
-                        <div className="lib-header-search-item-main">
-                          <span className="lib-header-search-item-label">{b.label}</span>
-                          {b.code && <span className="lib-search-tag">{b.code}</span>}
-                        </div>
-                        <div className="lib-header-search-item-sub">
-                          {b.availableCopies !== undefined && (
-                            b.availableCopies > 0 ? (
-                              <span className="lib-search-avail-badge">Còn {b.availableCopies} cuốn khả dụng</span>
-                            ) : (
-                              <span className="lib-search-unavail-badge">Đã mượn hết</span>
-                            )
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div
-                  role="button"
-                  tabIndex={0}
-                  className="lib-header-search-footer"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    setSearchFocused(false);
-                    navigate(`/librarian/circulation/loans?q=${encodeURIComponent(headerSearch.trim())}`);
-                  }}
-                >
-                  <Search size={14} />
-                  <span>Tra cứu toàn bộ phiếu mượn/trả cho "<strong>{headerSearch}</strong>"</span>
-                </div>
-              </div>
-            )}
-          </form>
           <div className="lib-topbar-actions">
             <details className="lib-notification-menu">
               <summary className="lib-icon-button" aria-label={`Thông báo${unreadCount ? `, ${unreadCount} thông báo chưa xem` : ''}`}>
