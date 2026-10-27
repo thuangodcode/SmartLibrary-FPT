@@ -2,6 +2,7 @@
 from pathlib import Path
 from copy import deepcopy
 import json, zipfile, hashlib, io
+from collections import Counter
 from docx import Document
 from docx.shared import Pt, RGBColor, Inches
 from docx.oxml import OxmlElement
@@ -11,6 +12,7 @@ BASE=Path(__file__).resolve().parents[1]
 ref=BASE/'work/templates/Report5_Test Documentation.docx'
 assert hashlib.sha256(ref.read_bytes()).hexdigest()=='4ff653d4794fd23b905e9c85f26e33adf2ea6851cb15a1be3fa7f9270e4a2dfc'
 data=json.loads((BASE/'work/report-data.json').read_text())
+case_counts=Counter(c['status'] for c in data['cases'])
 d=Document(ref);p=list(d.paragraphs);tables=list(d.tables)
 pending='Đợi HuyLong điền'
 
@@ -57,7 +59,7 @@ texts={
 48:'The sequence is baseline/evidence preservation, local measurement, traceability and document preparation, then remaining system/provider tests, defect retest and acceptance. Official review dates have not been supplied.',
 51:'The accompanying workbooks contain executable-source references, expected/actual results and evidence locators. Temporary IDs are used only for this report package. '+pending+' — confirm the official requirement and test ID convention before submission.',
 52:'Unit cases: Report5_Unit Test.xlsx — 203 recorded executions organized into 93 related function groups. Conditions, theory inputs, assertion excerpts and source locations are included. N/A/B categories are provisional; full assertions remain in the referenced source.',
-53:'Other cases: Report5_Test Report.xlsx — 87 entries: 21 integration cases (including three skipped placeholders), four local NFR scenarios and 62 planned system/E2E/state scenarios. It also contains the feature inventory, workflows, 40-use-case RTM, unit traceability and defect register.',
+53:f'Other cases: Report5_Test Report.xlsx — {len(data["cases"])} entries: {case_counts["Passed"]} Passed / {case_counts["Failed"]} Failed / {case_counts["Not Tested"]} Not Tested. The inventory includes 21 integration cases (three skipped), four local NFR scenarios and 62 planned system/E2E/state scenarios. The four local checks are measured against a proposed criterion, not SRS acceptance. The workbook also contains the feature inventory, workflows, 40-use-case RTM, unit traceability and defect register.',
 55:'The evidence supports a working regression baseline, not a release sign-off. Unit results are 203/203 passed. Executed API integration results are 17/18 passed (94.4%), with three further cases skipped. Planned system/browser cases are not included in that denominator. One local load probe collected four concurrency scenarios; its successful completion is separate from business-test results.'}
 for idx,text in texts.items():put(p[idx],text)
 
@@ -70,7 +72,7 @@ bodyrows(tables[5],[['Baseline and isolated tests','2026-10-27','2026-10-27'],['
 anchor=p[55]
 sections=[
 ('5.1 Evidence and acceptance','Heading 3'),
-('Evidence paths are relative to docs/report5: evidence/unit.trx, evidence/integration.trx, evidence/unit-coverage.cobertura.xml and evidence/nfr-local.json. The successful measurement TRX is under evidence/nfr-verified. The initial NFR warmup failure was a test-fixture configuration issue and is not a product defect. The fixture was corrected without changing business code.','Normal'),
+('Evidence paths are relative to docs/report5: evidence/unit.trx, evidence/integration.trx, evidence/unit-coverage.cobertura.xml and evidence/nfr-local.json. The measurement TRX under evidence/nfr-verified is local-only and is not included in the committed evidence package. The initial NFR warmup failure was a test-fixture configuration issue and is not a product defect. The fixture was corrected without changing business code.','Normal'),
 ('The saved functional results precede the network-mode fixture extension; the full suite was not rerun. The new CI configuration is local and has not been pushed or executed remotely. Existing remote green runs are not proof that the new regression passes. Frontend lint/build previously exited successfully, but their console output was not archived as a separate artifact.','Normal'),
 ('The Review 2 guide sets Defense 1.1 targets, including at least three cases per mandatory feature, one E2E per main workflow, state-transition and NFR coverage, at least 90% overall passing, 100% mandatory main-flow passing, at least 50% automated in CI and no open Critical/High defects. These are targets, not claims of achievement. This package is not eligible for acceptance while scope, unexecuted workflows and the proposed-High defect remain unresolved.','Normal'),
 ('5.2 Local performance measurements','Heading 3'),

@@ -1,159 +1,105 @@
 # Report 5 checkpoint
 
-Updated: 2026-10-27 (Asia/Ho_Chi_Minh). **Preservation-only checkpoint requested by HuyLong. Stop after local commit; no push, rebuild, additional testing or artifact completion in this turn.**
+Updated: 2026-10-27 (Asia/Ho_Chi_Minh). Branch: `report5-wip`; this rebuild started from `5b5e7d9`. Application baseline: `e5beb8ecff1fb41234857bc4975e8303e80f2694`.
 
-## Current deliverables and remaining work (supersedes earlier planning)
+## Scope of this checkpoint
 
-Three working deliverables have been generated under `deliverables/`:
+HuyLong authorized rebuilding the three artifacts and text/numeric validation, with at most two correction rounds. No application tests, database startup, business-code changes, push, or image rendering are authorized for this checkpoint. Earlier pause/confirmation wording is superseded by that instruction. Stop after the local commit and status report.
 
-- `Report5_Test Documentation.docx`: populated project content; latest layout adjustments rendered to `/private/tmp/smartlibrary-report5-work/final-doc-v2`. Final all-page visual review and TOC cached page-number verification remain.
-- `Report5_Test Report.xlsx`: populated 87 non-unit cases (21 Passed / 1 Failed / 65 Not Tested), 40 UC traceability rows, candidate Mandatory Features, workflows, defects and local NFR results. These are case-level results, not full requirement acceptance.
-- `Report5_Unit Test.xlsx`: 203 unit results across 93 function groups; intentionally converted from the preserved legacy XLS template. Latest builder fix for assertion text beginning `=>` has NOT been regenerated into the workbook. Formula-error and final visual verification remain.
+Existing dependency link remains available:
+`/private/tmp/smartlibrary-report5-work/node_modules` → bundled runtime dependencies.
+No dependency installation or reconstruction was performed.
 
-The two XLSX files predate the latest builder fixes; do not call these final/QA-approved. Browser E2E, real-provider tests, sustained-user capacity and unresolved metadata remain incomplete. Known R5-DEF-001 remains Fail; no business fix was made. Baseline results remain 203 unit pass and integration 17 pass / 1 fail / 3 skip, not rerun here.
+## Deliverables and verified counts
 
-Copied `build-workbooks.mjs`, `inspect-artifacts.mjs`, and `artifact.md` from the temporary workspace into `work/`. `inspect-artifacts.mjs` inspects the original spreadsheet template, not the final deliverables. The JavaScript scripts retain machine-specific paths and require the bundled `@oai/artifact-tool` dependency. Python builders require python-docx for document generation.
+Files under `deliverables/`:
 
-Rebuild commands from repository root, ONLY after further authorization (not executed at this checkpoint):
+- `Report5_Test Documentation.docx`: generated from the original template. Explicit non-unit totals added from report-data.json. Original package parts other than document.xml/settings.xml are preserved by builder assertions.
+- `Report5_Test Report.xlsx`: 87 non-unit entries: **21 Passed / 1 Failed / 65 Not Tested**, matching JSON, case rows, statistics and DOCX. The earlier 82 (21/1/60) count is obsolete: the current inventory includes five planned state-lifecycle scenarios.
+- `Report5_Unit Test.xlsx`: **203 recorded Passed / 0 Failed**, **93 function groups**. This is the intentional XLS-to-XLSX delivery. Five assertion excerpts starting `=>` remain literal text, not formulas. A related-defect note records R5-DEF-001 as Open / Fail without falsely changing unit outcomes.
 
-```sh
-python3 docs/report5/work/build_data.py
-python3 docs/report5/work/build_document.py
-# Run JS from the existing temporary dependency workspace; do not commit node_modules.
-cp docs/report5/work/build-workbooks.mjs /private/tmp/smartlibrary-report5-work/build-workbooks.mjs
-/Users/haolongkakashi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /private/tmp/smartlibrary-report5-work/build-workbooks.mjs
-```
+Inventory composition: 21 integration cases (17 pass, 1 fail, 3 skipped), four measured local NFR scenarios (proposed criterion), 48 planned system cases, nine planned browser workflows and five planned state lifecycles. 65 Not Tested = 62 planned + three skipped. The four passing local measurements do not mean SRS NFR acceptance.
 
-Use the bundled Python runtime if system Python lacks python-docx. Rendering/inspection is a separate required follow-up, not proof supplied by running these builders.
+The RTM includes 40 UCs, 16 candidate feature groups and nine workflows. UC18 is Fail; other UC-level acceptance remains Not Tested. A component/case pass is not full feature acceptance. Signed mandatory-feature commitment is still not supplied.
 
-Evidence preservation decision: `nfr-run/` is 8 KB (one approximately 5 KB TRX); `nfr-verified/` is 4 KB (one approximately 3 KB TRX). Both directories are excluded from this commit as requested; files remain local, not deleted. Preserve only `evidence/nfr-local.json` for the new NFR evidence (raw measurements plus summaries). Generated `.inspect.ndjson` diagnostics are also excluded. No database dump, server log, credentials or dependencies are included.
+## Saved test evidence; not rerun
 
-Staged-file safety check included DOCX/XLSX XML contents. Provider-key-shaped matches in unit assertion excerpts were traced to synthetic literals in `AiSettingsServiceTests.cs` (mock provider configuration tests), not live credentials. No supplied user passwords, JWTs, private keys, URL credentials or forbidden paths were found. No tests or builders were executed in this preservation-only turn.
+- `evidence/unit.trx`: 203/203 pass, preserved execution 2026-10-27.
+- `evidence/integration.trx`: 21 total / 18 executed / 17 pass / 1 fail / 3 skipped. Individual NotExecuted records establish the skips; the TRX summary notExecuted field is misleading.
+- `evidence/unit-coverage.cobertura.xml`: unit-run coverage only, not system coverage.
+- `evidence/nfr-local.json`: 4800 samples and four summaries; no new load run at this checkpoint.
+- `nfr-run/` (8 KB) and `nfr-verified/` (4 KB) contain local-only TRX and remain excluded from Git. Generated XLSX inspect.ndjson diagnostics remain excluded too.
 
-## Step 3 progress
+The original unit/integration results precede the network-mode fixture extension. Current test/CI changes have not been executed on remote CI. The known failing regression must not be suppressed.
 
-- Added opt-in `NfrProbeTests` and a Kestrel network mode to the test fixture. No full suite rerun. A runtime-only random encryption key fixes fixture resolution for BooksController; no key is stored.
-- PostgreSQL was already running when inspected with appropriate process access. The earlier “no server running” result came from restricted visibility; do not start a second instance.
-- `evidence/nfr-local.json` contains 4800 raw samples and four level summaries. 1000 books / 4000 copies / 3 accounts / 0 loans, 60 warmups, 1200 requests per level, levels 1/10/50/100. Actual HTTP loopback Kestrel, closed loop, same-process generator, no TLS, no live providers. All HTTP responses successful. P95: 3.7329 / 13.2181 / 50.0817 / 152.293 ms. Bursts last about 0.88–3.75 seconds, not sustained-user capacity evidence.
-- Machine: macOS 15.3 Arm64, .NET runtime 10.0.13, SDK 10.0.402, PostgreSQL 17.11, 10 logical processors. CPU model/RAM query permission was denied; record unavailable, do not invent values or retry without permission.
-- Initial NFR warmup failed because fixture lacked Ai:EncryptionKey; corrected only in fixture. `evidence/nfr-verified/` is the successful experiment TRX. Probe pass proves measurement completed, not that full SRS performance is accepted. Default probe is explicitly skipped unless opted in.
-- `work/build_data.py` builds `work/report-data.json` from preserved TRX and targeted source references: 16 candidate feature groups, 40 UC traceability rows, 9 workflows, 203 actual unit results. Report-level commitment still requires signed review confirmation.
-- Next: finish all three artifacts, validate formulas/rendering and update progress below. Baseline unit/integration counts remain from preserved evidence, not rerun on the new harness revision.
+## NFR results and limitations
 
-## Branch and scope
+Concurrency 1 / 10 / 50 / 100: P95 **3.7329 / 13.2181 / 50.0817 / 152.293 ms**, respectively. Every numeric metric in the spreadsheet NFR table is compared against saved evidence. DOCX uses two-decimal P95 values.
 
-- Work branch: `report5-wip`, created from `dev` at `e5beb8ecff1fb41234857bc4975e8303e80f2694`.
-- No application/business code changed. Only tests, test README, CI and Report 5 checkpoint files are included.
-- Do not push. Do not commit to `dev`. Preserve unrelated untracked `project_understanding.md` without staging it.
-- Current CI changes have not run on GitHub. Existing green remote runs do not prove these new tests pass. The new regression failure will make the integration CI step fail; do not suppress it.
+Environment: macOS 15.3 Arm64, 10 logical processors, .NET runtime 10.0.13 / SDK 10.0.402, PostgreSQL 17.11. CPU model and RAM are unavailable because hardware-query permission was denied; do not invent or retry them without permission.
 
-## Preserved files
+Synthetic dataset: 1000 titles / 4000 copies / 3 accounts / 0 loans. Three equally mixed read endpoints, 60 warmups, 1200 requests per level, closed loop without think time, same-process generator, HTTP loopback Kestrel, body-read timing and nearest-rank percentiles. Bursts last only 0.88–3.75 seconds.
 
-- `work/templates/`: exact copies of the three original Report 5 templates from Downloads, **not completed deliverables**.
-- `work/reports/report1.txt` through `report4.txt`: previously fetched report text snapshots. Report 3/4 were described by HuyLong as about 80% complete. Text exports do not preserve diagram images.
-- `evidence/unit.trx`: final available unit run from 2026-10-27 03:00 +07:00.
-- `evidence/integration.trx`: verified integration run from 2026-10-27 03:02 +07:00, after test-data isolation fixes.
-- `evidence/unit-coverage.cobertura.xml`: coverage collected with the unit run; not whole-system test coverage.
-- `work/SHA256SUMS.txt`: copied-file hashes for checkpoint verification.
-- No need to retain earlier failed fixture runs, duplicate coverage files, template preview PNGs, the temporary node_modules symlink or PostgreSQL cluster/logs in Git.
+API P95 <2000 ms and zero errors is explicitly **Đề xuất**, not a signed requirement. These short bursts do not prove sustained 100-user capacity, browser page-load targets, AI latency, 99.9% availability, MTBF, MTTR, large-catalog capacity or CPU/RAM limits.
 
-## Verified results without rerunning tests
+Identity uses test authentication headers; actual role policies are exercised. PayOS gateway/signature validation, email and storage use mocks. No real Supabase login/OTP, live payment/signature validation, email, Cloudinary or AI-provider verification is claimed. The fixture uses EnsureCreated/text domains, not production migrations/pgvector; background workers are disabled.
 
-Counters and individual results were reread from the saved TRX files on this checkpoint:
+## PostgreSQL actual state
 
-| Suite | Total | Executed | Pass | Fail | Skipped |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Unit | 203 | 203 | 203 | 0 | 0 |
-| API integration | 21 | 18 | 17 | 1 | 3 |
+Read-only `pg_ctl status` with sufficient process visibility on 2026-10-27 confirmed **server running, PID 37873**, existing cluster `/private/tmp/smartlibrary-report5-pg.x2syoj`, bound to `127.0.0.1:55437`, socket directory `/private/tmp`.
 
-The integration TRX counters show executed=18; its three individual `NotExecuted` results are the skipped tests (do not rely on the TRX `notExecuted=0` summary field).
-
-Failed: `WorkflowTests.Registration_ApprovedRequest_CannotBeReopenedForDocuments`.
-
-Skipped pre-existing placeholders:
-
-- `CirculationConcurrencyTests.ConcurrentExpireAndReady_SameQueue_AtMostOneReaderReady`
-- `CirculationConcurrencyTests.ConcurrentApprove_SameCopy_AtMostOneSuccess`
-- `CirculationConcurrencyTests.ConcurrentConfirmIncident_AtMostOneCompensationFine`
-
-Earlier frontend `npm run lint` and `npm run build` exited 0 in tool output. Build warned about a chunk over 500 kB. No standalone frontend log was retained, so do not present it as a saved evidence artifact. No tests were rerun during this preservation step.
-
-## What is implemented in the test harness
-
-`apps/api/tests/SmartLibrary.IntegrationTests/WorkflowFixture.cs` uses actual controllers, application services, EF mappings and PostgreSQL transactions. Synthetic accounts/data only. It refuses non-localhost DB hosts, creates a random `smartlibrary_test_<guid>` database and drops only that database at disposal.
-
-Covered cases include borrow/approve/handover/return, past pickup rejection, staff authorization, last-copy concurrent requests, registration approve/reject/resubmit, copy intake quantities/counts/barcodes, cash settlement, duplicate PayOS webhook application handling, wrong-reader fine access, and overdue/damaged/lost returns.
-
-Limits: identity authentication is a test header handler; authorization policies are real. PayOS gateway verification, email and storage are mocked. No real Supabase login, provider signature verification, live payment, email delivery, Cloudinary upload, browser E2E or pgvector migration was verified. Initial external registration with Supabase auth/OTP is not covered by the seeded review tests. Background workers are disabled. `EnsureCreated` plus text domains is not evidence that production migrations succeed.
-
-## PostgreSQL test setup and commands
-
-PostgreSQL 17 tools are available at `/opt/homebrew/bin/initdb` and `/opt/homebrew/bin/pg_ctl` on the checkpoint machine. Existing disposable cluster: `/private/tmp/smartlibrary-report5-pg.x2syoj`; `pg_ctl status` reported **no server running** during preservation. Port: **55437**. Do not copy the cluster or server log into Git.
-
-To restart this existing cluster if it still exists (do not run initdb on it):
-
-```sh
-pg_ctl -D /private/tmp/smartlibrary-report5-pg.x2syoj -l /private/tmp/smartlibrary-report5-pg.x2syoj/server.log -o '-h 127.0.0.1 -p 55437 -k /private/tmp' start
-```
-
-If the cluster has disappeared, create a fresh local disposable one:
-
-```sh
-REPORT5_PG_DIR=$(mktemp -d /private/tmp/smartlibrary-report5-pg.XXXXXX)
-initdb -D "$REPORT5_PG_DIR" -U report5 -A trust --encoding=UTF8
-pg_ctl -D "$REPORT5_PG_DIR" -l "$REPORT5_PG_DIR/server.log" -o '-h 127.0.0.1 -p 55437 -k /private/tmp' start
-```
-
-Trust authentication is for disposable local testing only; it is not a production security configuration. Check that port 55437 is free before starting. Record the newly created directory for later shutdown. Local socket/network execution may require sandbox approval.
-
-From repository root (only rerun when necessary):
-
-```sh
-dotnet test apps/api/tests/SmartLibrary.UnitTests/SmartLibrary.UnitTests.csproj --logger trx --collect:"XPlat Code Coverage" --results-directory /private/tmp/smartlibrary-report5-work/unit-results
-
-SMARTLIBRARY_TEST_POSTGRES='Host=127.0.0.1;Port=55437;Username=report5;Database=postgres' dotnet test apps/api/tests/SmartLibrary.IntegrationTests/SmartLibrary.IntegrationTests.csproj --logger trx --results-directory /private/tmp/smartlibrary-report5-work/integration-verified
-```
-
-Targeted defect reproduction: append `--filter FullyQualifiedName~Registration_ApprovedRequest_CannotBeReopenedForDocuments` to the integration command. Full integration command currently returns nonzero because of the confirmed failure.
-
-To stop the preserved cluster after use:
-
-```sh
-pg_ctl -D /private/tmp/smartlibrary-report5-pg.x2syoj stop -m fast
-```
+The sandbox-only status call said “no server running”; the unrestricted read-only status resolved that visibility discrepancy. No start, stop, initdb or database query was performed this turn. Do not copy the cluster, PID file or server log into Git. Check status again before any future database operation rather than assuming this checkpoint is live state.
 
 ## Confirmed defect
 
-See `DEFECTS.md`, R5-DEF-001 (local provisional ID). Approved registration accepts a subsequent request-more-info action. The test confirms an unexpected successful HTTP response; source inspection confirms unconditional writes to NeedMoreInfo/PendingDocuments. The failing assertion occurs before the test's later database assertion, so do not claim that this run separately asserted the final database values. Business code remains unchanged.
+**R5-DEF-001: Open / Fail**, proposed High severity pending human confirmation. Seed a Submitted registration, approve it, then POST request-more-info on the same ID. Expected: reject invalid transition and retain Approved/Active. Actual: unexpected successful HTTP response.
 
-## Historical template assessment before authoring (not current deliverable status)
+Evidence: `WorkflowTests.Registration_ApprovedRequest_CannotBeReopenedForDocuments` in integration.trx. Source `RegistrationService.RequestMoreInfoAsync` (baseline lines 193–208) unconditionally writes NeedMoreInfo/PendingDocuments. The failed HTTP assertion occurs before the later DB assertion: do not claim the run separately asserted post-action DB values. No business fix was applied. All three artifacts explicitly mention Fail; unit statistics stay 203 Passed because this failure belongs to integration.
 
-Percentages below measure **project-specific content filled in the actual files**, not preparation/test execution effort.
+## Rebuild and text-only audit commands
 
-| File under work/templates | Completed content | Verified state | Missing / priority |
-| --- | ---: | --- | --- |
-| Report5_Test Documentation.docx | 0% | Original 56 paragraphs, 6 tables; instructional placeholders remain | P1: scope, strategy, levels/tools, resources/environment/milestones, cases, results, defect and limitations; metadata placeholders |
-| Report5_Test Report.xlsx | 0% | Original 5 sheets; sample Feature 1/2 cases; two existing #REF! cells | P1: real cases, test data, expected/actual, statuses, evidence, RTM, defects, corrected formulas; P2: additional execution rounds |
-| Report5_Unit Test.xls | 0% | Original 8 sheets with sample function matrices/statistics | P1: map 203 actual results to tested functions and inputs/assertions, populate matrices/statistics/evidence; remove sample results; P2: verify export/render |
+From repository root; these commands only build documentation from saved evidence. Use the existing bundled runtime, not a repo dependency installation.
 
-The table above describes the original preserved templates, which remain untouched. Current populated deliverables are described at the top of this handoff. Do not report 203/203 as 100% mandatory-feature coverage or as release acceptance.
+```sh
+/Users/haolongkakashi/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python docs/report5/work/build_data.py
+/Users/haolongkakashi/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python docs/report5/work/build_document.py
+cp docs/report5/work/build-workbooks.mjs /private/tmp/smartlibrary-report5-work/build-workbooks.mjs
+REPORT5_RENDER=0 /Users/haolongkakashi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /private/tmp/smartlibrary-report5-work/build-workbooks.mjs
+/Users/haolongkakashi/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python docs/report5/work/check_artifacts.py
+```
 
-## Next work ONLY after confirmation
+Workbook rendering now requires explicit `REPORT5_RENDER=1`; default is off. Do not run `inspect-artifacts.mjs` in a text-only turn: that retained helper renders original template previews. JavaScript builders retain machine-specific paths. If the existing temporary dependency link is missing, report it and stop rather than recreating it.
 
-1. Measure API response time and concurrent users against an isolated DB. Record machine/config/data size, warmup, duration, endpoint mix, concurrency, latency distribution and errors. TestServer timings are not deployed network latency. Do not measure against shared production data.
-2. Finalize Mandatory Features/main workflows: code governs implemented behavior; reports govern committed requirements. Record conflicts instead of silently rewriting commitments. Report 3 has UC01–UC40. NFR text includes standard loads under 2s, AI under 3.5s, 100 users and 99.9% availability, but scope/acceptance must be reconciled with the review commitment. Unsupported thresholds must say "Đề xuất". A short run cannot establish uptime/MTBF.
-3. RTM: Requirement ↔ Test ↔ Evidence ↔ Pass/Fail/Not Tested. Distinguish planned, automated, skipped and real-provider tests. Do not equate mocked API workflows with browser E2E.
-4. Complete three Report 5 artifacts in English following the templates; preserve original backups. Use documents/spreadsheets skills and render/verify final outputs. Decide whether legacy XLS should be delivered as XLSX and disclose conversion. Record R5-DEF-001 as Fail in the final workbook/document.
-5. Browser E2E if quota permits. Do not change business code, push, use real payments or send external emails as an accidental side effect.
+`check_artifacts.py` reads the saved files only. It checks exact totals/verdicts, unique IDs, unit-group counts, assertion literals, formula caches/errors, NFR metrics, defect status and metadata placeholders. Claim excerpts are printed for human/agent review; this is not an automatic semantic proof and is not native Excel/Word or visual QA.
 
-User-required metadata placeholders: "Đợi HuyLong điền" with instructions for official project name/code; author/date/version; team/actual roles; Review 2/Defense 1.1/submission deadlines; requirement-ID convention; official evidence location. Temporary R5 IDs are not official requirement IDs.
+## Corrections in this rebuild
 
-Update this HANDOFF after each substantial part. Further execution is paused by the latest preservation-only instruction.
+- Rendering disabled by default to obey the user's no-image instruction.
+- One correction round: derive DOCX 21/1/65 breakdown from JSON; add the integration-defect note to the Unit workbook; clarify that NFR TRX is local-only, not committed evidence.
+- No change to observed test verdicts, source requirements, application code or saved NFR evidence.
+- Final read-only audit exited 0 with no issues: counts and case IDs reconcile; all 203 unit assertion excerpts are preserved as text; five leading `=>` excerpts are not formulas; no error cells, missing formula caches, #REF!, #VALUE! or #NAME? were found. NFR metrics match evidence and R5-DEF-001 is explicitly Fail in all three files. Claim excerpts were reviewed: no feature acceptance, sustained 100-user capacity or availability acceptance is inferred from the local/component results. No second correction round was needed.
 
-## Safety review
+## Remaining work
 
-Copied reports/templates and selected evidence were inspected, including OOXML ZIP contents and all XLS sheet values. Credential-pattern scan found no JWTs, private keys, provider API keys, embedded URL credentials or literal secret assignments. TRX contains synthetic validator input strings, not live account credentials. Source test uses example.test URLs and a fake signature. Reports may include team names/academic information already supplied by the user; they are scoped report sources, not public release artifacts.
+Visual QA and TOC/page-number refresh remain outstanding. Word updateFields is enabled, but cached TOC pagination has not been validated this turn. No current claim of final layout approval.
 
-`git diff --cached --check` flags trailing whitespace in the original report text exports. These snapshots are intentionally preserved byte-for-byte, verified against their source hashes. Check code and newly authored Markdown separately; do not rewrite reference snapshots merely to remove whitespace.
+Browser E2E, real-provider verification, sustained performance tests, requirement/code conflict reconciliation, signed mandatory scope, defect fix/retest and release acceptance remain incomplete. Unexecuted items must retain Not Tested. The known failure remains Fail.
 
-Do not stage `.env`, real account credentials, DB data/logs, node_modules, build output, unrelated `project_understanding.md`, or the entire temporary folder. Commit only the explicit Report 5/test/CI paths and verify staged contents before committing. No push authorized.
+### “Đợi HuyLong điền” fields
+
+- Official project name and project code.
+- Report/document code; author, issue date and version.
+- Reviewer and team members with actual responsibilities (not inferred from Git authors).
+- Planned start/end for remaining provider/browser tests and defect retest.
+- Review 2, Defense 1.1 and submission milestones/deadline.
+- Official requirement/test ID convention; current MF/ST/IT/UT/WF/NFR IDs are provisional.
+- Official evidence archive location/link.
+- Per-function matrix author (93 repeated fields); execution is already identified as xUnit automation.
+
+Also confirm signed mandatory scope and proposed defect severity. These confirmations are not invented metadata.
+
+## Preservation and safety
+
+Original templates remain unchanged under `work/templates/`; report text snapshots under `work/reports/`; original backup hashes in `work/SHA256SUMS.txt`. Keep `artifact.md` and builders as reproducibility support.
+
+Provider-key-shaped assertion excerpts were traced to synthetic unit-fixture literals, not live credentials. Do not stage real passwords, .env, database dumps/logs, bin/obj, node_modules, diagnostic inspect.ndjson, local NFR TRX folders or unrelated `project_understanding.md`. Stage only explicit Report 5 paths. No push authorized.
