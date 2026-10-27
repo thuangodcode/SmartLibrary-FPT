@@ -109,6 +109,7 @@ function App() {
         <Route path="books" element={<LibrarianCategoriesPage />} />
         <Route path="books/categories/new" element={<LibrarianCreateCategoryPage />} />
         <Route path="books/categories/:categoryId" element={<LibrarianCategoryBooksPage />} />
+        <Route path="books/categories/:categoryId/add" element={<LibrarianCategoryBooksPage />} />
         <Route path="books/:bookId" element={<LibrarianBookDetailPage />} />
         <Route path="copies" element={<Navigate to="/librarian/books?view=copies" replace />} />
         <Route path="loans" element={<LibrarianModulePage />} />

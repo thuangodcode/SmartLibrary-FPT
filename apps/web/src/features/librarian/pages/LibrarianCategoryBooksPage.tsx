@@ -74,7 +74,6 @@ const DEFAULT_BOOK_FIELDS: BookFieldDefinition[] = [
 ];
 
 const BOOK_FIELDS_STORAGE_KEY = 'smartlibrary.book-field-definitions';
-const BOOK_FIELD_CONFIG_EVENT = 'smartlibrary-book-field-config';
 const CORE_BOOK_FIELD_KEYS = ['title', 'code', 'copies'];
 
 function readBookFieldDefinitions(): BookFieldDefinition[] {
@@ -185,6 +184,7 @@ const BookCard: React.FC<{ book: BookItem }> = ({ book }) => {
 const LibrarianCategoryBooksPage: React.FC = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
   const navigate = useNavigate();
+  const isAddBookRoute = window.location.pathname.endsWith('/add');
   const accessToken = useAuthStore((s) => s.accessToken);
   const { showToast } = useToast();
 
@@ -221,7 +221,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Add Book modal states
-  const [isAddBookModalOpen, setIsAddBookModalOpen] = useState(false);
+  const [isFieldConfigModalOpen, setIsFieldConfigModalOpen] = useState(false);
   const [bookTitle, setBookTitle] = useState('');
   const [bookCode, setBookCode] = useState('');
   const [bookCodeAvailability, setBookCodeAvailability] = useState<BookCodeAvailability>('idle');
@@ -261,7 +261,6 @@ const LibrarianCategoryBooksPage: React.FC = () => {
 
   useEffect(() => {
     localStorage.setItem(BOOK_FIELDS_STORAGE_KEY, JSON.stringify(bookFields));
-    window.dispatchEvent(new CustomEvent(BOOK_FIELD_CONFIG_EVENT, { detail: { fields: bookFields } }));
     if (accessToken && bookFieldsLoaded) {
       void fetch(`${API_BASE_URL}/api/v1/books/field-config`, {
         method: 'PUT',
@@ -285,7 +284,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
 
   useEffect(() => {
     const code = bookCode.trim();
-    if (!isAddBookModalOpen || !code || !BOOK_CODE_PATTERN.test(code)) return;
+    if (!isAddBookRoute || !code || !BOOK_CODE_PATTERN.test(code)) return;
 
     let cancelled = false;
     const timer = window.setTimeout(async () => {
@@ -314,7 +313,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [accessToken, bookCode, isAddBookModalOpen]);
+  }, [accessToken, bookCode, isAddBookRoute]);
 
   const markInitialRequestComplete = (request: 'category' | 'books') => {
     initialRequestsRef.current[request] = true;
@@ -707,11 +706,11 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       setCustomBookValues({});
       setBookCoverFile(null);
       setBookCoverPreview(null);
-      setIsAddBookModalOpen(false);
 
       // Refresh list
       fetchCategoryBooks();
       fetchCategoryInfo();
+      navigate(`/librarian/books/categories/${categoryId}`);
     } catch (err: unknown) {
       console.error('Error creating book:', err);
       showToast({
@@ -723,6 +722,10 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       setSavingBook(false);
     }
   };
+
+  useEffect(() => {
+    if (isAddBookRoute) setIsFieldConfigModalOpen(false);
+  }, [isAddBookRoute]);
 
   if (initialLoading) {
     return (
@@ -796,7 +799,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
               <button
                 type="button"
                 className="lib-cat-btn-add-book-banner"
-                onClick={() => setIsAddBookModalOpen(true)}
+                onClick={() => navigate(`/librarian/books/categories/${categoryId}/add`)}
                 title="Thêm một đầu sách mới vào danh mục này"
               >
                 <Plus size={16} />
@@ -914,7 +917,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
             <button
               type="button"
               className="lib-cat-btn-add-book-center"
-              onClick={() => setIsAddBookModalOpen(true)}
+              onClick={() => navigate(`/librarian/books/categories/${categoryId}/add`)}
             >
               <Plus size={16} />
               <span>Thêm đầu sách đầu tiên</span>
@@ -1146,16 +1149,16 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       )}
 
       {/* ─── Modal 4: Add New Book Modal ─── */}
-      {isAddBookModalOpen && (
-        <div className="lib-cat-modal-overlay" onClick={() => setIsAddBookModalOpen(false)}>
-          <div className="lib-cat-modal-content add-book-modal" onClick={(e) => e.stopPropagation()}>
+      {isAddBookRoute && (
+        <div className="lib-cat-add-book-page">
+          <div className="lib-cat-add-book-card add-book-modal">
             <div className="lib-cat-modal-header">
               <div className="lib-cat-modal-title-row">
                 <div className="lib-cat-modal-badge orange">
                   <Plus size={14} />
                   <span>THÊM ĐẦU SÁCH MỚI</span>
                 </div>
-                <button type="button" className="lib-cat-modal-close" onClick={() => setIsAddBookModalOpen(false)}>
+                <button type="button" className="lib-cat-modal-close" onClick={() => navigate(`/librarian/books/categories/${categoryId}`)} aria-label="Quay lại danh mục">
                   <X size={18} />
                 </button>
               </div>
@@ -1165,35 +1168,14 @@ const LibrarianCategoryBooksPage: React.FC = () => {
               </p>
             </div>
 
+            <div className="lib-cat-add-book-toolbar">
+              <p>Nhập thông tin đầu sách và bản sao cần tạo.</p>
+              <button type="button" className="lib-cat-manage-fields-button" onClick={() => setIsFieldConfigModalOpen(true)}>
+                <Layers size={16} /> Quản lý trường thông tin
+              </button>
+            </div>
             <form onSubmit={handleCreateBook} className="lib-cat-book-form">
-              <section className="lib-cat-fields-manager" aria-label="Quản lý trường thông tin sách">
-                <div className="lib-cat-fields-manager-heading">
-                  <strong>Trường thông tin sách</strong>
-                  <span>Chọn trường hiển thị cho biểu mẫu và trang chi tiết độc giả.</span>
-                </div>
-                <div className="lib-cat-fields-manager-list">
-                  {bookFields.map((field) => (
-                    <div className="lib-cat-field-manager-row" key={field.key}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={field.visible}
-                          disabled={CORE_BOOK_FIELD_KEYS.includes(field.key)}
-                          onChange={(event) => setBookFields((current) => current.map((item) => item.key === field.key ? { ...item, visible: event.target.checked } : item))}
-                        />
-                        <span>{field.label}{CORE_BOOK_FIELD_KEYS.includes(field.key) ? ' · bắt buộc cho quản lý kho' : ''}</span>
-                      </label>
-                      {!CORE_BOOK_FIELD_KEYS.includes(field.key) && (
-                        <button type="button" onClick={() => setBookFields((current) => current.filter((item) => item.key !== field.key))}>Xóa trường</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div className="lib-cat-add-field-row">
-                  <input value={newBookFieldLabel} onChange={(event) => setNewBookFieldLabel(event.target.value)} maxLength={80} placeholder="Tên trường mới, ví dụ: Nhà xuất bản" />
-                  <button type="button" onClick={addBookField} disabled={!newBookFieldLabel.trim()}><Plus size={14} /> Thêm trường</button>
-                </div>
-              </section>
+
               <div className="lib-cat-form-grid-2">
                 {bookFields.find((field) => field.key === 'title')?.visible && <div className="lib-cat-form-group col-span-2">
                   <label htmlFor="book-title">
@@ -1439,7 +1421,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                 <button
                   type="button"
                   className="lib-cat-modal-btn-cancel"
-                  onClick={() => setIsAddBookModalOpen(false)}
+                  onClick={() => navigate(`/librarian/books/categories/${categoryId}`)}
                   disabled={savingBook || bookCodeAvailability !== 'available'}
                 >
                   Hủy bỏ
@@ -1454,6 +1436,30 @@ const LibrarianCategoryBooksPage: React.FC = () => {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {isFieldConfigModalOpen && (
+        <div className="lib-cat-modal-overlay lib-cat-field-config-overlay" onClick={() => setIsFieldConfigModalOpen(false)}>
+          <section className="lib-cat-modal-content lib-cat-field-config-modal" role="dialog" aria-modal="true" aria-labelledby="book-field-config-title" onClick={(event) => event.stopPropagation()}>
+            <header className="lib-cat-field-config-header">
+              <div><span className="lib-cat-modal-badge orange"><Layers size={14} /> CẤU HÌNH BIỂU MẪU</span><h2 id="book-field-config-title">Trường thông tin sách</h2><p>Chọn trường hiển thị cho form nhập và trang chi tiết độc giả.</p></div>
+              <button type="button" className="lib-cat-modal-close" onClick={() => setIsFieldConfigModalOpen(false)} aria-label="Đóng"><X size={18} /></button>
+            </header>
+            <div className="lib-cat-fields-manager-list lib-cat-field-config-list">
+              {bookFields.map((field) => (
+                <div className="lib-cat-field-manager-row" key={field.key}>
+                  <label><input type="checkbox" checked={field.visible} disabled={CORE_BOOK_FIELD_KEYS.includes(field.key)} onChange={(event) => setBookFields((current) => current.map((item) => item.key === field.key ? { ...item, visible: event.target.checked } : item))} /><span>{field.label}{CORE_BOOK_FIELD_KEYS.includes(field.key) ? ' · bắt buộc cho quản lý kho' : ''}</span></label>
+                  {!CORE_BOOK_FIELD_KEYS.includes(field.key) && <button type="button" onClick={() => setBookFields((current) => current.filter((item) => item.key !== field.key))}><Trash2 size={13} /> Xóa trường</button>}
+                </div>
+              ))}
+            </div>
+            <div className="lib-cat-add-field-row">
+              <input value={newBookFieldLabel} onChange={(event) => setNewBookFieldLabel(event.target.value)} maxLength={80} placeholder="Tên trường mới, ví dụ: Nhà xuất bản" />
+              <button type="button" onClick={addBookField} disabled={!newBookFieldLabel.trim()}><Plus size={14} /> Thêm trường</button>
+            </div>
+            <footer className="lib-cat-field-config-footer"><span>Thay đổi được lưu tự động và áp dụng cho Reader.</span><button type="button" onClick={() => setIsFieldConfigModalOpen(false)}>Hoàn tất</button></footer>
+          </section>
         </div>
       )}
     </div>
