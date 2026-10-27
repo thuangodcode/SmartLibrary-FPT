@@ -1,5 +1,17 @@
 # Report 5 checkpoint
 
+## Latest checkpoint — planned API execution (2026-10-27)
+
+This section supersedes older counts and authorization wording below. Current deliverables and JSON contain **87 cases: 42 Passed / 3 Failed / 42 Not Tested; 45 Executed (51.72%)**. Unit evidence remains 203 Passed / 93 function groups; no full-suite rerun.
+
+`evidence/planned-api/planned-api.trx` records 24 targeted API tests: 22 Passed / 2 Failed. Only 23 fully covered report scenarios were promoted; ST-10-2 remains Not Tested because its coverage is partial. External services are mocked, not live-provider or browser E2E evidence.
+
+R5-DEF-001 remains Open / Fail. New R5-DEF-002 is Open / Fail: a Reader can create a persisted book via POST `/api/v1/books/form` (201 instead of 403). See DEFECTS.md for reproduction. Both defects appear in all three deliverables. No business code was changed.
+
+Section 3 contains 40 milestone rows with the proposed common schedule 27–31 October 2026. Workbook statistics are grouped by 16 feature groups plus local Performance. Rebuild commands below remain valid; use REPORT5_RENDER=0. Cached Word TOC still needs refresh.
+
+Next authorized work: select only feasible remaining API/PostgreSQL scenarios, run only new tests in one filtered command, then rebuild and audit all three files. Target approximately 61 Executed, but do not promote partial coverage or fabricate results. Do not start/stop PostgreSQL, push, render, or modify business code. PostgreSQL was last confirmed running on port 55437; this checkpoint does not claim a fresh status check.
+
 Updated: 2026-10-27 (Asia/Ho_Chi_Minh). Branch: `report5-wip`; this rebuild started from `5b5e7d9`. Application baseline: `e5beb8ecff1fb41234857bc4975e8303e80f2694`.
 
 ## Scope of this checkpoint

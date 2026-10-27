@@ -150,6 +150,27 @@ for x in nfr['summaries']:
         data='1000 titles, 4000 copies, 3 accounts, 0 loans; CPU model/RAM not available (hardware query permission denied).',status='Passed' if x['p95Ms']<2000 and x['errors']==0 else 'Failed',date='2026-10-27',tester='Opt-in NfrProbeTests',
         actual=f'p95={x["p95Ms"]:.2f} ms; p99={x["p99Ms"]:.2f} ms; errors={x["errors"]}; {x["requestsPerSecond"]:.1f} req/s; {x["seconds"]:.3f}s burst.',mode='Local NFR experiment',evidence='evidence/nfr-local.json',note='One short run, warm cache, no TLS/providers/browser/AI; not sustained production load.'))
 
+# Overlay only cases actually exercised by the targeted API run. Preserve planned cases
+# and do not promote partial API coverage to browser/full-case acceptance.
+planned_path=BASE/'evidence/planned-api/planned-api.trx'
+planned_results=trx('planned-api/planned-api.trx') if planned_path.exists() else []
+for result in planned_results:
+    match=re.search(r'\.(ST_\d{2}_\d|SM_\d{2})_',result['name'])
+    if not match: raise ValueError('Unmapped planned test: '+result['name'])
+    cid=match[1].replace('_','-')
+    case=next(c for c in cases if c['id']==cid)
+    partial=cid=='ST-10-2'
+    case.update(status='Not Tested' if partial else result['status'],date=result['date'],tester='xUnit API automation',
+        evidence='evidence/planned-api/planned-api.trx :: '+result['name'],
+        mode='Partial API execution' if partial else 'API scenario execution (provider/auth doubles)',
+        precondition='WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.',
+        data='Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.',
+        actual=result['message'] or ('Empty support content and nonexistent request type rejected; private/missing conversation branch remains untested.' if partial else 'All assertions in the referenced API test completed successfully.'),
+        note=('Partial: invalid conversation branch not executed; retain Not Tested.' if partial else
+            'R5-DEF-002: Reader form-create HTTP 201 and book persisted.' if cid=='ST-02-3' and result['status']=='Failed' else
+            'R5-DEF-001: approved registration reopened.' if cid=='SM-04' and result['status']=='Failed' else
+            'API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence.'))
+
 unit=trx('unit.trx')
 sources={p.stem:p for p in (ROOT/'apps/api/tests/SmartLibrary.UnitTests').rglob('*.cs')}
 for i,r in enumerate(unit,1):
@@ -173,10 +194,10 @@ for uid,title,actors,description in ucmatches:
     linked=[c for c in cases if f'UC{uid}' in c['requirement'].split(', ')]
     rtm.append(dict(id='UC'+uid,title=title.strip(),description=description.strip(),actors=actors.strip(),feature=f['id'],code=f['code'],
         tests=', '.join(c['id'] for c in linked),evidence='; '.join(sorted(set(c['evidence'].split(' :: ')[0] for c in linked if c['evidence']))),
-        status='Fail' if uid=='18' else 'Not Tested',
-        note='R5-DEF-001; partial approval workflow failed.' if uid=='18' else 'Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC.'))
+        status='Fail' if uid in ('18','28') else 'Not Tested',
+        note='R5-DEF-001; partial approval workflow failed.' if uid=='18' else 'R5-DEF-002; catalog form-create authorization failed.' if uid=='28' else 'Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC.'))
 assert len(rtm)==40
-output=dict(features=features,cases=cases,unit=unit,rtm=rtm,workflows=workflows,nfr=nfr,
+output=dict(features=features,cases=cases,unit=unit,rtm=rtm,workflows=workflows,nfr=nfr,plannedResults=planned_results,
     counts=dict(unit=203,integrationPassed=17,integrationFailed=1,integrationSkipped=3),
     baseline='e5beb8ecff1fb41234857bc4975e8303e80f2694')
 (BASE/'work/report-data.json').write_text(json.dumps(output,ensure_ascii=False,indent=2))

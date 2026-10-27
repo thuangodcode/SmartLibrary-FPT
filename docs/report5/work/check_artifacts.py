@@ -16,7 +16,7 @@ def check(ok, message):
     if not ok: issues.append(message)
 
 counts = Counter(c['status'] for c in data['cases'])
-check(len(data['cases']) == 87 and counts == {'Passed':21, 'Failed':1, 'Not Tested':65}, f'Non-unit inventory: {len(data["cases"])} {dict(counts)}')
+check(len(data['cases']) == 87 and counts == {'Passed':42, 'Failed':3, 'Not Tested':42}, f'Non-unit inventory: {len(data["cases"])} {dict(counts)}')
 check(len({c['id'] for c in data['cases']}) == len(data['cases']), 'Unique non-unit case IDs')
 check(len(data['unit']) == 203 and len({c['group'] for c in data['unit']}) == 93, '203 unit results / 93 function groups')
 check(data['nfr'] == evidence, 'NFR data equals saved evidence')
@@ -44,7 +44,7 @@ for name in ['Report5_Test Report.xlsx', 'Report5_Unit Test.xlsx']:
                     errors.append(f'{sheet.title}!{c.coordinate}')
                 if f.data_type == 'f':
                     if v is None: missing_cache.append(f'{sheet.title}!{c.coordinate}')
-                    if not re.match(r'=(?:COUNTIF\(|COUNTA\(|SUM\(|IFERROR\(|Cover!|\x27)',f.value):
+                    if not re.match(r'=(?:COUNTIFS?\(|COUNTA\(|SUM\(|IFERROR\(|Cover!|\x27)',f.value):
                         unexpected.append(f'{sheet.title}!{c.coordinate}')
                 if isinstance(v,str) and 'Đợi HuyLong điền' in v:
                     slots.append((f'{sheet.title}!{c.coordinate}',v))
@@ -56,7 +56,10 @@ for name in ['Report5_Test Report.xlsx', 'Report5_Unit Test.xlsx']:
 
 report = books['Report5_Test Report.xlsx'][0]
 stat = report['Test Statistics']
-check([stat[a].value for a in ['D14','E14','F14','G14','H14']] == [21,1,65,0,87], 'Test Report statistics reconcile to JSON')
+check([stat[a].value for a in ['D29','E29','F29','G29','H29']] == [42,3,42,0,87], 'Test Report statistics reconcile to JSON')
+for i,feature in enumerate([f['name'] for f in data['features']]+['Performance'],11):
+    expected=Counter(c['status'] for c in data['cases'] if c['feature']==feature)
+    check([stat.cell(i,c).value for c in range(4,7)]==[expected[s] for s in ['Passed','Failed','Not Tested']],f'Feature statistics: {feature}')
 observed = {}
 for name in ['Feature 1','Feature 2']:
     for row in report[name].iter_rows(min_row=12,values_only=True):
@@ -99,7 +102,8 @@ with zipfile.ZipFile(docpath) as z:
 text='\n'.join(paragraphs)
 texts[docpath.name]=text
 placeholders[docpath.name]=[(f'paragraph {i+1}',p) for i,p in enumerate(paragraphs) if 'Đợi HuyLong điền' in p]
-check('87 entries' in text and re.search(r'21 Passed\s*/\s*1 Failed\s*/\s*65 Not Tested',text), 'DOCX: non-unit total and verdict breakdown reconcile')
+check('87 entries' in text and re.search(r'42 Passed\s*/\s*3 Failed\s*/\s*42 Not Tested',text), 'DOCX: non-unit total and verdict breakdown reconcile')
+check(text.count('27-10-2026')==40 and text.count('31-10-2026')==40,'DOCX: 40 feature milestones share approved planned dates')
 for s in evidence['summaries']:
     check(f'{s["p95Ms"]:.2f}' in text,f'DOCX: P95 {s["p95Ms"]:.2f} present')
 for name,text in texts.items():
@@ -107,6 +111,8 @@ for name,text in texts.items():
         defect_ok=report['Defects']['A5'].value=='R5-DEF-001' and report['Defects']['B5'].value=='Open / Fail'
     else: defect_ok=bool(re.search(r'R5-DEF-001[^\n]*Fail',text))
     check(defect_ok,f'{name}: R5-DEF-001 explicitly Fail')
+    second_ok=(report['Defects']['A6'].value=='R5-DEF-002' and report['Defects']['B6'].value=='Open / Fail') if name=='Report5_Test Report.xlsx' else bool(re.search(r'R5-DEF-002[^\n]*Fail',text))
+    check(second_ok,f'{name}: R5-DEF-002 explicitly Fail')
     check(not re.search(r'#REF!|#VALUE!|#NAME\?',text),f'{name}: no requested error strings')
     print('CLAIM REVIEW:',name)
     for line in dict.fromkeys(text.splitlines()):

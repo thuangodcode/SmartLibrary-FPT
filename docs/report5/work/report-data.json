@@ -228,15 +228,15 @@
       "description": "Permission",
       "procedure": "Reader attempts registration approval API.",
       "expected": "Deny staff-only action; request remains unchanged.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "AuthController; RegistrationsController; MeController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_01_3_ReaderCannotApprove",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-02-1",
@@ -262,15 +262,15 @@
       "description": "Validation / exception",
       "procedure": "Intake 0 and 501 copies; submit duplicate book code.",
       "expected": "Reject quantity outside 1–500 and conflicting code; do not change inventory.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "BooksController; BookCopiesController; CategoriesController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_02_2_InvalidIntakeAndDuplicateCode",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-02-3",
@@ -279,15 +279,15 @@
       "description": "Permission",
       "procedure": "Reader attempts to create or update inventory.",
       "expected": "Deny unauthorized inventory mutations. UC29 import-ticket CRUD requires separate scope verification.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "BooksController; BookCopiesController; CategoriesController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Failed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "Reader form-create: HTTP 201; persisted=True. Expected 403 and no new book.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_02_3_ReaderCannotMutateInventory",
+      "note": "R5-DEF-002: Reader form-create HTTP 201 and book persisted."
     },
     {
       "id": "ST-03-1",
@@ -296,15 +296,15 @@
       "description": "Main flow",
       "procedure": "Choose available book and valid pickup slot; submit; librarian approves then checks out.",
       "expected": "Pending holds a copy; Approved is not Borrowed; handoff sets Borrowed and due dates.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "CirculationMeController; CirculationController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_03_1_BorrowAndHandover",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-03-2",
@@ -313,15 +313,15 @@
       "description": "Validation / exception",
       "procedure": "Submit a past pickup slot or two simultaneous requests for the last copy.",
       "expected": "Reject invalid slot; at most one last-copy request succeeds.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "CirculationMeController; CirculationController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_03_2_PastSlotAndLastCopyRace",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-03-3",
@@ -330,15 +330,15 @@
       "description": "Permission",
       "procedure": "Anonymous user or Reader opens staff loans endpoint.",
       "expected": "Return 401 for anonymous and 403 for Reader.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "CirculationMeController; CirculationController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_03_3_StaffLoansAuthorization",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-04-1",
@@ -347,15 +347,15 @@
       "description": "Main flow",
       "procedure": "Return overdue copy; inspect Good, Damaged and Lost conditions in separate runs.",
       "expected": "Good creates overdue fine and releases copy; Lost/Damaged opens PendingReview incident and keeps copy unavailable.",
-      "precondition": "Isolated staging data; Librarian / Reader accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "CirculationController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_04_1_ReturnConditions",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-04-2",
@@ -364,15 +364,15 @@
       "description": "Validation / exception",
       "procedure": "Return an already returned barcode.",
       "expected": "Reject duplicate return without duplicate fine or inventory increment.",
-      "precondition": "Isolated staging data; Librarian / Reader accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "CirculationController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_04_2_DuplicateReturn",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-04-3",
@@ -381,15 +381,15 @@
       "description": "Permission",
       "procedure": "Reader calls staff return endpoint.",
       "expected": "Deny return processing by Reader.",
-      "precondition": "Isolated staging data; Librarian / Reader accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "CirculationController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_04_3_ReaderCannotReturn",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-05-1",
@@ -432,15 +432,15 @@
       "description": "Permission",
       "procedure": "Reader attempts renewal of another reader loan.",
       "expected": "Deny access to another reader loan.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "CirculationMeController; CirculationController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_05_3_CrossReaderRenewal",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-06-1",
@@ -483,15 +483,15 @@
       "description": "Permission",
       "procedure": "Reader cancels another reader reservation.",
       "expected": "Deny cross-reader cancellation.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "CirculationMeController; CirculationController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_06_3_CrossReaderReservation",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-07-1",
@@ -534,15 +534,15 @@
       "description": "Permission",
       "procedure": "Reader attempts checkout for another reader fine.",
       "expected": "Deny access and create no checkout.",
-      "precondition": "Isolated staging data; Reader / Librarian / PayOS accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "CirculationMeController; CirculationController; PayOSWebhookController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_07_3_CrossReaderCheckout",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-08-1",
@@ -585,15 +585,15 @@
       "description": "Permission",
       "procedure": "Reader attempts another reader private profile endpoint.",
       "expected": "Deny exposure or modification of private fields.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "ProfileController; ReadersController; LibrarianUsersController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_08_3_PrivateReaderDetails",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-09-1",
@@ -619,15 +619,15 @@
       "description": "Validation / exception",
       "procedure": "Submit rating 0 or 6 and duplicate active review.",
       "expected": "Reject out-of-range rating/duplicate; average rating remains consistent.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "BookReviewsController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_09_2_ReviewValidation",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-09-3",
@@ -636,15 +636,15 @@
       "description": "Permission",
       "procedure": "Reader edits another reader review.",
       "expected": "Deny cross-reader modification.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "BookReviewsController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_09_3_ReviewOwnership",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-10-1",
@@ -670,15 +670,15 @@
       "description": "Validation / exception",
       "procedure": "Submit empty content or invalid conversation ID.",
       "expected": "Reject invalid content/target without creating an orphan message.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
       "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "SupportController"
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "Empty support content and nonexistent request type rejected; private/missing conversation branch remains untested.",
+      "mode": "Partial API execution",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_10_2_InvalidSupportContent",
+      "note": "Partial: invalid conversation branch not executed; retain Not Tested."
     },
     {
       "id": "ST-10-3",
@@ -687,15 +687,15 @@
       "description": "Permission",
       "procedure": "Another reader requests a private conversation.",
       "expected": "Deny access to conversation content.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "SupportController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_10_3_PrivateConversation",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-11-1",
@@ -738,15 +738,15 @@
       "description": "Permission",
       "procedure": "Reader publishes news or reads another reader notification.",
       "expected": "Deny staff-only publication and cross-reader inbox access.",
-      "precondition": "Isolated staging data; Reader / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "NewsController; NotificationsController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_11_3_NewsAndNotificationOwnership",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-12-1",
@@ -789,15 +789,15 @@
       "description": "Permission",
       "procedure": "Librarian or Reader calls admin user management.",
       "expected": "Deny admin-only operation.",
-      "precondition": "Isolated staging data; Admin accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "AdminUsersController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_12_3_AdminUsersAuthorization",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-13-1",
@@ -840,15 +840,15 @@
       "description": "Permission",
       "procedure": "Reader or Librarian changes admin policy.",
       "expected": "Deny unauthorized policy mutation.",
-      "precondition": "Isolated staging data; Admin / Reader accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "PolicyRulesController; RegulationsController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_13_3_AdminPolicyAuthorization",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-14-1",
@@ -891,15 +891,15 @@
       "description": "Permission",
       "procedure": "Reader requests provider credential/configuration endpoints.",
       "expected": "Deny access to administrative configuration.",
-      "precondition": "Isolated staging data; Admin accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "AiSettingsController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_14_3_AiSettingsAuthorization",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-15-1",
@@ -942,15 +942,15 @@
       "description": "Permission",
       "procedure": "Reader attempts staff-only AI demand report.",
       "expected": "Deny privileged analytics; public reader search remains available as designed.",
-      "precondition": "Isolated staging data; Reader / Librarian / AI accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "RagController; AiSettingsController; DashboardController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_15_3_AiAnalyticsAuthorization",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "ST-16-1",
@@ -993,15 +993,15 @@
       "description": "Permission",
       "procedure": "Reader accesses staff report/export.",
       "expected": "Deny unauthorized report data access.",
-      "precondition": "Isolated staging data; Admin / Librarian accounts; active policy; record fixture IDs.",
-      "data": "Use dedicated synthetic records; include IDs and actual input values in execution evidence.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Not executed in this checkpoint.",
-      "mode": "Planned system test",
-      "evidence": "",
-      "note": "AdminReportsController; LibrarianReportsController; DashboardController"
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "All assertions in the referenced API test completed successfully.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.ST_16_3_ReportAuthorization",
+      "note": "API-level only; not browser E2E. Some tests reuse existing workflow helpers; not independent feature-acceptance evidence."
     },
     {
       "id": "IT-001",
@@ -1571,15 +1571,15 @@
       "description": "Full entity lifecycle and invalid transitions",
       "procedure": "Approve/reject/NeedMoreInfo from Submitted; resubmit documents; try request-more-info after approval.",
       "expected": "New Submitted request after resubmission; reject invalid terminal-state actions. Known bug R5-DEF-001 remains open.",
-      "precondition": "Fresh isolated fixtures for each branch; active policy; staff and reader roles.",
-      "data": "Record entity IDs and state before/after every transition.",
-      "status": "Not Tested",
-      "date": "",
-      "tester": "",
-      "actual": "Full lifecycle matrix not yet executed; see linked IT cases for partial coverage.",
-      "mode": "Planned state-transition test",
-      "evidence": "",
-      "note": "Do not infer full lifecycle coverage from one successful path."
+      "precondition": "WorkflowFixture: disposable localhost PostgreSQL; real controllers/services/EF; synthetic identity headers and mocked external providers.",
+      "data": "Synthetic records created per test; exact payloads and assertions in Report5PlannedTests.cs. No shared user data.",
+      "status": "Failed",
+      "date": "2026-10-27",
+      "tester": "xUnit API automation",
+      "actual": "An approved request must not be downgraded by a stale review action.",
+      "mode": "API scenario execution (provider/auth doubles)",
+      "evidence": "evidence/planned-api/planned-api.trx :: SmartLibrary.IntegrationTests.Report5PlannedTests.SM_04_RegistrationLifecycle",
+      "note": "R5-DEF-001: approved registration reopened."
     },
     {
       "id": "SM-05",
@@ -4926,7 +4926,7 @@
       "feature": "MF-01",
       "code": "AuthController; RegistrationsController; MeController",
       "tests": "ST-01-1, ST-01-2, ST-01-3, IT-017, SM-04",
-      "evidence": "evidence/integration.trx",
+      "evidence": "evidence/integration.trx; evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -4938,7 +4938,7 @@
       "feature": "MF-01",
       "code": "AuthController; RegistrationsController; MeController",
       "tests": "ST-01-1, ST-01-2, ST-01-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -4950,7 +4950,7 @@
       "feature": "MF-01",
       "code": "AuthController; RegistrationsController; MeController",
       "tests": "ST-01-1, ST-01-2, ST-01-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -4962,7 +4962,7 @@
       "feature": "MF-02",
       "code": "BooksController; BookCopiesController; CategoriesController",
       "tests": "ST-02-1, ST-02-2, ST-02-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -4974,7 +4974,7 @@
       "feature": "MF-02",
       "code": "BooksController; BookCopiesController; CategoriesController",
       "tests": "ST-02-1, ST-02-2, ST-02-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -4986,7 +4986,7 @@
       "feature": "MF-15",
       "code": "RagController; AiSettingsController; DashboardController",
       "tests": "ST-15-1, ST-15-2, ST-15-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -4998,7 +4998,7 @@
       "feature": "MF-08",
       "code": "ProfileController; ReadersController; LibrarianUsersController",
       "tests": "ST-08-1, ST-08-2, ST-08-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5010,7 +5010,7 @@
       "feature": "MF-03",
       "code": "CirculationMeController; CirculationController",
       "tests": "ST-03-1, ST-03-2, ST-03-3, IT-001, IT-002, IT-003, IT-004, IT-005, IT-006, SM-01",
-      "evidence": "evidence/integration.trx",
+      "evidence": "evidence/integration.trx; evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5022,7 +5022,7 @@
       "feature": "MF-05",
       "code": "CirculationMeController; CirculationController",
       "tests": "ST-05-1, ST-05-2, ST-05-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5034,7 +5034,7 @@
       "feature": "MF-06",
       "code": "CirculationMeController; CirculationController",
       "tests": "ST-06-1, ST-06-2, ST-06-3, SM-02",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5046,7 +5046,7 @@
       "feature": "MF-09",
       "code": "BookReviewsController",
       "tests": "ST-09-1, ST-09-2, ST-09-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5058,7 +5058,7 @@
       "feature": "MF-09",
       "code": "BookReviewsController",
       "tests": "ST-09-1, ST-09-2, ST-09-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5070,7 +5070,7 @@
       "feature": "MF-10",
       "code": "SupportController",
       "tests": "ST-10-1, ST-10-2, ST-10-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5082,7 +5082,7 @@
       "feature": "MF-10",
       "code": "SupportController",
       "tests": "ST-10-1, ST-10-2, ST-10-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5094,7 +5094,7 @@
       "feature": "MF-10",
       "code": "SupportController",
       "tests": "ST-10-1, ST-10-2, ST-10-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5106,7 +5106,7 @@
       "feature": "MF-07",
       "code": "CirculationMeController; CirculationController; PayOSWebhookController",
       "tests": "ST-07-1, ST-07-2, ST-07-3, IT-010, IT-011, IT-012, SM-03",
-      "evidence": "evidence/integration.trx",
+      "evidence": "evidence/integration.trx; evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5118,7 +5118,7 @@
       "feature": "MF-11",
       "code": "NewsController; NotificationsController",
       "tests": "ST-11-1, ST-11-2, ST-11-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5130,7 +5130,7 @@
       "feature": "MF-01",
       "code": "AuthController; RegistrationsController; MeController",
       "tests": "ST-01-1, ST-01-2, ST-01-3, IT-015, IT-016, IT-017, IT-018, SM-04",
-      "evidence": "evidence/integration.trx",
+      "evidence": "evidence/integration.trx; evidence/planned-api/planned-api.trx",
       "status": "Fail",
       "note": "R5-DEF-001; partial approval workflow failed."
     },
@@ -5142,7 +5142,7 @@
       "feature": "MF-08",
       "code": "ProfileController; ReadersController; LibrarianUsersController",
       "tests": "ST-08-1, ST-08-2, ST-08-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5154,7 +5154,7 @@
       "feature": "MF-08",
       "code": "ProfileController; ReadersController; LibrarianUsersController",
       "tests": "ST-08-1, ST-08-2, ST-08-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5166,7 +5166,7 @@
       "feature": "MF-11",
       "code": "NewsController; NotificationsController",
       "tests": "ST-11-1, ST-11-2, ST-11-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5178,7 +5178,7 @@
       "feature": "MF-03",
       "code": "CirculationMeController; CirculationController",
       "tests": "ST-03-1, ST-03-2, ST-03-3, IT-004, IT-013, IT-014, SM-01",
-      "evidence": "evidence/integration.trx",
+      "evidence": "evidence/integration.trx; evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5190,7 +5190,7 @@
       "feature": "MF-03",
       "code": "CirculationMeController; CirculationController",
       "tests": "ST-03-1, ST-03-2, ST-03-3, IT-004, SM-01",
-      "evidence": "evidence/integration.trx",
+      "evidence": "evidence/integration.trx; evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5202,7 +5202,7 @@
       "feature": "MF-04",
       "code": "CirculationController",
       "tests": "ST-04-1, ST-04-2, ST-04-3, ST-05-1, ST-05-2, ST-05-3, IT-004, IT-019, IT-020, IT-021, SM-01",
-      "evidence": "evidence/integration.trx",
+      "evidence": "evidence/integration.trx; evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5214,7 +5214,7 @@
       "feature": "MF-06",
       "code": "CirculationMeController; CirculationController",
       "tests": "ST-06-1, ST-06-2, ST-06-3, IT-001, IT-002, IT-003, SM-02",
-      "evidence": "evidence/integration.trx",
+      "evidence": "evidence/integration.trx; evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5226,7 +5226,7 @@
       "feature": "MF-04",
       "code": "CirculationController",
       "tests": "ST-04-1, ST-04-2, ST-04-3, IT-001, IT-002, IT-003, IT-019, IT-020, IT-021, SM-05",
-      "evidence": "evidence/integration.trx",
+      "evidence": "evidence/integration.trx; evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5238,7 +5238,7 @@
       "feature": "MF-10",
       "code": "SupportController",
       "tests": "ST-10-1, ST-10-2, ST-10-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5250,9 +5250,9 @@
       "feature": "MF-02",
       "code": "BooksController; BookCopiesController; CategoriesController",
       "tests": "ST-02-1, ST-02-2, ST-02-3, IT-007, IT-008, IT-009",
-      "evidence": "evidence/integration.trx",
-      "status": "Not Tested",
-      "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
+      "evidence": "evidence/integration.trx; evidence/planned-api/planned-api.trx",
+      "status": "Fail",
+      "note": "R5-DEF-002; catalog form-create authorization failed."
     },
     {
       "id": "UC29",
@@ -5262,7 +5262,7 @@
       "feature": "MF-02",
       "code": "BooksController; BookCopiesController; CategoriesController",
       "tests": "ST-02-1, ST-02-2, ST-02-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5274,7 +5274,7 @@
       "feature": "MF-07",
       "code": "CirculationMeController; CirculationController; PayOSWebhookController",
       "tests": "ST-07-1, ST-07-2, ST-07-3, IT-010, IT-012, SM-03, SM-05",
-      "evidence": "evidence/integration.trx",
+      "evidence": "evidence/integration.trx; evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5286,7 +5286,7 @@
       "feature": "MF-11",
       "code": "NewsController; NotificationsController",
       "tests": "ST-11-1, ST-11-2, ST-11-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5298,7 +5298,7 @@
       "feature": "MF-15",
       "code": "RagController; AiSettingsController; DashboardController",
       "tests": "ST-15-1, ST-15-2, ST-15-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5310,7 +5310,7 @@
       "feature": "MF-12",
       "code": "AdminUsersController",
       "tests": "ST-12-1, ST-12-2, ST-12-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5322,7 +5322,7 @@
       "feature": "MF-12",
       "code": "AdminUsersController",
       "tests": "ST-12-1, ST-12-2, ST-12-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5334,7 +5334,7 @@
       "feature": "MF-13",
       "code": "PolicyRulesController; RegulationsController",
       "tests": "ST-13-1, ST-13-2, ST-13-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5346,7 +5346,7 @@
       "feature": "MF-14",
       "code": "AiSettingsController",
       "tests": "ST-14-1, ST-14-2, ST-14-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5358,7 +5358,7 @@
       "feature": "MF-16",
       "code": "AdminReportsController; LibrarianReportsController; DashboardController",
       "tests": "ST-16-1, ST-16-2, ST-16-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5370,7 +5370,7 @@
       "feature": "MF-15",
       "code": "RagController; AiSettingsController; DashboardController",
       "tests": "ST-15-1, ST-15-2, ST-15-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5382,7 +5382,7 @@
       "feature": "MF-15",
       "code": "RagController; AiSettingsController; DashboardController",
       "tests": "ST-15-1, ST-15-2, ST-15-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     },
@@ -5394,7 +5394,7 @@
       "feature": "MF-15",
       "code": "RagController; AiSettingsController; DashboardController",
       "tests": "ST-15-1, ST-15-2, ST-15-3",
-      "evidence": "",
+      "evidence": "evidence/planned-api/planned-api.trx",
       "status": "Not Tested",
       "note": "Requirement-level sign-off incomplete; linked case results can Pass without proving the entire UC."
     }
@@ -39131,6 +39131,176 @@
       }
     ]
   },
+  "plannedResults": [
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.SM_04_RegistrationLifecycle",
+      "status": "Failed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.1657197",
+      "message": "An approved request must not be downgraded by a stale review action."
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_01_3_ReaderCannotApprove",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0351540",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_02_2_InvalidIntakeAndDuplicateCode",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0674203",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_02_3_ReaderCannotMutateInventory",
+      "status": "Failed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.1972655",
+      "message": "Reader form-create: HTTP 201; persisted=True. Expected 403 and no new book."
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_03_1_BorrowAndHandover",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0806559",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_03_2_PastSlotAndLastCopyRace",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0359882",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_03_3_StaffLoansAuthorization",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0018462",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_04_1_ReturnConditions",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.1557941",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_04_2_DuplicateReturn",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:01.4103603",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_04_3_ReaderCannotReturn",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0005241",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_05_3_CrossReaderRenewal",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0277111",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_06_3_CrossReaderReservation",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0567619",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_07_3_CrossReaderCheckout",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0804919",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_08_3_PrivateReaderDetails",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0036503",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_09_2_ReviewValidation",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0276686",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_09_3_ReviewOwnership",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.1013957",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_10_2_InvalidSupportContent",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0242961",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_10_3_PrivateConversation",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0020307",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_11_3_NewsAndNotificationOwnership",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0455555",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_12_3_AdminUsersAuthorization",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0010859",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_13_3_AdminPolicyAuthorization",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0014916",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_14_3_AiSettingsAuthorization",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0023434",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_15_3_AiAnalyticsAuthorization",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0006370",
+      "message": ""
+    },
+    {
+      "name": "SmartLibrary.IntegrationTests.Report5PlannedTests.ST_16_3_ReportAuthorization",
+      "status": "Passed",
+      "date": "2026-10-27",
+      "duration": "00:00:00.0011680",
+      "message": ""
+    }
+  ],
   "counts": {
     "unit": 203,
     "integrationPassed": 17,

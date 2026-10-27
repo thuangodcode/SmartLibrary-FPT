@@ -1,5 +1,18 @@
 # Report 5 defect checkpoint
 
+## R5-DEF-002 — Reader can create catalog inventory using multipart endpoint
+
+- Status: **Open / Fail**, proposed High (authorization bypass; needs HuyLong severity confirmation).
+- Targeted test: `Report5PlannedTests.ST_02_3_ReaderCannotMutateInventory`.
+- Evidence: `evidence/planned-api/planned-api.trx`, executed 2026-10-27.
+- Reproduce on isolated test data: authenticate with Reader role; POST multipart `/api/v1/books/form` with unique alphanumeric Code, nonempty Title and TotalCopies=1.
+- Expected: 403 and no inserted book. Actual: **201 and persisted=True**, both response and database existence checked in the failing assertion.
+- Control checks: Reader receives 403 from JSON create, update and copies/intake endpoints before the form attempt.
+- Source: `BooksController.CreateFromForm` has `[Authorize]` without `LibrarianOnly`, unlike JSON create. Test identity is a header double; authorization middleware, controller, service and PostgreSQL are real. No live Supabase/browser claim.
+- No application fix applied. The synthetic database is disposed by the fixture; shared catalog data was not changed.
+
+The targeted `SM_04_RegistrationLifecycle` test also reproduces R5-DEF-001 after the approve/reject/resubmit branches. Thus three failed report cases refer to two distinct defects, not three distinct bugs.
+
 ## R5-DEF-001 — Approved registration can request more information
 
 - Status: **Open / Fail**. Provisional local defect ID; severity proposed High because an active reader can be downgraded by a stale review action. Severity needs HuyLong confirmation.
