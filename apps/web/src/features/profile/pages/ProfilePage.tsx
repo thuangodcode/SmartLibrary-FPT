@@ -466,32 +466,22 @@ const ProfilePage: React.FC = () => {
             </dl>
           </section>
 
-          <footer className="profile-card-actions">
-            {!isEditing ? (
+          {isEditing && (
+            <footer className="profile-card-actions">
               <button
-                className="profile-btn-edit"
-                onClick={handleStartEdit}
+                className="profile-btn-cancel"
+                disabled={busy}
+                onClick={handleCancel}
                 type="button"
               >
-                <Pencil size={15} /> Chỉnh sửa
+                <X size={15} /> Hủy
               </button>
-            ) : (
-              <>
-                <button
-                  className="profile-btn-cancel"
-                  disabled={busy}
-                  onClick={handleCancel}
-                  type="button"
-                >
-                  <X size={15} /> Hủy
-                </button>
-                <button className="profile-btn-save" disabled={busy} type="submit">
-                  {busy ? <LoaderCircle size={16} className="profile-spinner" /> : <Check size={16} />}
-                  Lưu thay đổi
-                </button>
-              </>
-            )}
-          </footer>
+              <button className="profile-btn-save" disabled={busy} type="submit">
+                {busy ? <LoaderCircle size={16} className="profile-spinner" /> : <Check size={16} />}
+                Lưu thay đổi
+              </button>
+            </footer>
+          )}
         </form>
       ) : null}
     </div>
