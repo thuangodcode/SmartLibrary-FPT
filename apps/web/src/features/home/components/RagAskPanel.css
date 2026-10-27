@@ -256,6 +256,28 @@
 .rag-chat-assistant-message .rag-ask-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 .rag-chat-assistant-message .rag-ask-grid .book-card { max-width: 100%; }
 
+/* Keep long answers and book results inside the chat column without pushing into
+   the suggestions or composer. */
+.rag-ask { height: min(86vh, 820px); overflow: hidden; min-height: 0; }
+.rag-ask-conversation { flex: 1 1 0; min-height: 0; max-height: none; width: 100%; box-sizing: border-box; }
+.rag-chat-turn, .rag-chat-assistant-message { min-width: 0; box-sizing: border-box; }
+.rag-chat-assistant-message { width: 100%; max-width: 100%; overflow: hidden; overflow-wrap: anywhere; }
+.rag-ask-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.rag-ask-book-result { display: flex; min-width: 0; gap: 10px; padding: 9px; border: 1px solid #e3ebe5; border-radius: 12px; background: #fff; color: inherit; text-decoration: none; transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease; }
+.rag-ask-book-result:hover { transform: translateY(-1px); border-color: #8ba997; box-shadow: 0 5px 15px rgb(29 55 39 / 8%); }
+.rag-ask-book-cover { display: grid; width: 48px; height: 66px; flex: 0 0 48px; place-items: center; overflow: hidden; border-radius: 6px; background: #edf3ef; color: #42644f; }
+.rag-ask-book-cover img { width: 100%; height: 100%; object-fit: cover; }
+.rag-ask-book-copy { display: grid; min-width: 0; align-content: center; gap: 4px; }
+.rag-ask-book-copy strong { display: -webkit-box; overflow: hidden; color: #26372c; font-size: 12px; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.rag-ask-book-copy small, .rag-ask-more-results { overflow: hidden; color: #758279; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.rag-policy-source { margin-top: 9px; padding-top: 8px; border-top: 1px solid #e5ebe6; color: #748176; font-size: 11px; }
+.rag-ask-more-results { display: block; margin-top: 7px; }
+
+@media (max-width: 560px) {
+  .rag-ask { height: min(88vh, 820px); }
+  .rag-ask-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 @keyframes ai-spin {
   to { transform: rotate(360deg); }
 }

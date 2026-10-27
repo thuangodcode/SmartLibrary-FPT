@@ -190,8 +190,8 @@ public static class QueryExpander
             return "Học tiếng Nhật Japanese language learning JLPT N1 N2 N3 N4 N5 kanji hiragana katakana";
         if (ContainsAny(fold, "tieng anh", "tienganh", "english"))
             return "Học tiếng Anh English language learning TOEIC IELTS TOEFL communication giao tiếp";
-        if (ContainsAny(fold, "tieng han", "tienghan", "korean", "hangul"))
-            return "Học tiếng Hàn Korean language learning TOPIK hangul";
+        if (ContainsAny(fold, "tieng han", "tienghan", "korean", "korea", "hanguk", "hangul"))
+            return "Học tiếng Hàn Korean language learning Korea Hanguk 한국어 TOPIK hangul Integrated Korean Korean grammar vocabulary speaking";
         if (ContainsAny(fold, "tieng trung", "tiengtrung", "chinese", "mandarin"))
             return "Học tiếng Trung Chinese Mandarin language learning HSK";
         return "Học ngôn ngữ language learning";

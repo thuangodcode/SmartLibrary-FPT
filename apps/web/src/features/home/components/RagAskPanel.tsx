@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowUp, LoaderCircle, RotateCcw, Sparkles, X } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import {
@@ -7,8 +7,6 @@ import {
   getReaderAiSuggestedQuestions,
   type RagAskResult,
 } from '../../ai/aiApi';
-import { toBookFromRag } from '../utils/toBookCardData';
-import { BookCard } from './BookCard';
 import robotLogo from '../../../assets/figma/friendly-humanoid-ai-robot.jpg';
 import talkingRobotLogo from '../../../assets/figma/thumb-robot-noi-chuyen-pika-robot-ai.png';
 import './RagAskPanel.css';
@@ -40,7 +38,6 @@ function friendlyAskError(error: unknown): string {
 }
 
 const RagAskPanel = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const accessToken = useAuthStore((state) => state.accessToken);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -181,17 +178,23 @@ const RagAskPanel = () => {
                                 <div><strong>{bookSources.reduce((total, source) => total + (source.availableCopies ?? 0), 0)}</strong><span>bản có thể mượn</span></div>
                               </div>
                               <div className="rag-ask-grid">
-                                {bookSources.map((source) => (
-                                  <BookCard
-                                    key={`${source.sourceType}-${source.sourceId}`}
-                                    book={toBookFromRag(source)}
-                                    onSelect={(book) => navigate(`/books/${book.id}`)}
-                                  />
+                                {bookSources.slice(0, 4).map((source) => (
+                                  <Link className="rag-ask-book-result" key={`${source.sourceType}-${source.sourceId}`} to={`/books/${source.sourceId}`}>
+                                    <span className="rag-ask-book-cover">
+                                      {source.coverImageUrl ? <img src={source.coverImageUrl} alt="" loading="lazy" /> : <span aria-hidden="true">📖</span>}
+                                    </span>
+                                    <span className="rag-ask-book-copy">
+                                      <strong>{source.title}</strong>
+                                      <small>{source.author || 'Tác giả chưa cập nhật'}</small>
+                                      <small>{source.availableCopies ?? 0} bản có thể mượn</small>
+                                    </span>
+                                  </Link>
                                 ))}
                               </div>
+                              {bookSources.length > 4 && <small className="rag-ask-more-results">Còn {bookSources.length - 4} đầu sách phù hợp khác.</small>}
                             </>
                           )}
-                          {policySources.length > 0 && <ul>{policySources.map((source) => <li key={`${source.sourceType}-${source.sourceId}`}>Chính sách: {source.title}</li>)}</ul>}
+                          {policySources.length > 0 && <div className="rag-policy-source">Theo chính sách: {policySources[0].title}</div>}
                           {turn.result.sources.length === 0 && <p className="rag-chat-no-source">Câu trả lời dựa trên dữ liệu thư viện hiện có.</p>}
                         </div>
                       )}

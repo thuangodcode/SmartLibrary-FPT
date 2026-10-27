@@ -66,6 +66,8 @@ public class RagService
             return Result<RagAskResultDto>.Failure(credential.Error ?? "Chưa cấu hình nhà cung cấp AI.");
 
         var cred = credential.Data!;
+        // An explicit language or policy question is self-contained. Older turns must
+        // not override its search intent (for example, Korean books becoming Chinese).
         var searchQuery = BuildContextualQuery(conversationContext, query);
         var isReader = !AiSettingsService.IsStaff(role);
         var readerBookSearch = isReader && SearchTopicGuard.IsBookSearch(searchQuery);
@@ -244,7 +246,14 @@ public class RagService
             ? semantic
             : await _documents.AttachBookFactsAsync(semantic, ct);
         var semanticOnTopic = SearchTopicGuard.FilterSemantic(query, withFacts);
-        var onTopic = MergeHits(catalogOnTopic, semanticOnTopic)
+        var rankedHits = MergeHits(catalogOnTopic, semanticOnTopic);
+        if (policyQuestion && rankedHits.Count > 1)
+        {
+            // Policy prompts often have several semantically similar records. Keep only
+            // the strongest match so the answer and citations stay focused.
+            rankedHits = rankedHits.Take(1).ToList();
+        }
+        var onTopic = rankedHits
             .Where(hit => !readerBookSearch
                           || string.Equals(hit.SourceType, "book", StringComparison.OrdinalIgnoreCase))
             .Take(15)
@@ -268,9 +277,9 @@ public class RagService
             var prompt = $"""
                 Bạn là trợ lý thư viện SmartLibrary của FPT University TP. Hồ Chí Minh.
                 {(policyQuestion
-                    ? "Đây là câu hỏi về dịch vụ hoặc quy định thư viện. Chỉ dùng các chính sách đang áp dụng được truy xuất bên dưới để trả lời. Không đề xuất hoặc liệt kê sách. Nếu dữ liệu không nêu rõ, hãy nói chưa có thông tin và hướng dẫn liên hệ Thủ thư."
+                    ? "Đây là câu hỏi về dịch vụ hoặc quy định thư viện. Chỉ dùng chính sách phù hợp nhất bên dưới để trả lời đúng điều người dùng hỏi. Trả lời trực tiếp trong 1-2 câu, tối đa 35 từ. Không liệt kê các chính sách khác, không lặp nguồn, không đề xuất sách. Nếu dữ liệu không nêu rõ, hãy nói chưa có thông tin và hướng dẫn liên hệ Thủ thư."
                     : "Chỉ giải thích các đầu sách/chính sách đã truy xuất bên dưới. Không thêm sách khác. Không bịa tên sách, tác giả, ISBN, mã sách, số lượng hoặc tình trạng mượn.")}
-                Trả lời tiếng Việt, tối đa 80 từ.
+                Trả lời tiếng Việt, ngắn gọn và không lặp lại danh sách nguồn.
 
                 Dữ liệu thư viện đã truy xuất:
                 {BuildContext(hits)}
@@ -332,6 +341,10 @@ public class RagService
 
     private static string BuildContextualQuery(string? context, string query)
     {
+        var currentIntent = SearchTopicGuard.Parse(query);
+        if (currentIntent.Language is not null || SearchTopicGuard.IsPolicyQuestion(query))
+            return query;
+
         var trimmed = context?.Trim();
         if (string.IsNullOrWhiteSpace(trimmed))
             return query;
@@ -368,7 +381,7 @@ public class RagService
         if (policies.Count > 0 && SearchTopicGuard.IsPolicyQuestion(query))
         {
             var policyAnswer = new StringBuilder("Thông tin từ chính sách thư viện đang áp dụng: ");
-            foreach (var policy in policies.Take(3))
+            foreach (var policy in policies.Take(1))
             {
                 policyAnswer.Append(policy.Title).Append(". ");
                 if (!string.IsNullOrWhiteSpace(policy.Content))

@@ -343,6 +343,10 @@ public static class SearchTopicGuard
                "tieng han",
                "tienghan",
                "hangul",
+               "korea",
+               "korean",
+               "hanguk",
+               "한국어",
                "korean language",
                "learn korean",
                "tieng trung",
@@ -438,7 +442,7 @@ public static class SearchTopicGuard
 
     private static bool HasKorean(string fold, string? language)
         => IsLang(language, "ko", "kr", "kor", "korean")
-           || ContainsAny(fold, "tieng han", "tienghan", "han ngu", "ngon ngu han", "korean", "hangul");
+           || ContainsAny(fold, "tieng han", "tienghan", "han ngu", "ngon ngu han", "korean", "korea", "hanguk", "hangul", "한국어");
 
     private static bool HasChinese(string fold, string? language)
         => IsLang(language, "zh", "cn", "chi", "chinese")
