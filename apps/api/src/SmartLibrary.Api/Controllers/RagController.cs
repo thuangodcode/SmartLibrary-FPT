@@ -6,6 +6,8 @@ using SmartLibrary.Application.Features.Ai;
 using SmartLibrary.Application.Features.Ai.DTOs;
 using SmartLibrary.Application.Features.Rag;
 using SmartLibrary.Application.Features.Rag.DTOs;
+using SmartLibrary.Application.Features.Policies;
+using SmartLibrary.Domain.Enums;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -17,12 +19,14 @@ public class RagController : ControllerBase
     private readonly RagService _rag;
     private readonly AiInsightsService _insights;
     private readonly AiSettingsService _settings;
+    private readonly PolicyRuleService _policyRules;
 
-    public RagController(RagService rag, AiInsightsService insights, AiSettingsService settings)
+    public RagController(RagService rag, AiInsightsService insights, AiSettingsService settings, PolicyRuleService policyRules)
     {
         _rag = rag;
         _insights = insights;
         _settings = settings;
+        _policyRules = policyRules;
     }
 
     [HttpPost("ask")]
@@ -41,6 +45,36 @@ public class RagController : ControllerBase
     {
         var questions = await _settings.GetReaderSuggestedQuestionsAsync(ct);
         return Ok(ApiResponse<IReadOnlyList<string>>.Ok(questions));
+    }
+
+    [HttpGet("reader-policies")]
+    public async Task<IActionResult> ReaderPolicies(CancellationToken ct)
+    {
+        var policies = await _policyRules.GetPagedAsync(
+            search: null,
+            type: null,
+            status: "Active",
+            page: 1,
+            pageSize: 50,
+            allowedTypes: PolicyRuleKinds.PolicyTypes,
+            ct: ct);
+        var regulations = await _policyRules.GetPagedAsync(
+            search: null,
+            type: null,
+            status: "Active",
+            page: 1,
+            pageSize: 50,
+            allowedTypes: PolicyRuleKinds.RegulationTypes,
+            ct: ct);
+        var libraryKnowledge = policies.Items.Concat(regulations.Items).Select(policy => new
+        {
+            policy.Code,
+            policy.Name,
+            policy.Description,
+            PolicyType = policy.PolicyType.ToString(),
+            policy.Parameters
+        }).ToArray();
+        return Ok(ApiResponse<object>.Ok(libraryKnowledge));
     }
 
     [HttpPut("suggested-questions")]

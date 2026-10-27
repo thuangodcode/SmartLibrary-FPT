@@ -490,6 +490,15 @@ html.dark .annual-home.annual-book-detail-page .book-review-form > label { color
 html.dark .annual-home.annual-info-page .news-live-banner,
 html.dark .annual-home.annual-info-page .news-card,
 html.dark .annual-home.annual-info-page .news-article { border-color: #35443b; background: #1b2520; color: #edf4ee; }
+
+/* Keep the shared Reader brand near the viewport edge while giving book search
+   enough width to read as the primary navbar action. */
+.annual-header-inner.annual-frame { width: min(calc(100% - 48px), 1720px); gap: 22px; }
+.annual-header-search { flex: 1 1 760px; width: auto; max-width: 820px; margin-inline: auto; }
+@media (max-width: 760px) {
+  .annual-header-inner.annual-frame { width: min(calc(100% - 24px), 620px); }
+  .annual-header-search { flex: 1 0 100%; width: 100%; max-width: none; margin: 0; }
+}
 .annual-categories { padding-block: clamp(56px, 6vw, 84px); }
 .annual-live-section-heading { margin-bottom: 28px; }
 .annual-live-section-heading h2 { font-size: clamp(38px, 4.5vw, 62px); }

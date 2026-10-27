@@ -103,6 +103,14 @@ export interface RagAskResult {
   sources: RagSource[];
 }
 
+export interface ReaderPolicyAnswerSource {
+  code: string;
+  name: string;
+  description?: string | null;
+  policyType: string;
+  parameters: Array<{ key: string; value: string; label?: string | null }>;
+}
+
 export interface RagReindexResult {
   booksIndexed: number;
   policiesIndexed: number;
@@ -275,6 +283,9 @@ export const askRag = (token: string, question: string, conversationContext?: st
 
 export const getReaderAiSuggestedQuestions = (token: string) =>
   callApi<string[]>(token, '/api/v1/rag/suggested-questions', { method: 'GET' });
+
+export const getReaderPolicyAnswerSources = (token: string) =>
+  callApi<ReaderPolicyAnswerSource[]>(token, '/api/v1/rag/reader-policies', { method: 'GET' });
 
 export const saveReaderAiSuggestedQuestions = (token: string, questions: string[]) =>
   callApi<string[]>(token, '/api/v1/rag/suggested-questions', {

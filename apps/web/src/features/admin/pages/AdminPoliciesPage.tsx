@@ -20,7 +20,6 @@ import {
   DEFAULT_PARAMS,
   STATUS_LABELS,
   TYPE_LABELS,
-  buildSummaryCards,
   emptyForm,
   formFromDetail,
   formatDateTime,
@@ -28,6 +27,7 @@ import {
   paramHint,
   paramKind,
   paramLimits,
+  isVisiblePolicyParameter,
   policyHref,
   usePolicyClient,
   validatePolicyForm,
@@ -270,7 +270,7 @@ function PolicyView() {
   const location = useLocation();
   const { authHeaders, toast, showToast } = usePolicyClient();
   const [detail, setDetail] = useState<PolicyDetail | null>(null);
-  const [tab, setTab] = useState<'general' | 'rules' | 'targets' | 'history'>('general');
+  const [tab, setTab] = useState<'rules' | 'targets' | 'history'>('rules');
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -316,6 +316,7 @@ function PolicyView() {
       }, 0);
       return () => window.clearTimeout(timer);
     }
+    setTab('rules');
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       void loadDetail(policyCode, controller.signal);
@@ -382,8 +383,6 @@ function PolicyView() {
     }
   };
 
-  const summaryCards = detail ? buildSummaryCards(detail.parameters) : [];
-
   return (
     <section className="pol-page">
       {toast && <div className={`pol-toast pol-toast--${toast.tone}`}>{toast.message}</div>}
@@ -431,44 +430,22 @@ function PolicyView() {
               </div>
             </div>
           </div>
-          {summaryCards.length > 0 && (
-            <>
-              <h2 className="pol-section-title">Giá trị cấu hình</h2>
-              <div className="pol-metrics">
-                {summaryCards.map((card) => (
-                  <article key={`${card.label}-${card.value}`}>
-                    <strong>{card.value}{card.unit ? <span> {card.unit}</span> : null}</strong>
-                    <small>{card.label}</small>
-                  </article>
-                ))}
-              </div>
-            </>
-          )}
           <div className="pol-tabs">
-            <button type="button" className={tab === 'general' ? 'active' : ''} onClick={() => setTab('general')}>Thông tin chung</button>
             <button type="button" className={tab === 'rules' ? 'active' : ''} onClick={() => setTab('rules')}>Cấu hình & lưu ý</button>
-            <button type="button" className={tab === 'targets' ? 'active' : ''} onClick={() => setTab('targets')}>Đối tượng áp dụng</button>
+            {detail.policyType === 'CategoryOverride' && <button type="button" className={tab === 'targets' ? 'active' : ''} onClick={() => setTab('targets')}>Đối tượng áp dụng</button>}
             <button type="button" className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>Lịch sử thay đổi</button>
           </div>
           <div className="pol-detail-body">
-            {tab === 'general' && (
-              <dl className="pol-facts">
-                <div><dt>Mã chính sách</dt><dd>{detail.code}</dd></div>
-                <div><dt>Loại chính sách</dt><dd>{TYPE_LABELS[detail.policyType]}</dd></div>
-                <div><dt>Trạng thái</dt><dd>{STATUS_LABELS[detail.status]}</dd></div>
-                <div><dt>Ngày tạo</dt><dd>{formatDateTime(detail.createdAt)}</dd></div>
-                <div><dt>Người tạo</dt><dd>{detail.createdByName || 'Hệ thống / Admin'}</dd></div>
-                <div><dt>Cập nhật lần cuối</dt><dd>{formatDateTime(detail.updatedAt)}</dd></div>
-              </dl>
-            )}
             {tab === 'rules' && (
               <div className="pol-rules">
-                {detail.parameters.length === 0 ? <p className="pol-muted">Chưa có tham số cấu hình.</p> : detail.parameters.map((p) => (
-                  <div key={p.key} className="pol-rule-row"><span>{p.label || p.key}</span><strong>{p.value || '—'}</strong></div>
+                {detail.parameters.filter((parameter) => isVisiblePolicyParameter(detail.policyType, parameter.key)).length === 0
+                  ? <p className="pol-muted">Chưa có tham số cấu hình.</p>
+                  : detail.parameters.filter((parameter) => isVisiblePolicyParameter(detail.policyType, parameter.key)).map((p) => (
+                  <div key={p.key} className="pol-rule-row"><span>{detail.policyType === 'BorrowLimit' && p.key === 'max_books' ? DEFAULT_PARAMS.BorrowLimit[0].label : p.label || p.key}</span><strong>{p.value || '—'}</strong></div>
                 ))}
               </div>
             )}
-            {tab === 'targets' && (
+            {tab === 'targets' && detail.policyType === 'CategoryOverride' && (
               <div className="pol-targets">
                 {detail.targets.length === 0 ? <p className="pol-muted">Chưa gán đối tượng áp dụng.</p> : detail.targets.map((t, idx) => (
                   <div key={`${t.targetType}-${t.targetValue}-${idx}`} className="pol-target-row">
@@ -588,12 +565,14 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
           status,
           priority: form.priority,
           overridesGeneral: form.overridesGeneral,
-          parameters: form.parameters.map((parameter) => ({
+          parameters: form.parameters.filter((parameter) => isVisiblePolicyParameter(form.policyType, parameter.key)).map((parameter) => ({
             key: parameter.key,
             value: parameter.value.trim(),
             label: parameter.label ?? null,
           })),
-          targets: form.targets,
+          targets: form.policyType === 'CategoryOverride'
+            ? form.targets
+            : [{ targetType: 'Role', targetValue: 'Reader', targetLabel: 'Độc giả' }],
         }),
       });
       const json = await parseApiResponse<ApiResult<PolicyDetail>>(res);
@@ -708,14 +687,18 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
               );
             })}
           </div>
-          <h2 className="pol-section-title">Đối tượng áp dụng</h2>
-          {form.targets.map((t, idx) => (
-            <div className="pol-target-edit" key={`${idx}-${t.targetType}`}>
-              <input placeholder="Loại (Role/Category/All)" value={t.targetType} onChange={(e) => setTarget(idx, { targetType: e.target.value })} />
-              <input placeholder="Giá trị" value={t.targetValue} onChange={(e) => setTarget(idx, { targetValue: e.target.value })} />
-              <input placeholder="Nhãn hiển thị" value={t.targetLabel ?? ''} onChange={(e) => setTarget(idx, { targetLabel: e.target.value })} />
-            </div>
-          ))}
+          {form.policyType === 'CategoryOverride' && (
+            <>
+              <h2 className="pol-section-title">Phạm vi danh mục áp dụng</h2>
+              {form.targets.map((t, idx) => (
+                <div className="pol-target-edit" key={`${idx}-${t.targetType}`}>
+                  <input placeholder="Loại (Category)" value={t.targetType} onChange={(e) => setTarget(idx, { targetType: e.target.value })} />
+                  <input placeholder="Mã danh mục" value={t.targetValue} onChange={(e) => setTarget(idx, { targetValue: e.target.value })} />
+                  <input placeholder="Tên danh mục" value={t.targetLabel ?? ''} onChange={(e) => setTarget(idx, { targetLabel: e.target.value })} />
+                </div>
+              ))}
+            </>
+          )}
           <footer className="pol-form-actions">
             <button type="button" className="pol-btn" disabled={saving} onClick={cancel}>Hủy</button>
             {mode === 'create' ? (

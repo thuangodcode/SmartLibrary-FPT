@@ -129,11 +129,8 @@ export const CHIP_ORDER = ['All', ...Object.keys(TYPE_LABELS)];
 
 export const DEFAULT_PARAMS: Record<PolicyType, PolicyParameter[]> = {
   BorrowLimit: [
-    { key: 'max_books', value: '', label: 'Hạn mức chung (cuốn)' },
-    { key: 'max_books_student', value: '', label: 'Hạn mức sinh viên (cuốn)' },
-    { key: 'max_books_lecturer', value: '', label: 'Hạn mức cán bộ/giảng viên (cuốn)' },
+    { key: 'max_books', value: '', label: 'Số sách tối đa mỗi độc giả (cuốn)' },
     { key: 'block_if_overdue', value: 'true', label: 'Chặn mượn khi còn sách quá hạn' },
-    { key: 'exception_note', value: '', label: 'Lưu ý / ngoại lệ' },
   ],
   BorrowDuration: [
     { key: 'max_days', value: '', label: 'Số ngày mượn theo chính sách' },
@@ -199,6 +196,10 @@ export function paramKind(key: string): PolicyParamKind {
   return 'text';
 }
 
+export function isVisiblePolicyParameter(type: PolicyType, key: string): boolean {
+  return !(type === 'BorrowLimit' && ['max_books_student', 'max_books_lecturer', 'exception_note'].includes(key));
+}
+
 export function paramLimits(key: string): { min: number; max: number } {
   if (WINDOW_DAY_KEYS.has(key)) return { min: 0, max: 365 };
   if (DAY_KEYS.has(key)) return { min: 1, max: 365 };
@@ -257,6 +258,11 @@ export const emptyForm = (type: PolicyType = 'BorrowLimit'): FormState => ({
 });
 
 export function formFromDetail(data: PolicyDetail): FormState {
+  const legacyBookLimits = data.parameters
+    .filter((parameter) => ['max_books_student', 'max_books_lecturer'].includes(parameter.key) && /^\d+$/.test(parameter.value))
+    .map((parameter) => Number(parameter.value));
+  const savedMaxBooks = data.parameters.find((parameter) => parameter.key === 'max_books')?.value
+    || (legacyBookLimits.length ? String(Math.min(...legacyBookLimits)) : '');
   return {
     name: data.name,
     description: data.description ?? '',
@@ -267,12 +273,19 @@ export function formFromDetail(data: PolicyDetail): FormState {
     parameters: DEFAULT_PARAMS[data.policyType].map((defaultParameter) => {
       const configured = data.parameters.find((parameter) => parameter.key === defaultParameter.key);
       return configured
-        ? { ...defaultParameter, value: configured.value, label: configured.label ?? defaultParameter.label }
-        : { ...defaultParameter, value: '' };
+        ? {
+          ...defaultParameter,
+          value: configured.value,
+          label: data.policyType === 'BorrowLimit' && defaultParameter.key === 'max_books'
+            ? defaultParameter.label
+            : configured.label ?? defaultParameter.label,
+        }
+        : { ...defaultParameter, value: data.policyType === 'BorrowLimit' && defaultParameter.key === 'max_books' ? savedMaxBooks : '' };
     }).concat(data.parameters
-      .filter((parameter) => !DEFAULT_PARAMS[data.policyType].some((defaultParameter) => defaultParameter.key === parameter.key))
+      .filter((parameter) => isVisiblePolicyParameter(data.policyType, parameter.key)
+        && !DEFAULT_PARAMS[data.policyType].some((defaultParameter) => defaultParameter.key === parameter.key))
       .map((parameter) => ({ key: parameter.key, value: parameter.value, label: parameter.label ?? undefined }))),
-    targets: data.targets.length
+    targets: data.policyType === 'CategoryOverride' && data.targets.length
       ? data.targets.map((t) => ({ ...t }))
       : [{ targetType: 'Role', targetValue: 'Reader', targetLabel: 'Độc giả' }],
   };

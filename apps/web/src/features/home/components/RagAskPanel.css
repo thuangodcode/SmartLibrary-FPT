@@ -372,3 +372,17 @@
 @keyframes ai-spin {
   to { transform: rotate(360deg); }
 }
+
+/* The conversation panel grows with its contents and only becomes scrollable
+   when a longer chat actually needs the space. */
+.rag-ask:not(.is-setup) {
+  height: auto;
+  min-height: 0;
+  max-height: min(84vh, 780px);
+}
+.rag-ask:not(.is-setup) .rag-ask-conversation {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: min(44vh, 420px);
+}
+.rag-ask:not(.is-setup) .rag-prompt-composer { flex: 0 0 auto; }

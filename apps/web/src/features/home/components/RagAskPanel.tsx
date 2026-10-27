@@ -5,7 +5,9 @@ import { useAuthStore } from '../../auth/store/useAuthStore';
 import {
   askRag,
   getReaderAiSuggestedQuestions,
+  getReaderPolicyAnswerSources,
   type RagAskResult,
+  type ReaderPolicyAnswerSource,
 } from '../../ai/aiApi';
 import robotLogo from '../../../assets/figma/friendly-humanoid-ai-robot.jpg';
 import talkingRobotLogo from '../../../assets/figma/thumb-robot-noi-chuyen-pika-robot-ai.png';
@@ -53,6 +55,60 @@ function questionsForTopic(topic: ChatTopic, managedQuestions: string[]): string
   return [...new Set([...matching, ...topic.questions])].slice(0, 6);
 }
 
+function normalizeQuestion(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').toLowerCase();
+}
+
+function answerSuggestedQuestion(questionText: string, policies: ReaderPolicyAnswerSource[]): RagAskResult {
+  const normalized = normalizeQuestion(questionText);
+  const policyType = /phi|phat|boi thuong|mat sach|hong sach/.test(normalized) ? 'FineFee'
+    : /gia han|thoi han|han tra|bao lau/.test(normalized) ? 'BorrowDuration'
+      : /so luong|toi da|bao nhieu cuon|muon duoc/.test(normalized) ? 'BorrowLimit'
+        : /dat truoc/.test(normalized) ? 'Reservation'
+          : null;
+  const policy = policyType
+    ? policies.filter((item) => item.policyType === policyType).sort((a, b) => a.code.localeCompare(b.code))[0]
+    : undefined;
+  const knowledgeType = /dang ky|tai khoan|the thu vien|quyen su dung/.test(normalized) ? ['LibraryUse', 'QuotaInfo', 'General']
+    : /dat truoc|dich vu|tien ich|gio mo cua/.test(normalized) ? ['LibraryService', 'OpeningHours', 'General']
+      : /mat sach|hong sach|boi thuong/.test(normalized) ? ['Compensation', 'DocumentCare', 'Violation']
+        : [];
+  const regulation = policies.find((item) => knowledgeType.includes(item.policyType));
+  const knowledge = policy ?? regulation;
+
+  if (knowledge) {
+    const relevantKeys: Record<string, string[]> = {
+      BorrowLimit: ['max_books'],
+      BorrowDuration: ['max_days', 'max_days_vi', 'renewal_days', 'max_renewals'],
+      FineFee: ['overdue_fee_per_day', 'damage_fee', 'damaged_book_fee', 'lost_book_fee', 'lost_fee'],
+      Reservation: ['allow_reservation', 'hold_hours', 'pickup_deadline_hours'],
+    };
+    const dynamicDetails = knowledge.parameters.filter((parameter) => relevantKeys[knowledge.policyType]?.includes(parameter.key));
+    const answer = dynamicDetails.length
+      ? `${knowledge.name}: ${dynamicDetails.map((parameter) => {
+        const label = parameter.label || parameter.key.replaceAll('_', ' ');
+        const value = knowledge.policyType === 'FineFee' && /^\d+$/.test(parameter.value)
+          ? `${Number(parameter.value).toLocaleString('vi-VN')} đồng`
+          : parameter.value;
+        return `${label}: ${value}`;
+      }).join('; ')}.`
+      : knowledge.description?.trim()
+        || `Theo thông tin “${knowledge.name}”, vui lòng liên hệ thủ thư để được hướng dẫn chi tiết.`;
+    return { answer, sources: [{ sourceType: 'policy', sourceId: knowledge.code, title: `${knowledge.code} · ${knowledge.name}`, score: 1 }] };
+  }
+
+  if (/lam the nao|cach muon|muon sach tai thu vien/.test(normalized)) {
+    return { answer: 'Đăng nhập tài khoản Reader, tìm cuốn sách trong danh mục và gửi yêu cầu mượn. Theo dõi trạng thái phiếu trong mục “Mượn & trả”; khi được duyệt, bạn nhận sách tại thư viện.', sources: [] };
+  }
+  if (/dang ky|tao tai khoan/.test(normalized)) {
+    return { answer: 'Chọn “Đăng ký” và làm theo hướng dẫn trên màn hình. Nếu tài khoản cần xác minh, hãy gửi thông tin theo yêu cầu hoặc liên hệ thủ thư để được hỗ trợ.', sources: [] };
+  }
+  if (/tieng han|sach|tac gia|isbn|ngon ngu|tim/.test(normalized)) {
+    return { answer: 'Bạn có thể tìm sách trực tiếp trong danh mục bằng tên sách, tác giả, ISBN hoặc ngôn ngữ. Kết quả sẽ hiển thị thông tin bản sách và số bản hiện có.', sources: [] };
+  }
+  return { answer: 'Bạn có thể xem hướng dẫn và chính sách thư viện trong các mục tương ứng. Nếu cần tra cứu một thông tin cụ thể chưa có trong câu trả lời gợi ý, hãy nhập câu hỏi để trợ lý AI tìm hiểu thêm.', sources: [] };
+}
+
 function friendlyAskError(error: unknown): string {
   const message = error instanceof Error ? error.message.trim() : '';
   if (/chưa cấu hình api key|hệ thống ai đang tắt|độc giả đang tắt/i.test(message)) return message;
@@ -71,6 +127,8 @@ const RagAskPanel = () => {
   const [question, setQuestion] = useState(searchParams.get('q') ?? '');
   const [turns, setTurns] = useState<ConversationTurn[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>(DEFAULT_QUESTIONS);
+  const [policySources, setPolicySources] = useState<ReaderPolicyAnswerSource[]>([]);
+  const [loadingPolicySources, setLoadingPolicySources] = useState(true);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<ChatTopic | null>(null);
@@ -95,23 +153,31 @@ const RagAskPanel = () => {
     if (!isOpen || !accessToken) return undefined;
     let cancelled = false;
     setLoadingSuggestions(true);
+    setLoadingPolicySources(true);
     void getReaderAiSuggestedQuestions(accessToken)
       .then((items) => { if (!cancelled) setSuggestions(items); })
       .catch(() => { if (!cancelled) setSuggestions(DEFAULT_QUESTIONS); })
       .finally(() => { if (!cancelled) setLoadingSuggestions(false); });
+    void getReaderPolicyAnswerSources(accessToken)
+      .then((items) => { if (!cancelled) setPolicySources(items); })
+      .catch(() => { if (!cancelled) setPolicySources([]); })
+      .finally(() => { if (!cancelled) setLoadingPolicySources(false); });
     return () => { cancelled = true; };
   }, [isOpen, accessToken]);
 
-  const startSession = (initialQuestion?: string, topicOverride?: ChatTopic) => {
+  const startSession = (initialQuestion?: string, topicOverride?: ChatTopic, isSuggestedQuestion = false) => {
     const topic = selectedTopic ?? topicOverride;
     if (!topic) return;
     setTurns([]);
     const firstQuestion = initialQuestion ?? prefilledQuestion;
-    setQuestion(firstQuestion);
+    setQuestion(isSuggestedQuestion ? '' : firstQuestion);
     setPrefilledQuestion('');
     setSelectedTopic(topic);
     setSessionActive(true);
-    if (firstQuestion.trim().length >= 3) void runAsk(firstQuestion, undefined, topic, true);
+    if (isSuggestedQuestion && firstQuestion.trim().length >= 3) {
+      const id = ++nextIdRef.current;
+      setTurns([{ id, question: firstQuestion.trim(), result: answerSuggestedQuestion(firstQuestion, policySources) }]);
+    } else if (firstQuestion.trim().length >= 3) void runAsk(firstQuestion, undefined, topic, true);
     else window.setTimeout(() => questionRef.current?.focus(), 0);
   };
 
@@ -217,7 +283,7 @@ const RagAskPanel = () => {
                   </div>
                   <div className="rag-setup-suggestions">
                     <div className="rag-setup-suggestions-heading"><strong>Câu hỏi gợi ý</strong><span>{selectedTopic ? `Theo chủ đề ${selectedTopic.label}` : 'Chọn chủ đề để xem gợi ý phù hợp'}</span></div>
-                    <div>{(selectedTopic ? questionsForTopic(selectedTopic, suggestions) : suggestions.slice(0, 6)).map((item) => <button type="button" key={item} onClick={() => startSession(item, selectedTopic ?? topicForQuestion(item))}>{item}<ArrowUp size={12} /></button>)}</div>
+                    <div>{(selectedTopic ? questionsForTopic(selectedTopic, suggestions) : suggestions.slice(0, 6)).map((item) => <button type="button" key={item} disabled={loadingPolicySources} onClick={() => startSession(item, selectedTopic ?? topicForQuestion(item), true)}>{item}<ArrowUp size={12} /></button>)}</div>
                     {loadingSuggestions && <small>Đang cập nhật câu hỏi…</small>}
                   </div>
                   <div className="rag-session-footer"><span>{selectedTopic ? 'Bạn có thể đổi chủ đề bất cứ lúc nào trước khi bắt đầu.' : 'Chọn một chủ đề để cá nhân hóa câu trả lời.'}</span><button type="button" className="rag-session-start" disabled={!selectedTopic} onClick={() => startSession(prefilledQuestion || undefined)}>Bắt đầu trò chuyện <ArrowUp size={16} /></button></div>
@@ -287,7 +353,7 @@ const RagAskPanel = () => {
                   <span>Câu hỏi gợi ý</span>
                   <div>
                     {questionsForTopic(selectedTopic, suggestions).slice(0, 4).map((item) => (
-                      <button type="button" key={item} disabled={sending} onClick={() => submitQuestion(item)}>{item}</button>
+                      <button type="button" key={item} disabled={sending || loadingPolicySources} onClick={() => setTurns((current) => [...current, { id: ++nextIdRef.current, question: item, result: answerSuggestedQuestion(item, policySources) }])}>{item}</button>
                     ))}
                     {loadingSuggestions && <small>Đang cập nhật…</small>}
                   </div>
