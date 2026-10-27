@@ -1,0 +1,1257 @@
+﻿CAPSTONE PROJECT REPORT
+Report 3 – Software Requirement Specification
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+– Ho Chi Minh City, 2026 –
+
+
+Table of Contents
+I. Project Report        3
+1. Status Report        3
+2. Team Involvements        3
+3. Issues/Suggestions        3
+II. Software Requirement Specification        4
+1. Overall Description        4
+1.1 Product Overview        4
+1.2 Business Rules        5
+2. User Requirements        6
+2.1 System Actors        6
+2.2 Use Cases        6
+3. Functional Requirements        8
+3.1 System Functional Overview        8
+3.2 <<Feature Name 1>>        10
+3.3 <<Feature Name 2>>        10
+4. Non-Functional Requirements        11
+4.1 External Interfaces        11
+4.2 Quality Attributes        12
+5. Other Requirements        14
+5.1 Appendix1 - Messages List        14
+5.2 Appendix2 - …        14
+5.3 …        14
+
+
+________________
+
+
+I. Record of Changes
+Date
+	A*
+M, D
+	In charge
+	Change Description
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	*A - Added M - Modified D - Deleted
+________________
+
+
+II. Software Requirement Specification
+1. Product Overview
+[Gives the overall description about the product with some introduction and the context diagram. The context diagram presents the boundary and connections between the system you’re developing and everything else in the universe. This identifies external entities (or terminators – software, hardware, human components, and other systems) outside the system that interface to it in some way, as well as data, control, and material flows between the terminators and the system.]
+<<Sample: The Cafeteria Ordering System is a new software system that replaces the current manual and telephone processes for ordering and picking up meals in the Process Impact cafeteria. The context diagram below illustrates the external entities and system interfaces for release 1.0. The system is expected to evolve over several releases, ultimately connecting to the Internet ordering services for several local restaurants and to credit and debit card authorization services.
+  
+
+>>
+________________
+
+
+2. User Requirements
+2.1 Actors
+[An actor is a person (or sometimes another software system or a hardware device) that interacts with the system to perform a use case. Following are some questions you might ask to help user representatives identify actors
+* Who (or what) is notified when something occurs within the system?
+* Who (or what) provides information or services to the system?
+* Who (or what) helps the system respond to and complete a task?
+This part gives the description of system actors, you can follow the table form as below]
+#
+	Actor
+	Description
+	1
+	Administrator
+	The person responsible for system-level administration. Administrators log in to manage Librarian accounts, Reader accounts and account status, and user roles and access. They create and update borrowing policies and library regulations, configure AI providers and services (including testing connections and synchronizing the RAG index), browse the collection overview, and view, review, and export reports and statistics. 
+	2
+	Librarian 
+	The library staff member who handles daily operations. Librarians review Reader registrations, manage books, categories, book copies, and inventory, and process borrowing, returns, reservations, and renewals. They monitor overdue loans, record fines and process payments (cash and PayOS), handle lost and damaged book cases, respond to Reader support requests, publish library news and notices, and use AI-assisted acquisition suggestions and insights to support their decisions. 
+	3
+	Reader 
+	The library user, such as a student or lecturer, who uses the library services. Readers register, log in, and manage their profile. They search and browse books, manage favorites, submit borrowing, reservation, and renewal requests, track loans and due dates, and view and pay fines online via PayOS. They also rate and review books, send support requests, receive notifications, and use AI book recommendations and natural-language search. 
+	4
+	AI Services 
+	A system actor (software component) that provides intelligent features. It supplies personalized book recommendations, semantic search of library books and policy documents (RAG), advisory acquisition suggestions, operational insights, and overdue status indicators. Its outputs only support users; final decisions remain with Librarians.  
+	5
+	PayOS Payment Gateway 
+	An external payment system that processes online fine payments initiated by Readers (and PayOS-supported payments handled by Librarians) and returns the payment result to SmartLibrary. 
+	
+
+2.2 Use Cases
+2.2.1 Diagram(s)
+  
+
+
+
+2.2.2 Descriptions
+
+
+ID
+	Use Case
+	Actors
+	Use Case Description
+	01
+	Sign Up
+	Reader
+	Readers create a new account by entering their personal information. The system sends a verification code and activates the account only after the reader completes Verify Email.
+	02
+	Sign In
+	Reader
+	Readers sign in to the system using their registered email address and password to access reader functions.
+	03
+	Forgot Password
+	Reader
+	When readers forget their password, they enter their registered email address to receive a password-reset link, then complete Reset Password to create a new password.
+	04
+	Search & Discover Books
+	Reader
+	Readers search for books by keyword, title, author, or category (Search Books), and can open a book from the results list to view its details (View Book Details).
+	05
+	View Book Details
+	Reader
+	Displays detailed book information, the shelf locations of available copies (Get Available Copy Locations), and the book’s current status (Check Book Status).
+	06
+	Search Books Using AI
+	Reader, AI Service
+	Readers enter a question in natural language (Search by Natural Language). The AI Service analyzes it and returns a list of books with relevance scores and recommendation reasons (View Relevance Score & Reason).
+	07
+	Manage Personal Profile
+	Reader
+	Readers view their personal profile (View Personal Profile) and edit permitted information such as their full name, phone number, and address (Update Personal Profile).
+	08
+	Borrow Books Request
+	Reader
+	Readers submit a request to borrow a book with available copies (Create Borrow Request). Before the librarian processes it, readers can cancel the request (Cancel Borrow Request).
+	09
+	Book Renewals
+	Reader
+	Readers request an extension of the borrowing period for books they have borrowed (Request Renewal) and can cancel the request before it is processed (Cancel Renewal Request).
+	10
+	Reserve Books
+	Reader
+	When no copies of a book are available, readers can reserve it to receive priority when a copy is returned (Create Reservation), and can cancel the reservation (Cancel Reservation).
+	11
+	View Book Reviews & Ratings
+	Reader
+	Readers view other readers’ reviews, comments, and ratings for a book.
+	12
+	Reviews & Ratings
+	Reader
+	Readers write a review and rate a book they have borrowed (Create Review & Rating), then can edit (Update My Review) or delete their review (Delete My Review).
+	13
+	Complaints & Feedback
+	Reader
+	Readers submit complaints or feedback about library services, books, or library staff (Submit Complaint/Feedback) for the librarian to receive and handle.
+	14
+	View History Complaints
+	Reader
+	Readers review the complaints they have submitted, including each complaint’s status and resolution.
+	15
+	Submit Library Support Request
+	Reader
+	Readers submit a request for library service support (e.g., card replacement or questions about regulations) for the librarian to respond to.
+	16
+	View Fines
+	Reader
+	Readers view the details and reasons for fines (View Fine Details & Reasons), track payment status and transactions (View Fine Payment Status & Transactions), and pay fines online (Pay Fine).
+	17
+	View Notifications / View Library News
+	Reader
+	Readers view personal notifications, such as due-date reminders and request approval results, as well as general news and announcements posted by the library.
+	18
+	Approve External Reader Registration
+	Librarian
+	The librarian reviews registration applications from external readers and approves or rejects them to grant access to library services.
+	19
+	View Reader Information
+	Librarian
+	The librarian looks up reader profiles, borrowing and return history, and violation status to support library operations.
+	20
+	Manage Personal Profile
+	Librarian
+	The librarian views (View Personal Profile) and updates (Update Personal Profile) their own personal profile information.
+	21
+	Manage News
+	Librarian
+	The librarian publishes, edits, and deletes library news and announcements for readers to view in the news section.
+	22
+	View Borrowing Request
+	Librarian
+	The librarian views readers’ book borrowing requests and decides whether to approve or reject them (Approve/Reject).
+	23
+	Create Borrowing Ticket
+	Librarian
+	The librarian creates a borrowing ticket for an approved request or lends books directly to readers at the service desk, recording the copy and due date.
+	24
+	Returning & Renewal
+	Librarian
+	The librarian records book return transactions (Record Return Transaction) and book renewal transactions (Record Renewal Transaction) when readers return or renew books.
+	25
+	Book Reservation
+	Librarian
+	The librarian views readers’ reservation requests (View Reservation Requests) and processes them when copies become available again.
+	26
+	Overdue, Damaged & Lost Book
+	Librarian
+	The librarian monitors overdue borrowing tickets (Track Overdue Borrowing Tickets) and records books that are damaged (Record Damaged Book) or lost (Record Lost Book).
+	27
+	Reader Complaints & Service Requests
+	Librarian
+	The librarian receives and handles reader complaints (Process Reader Complaints) and library support requests (Process Library Support Requests), then communicates the outcomes.
+	28
+	Manage Books and Book Copies
+	Librarian
+	The librarian adds new books, updates book information, and searches for books; adds and updates copies; updates quantities and availability statuses; views available books; and views and responds to book comments.
+	29
+	Manage Book Import Tickets
+	Librarian
+	The librarian creates, updates, deletes, and searches book import tickets to manage books received into inventory.
+	30
+	Manage Fine
+	Librarian
+	The librarian calculates and records fines, views fine information, handles fines for overdue, damaged, or lost books, and updates fine payment statuses.
+	31
+	Send Reader Notifications
+	Librarian
+	The librarian sends notifications to readers, such as book due-date reminders, request processing results, and fine notices.
+	32
+	View Book Demand Report
+	Librarian, AI Service
+	The librarian views an AI Service-generated report on book demand to support decisions about purchasing additional books or adding more copies.
+	33
+	Manage Users
+	Admin
+	The admin views the user list (View Users) and creates new accounts for librarians (Create Librarian Account).
+	34
+	View Roles & Permissions
+	Admin
+	The admin views the roles and permissions assigned to each user group in the system.
+	35
+	Manage Policies & Regulations
+	Admin
+	The admin views the library’s policies and regulations (View Policies & Regulations) and configures settings such as borrowing periods, maximum number of books, and fine amounts (Configure Library Policies).
+	36
+	Manage AI Services
+	Admin
+	The admin configures the AI-powered search service (Configure AI Search) and the AI-powered book recommendation service (Configure AI Recommendations).
+	37
+	View Statistics & Generate Reports
+	Admin
+	The admin views statistics on books and resources, borrowing and returns, and reader activity, and exports reports when needed (Export Reports).
+	38
+	Analyze Book Demand
+	AI Service
+	The AI Service identifies books that are in high demand (Find Popular Books), checks whether they can meet demand (Check Book Availability), and generates a book demand report (Create "Book Demand" Report).
+	39
+	Generate Book Recommendations
+	AI Service, Reader
+	The AI Service analyzes readers’ reading preferences (Analyze Reader Preferences) and recommends suitable books.
+	40
+	Search Books Using AI
+	AI Service, Reader
+	The AI Service interprets readers’ search queries (Understand Search Query), then ranks books by relevance (Rank Relevant Books) and returns results for Use Case 06.
+	 
+
+
+3. Functional Requirements
+3.1 System Functional Overview
+[Provide functionality overview of software system: screen flow, screen descriptions, system user roles, screen authorization, non-screen functions, ERD]
+3.1.1 Screens Flow
+
+
+  
+
+3.1.2 Screen Descriptions
+The following table describes the primary screens and their purpose. Screen access is controlled by role and ownership rules.
+Role
+	Screen
+	Description
+	Public & Account
+	Sign Up
+	Reader creates an account by entering required personal information.
+	Public & Account
+	Verify Email
+	Reader enters the verification code or follows the verification link to activate the account.
+	Public & Account
+	Sign In
+	Reader or Administrator signs in with registered credentials; Librarian accounts are created by the Administrator.
+	Public & Account
+	Forgot / Reset Password
+	Reader requests a reset link by email and sets a new password.
+	Reader
+	Reader Dashboard
+	Shows shortcuts to book discovery, loans, reservations, fines, notifications, and AI features.
+	Reader
+	Search & Discover Books
+	Searches and browses books by keyword, title, author, category, publisher, or other available filters.
+	Reader
+	Book Details
+	Displays bibliographic details, description, ratings, reviews, availability, and copy locations.
+	Reader
+	AI Book Search
+	Accepts natural-language queries and displays relevant books with relevance scores and reasons.
+	Reader
+	Personal Profile
+	Displays and allows updates to permitted personal information, such as full name, phone number, and address.
+	Reader
+	Favorites
+	Displays saved books and lets the Reader add or remove books from the favorites list.
+	Reader
+	Borrowing Requests & My Loans
+	Shows submitted borrowing requests, request status, active loans, due dates, and borrowing history; supports cancellation when permitted.
+	Reader
+	Reservations
+	Allows the Reader to reserve unavailable books, view reservation status, or cancel a reservation before processing.
+	Reader
+	Renewal Requests
+	Allows the Reader to request a loan extension and cancel an unprocessed request.
+	Reader
+	Reviews & Ratings
+	Displays book reviews and ratings; lets eligible Readers create, update, or delete their own reviews.
+	Reader
+	Complaints & Feedback
+	Allows the Reader to submit complaints or feedback and view the status and resolution of submitted complaints.
+	Reader
+	Library Support Requests
+	Allows the Reader to request assistance with library services or regulations and view responses.
+	Reader
+	Fine Details & Payment
+	Displays fine reasons, amounts, payment status, and transaction history; initiates online payment through PayOS.
+	Reader
+	Notifications & Library News
+	Displays personal notifications, due-date reminders, request results, fine notices, and library announcements.
+	Librarian
+	Librarian Workspace
+	Provides access to daily library operations and relevant operational summaries.
+	Librarian
+	Reader Information
+	Allows the Librarian to view Reader profiles, borrowing and return history, reservation information, and violation/fine status needed for service.
+	Librarian
+	Borrowing Requests
+	Lists Reader borrowing requests and allows the Librarian to approve or reject them according to library rules.
+	Librarian
+	Borrowing Tickets
+	Creates borrowing tickets for approved requests or service-desk loans, recording book copies and due dates.
+	Librarian
+	Returns & Renewals
+	Records returned books and approved renewal transactions, updating loan and copy statuses.
+	Librarian
+	Reservations
+	Displays reservation requests and supports processing when copies become available.
+	Librarian
+	Overdue, Damaged & Lost Books
+	Tracks overdue tickets and records damaged or lost book cases.
+	Librarian
+	Books & Copies
+	Searches, adds, and updates book records and copies; maintains copy identifiers, locations, quantities, and availability statuses.
+	Librarian
+	Book Import Tickets
+	Creates, searches, updates, and deletes book import tickets used to record incoming inventory.
+	Librarian
+	Fines & Payments
+	Calculates and records fines, views fine details, updates payment status, and records supported cash or PayOS payment outcomes.
+	Librarian
+	Reader Complaints & Support
+	Reviews and processes complaints and support requests and records responses or resolutions.
+	Librarian
+	News & Notifications
+	Publishes or updates library news and sends notifications such as due-date reminders and request results.
+	Librarian
+	Book Demand Report
+	Views AI-generated demand and availability insights to support decisions about purchasing books or adding copies.
+	Administrator
+	Admin Dashboard
+	Shows system-level summaries and links to administrative functions.
+	Administrator
+	Users & Librarian Accounts
+	Views user accounts, creates Librarian accounts, and updates permitted account status information.
+	Administrator
+	Roles & Permissions
+	Views roles and permissions assigned to user groups in the system.
+	Administrator
+	Policies & Regulations
+	Views and configures borrowing periods, borrowing limits, renewal rules, reservation rules, and fine amounts.
+	Administrator
+	AI Service Configuration
+	Configures AI search and recommendation services and related provider/service settings.
+	Administrator
+	Statistics & Reports
+	Views collection, borrowing/return, and Reader activity statistics and exports reports.
+	
+
+3.1.3 Screen Authorization
+Legend: V = view/query; C = create; U = update; D = delete; P = process/approve; X = access to the screen. Permissions are limited to the functions described in this specification. AI Services and PayOS are external system actors rather than human users.
+Screen / Activity
+	Administrator
+	Librarian
+	Reader
+	AI Services
+	PayOS
+	Sign Up / Verify Email
+	—
+	—
+	C
+	—
+	—
+	Sign In / Forgot Password
+	X
+	X
+	X
+	—
+	—
+	Reader Dashboard
+	—
+	—
+	X
+	—
+	—
+	Search & Discover Books
+	—
+	—
+	V
+	—
+	—
+	Book Details / Copy Locations
+	—
+	V
+	V
+	—
+	—
+	AI Book Search
+	—
+	—
+	X
+	—
+	X
+	Personal Profile
+	—
+	—
+	V/U own data
+	V/U own data
+	—
+	Favorites
+	—
+	—
+	C/U/D own data
+	—
+	—
+	Borrowing Requests & My Loans
+	—
+	V/P
+	C/V own requests
+	—
+	—
+	Reservations
+	—
+	P
+	C/V/D own reservations
+	—
+	—
+	Renewal Requests
+	—
+	P
+	C/V/D own requests
+	—
+	—
+	Reviews & Ratings
+	—
+	—
+	C/U/D own reviews; V reviews
+	—
+	—
+	Complaints & Feedback / History
+	—
+	P
+	C/V own complaints
+	—
+	—
+	Library Support Requests
+	—
+	P
+	C/V own requests
+	—
+	—
+	Fine Details & Payment
+	—
+	V/P
+	V own fines; initiate payment
+	—
+	PayOS processes payment
+	Notifications & Library News
+	—
+	C/send; V
+	V
+	—
+	—
+	Reader Information
+	—
+	V managed service data
+	V own profile/status
+	—
+	—
+	Borrowing Tickets / Returns
+	—
+	C/U/P
+	V own loans/status
+	—
+	—
+	Overdue, Damaged & Lost Books
+	—
+	C/U/P
+	V own fine/loan status
+	—
+	AI may provide overdue indicator
+	Books & Copies / Import Tickets
+	—
+	C/V/U/D
+	V book catalogue
+	—
+	—
+	Fines & Payment Records
+	—
+	C/V/U/P
+	V own fine/payment status
+	—
+	PayOS returns payment result
+	Book Demand Report
+	V
+	V
+	—
+	—
+	Generates demand insights
+	Admin Dashboard / Statistics
+	V
+	—
+	—
+	—
+	—
+	Users & Librarian Accounts
+	V; create Librarian; update permitted status
+	—
+	—
+	—
+	—
+	Roles & Permissions
+	V
+	—
+	—
+	—
+	—
+	Policies & Regulations
+	V/U configuration
+	V
+	V published rules
+	—
+	—
+	AI Service Configuration
+	V/U configuration
+	—
+	—
+	—
+	AI service endpoint
+	
+
+3.1.4 Non-Screen Functions
+These functions run through backend services, scheduled jobs, or integrations and do not require a dedicated user screen to execute.
+#
+	Feature
+	System Function
+	Description
+	1
+	Authentication & Access Control
+	Credential verification and session/token handling
+	Validates sign-in credentials, protects restricted API routes, and applies role-based access rules.
+	2
+	Email Verification & Password Reset
+	Email service / API
+	Sends verification codes or links and password-reset links; validates tokens and expiry before activating an account or changing a password.
+	3
+	Book Catalogue API
+	REST API
+	Searches and retrieves book, author, category, publisher, copy, location, and availability data for authorized screens.
+	4
+	Borrowing & Return Processing
+	REST API / transaction service
+	Validates borrowing eligibility and copy availability; creates tickets, records returns and renewals, and updates copy and loan statuses consistently.
+	5
+	Reservation Queue Processing
+	Backend service
+	Stores reservation order and updates reservation status when a copy becomes available; triggers relevant notifications.
+	6
+	Fine Calculation
+	Backend service
+	Calculates fines using configured policy rules for overdue, damaged, or lost books and records the amount and payment status.
+	7
+	PayOS Payment Integration
+	External payment API / callback
+	Creates online fine-payment requests, receives and verifies payment callbacks, and updates transaction and fine statuses without trusting client-submitted results.
+	8
+	Notification Dispatch
+	Backend service / scheduled job
+	Sends due-date reminders, overdue notices, request-processing results, reservation availability alerts, and fine/payment notifications.
+	9
+	AI Book Recommendation
+	AI service / API
+	Uses permitted Reader profile, borrowing and reading history, viewed books, ratings/reviews, interests, and preferences to return personalized book recommendations.
+	10
+	AI Semantic Search (RAG)
+	AI service / API
+	Interprets natural-language queries, retrieves relevant library books and policy documents, ranks results, and returns relevance scores and reasons where applicable.
+	11
+	AI Book Demand Analysis
+	AI service / API
+	Analyzes borrowing/search activity and reservations, identifies high-demand books, checks available copies, and produces a Book Demand Report for Librarians.
+	12
+	AI Overdue Status Indicator
+	AI service / API
+	Provides an overdue-risk or status indicator as decision support; Librarians remain responsible for operational decisions.
+	13
+	Report Generation & Export
+	Backend reporting service
+	Aggregates collection, borrowing/return, Reader activity, and fine data into reports for authorized Administrators.
+	14
+	Audit Logging
+	Backend service
+	Records important security and operational events, such as account changes, borrowing transactions, fine updates, and administrative configuration changes.
+	15
+	Scheduled Due-Date Checks
+	Scheduled job / cron
+	Periodically checks active loans against due dates and triggers reminders or overdue processing according to configured rules.
+	 
+
+
+3.1.5 Entity Relationship Diagram
+[Provide the entity relationship diagram and the entity descriptions in the table format as below]
+  
+
+Entities Description
+#
+	Entity
+	Description
+	1
+	User
+	
+
+	2
+	Meal
+	
+
+	3
+	Meal Subscription
+	
+
+	4
+	…
+	
+
+	
+
+3.2 Website for customer and guest 
+3.2.1 Login Page
+●        Function Description: The login page allows users to sign in using a previously created account. It also provides options for users to navigate to the Registration page or the Home page.
+●        Function Activation:
+When a user is not yet logged in, the Login page displays a login form:
+❖        Account Authentication:
+■        Button/Navigation: The login form includes an input field for an email address.
+■        Activation: Triggered after entering an email address and password.
+■        Function: The system verifies whether the account exists. If the account exists and is valid, the user is redirected to the Home page.
+❖        Navigation to the Home Page:
+■        Button/Navigation: A “Home Page” button is located on the left side of the login form.
+■        Activation: Clicking this button redirects the user to the Home page.
+■        Function: The web application displays the full content of the Home page.
+
+
+
+
+  
+
+
+
+
+
+3.2.2 Registration Page 
+● Function Description: The registration page allows users to create a new account by filling out a registration form.
+● Function Activation:
+When a user does not yet have an account, the registration page displays a registration form:
+❖ Registering a new account:
+■ Button/Navigation: A registration form is positioned in the center of the screen.
+■ Activation: The user must complete all required fields, including: first name, last name, email address, phone number, password, and password confirmation.
+■ Functionality: The system checks whether the provided email address already exists. If the email is already in use, the user will be prompted to enter a different email address or notified that an account with that email already exists. If the email does not exist, the system creates a new account based on the provided information.
+❖ Redirecting to the homepage:
+■ Button/Navigation: A “Homepage” button is located on the left side of the registration form.
+■ Activation: Clicking this button redirects the user to the homepage.
+■ Functionality: The web application displays the full content of the homepage.
+❖ Redirecting to the login page:
+■ Button/Navigation: A “Sign in” button is located below the registration form.
+■ Activation: Clicking this button redirects the user to the login page.
+■ Functional: The web application displays the full content of the login page.
+  
+
+
+
+3.2.3 Email Verification Page (without account) 
+●        Function Description: Users must enter the OTP sent to their email address to verify it.
+●        Function Activation:
+When a user does not yet have an account, the registration page displays a sign-up form:
+❖        Entering the OTP:
+■        Button/Navigation: An input field for the OTP is located in the center of the email verification interface.
+■        Activation: The user enters the OTP received via email and clicks the “Continue” button.
+■        Function: The system validates the OTP.
+❖        Resending the OTP via email:
+■        Button/Navigation: A “Resend” button is located below the OTP input field.
+■        Activation: Clicking this button triggers the generation of a new OTP.
+■        Function: The system sends a new OTP to the user’s email address.
+❖        Navigating to the login page:
+■        Button/Navigation: A “Back to login” button is located at the bottom of the email verification form.
+■        Activation: Clicking this button redirects the user to the login page.
+■        Function: The web application displays the full content of the login page.
+  
+
+
+
+3.2.4 Verify Personal Documents
+● Function Description:
+Users must upload personal identification documents to verify their identity during account registration. The system supports Citizen ID Card (CCCD/CMND), Student ID Card, and Driving License. Users can upload images of the front and back of the selected document. An optional selfie holding the document can also be provided. After submission, the registration request is sent for administrative approval.
+● Function Activation:
+When a user registers a new account, the registration process displays the personal document verification interface after the user has completed the information and email OTP verification steps.
+❖ Selecting the Document Type:
+* Button/Navigation: The document type options are displayed as CCCD/CMND, Student ID Card, and Driving License.
+* Activation: The user selects one of the available document types.
+* Function: The system identifies the type of document the user intends to submit for identity verification.
+❖ Uploading the Front and Back of the Document:
+* Button/Navigation: Two upload areas are displayed: “Front Side” and “Back Side”.
+* Activation: The user clicks an upload area to take a photo or upload an image from their device.
+* Function: The system accepts document images in JPEG or PNG format, with a maximum file size of 5 MB per image. Both the front and back images are required.
+❖ Uploading a Selfie Holding the Document (Optional):
+* Button/Navigation: An optional upload area labeled “Selfie Holding the Document” is displayed below the document image fields.
+* Activation: The user clicks the upload area to take a photo or upload an image.
+* Function: The system accepts an optional selfie image in JPEG or PNG format, with a maximum file size of 5 MB.
+❖ Submitting Documents for Approval:
+* Button/Navigation: The user proceeds using the submission or continuation button provided at the bottom of the registration interface.
+* Activation: The user submits the required document images after completing the form.
+* Function: The system receives the submitted documents and sends the registration request for administrative approval. The registration process then moves to the “Pending Approval” stage.
+❖ Navigating Back to Login:
+* Button/Navigation: A “Back to Login” option is available if provided by the interface.
+* Activation: The user clicks the option.
+* Function: The system redirects the user to the login page.
+
+
+  
+
+
+
+3.2.5 HomePage
+● Function Description:
+The Home Page provides users, including guests and logged-in users, with an overview of the SmartLibrary system. It displays the main navigation menu, a book search bar, notifications, user account information, and featured library content. Users can search for books, browse book categories, explore books, view library news, and access library-related services.
+● Function Trigger:
+When users access the SmartLibrary web application, the Home Page is displayed. The interface provides the following functions:
+❖ Searching for Books:
+* Button/Navigation: A search input field and a “Search Library” button are displayed in the header.
+* Trigger: The user enters a book title, author, ISBN, or other search keywords and clicks the “Search Library” button.
+* Function: The system processes the search query and displays relevant library books.
+❖ Browsing Book Categories:
+* Button/Navigation: A “Categories” menu is displayed in the navigation bar.
+* Trigger: The user clicks the “Categories” menu.
+* Function: The system displays available book categories, allowing users to browse books by category.
+❖ Exploring Books:
+* Button/Navigation: A “Discover Books” item is displayed in the navigation bar.
+* Trigger: The user clicks “Discover Books”.
+* Function: The system navigates the user to the book discovery section, where available books can be explored.
+❖ Viewing Library News:
+* Button/Navigation: A “News” item is displayed in the navigation bar.
+* Trigger: The user clicks “News”.
+* Function: The system navigates the user to the library news section to view published news and announcements.
+❖ Accessing Library Services:
+* Button/Navigation: A “Library” item is displayed in the navigation bar.
+* Trigger: The user clicks “Library”.
+* Function: The system navigates the user to the library-related section.
+❖ Viewing Notifications:
+* Button/Navigation: A notification bell icon is displayed in the header.
+* Trigger: The user clicks the notification icon.
+* Function: The system opens the notification interface and displays relevant notifications according to the user's account and permissions.
+❖ Accessing the User Account:
+* Button/Navigation: The user's avatar, name, and a dropdown arrow are displayed in the header.
+* Trigger: The user clicks the account area.
+* Function: The system displays the available account menu options, allowing the user to access the corresponding account-related functions.
+❖ Viewing Featured Content:
+* Button/Navigation: A large banner image and a book discovery section are displayed on the Home Page.
+* Trigger: The user accesses the Home Page or scrolls down the page.
+* Function: The system displays featured visual content and additional book discovery content to help users explore the library.
+
+
+
+
+  
+
+
+
+  
+
+  
+
+
+
+3.2.6 Search the Library item
+ 
+●     Function Description: The users can search the library items they want by typing the keyword on the search bar. Moreover, they can use some search features (quick search, basic search and advanced search).
+●     Function Trigger:
+❖    Search the library item:
+■     Button/Navigation: There is a search input on the search bar
+■     Trigger: The users type any keyword related to the library items they want.
+■     Function: The system will display the filtered library items.
+  
+
+
+
+3.2.7 Library Item Detail
+●        Function Description: Users can view detailed information about library items, including cover images, publication details, and author information. Additionally, users can locate items, borrow them, or access resources related to those items.
+●        Function Activation:
+❖        Locating an item:
+■        Includes information regarding the physical location of the item.
+❖        Adding an item to the favorites list:
+■        Button/Navigation: An “Add to favorite list” button is available within the item details section.
+■        Activation: Users click the “Add to favorite list” button to include the item in their favorites.
+■        Functionality: The system saves the user’s list of favorite items on the web platform.
+❖        Adding an item to the borrowing list:
+■        Button/Navigation: A “Borrow” button is available within the item details section.
+■        Activation: Users click the “Borrow” button to add the item to their borrowing list.
+■        Functionality: The system saves the list of items the user intends to borrow on the web platform.
+❖        Accessing resources related to an item:
+■        Button/Navigation: Buttons for accessing resources are provided within the item details section.
+■        Activation: Clicking these buttons opens resources associated with the item.
+■        Functionality: The system directs the user to resources related to the item.
+❖        Viewing reviews of an item:
+■        Button/Navigation: A “Review” tab is located below the item details. ■        Activation action: Clicking on this tab will display reviews for the publication.
+■        Function: The system displays a list of reviews for the selected publication
+  
+
+  
+
+3.2.8 Select Pickup Time Slot 
+●        Function Description: The time slot selection feature allows users to choose an available pickup time frame from a dropdown menu to schedule a book pickup at the library. The system displays real-time slot availability, enabling users to reserve a specific time window for borrowing books efficiently. 
+● Function Trigger:
+❖ Select a pickup time slot:
+* Button/Navigation: There is a time slot dropdown menu located above the note instruction and the "Mượn sách" (Borrow Book) button on the right side of the book detail section.
+* Trigger: The user clicks on the dropdown menu to expand the list of available time slots.
+* Function: The system expands a dropdown menu displaying a list of specific time slots (e.g., 09:00:00 27/10/2026). Each item in the list indicates the specific date, time, and the remaining slot quota (e.g., còn 5/5 lượt, còn 0/5 lượt).
+❖ Choose a specific time slot:
+* Button/Navigation: An individual time slot item inside the expanded dropdown menu.
+* Trigger: The user clicks on a preferred available time slot (with remaining slots > 0).
+* Function: The selected time slot will be set as the chosen pickup time, the dropdown menu collapses, and the selected value is displayed in the main input box.
+❖ Confirm book borrowing / schedule appointment:
+* Button/Navigation: There is a green “Mượn sách” button located directly below the time slot dropdown menu.
+* Trigger: The user clicks the “Mượn sách” button after selecting a valid time slot.
+* Function: The system validates the selected time slot and processes the book borrowing reservation for the user, updating the slot quota accordingly.
+  
+
+
+
+3.2.9 Select Pickup Time Slot 
+●        Function Description: The time slot selection feature allows users to choose an available pickup time frame from a dropdown menu to schedule a book pickup at the library. The system displays real-time slot availability, enabling users to reserve a specific time window for borrowing books efficiently. 
+● Function Trigger:
+❖ Select a pickup time slot:
+* Button/Navigation: There is a time slot dropdown menu located above the note instruction and the "Mượn sách" (Borrow Book) button on the right side of the book detail section.
+* Trigger: The user clicks on the dropdown menu to expand the list of available time slots.
+* Function: The system expands a dropdown menu displaying a list of specific time slots (e.g., 09:00:00 27/10/2026). Each item in the list indicates the specific date, time, and the remaining slot quota (e.g., còn 5/5 lượt, còn 0/5 lượt).
+❖ Choose a specific time slot:
+* Button/Navigation: An individual time slot item inside the expanded dropdown menu.
+* Trigger: The user clicks on a preferred available time slot (with remaining slots > 0).
+* Function: The selected time slot will be set as the chosen pickup time, the dropdown menu collapses, and the selected value is displayed in the main input box.
+❖ Confirm book borrowing / schedule appointment:
+* Button/Navigation: There is a green “Mượn sách” button located directly below the time slot dropdown menu.
+* Trigger: The user clicks the “Mượn sách” button after selecting a valid time slot.
+* Function: The system validates the selected time slot and processes the book borrowing reservation for the user, updating the slot quota accordingly.
+
+
+3.3 <<Feature Name 2>>
+…
+________________
+
+
+4. Non-Functional Requirements
+4.1 External Interfaces
+1. User Interfaces
+Responsive Web Design: The system must deliver a fully responsive web interface supporting modern desktop, tablet, and mobile browsers (Google Chrome, Mozilla Firefox, Microsoft Edge, Safari).
+Consistent Design System: Built on React 19 with a standardized typography, harmonious color palette (FPT University Orange #F36F21, Library Deep Forest Green #244D39, and clean neutral tones), and Lucide React icons.
+Clarity & Intuitiveness: Forms, action buttons, status pills (e.g., Available, Borrowed, Overdue, Pinned), and book catalog cards must have clear, readable Vietnamese labels with high-contrast ratios.
+Real-time Feedback: Key actions must provide immediate visual indicators (loading spinners, progress bars, and modal confirmation dialogs) to prevent duplicate submissions.
+2. Payment Integration
+Vietnamese Payment Gateways: Must integrate with popular domestic payment solutions (e.g., VNPay, MoMo, VietQR bank transfer) to enable online fine payments for overdue books, lost item compensations, or library membership services.
+Transaction Verification & Webhook: Must support asynchronous payment callbacks/webhooks with HMAC-SHA256 signature validation to automatically update reader balance, clear outstanding fines, and issue digital receipts.
+Local Financial Compliance: Maintain transaction references and payment histories compliant with Vietnamese electronic transaction regulations.
+3. External Systems
+Cloud Database & Auth (Supabase PostgreSQL): Must securely communicate with Supabase via an IPv4 Session Pooler with TLS encryption for relational data persistence and role-based authentication.
+Cloud Media Storage (Cloudinary): Integration with Cloudinary CDN for secure, optimized upload, storage, and retrieval of book cover images, category thumbnails, reader identification cards, and news announcement banners.
+Artificial Intelligence Engine (Google Gemini API): Secure API connection with Google Gemini (Embedding text-embedding-004 and Gemini Flash models) via HTTPS for Semantic Search (RAG) and intelligent book recommendations.
+Realtime Communication (ASP.NET Core SignalR): WebSocket-based real-time hub (/hubs/support-chat, /hubs/circulation) for instant reader support chat, immediate book checkout notifications, and real-time news broadcast.
+Mailing Services (SMTP / Brevo / Resend): Integration with transactional email gateways to deliver verification OTPs, account activation notices, and automatic overdue reminder emails.
+4.2 Quality Attributes
+4.2.1 Usability 
+User-Friendly Interface: The system layout must be self-explanatory. University students and librarians should be able to navigate the book catalog, borrow/return books, and manage inventory within 30 minutes of orientation.
+Design Standards & Accessibility: Adhere to modern UI principles (Material Design & Shadcn UI inspirations) with clear semantic HTML5, keyboard navigation support, and ARIA labels.
+Simple Operational Flows:
+Placing a book reservation or renewal must be achievable in under 3 clicks.
+Direct book checkout by librarian must be executed in under 4 steps (Scan Reader ID  Scan Book Barcode  Confirm Due Date  Issue).
+4.2.2 Reliability 
+System Availability: Target 99.9% uptime, operating 24/7 to support student self-study, book search, and online renewals even during peak examination periods.
+MTBF (Mean Time Between Failures): Core circulation operations (borrowing, returning, fine computation) must maintain an MTBF of at least 180 days without critical interruptions.
+MTTR (Mean Time To Repair): Any critical service disruption (e.g., API crash or database pooler timeout) must be diagnosed and restored within 2 hours.
+Data Integrity & Consistency: Database transactions for circulation records must adhere to strict ACID principles to prevent inventory count mismatches or duplicate reservation locks.
+Graceful Exception Handling: All backend exceptions must be intercepted by global middleware, returning structured error responses and logging to Serilog rolling files without exposing stack traces to end users.
+4.2.3 Performance
+Response Time:
+Standard operations (viewing book catalog, viewing news, checking profile) must load in under 2 seconds.
+AI Semantic Search and RAG queries must return top matched book recommendations within 3.5 seconds.
+Concurrent Throughput: The system must comfortably handle at least 100 concurrent active users without degradation in response time or database connection drops.
+Catalog Capacity: Efficiently index and search a library repository of over 50,000 book titles and 200,000 physical copies using PostgreSQL indexed B-Tree and pgvector indexing.
+Resource Optimization: Server CPU and RAM usage on the API container should remain below 70% under standard working loads.
+4.2.4 Security
+Data in Transit: Enforce HTTPS/TLS 1.3 across all communication channels between web clients, backend API, Supabase, Cloudinary, and AI endpoints.
+Authentication & Authorization: Secure JWT (JSON Web Tokens) with standard claims and refresh tokens stored in HTTP-only cookies. Strict Role-Based Access Control (RBAC) separating Admin, Librarian, and Reader.
+Password & Credential Protection: All user passwords must be hashed using strong one-way hashing algorithms (Argon2 / BCrypt via Supabase Auth). External API keys (Gemini, Cloudinary) must be AES-256 encrypted at rest.
+Audit Trails & Logging: Critical events (reader card approvals, user deactivations, fine waivers, policy changes, book inventory write-offs) must be immutably recorded in audit tables.
+Data Privacy: Personal reader information (student ID, national ID, phone, email) must be shielded from unauthorized third-party access in compliance with Vietnamese data privacy regulations.
+4.2.5 Scalability
+Horizontal Scaling: The ASP.NET Core API is container-ready (Docker), allowing stateless multi-instance scaling behind reverse proxies or load balancers.
+Multi-Campus Expansion: The database architecture supports multi-campus filtering and location tags, allowing expansion across multiple FPT University campuses (Hanoi, Da Nang, Quy Nhon, HCMC, Can Tho) without redesign.
+Cloud-First Architecture: Decoupled storage (Cloudinary for static assets, Supabase for relational data, Gemini for vector processing) ensures zero local storage bottlenecks.
+5. Requirement Appendix
+[Provide business rules, common requirements, or other extra requirements information here]
+5.1 Business Rules
+[Provide common business rules that you must follow. The information can be provided in the table format as the sample below]
+ID
+	Rule Definition
+	BR-01
+	Delivery time windows are 15 minutes, beginning on each quarter hour.
+	BR-02
+	Deliveries must be completed between 10:00 A.M. and 2:00 P.M. local time, inclusive.
+	BR-03
+	All meals in a single order must be delivered to the same location.
+	BR-04
+	All meals in a single order must be paid for by using the same payment method.
+	BR-11
+	If an order is to be delivered, the patron must pay by payroll deduction.
+	BR-12
+	Order price is calculated as the sum of each food item price times the quantity of that food item ordered, plus applicable sales tax, plus a delivery charge if a meal is delivered outside the free delivery zone.
+	BR-24
+	Only cafeteria employees who are designated as Menu Managers by the Cafeteria Manager can create, modify, or delete cafeteria menus.
+	BR-33
+	Network transmissions that involve financial information or personally identifiable information require 256-bit encryption.
+	BR-86
+	Only regular employees can register for payroll deduction for any company purchase.
+	BR-88
+	An employee can register for payroll deduction payment of cafeteria meals if no more than 40 percent of his gross pay is currently being deducted for other reasons.
+	
+
+
+
+ID
+	Rule Definition
+	BR-01
+	Readers (Students/Lecturers) must provide valid university identification (Student ID card / National ID) and personal profile photo when submitting a library membership registration request.
+	BR-02
+	An active reader can borrow a maximum of 5 books concurrently for standard undergraduate students (14-day duration) and up to 8 books for Capstone graduation students (30-day duration).
+	BR-03
+	A book loan can be renewed for a maximum of 2 consecutive times (each renewal extends the due date by 7 days), provided the book is not overdue and has not been reserved by another reader.
+	BR-04
+	Readers with overdue books or outstanding unpaid fines exceeding 50,000 VND are strictly blocked from borrowing additional books, placing reservations, or renewing existing loans.
+	BR-05
+	Overdue borrowing fines are calculated automatically at the fixed rate of 5,000 VND per book per overdue day, commencing from 00:00 of the day following the due date.
+	BR-06
+	When a book reservation is placed online, the physical copy is set aside and held for a maximum of 48 hours. If the reader does not pick up the book within 48 hours, the reservation expires and the book returns to public circulation.
+	BR-07
+	In the event of lost or irreparably damaged books, the reader must compensate 100% of the book's listed replacement value plus a standard cataloging/processing fee of 30,000 VND.
+	BR-08
+	Only users designated with the Librarian or Admin role have permission to create, edit, or delete book categories, book copies, author profiles, and official library announcements.
+	BR-09
+	Any modification to library circulation policies (loan periods, fine rates, max quota) must be configured by an Admin and will automatically log a policy change history record.
+	BR-10
+	A reader account will be automatically suspended if an overdue loan remains unreturned for more than 30 consecutive days or upon disciplinary notice from the university.
+	BR-11
+	Books marked as "Reference Only" (Chỉ đọc tại chỗ) or rare archival documents cannot be checked out for home borrowing.
+	BR-12
+	When a new announcement is published or updated by a librarian, the system must immediately broadcast the update to active readers via WebSocket without requiring a page reload.
+	
+
+5.2 Common Requirements
+Omnichannel Notifications: The system must dispatch automated notifications via both in-app alerts and email for: Loan Confirmation, Due Date Reminder (sent 2 days prior to due date), Overdue Notice, Reservation Ready for Pickup, and Registration Request Approval/Rejection.
+Campus Data Compliance: Student and reader data must strictly comply with FPT University's internal student data privacy code and Vietnam's Cybersecurity and Personal Data Protection laws (Decree 13/2023/ND-CP).
+System Traceability: Every circulation transaction must capture the timestamp, operator librarian ID, reader ID, and exact physical book copy barcode for accountability.
+Uninterrupted Operations: Critical reading material catalogs, library rules, and contact information must remain viewable even when external third-party services (AI API, Payment Gateway) experience temporary network maintenance.
+5.3 Application Messages List
+#
+	Message code
+	Message Type
+	Context
+	Content
+	1
+	MSG01
+	In line
+	There is not any search result
+	No search results.  
+	2
+	MSG02
+	In red, under the text box
+	Input-required fields are empty
+	The * field is required. 
+	3
+	MSG03
+	Toast message
+	Updating asset(s) information successfully
+	Update asset(s) successfully. 
+	4
+	MSG04
+	Toast message
+	Adding new asset successfully
+	Add asset successfully. 
+	5
+	MSG05
+	Toast message
+	Confirming email of asset hand-over is sent successfully
+	A confirmation email has been sent to {email_address}. 
+	6
+	MSG06
+	Toast message
+	Resetting asset information successfully
+	Return asset(s) successfully. 
+	7
+	MSG07
+	Toast message
+	Deleting asset information successfully
+	Delete asset(s) successfully. 
+	8
+	MSG08
+	In red, under the text box
+	Input value length > max length
+	Exceed max length of {max_length}. 
+	9
+	MSG09
+	In line
+	Username or password is not correct when clicking sign-in
+	Incorrrect user name or password. Please check again.
+	
+
+
+
+#
+	Message code
+	Message Type
+	Context
+	Content
+	1
+	MSG01
+	In line
+	There are no matching books or announcements found during search/filtering
+	Không tìm thấy kết quả phù hợp.
+	2
+	MSG02
+	In red, under the text box
+	Mandatory input fields are left blank upon submitting form
+	Trường này là bắt buộc.
+	3
+	MSG03
+	Toast message
+	Librarian successfully creates a new book category
+	Thêm danh mục sách thành công.
+	4
+	MSG04
+	Toast message
+	Librarian successfully updates existing category or book information
+	Cập nhật thông tin thành công.
+	5
+	MSG05
+	Toast message
+	Librarian successfully deletes an empty category or decommissioned book
+	Xóa dữ liệu thành công.
+	6
+	MSG06
+	Toast message
+	Reader account registration approved by librarian
+	Hồ sơ bạn đọc đã được phê duyệt thành công.
+	7
+	MSG07
+	Toast message
+	Reader account registration rejected with reasons provided
+	Hồ sơ bạn đọc đã bị từ chối.
+	8
+	MSG08
+	Toast message
+	Direct book checkout successfully recorded
+	Ghi nhận mượn sách thành công. Hạn trả: {due_date}.
+	9
+	MSG09
+	Toast message
+	Book return successfully processed
+	Trả sách thành công.
+	10
+	MSG10
+	Toast message
+	Book loan extended/renewed successfully
+	Gia hạn mượn sách thành công. Hạn mới: {new_due_date}.
+	11
+	MSG11
+	Toast message
+	Book renewal rejected because maximum renewals reached or book is reserved
+	Không thể gia hạn: Đã đạt số lần tối đa hoặc sách có người đặt trước.
+	12
+	MSG12
+	Toast message
+	Book reservation placed successfully
+	Đặt giữ sách thành công. Vui lòng nhận sách trước {expire_time}.
+	13
+	MSG13
+	Toast message
+	Online fine payment processed successfully via payment gateway
+	Thanh toán tiền phạt thành công.
+	14
+	MSG14
+	Toast message
+	Online fine payment failed or was cancelled by user
+	Giao dịch thanh toán thất bại hoặc đã bị hủy.
+	15
+	MSG15
+	Toast message
+	User authentication failed due to invalid email/student ID or password
+	Email, mã sinh viên hoặc mật khẩu không chính xác.
+	16
+	MSG16
+	Toast message
+	Account is inactive, suspended, or awaiting librarian verification
+	Tài khoản chưa được kích hoạt hoặc đang bị tạm khóa.
+	17
+	MSG17
+	Toast message
+	New official announcement published and broadcasted to readers
+	Đã đăng và phát sóng thông báo mới đến độc giả.
+	18
+	MSG18
+	Toast message
+	Connection to backend or database temporarily interrupted
+	Không thể kết nối đến máy chủ. Vui lòng thử lại sau.
+	
+
+5.4 Other Requirements…
+ | Page
