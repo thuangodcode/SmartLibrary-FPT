@@ -1422,7 +1422,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                   type="button"
                   className="lib-cat-modal-btn-cancel"
                   onClick={() => navigate(`/librarian/books/categories/${categoryId}`)}
-                  disabled={savingBook || bookCodeAvailability !== 'available'}
+                  disabled={savingBook}
                 >
                   Hủy bỏ
                 </button>
