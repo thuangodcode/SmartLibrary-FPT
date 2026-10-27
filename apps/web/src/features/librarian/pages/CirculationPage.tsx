@@ -78,13 +78,13 @@ interface ReservationOption {
   studentId?: string | null;
   email?: string;
   code?: string;
+  coverImageUrl?: string | null;
   sampleBarcode?: string | null;
   availableCopies?: number;
 }
 
 function ReservationAutocomplete({
   label,
-  step,
   value,
   selected,
   placeholder,
@@ -94,7 +94,6 @@ function ReservationAutocomplete({
   onClear,
 }: {
   label: string;
-  step?: string;
   value: string;
   selected: ReservationOption | null;
   placeholder: string;
@@ -143,6 +142,7 @@ function ReservationAutocomplete({
             code?: string;
             availableCopies?: number;
             sampleBarcode?: string | null;
+            coverImageUrl?: string | null;
           }>>>(response);
           if (!response.ok || !result?.success || !result.data) {
             throw new Error(result?.error || 'Không tải được danh sách gợi ý.');
@@ -169,6 +169,7 @@ function ReservationAutocomplete({
                     : null,
                 ].filter(Boolean).join(' · '),
                 code: item.code,
+                coverImageUrl: item.coverImageUrl,
                 sampleBarcode: item.sampleBarcode,
                 availableCopies: item.availableCopies,
               }),
@@ -233,7 +234,6 @@ function ReservationAutocomplete({
         <>
           <label className="circ-field" htmlFor={listboxId}>
             <span className="circ-reservation-label">
-              {step && <span className="circ-reservation-step">{step}</span>}
               {label}
             </span>
             <span className="circ-autocomplete-control">
@@ -293,8 +293,13 @@ function ReservationAutocomplete({
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => selectOption(option)}
                   >
-                    <strong>{option.label}</strong>
-                    {option.detail && <small>{option.detail}</small>}
+                    {endpoint === 'book' && (option.coverImageUrl
+                      ? <img className="circ-book-option-cover" src={option.coverImageUrl} alt="" loading="lazy" />
+                      : <span className="circ-book-option-cover circ-book-option-cover--empty"><BookOpen size={18} aria-hidden="true" /></span>)}
+                    <span className="circ-book-option-copy">
+                      <strong>{option.label}</strong>
+                      {option.detail && <small>{option.detail}</small>}
+                    </span>
                   </button>
                 ))
               ) : (
@@ -870,7 +875,6 @@ export function DirectCheckoutPage() {
       <form className="circ-card circ-direct-form" onSubmit={(event) => void submit(event)}>
         <ReservationAutocomplete
           label="Mã thẻ hoặc thông tin độc giả"
-          step="BƯỚC 1"
           placeholder="Nhập mã thẻ, email, họ tên hoặc MSSV (ví dụ SE1...)"
           endpoint="reader"
           value={readerSearch}
@@ -888,7 +892,6 @@ export function DirectCheckoutPage() {
 
         <ReservationAutocomplete
           label="Tên đầu sách"
-          step="BƯỚC 2"
           placeholder="Nhập tên đầu sách, mã sách hoặc quét mã vạch bản sao..."
           endpoint="book"
           value={bookSearch}
@@ -1400,7 +1403,6 @@ function ReservationsView() {
           }}
         >
           <ReservationAutocomplete
-            step="01"
             label="Tên độc giả hoặc mã sinh viên"
             value={readerSearch}
             selected={readerOption}
@@ -1419,7 +1421,6 @@ function ReservationsView() {
             onClear={() => setReaderOption(null)}
           />
           <ReservationAutocomplete
-            step="02"
             label="Tên đầu sách"
             value={bookSearch}
             selected={bookOption}

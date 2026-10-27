@@ -181,7 +181,8 @@ public class CirculationRepository : ICirculationRepository
                 x.Copies.Count(c => c.IsAvailable && c.Condition != BookCondition.Damaged && c.Condition != BookCondition.Lost),
                 x.Copies.Where(c => c.IsAvailable && c.Condition != BookCondition.Damaged && c.Condition != BookCondition.Lost)
                     .Select(c => c.Barcode)
-                    .FirstOrDefault()))
+                    .FirstOrDefault(),
+                x.CoverImageUrl))
             .ToListAsync(ct);
     }
 

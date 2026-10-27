@@ -85,7 +85,7 @@ export const LibrarianLayout: React.FC = () => {
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [readerSuggestions, setReaderSuggestions] = useState<Array<{ id: string; label: string; studentId?: string; email?: string }>>([]);
-  const [bookSuggestions, setBookSuggestions] = useState<Array<{ id: string; label: string; code?: string; availableCopies?: number }>>([]);
+  const [bookSuggestions, setBookSuggestions] = useState<Array<{ id: string; label: string; code?: string; availableCopies?: number; coverImageUrl?: string | null }>>([]);
   const searchContainerRef = useRef<HTMLFormElement>(null);
   const [circulationOpen, setCirculationOpen] = useState(true);
   const [supportOpen, setSupportOpen] = useState(() => location.pathname.startsWith('/librarian/support'));
@@ -178,7 +178,13 @@ export const LibrarianLayout: React.FC = () => {
         if (resBooks.ok) {
           const jsonB = await resBooks.json();
           if (jsonB.success && Array.isArray(jsonB.data)) {
-            setBookSuggestions(jsonB.data.slice(0, 5));
+            setBookSuggestions(jsonB.data.slice(0, 5).map((book: { id: string; title?: string; code?: string; availableCopies?: number; coverImageUrl?: string | null }) => ({
+              id: book.id,
+              label: book.title || '',
+              code: book.code,
+              availableCopies: book.availableCopies,
+              coverImageUrl: book.coverImageUrl,
+            })));
           }
         }
       } catch (err) {
@@ -531,6 +537,9 @@ export const LibrarianLayout: React.FC = () => {
                           navigate(`/librarian/books?search=${encodeURIComponent(b.label)}`);
                         }}
                       >
+                        {b.coverImageUrl
+                          ? <img className="lib-search-book-cover" src={b.coverImageUrl} alt="" loading="lazy" />
+                          : <span className="lib-search-book-cover lib-search-book-cover--empty"><BookOpen size={17} aria-hidden="true" /></span>}
                         <div className="lib-header-search-item-main">
                           <span className="lib-header-search-item-label">{b.label}</span>
                           {b.code && <span className="lib-search-tag">{b.code}</span>}

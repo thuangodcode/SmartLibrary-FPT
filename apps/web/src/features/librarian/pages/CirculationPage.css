@@ -1071,8 +1071,9 @@
 }
 
 .circ-autocomplete-options button {
-  display: grid;
-  gap: 3px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 10px 12px;
   border: 0;
   border-bottom: 1px solid #f0f2f5;
@@ -1081,6 +1082,21 @@
   text-align: left;
   cursor: pointer;
 }
+
+.circ-book-option-cover {
+  display: grid;
+  width: 38px;
+  height: 52px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #94a3b8;
+  object-fit: cover;
+}
+
+.circ-book-option-copy { display: grid; min-width: 0; gap: 4px; }
 
 .circ-autocomplete-options button:hover,
 .circ-autocomplete-options button:focus-visible {
@@ -1421,18 +1437,6 @@
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.circ-reservation-step {
-  display: grid;
-  width: 27px;
-  height: 27px;
-  place-items: center;
-  border-radius: 9px;
-  color: #c2410c;
-  background: #fff1e7;
-  font-size: 11px;
-  font-weight: 800;
 }
 
 .circ-autocomplete-control {

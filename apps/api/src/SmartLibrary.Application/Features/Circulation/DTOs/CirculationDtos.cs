@@ -250,7 +250,7 @@ public sealed record RequestBookReservationRequest(Guid BookId);
 public sealed record CirculationReaderOptionDto(Guid Id, string FullName, string? StudentId, string Email);
 
 /// <summary>Book suggestion shown while a librarian searches the reservation form.</summary>
-public sealed record CirculationBookOptionDto(Guid Id, string Title, string Code, int AvailableCopies = 0, string? SampleBarcode = null);
+public sealed record CirculationBookOptionDto(Guid Id, string Title, string Code, int AvailableCopies = 0, string? SampleBarcode = null, string? CoverImageUrl = null);
 
 /// <summary>Creates a reservation for a selected reader and book.</summary>
 public sealed record CreateLibrarianReservationRequest(Guid ReaderId, Guid BookId);
