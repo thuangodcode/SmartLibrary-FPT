@@ -153,9 +153,9 @@ export const DEFAULT_PARAMS: Record<PolicyType, PolicyParameter[]> = {
     { key: 'pickup_capacity_per_slot', value: '', label: 'Số lượt nhận tối đa mỗi khung giờ' },
   ],
   FineFee: [
-    { key: 'overdue_fee_per_day', value: '', label: 'Phạt quá hạn mỗi ngày (VND)' },
-    { key: 'damage_fee', value: '', label: 'Phí phạt sách hỏng (VND)' },
-    { key: 'lost_book_fee', value: '', label: 'Phí phạt sách mất / hư nặng (VND)' },
+    { key: 'overdue_fee_per_day', value: '', label: 'Phạt quá hạn mỗi ngày (đồng)' },
+    { key: 'damage_fee', value: '', label: 'Phí phạt sách hỏng (đồng)' },
+    { key: 'lost_book_fee', value: '', label: 'Phí phạt sách mất / hư nặng (đồng)' },
     { key: 'restrict_if_unpaid', value: 'true', label: 'Hạn chế mượn khi còn phí chưa thanh toán' },
   ],
   CategoryOverride: [
@@ -202,6 +202,32 @@ export function isVisiblePolicyParameter(type: PolicyType, key: string): boolean
 
 export function isMoneyPolicyParameter(key: string): boolean {
   return FEE_KEYS.has(key);
+}
+
+export function policyParameterLabel(type: PolicyType, key: string, savedLabel?: string | null): string {
+  const standardLabel = DEFAULT_PARAMS[type].find((parameter) => parameter.key === key)?.label;
+  if (standardLabel) return standardLabel;
+
+  const knownLabels: Record<string, string> = {
+    max_days_en: 'Thời hạn mượn sách ngoại văn (ngày)',
+    max_books_student: 'Hạn mức sách dành cho sinh viên (cuốn)',
+    max_books_lecturer: 'Hạn mức sách dành cho cán bộ, giảng viên (cuốn)',
+    exception_note: 'Ghi chú ngoại lệ',
+    renewal_days_vi: 'Số ngày mỗi lần gia hạn',
+    renewal_days_foreign: 'Số ngày mỗi lần gia hạn',
+    renewal_days_en: 'Số ngày mỗi lần gia hạn',
+    pickup_slot_minutes: 'Thời lượng mỗi khung nhận sách (phút)',
+    pickup_days_ahead: 'Số ngày được đặt lịch trước',
+    damaged_book_fee: 'Phí phạt sách hỏng (đồng)',
+    lost_fee: 'Phí phạt sách mất / hư hỏng nặng (đồng)',
+    lost_book_fee: 'Phí phạt sách mất / hư hỏng nặng (đồng)',
+    overdue_fee_per_day: 'Phạt quá hạn mỗi ngày (đồng)',
+    damage_compensation_factor: 'Hệ số bồi thường sách mất',
+    lost_book_compensation_factor: 'Hệ số bồi thường sách mất',
+  };
+  if (knownLabels[key]) return knownLabels[key];
+  if (savedLabel?.trim() && savedLabel.trim() !== key && /[À-ỹ]/.test(savedLabel.trim())) return savedLabel.trim();
+  return 'Thông tin chính sách bổ sung';
 }
 
 export function paramLimits(key: string): { min: number; max: number } {
@@ -287,9 +313,7 @@ export function formFromDetail(data: PolicyDetail): FormState {
           value: data.policyType === 'Renewal' && defaultParameter.key === 'renewal_days'
             ? configured.value || savedRenewalDays
             : configured.value,
-          label: data.policyType === 'BorrowLimit' && defaultParameter.key === 'max_books'
-            ? defaultParameter.label
-            : configured.label ?? defaultParameter.label,
+          label: defaultParameter.label,
         }
         : { ...defaultParameter, value: data.policyType === 'BorrowLimit' && defaultParameter.key === 'max_books'
           ? savedMaxBooks

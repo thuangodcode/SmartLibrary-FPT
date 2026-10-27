@@ -29,6 +29,7 @@ import {
   paramLimits,
   isVisiblePolicyParameter,
   isMoneyPolicyParameter,
+  policyParameterLabel,
   policyHref,
   usePolicyClient,
   validatePolicyForm,
@@ -442,7 +443,10 @@ function PolicyView() {
                 {detail.parameters.filter((parameter) => isVisiblePolicyParameter(detail.policyType, parameter.key)).length === 0
                   ? <p className="pol-muted">Chưa có tham số cấu hình.</p>
                   : detail.parameters.filter((parameter) => isVisiblePolicyParameter(detail.policyType, parameter.key)).map((p) => (
-                  <div key={p.key} className="pol-rule-row"><span>{detail.policyType === 'BorrowLimit' && p.key === 'max_books' ? DEFAULT_PARAMS.BorrowLimit[0].label : p.label || p.key}</span><strong>{p.value || '—'}</strong></div>
+                  <div key={p.key} className="pol-rule-row">
+                    <span>{policyParameterLabel(detail.policyType, p.key, p.label)}</span>
+                    <strong>{paramKind(p.key) === 'boolean' ? (p.value === 'true' || p.value === '1' ? 'Có' : p.value === 'false' || p.value === '0' ? 'Không' : '—') : isMoneyPolicyParameter(p.key) && p.value ? `${Number(p.value).toLocaleString('vi-VN')} đ` : p.value || '—'}</strong>
+                  </div>
                 ))}
               </div>
             )}
@@ -451,7 +455,7 @@ function PolicyView() {
                 {detail.targets.length === 0 ? <p className="pol-muted">Chưa gán đối tượng áp dụng.</p> : detail.targets.map((t, idx) => (
                   <div key={`${t.targetType}-${t.targetValue}-${idx}`} className="pol-target-row">
                     <Users size={16} />
-                    <div><strong>{t.targetLabel || t.targetValue}</strong><small>{t.targetType}: {t.targetValue}</small></div>
+                    <div><strong>{t.targetLabel || (t.targetValue === 'Reader' ? 'Độc giả' : t.targetValue)}</strong><small>{t.targetType === 'Role' ? 'Vai trò' : t.targetType === 'Category' ? 'Danh mục' : t.targetType}: {t.targetValue === 'Reader' ? 'Độc giả' : t.targetValue}</small></div>
                   </div>
                 ))}
               </div>
@@ -666,7 +670,7 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
               const hint = paramHint(p.key);
               return (
                 <label key={p.key}>
-                  {p.label || p.key}
+                  {policyParameterLabel(form.policyType, p.key, p.label)}
                   {kind === 'boolean' ? (
                     <select value={p.value} onChange={(e) => setParam(idx, e.target.value)}>
                       <option value="">Chưa đặt</option>
@@ -697,7 +701,7 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
               <h2 className="pol-section-title">Phạm vi danh mục áp dụng</h2>
               {form.targets.map((t, idx) => (
                 <div className="pol-target-edit" key={`${idx}-${t.targetType}`}>
-                  <input placeholder="Loại (Category)" value={t.targetType} onChange={(e) => setTarget(idx, { targetType: e.target.value })} />
+                  <input placeholder="Loại (ví dụ: danh mục)" value={t.targetType} onChange={(e) => setTarget(idx, { targetType: e.target.value })} />
                   <input placeholder="Mã danh mục" value={t.targetValue} onChange={(e) => setTarget(idx, { targetValue: e.target.value })} />
                   <input placeholder="Tên danh mục" value={t.targetLabel ?? ''} onChange={(e) => setTarget(idx, { targetLabel: e.target.value })} />
                 </div>

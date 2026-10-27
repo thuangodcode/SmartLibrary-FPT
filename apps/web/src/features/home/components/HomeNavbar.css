@@ -447,6 +447,20 @@ html.dark .annual-theme-toggle:hover { border-color: #45564b; background: #26372
   color: #a53e2b;
 }
 
+html.dark .annual-home .annual-user-popover {
+  border-color: #45564b;
+  background: #202c26;
+  box-shadow: 0 16px 36px rgb(0 0 0 / 38%);
+}
+html.dark .annual-home .annual-user-popover a,
+html.dark .annual-home .annual-user-popover button { color: #e4eee7; }
+html.dark .annual-home .annual-user-popover button { border-top-color: #45564b; }
+html.dark .annual-home .annual-user-popover a:hover,
+html.dark .annual-home .annual-user-popover button:hover,
+html.dark .annual-home .annual-user-popover a:focus-visible,
+html.dark .annual-home .annual-user-popover button:focus-visible { background: #31483a; color: #fff; }
+html.dark .annual-home .annual-user-trigger { color: #edf4ee; }
+
 @media (max-width: 760px) {
   .annual-user-menu {
     width: 100%;
