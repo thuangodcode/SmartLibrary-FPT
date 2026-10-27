@@ -3,7 +3,6 @@ import { ArrowLeft, ArrowRight, LibraryBig, X } from "lucide-react";
 import { BookCard } from "../components/BookCard";
 import HomeFooter from "../components/HomeFooter";
 import HomeNavbar from "../components/HomeNavbar";
-import RagAskPanel from "../components/RagAskPanel";
 import { useHomeBookHighlights, useHomeBooks, useHomeCategories, type HomeBook } from "../hooks/useHomeData";
 import { toBookCardData } from "../utils/toBookCardData";
 import "./HomePage.css";
@@ -255,7 +254,6 @@ const HomeCatalogPage = () => {
           </>
         )}
       </main>
-      <RagAskPanel />
       <HomeFooter />
     </div>
   );

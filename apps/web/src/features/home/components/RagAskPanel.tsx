@@ -5,6 +5,7 @@ import { useAuthStore } from '../../auth/store/useAuthStore';
 import { askRag, type RagAskResult } from '../../ai/aiApi';
 import { toBookFromRag } from '../utils/toBookCardData';
 import { BookCard } from './BookCard';
+import robotLogo from '../../../assets/figma/friendly-humanoid-ai-robot.jpg';
 import './RagAskPanel.css';
 
 function friendlyAskError(error: unknown): string {
@@ -84,7 +85,7 @@ const RagAskPanel = () => {
   return (
     <>
       <button type="button" className="rag-ask-launcher" onClick={() => setIsOpen(true)} aria-label="Mở trợ lý AI thư viện" title="Hỏi trợ lý AI">
-        <Sparkles size={22} aria-hidden="true" />
+        <img src={robotLogo} alt="" aria-hidden="true" />
       </button>
       {isOpen && <div className="rag-ask-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsOpen(false); }}>
       <section className="rag-ask" aria-label="Hỏi trợ lý thư viện" role="dialog" aria-modal="true" aria-labelledby="rag-ask-title">
@@ -94,15 +95,10 @@ const RagAskPanel = () => {
         <button type="button" className="rag-ask-close" onClick={() => setIsOpen(false)} aria-label="Đóng trợ lý AI"><X size={18}/></button>
       </div>
       {!isAuthenticated || !accessToken ? (
-        <p className="rag-ask-hint">
-          Đăng nhập tài khoản độc giả để gửi câu hỏi. Trợ lý chỉ trả lời từ sách thật trong thư viện.
-          {' '}<Link to="/login">Đăng nhập</Link>
-        </p>
+        <p className="rag-ask-hint rag-ask-login">Đăng nhập để trò chuyện với trợ lý thư viện. <Link to="/login">Đăng nhập</Link></p>
       ) : (
         <form onSubmit={(event) => void submit(event)}>
-          <p className="rag-ask-hint">
-            Mô tả nhu cầu bằng câu tự nhiên. Khi tìm sách, kết quả chỉ lấy từ danh mục thư viện và có thống kê số lượng, tình trạng bản sách.
-          </p>
+          <div className="rag-prompt-composer">
           <textarea
             ref={questionRef}
             rows={3}
@@ -116,6 +112,7 @@ const RagAskPanel = () => {
             <button type="submit" aria-label="Gửi câu hỏi" disabled={loading || question.trim().length < 3}>
               {loading ? <LoaderCircle size={17} className="ai-spin" /> : <ArrowUp size={17} />}
             </button>
+          </div>
           </div>
         </form>
       )}

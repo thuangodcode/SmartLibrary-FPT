@@ -2,7 +2,7 @@ import React from 'react';
 import { BookOpen, CheckCircle, ShieldCheck, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AnnouncementBar } from '../../../components/layout/AnnouncementBar';
-import libraryImage from '../../../assets/figma/auth-library-interior.jpg';
+import libraryImage from '../../../assets/figma/thu-vien-fpt-auth.jpg';
 import libraryLogo from '../../../assets/figma/auth-logo-fpt.png';
 import './AuthLayout.css';
 
@@ -21,7 +21,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
 }) => {
   if (variant === 'design') {
     return (
-      <div className="figma-auth-page">
+      <div className="figma-auth-page" style={{ backgroundImage: `linear-gradient(130deg, rgb(250 252 251 / 92%), rgb(242 246 244 / 82%)), url(${libraryImage})` }}>
         <main className="figma-auth-panel">
           <nav className="figma-auth-nav" aria-label="Điều hướng xác thực">
             <Link to="/" className="figma-auth-logo" aria-label="SmartLibrary - Trang chủ">
@@ -55,13 +55,13 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF8] dark:bg-[#0B0F17] flex flex-col justify-between">
+      <div className="auth-classic-page min-h-screen bg-[#FAFAF8] dark:bg-[#0B0F17] flex flex-col justify-between" style={{ backgroundImage: `linear-gradient(rgb(246 248 247 / 88%), rgb(246 248 247 / 88%)), url(${libraryImage})` }}>
       <AnnouncementBar />
 
       <main className="flex-grow flex items-center justify-center p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-5xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[600px]">
           {/* Left Split Screen: Branding Hero */}
-          <div className="hidden lg:flex lg:col-span-5 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 text-white p-10 flex-col justify-between relative overflow-hidden">
+          <div className="auth-classic-visual hidden lg:flex lg:col-span-5 text-white p-10 flex-col justify-between relative overflow-hidden" style={{ backgroundImage: `linear-gradient(145deg, rgb(13 25 43 / 86%), rgb(28 33 59 / 72%)), url(${libraryImage})` }}>
             <div className="absolute top-0 left-0 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
 

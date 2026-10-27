@@ -4,6 +4,7 @@ import HomePage from './features/home/pages/HomePage';
 import HomeCatalogPage from './features/home/pages/HomeCatalogPage';
 import BookDetailPage from './features/home/pages/BookDetailPage';
 import HomeInfoPage from './features/home/pages/HomeInfoPage';
+import RagAskPanel from './features/home/components/RagAskPanel';
 import LoginPage from './features/auth/pages/LoginPage';
 import RegisterPage from './features/auth/pages/RegisterPage';
 import VerifyEmailPage from './features/auth/pages/VerifyEmailPage';
@@ -55,12 +56,14 @@ function ProfileEntry() {
 
 function App() {
   const hydrate = useAuthStore((s) => s.hydrate);
+  const role = useAuthStore((s) => s.user?.role);
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
 
   return (
+    <>
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<HomePage />} />
@@ -164,6 +167,8 @@ function App() {
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Route>
     </Routes>
+    {role === 'Reader' && <RagAskPanel />}
+    </>
   );
 }
 
