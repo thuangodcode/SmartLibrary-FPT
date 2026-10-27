@@ -54,6 +54,9 @@ public static class DependencyInjection
         services.AddSingleton<RagReindexJobService>();
         services.AddSingleton<IRagReindexJobQueue>(provider => provider.GetRequiredService<RagReindexJobService>());
         services.AddHostedService(provider => provider.GetRequiredService<RagReindexJobService>());
+        services.AddSingleton<PolicyRagSyncQueue>();
+        services.AddSingleton<IPolicyRagSyncQueue>(provider => provider.GetRequiredService<PolicyRagSyncQueue>());
+        services.AddHostedService(provider => provider.GetRequiredService<PolicyRagSyncQueue>());
 
         // Services
         services.AddSingleton<ISecretProtector, SecretProtector>();

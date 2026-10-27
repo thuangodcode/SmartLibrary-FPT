@@ -578,12 +578,15 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
       });
       const json = await parseApiResponse<ApiResult<PolicyDetail>>(res);
       if (!res.ok || !json?.success || !json.data) throw new Error(json?.error || 'Lưu chính sách thất bại.');
-      navigate(policyHref(json.data.code), {
-        state: {
-          toast: 'Đã lưu chính sách. Giá trị mới sẽ áp dụng cho lượt mượn và phí phạt tiếp theo.',
-          tab: 'rules',
-        },
-      });
+      const successMessage = 'Đã lưu chính sách. Giá trị mới sẽ áp dụng cho các lượt mượn tiếp theo.';
+      if (mode === 'edit') {
+        setForm(formFromDetail(json.data));
+        showToast(successMessage, 'success');
+      } else {
+        navigate(policyHref(json.data.code), {
+          state: { toast: successMessage, tab: 'rules' },
+        });
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Lỗi lưu chính sách.', 'error');
     } finally {

@@ -1,7 +1,6 @@
 using System.Text.Json;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Policies.DTOs;
-using SmartLibrary.Application.Features.Rag;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Domain.Entities;
 using SmartLibrary.Domain.Enums;
@@ -14,16 +13,16 @@ public class PolicyRuleService
 
     private readonly IPolicyRuleRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IRagIndexer? _ragIndexer;
+    private readonly IPolicyRagSyncQueue? _policyRagSyncQueue;
 
     public PolicyRuleService(
         IPolicyRuleRepository repository,
         IUnitOfWork unitOfWork,
-        IRagIndexer? ragIndexer = null)
+        IPolicyRagSyncQueue? policyRagSyncQueue = null)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _ragIndexer = ragIndexer;
+        _policyRagSyncQueue = policyRagSyncQueue;
     }
 
     public Task<PolicyRuleListResultDto> GetPagedAsync(
@@ -139,7 +138,7 @@ public class PolicyRuleService
         await _unitOfWork.SaveChangesAsync(ct);
 
         var created = await _repository.GetByIdWithDetailsAsync(entity.Id, ct);
-        await SyncRagPolicyAsync(entity.Id, entity.Status, deleted: false, ct);
+        QueueRagPolicySync(entity.Id, entity.Status, deleted: false);
         return Result<PolicyRuleDetailDto>.Success(MapDetail(created!));
     }
 
@@ -230,7 +229,7 @@ public class PolicyRuleService
         await _unitOfWork.SaveChangesAsync(ct);
 
         var updated = await _repository.GetByIdWithDetailsAsync(id.Value, ct);
-        await SyncRagPolicyAsync(id.Value, status, deleted: false, ct);
+        QueueRagPolicySync(id.Value, status, deleted: false);
         return Result<PolicyRuleDetailDto>.Success(MapDetail(updated!));
     }
 
@@ -292,7 +291,7 @@ public class PolicyRuleService
         await _unitOfWork.SaveChangesAsync(ct);
 
         var updated = await _repository.GetByIdWithDetailsAsync(entity.Id, ct);
-        await SyncRagPolicyAsync(entity.Id, newStatus, deleted: false, ct);
+        QueueRagPolicySync(entity.Id, newStatus, deleted: false);
         return Result<PolicyRuleDetailDto>.Success(MapDetail(updated!));
     }
 
@@ -331,26 +330,13 @@ public class PolicyRuleService
         }, ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
-        await SyncRagPolicyAsync(entity.Id, entity.Status, deleted: true, ct);
+        QueueRagPolicySync(entity.Id, entity.Status, deleted: true);
         return Result<bool>.Success(true);
     }
 
-    private async Task SyncRagPolicyAsync(Guid policyId, PolicyRuleStatus status, bool deleted, CancellationToken ct)
+    private void QueueRagPolicySync(Guid policyId, PolicyRuleStatus status, bool deleted)
     {
-        if (_ragIndexer is null)
-            return;
-
-        try
-        {
-            if (deleted || status != PolicyRuleStatus.Active)
-                await _ragIndexer.DeleteAsync("policy", policyId, ct);
-            else
-                await _ragIndexer.UpsertPolicyAsync(policyId, ct);
-        }
-        catch
-        {
-            // Không chặn lưu chính sách nếu Gemini/RAG lỗi.
-        }
+        _policyRagSyncQueue?.Enqueue(policyId, !deleted && status == PolicyRuleStatus.Active);
     }
 
     private async Task<Result<string>> ResolveCodeAsync(
