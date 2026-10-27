@@ -19,6 +19,7 @@ public class BookConfiguration : IEntityTypeConfiguration<Book>
         builder.Property(b => b.Title).HasColumnName("title").HasMaxLength(500).IsRequired();
         builder.Property(b => b.Isbn).HasColumnName("isbn").HasMaxLength(20);
         builder.Property(b => b.Description).HasColumnName("description");
+        builder.Property(b => b.CustomFieldsJson).HasColumnName("custom_fields").HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb").IsRequired();
         builder.Property(b => b.CoverImageUrl).HasColumnName("cover_image_url");
         builder.Property(b => b.PublisherId).HasColumnName("publisher_id");
         builder.Property(b => b.PublishedYear).HasColumnName("published_year");

@@ -6,6 +6,7 @@ export interface HomeCategory {
   id: string;
   name: string;
   description?: string | null;
+  customFields?: Record<string, string>;
   imageUrl?: string | null;
   bookCount: number;
 }
@@ -16,6 +17,7 @@ export interface HomeBook {
   title: string;
   isbn?: string | null;
   description?: string | null;
+  customFields?: Record<string, string>;
   coverImageUrl?: string | null;
   publishedYear?: number | null;
   language?: string;

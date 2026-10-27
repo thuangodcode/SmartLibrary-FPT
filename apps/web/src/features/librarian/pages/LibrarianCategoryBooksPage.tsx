@@ -52,6 +52,48 @@ export interface BookItem {
   createdAt: string;
 }
 
+interface BookFieldDefinition {
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'textarea';
+  visible: boolean;
+  required?: boolean;
+  placeholder?: string;
+}
+
+const DEFAULT_BOOK_FIELDS: BookFieldDefinition[] = [
+  { key: 'title', label: 'Tiêu đề sách', type: 'text', visible: true, required: true },
+  { key: 'code', label: 'Mã sách', type: 'text', visible: true, required: true },
+  { key: 'author', label: 'Tác giả', type: 'text', visible: true },
+  { key: 'isbn', label: 'Mã ISBN', type: 'text', visible: true },
+  { key: 'year', label: 'Năm xuất bản', type: 'number', visible: true },
+  { key: 'copies', label: 'Số lượng cuốn bản sao', type: 'number', visible: true },
+  { key: 'language', label: 'Ngôn ngữ', type: 'text', visible: true },
+  { key: 'location', label: 'Vị trí kệ sách', type: 'text', visible: true },
+  { key: 'description', label: 'Mô tả tóm tắt nội dung', type: 'textarea', visible: true },
+];
+
+const BOOK_FIELDS_STORAGE_KEY = 'smartlibrary.book-field-definitions';
+const BOOK_FIELD_CONFIG_EVENT = 'smartlibrary-book-field-config';
+const CORE_BOOK_FIELD_KEYS = ['title', 'code', 'copies'];
+
+function readBookFieldDefinitions(): BookFieldDefinition[] {
+  try {
+    const saved = localStorage.getItem(BOOK_FIELDS_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved) as BookFieldDefinition[];
+      if (Array.isArray(parsed)) {
+        const merged = DEFAULT_BOOK_FIELDS.map((field) => ({
+          ...field,
+          ...parsed.find((item) => item.key === field.key),
+        }));
+        return [...merged, ...parsed.filter((item) => !DEFAULT_BOOK_FIELDS.some((field) => field.key === item.key))];
+      }
+    }
+  } catch { /* use defaults when browser storage is unavailable */ }
+  return DEFAULT_BOOK_FIELDS;
+}
+
 // SVG Icon Components from user's template
 const ClockIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -194,6 +236,49 @@ const LibrarianCategoryBooksPage: React.FC = () => {
   const [bookCoverFile, setBookCoverFile] = useState<File | null>(null);
   const [bookCoverPreview, setBookCoverPreview] = useState<string | null>(null);
   const [savingBook, setSavingBook] = useState(false);
+  const [bookFields, setBookFields] = useState<BookFieldDefinition[]>(readBookFieldDefinitions);
+  const [bookFieldsLoaded, setBookFieldsLoaded] = useState(false);
+  const [customBookValues, setCustomBookValues] = useState<Record<string, string>>({});
+  const [newBookFieldLabel, setNewBookFieldLabel] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const headers: Record<string, string> = {};
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    void fetch(`${API_BASE_URL}/api/v1/books/field-config`, { headers })
+      .then((response) => response.json())
+      .then((result) => {
+        if (cancelled) return;
+        if (Array.isArray(result?.data?.fields)) {
+          setBookFields(result.data.fields);
+          localStorage.setItem(BOOK_FIELDS_STORAGE_KEY, JSON.stringify(result.data.fields));
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => { if (!cancelled) setBookFieldsLoaded(true); });
+    return () => { cancelled = true; };
+  }, [accessToken]);
+
+  useEffect(() => {
+    localStorage.setItem(BOOK_FIELDS_STORAGE_KEY, JSON.stringify(bookFields));
+    window.dispatchEvent(new CustomEvent(BOOK_FIELD_CONFIG_EVENT, { detail: { fields: bookFields } }));
+    if (accessToken && bookFieldsLoaded) {
+      void fetch(`${API_BASE_URL}/api/v1/books/field-config`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: bookFields }),
+      }).catch(() => undefined);
+    }
+  }, [accessToken, bookFields, bookFieldsLoaded]);
+
+  const addBookField = () => {
+    const label = newBookFieldLabel.trim();
+    if (!label) return;
+    const key = `custom_${crypto.randomUUID()}`;
+    setBookFields((current) => [...current, { key, label, type: 'text', visible: true }]);
+    setCustomBookValues((current) => ({ ...current, [key]: '' }));
+    setNewBookFieldLabel('');
+  };
 
   const editFileInputRef = useRef<HTMLInputElement>(null);
   const bookCoverInputRef = useRef<HTMLInputElement>(null);
@@ -579,6 +664,11 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       formData.append('TotalCopies', String(Math.max(1, bookTotalCopies || 1)));
       if (bookLocation) formData.append('Location', bookLocation);
       if (bookDescription.trim()) formData.append('Description', bookDescription.trim());
+      formData.append('CustomFieldsJson', JSON.stringify(Object.fromEntries(
+        bookFields.filter((field) => !['title', 'code', 'author', 'isbn', 'year', 'copies', 'language', 'location', 'description'].includes(field.key))
+          .map((field) => [field.key, customBookValues[field.key]?.trim() || ''])
+          .filter(([, value]) => Boolean(value)),
+      )));
       formData.append('CategoryId', categoryId);
       if (bookCoverFile) formData.append('CoverImage', bookCoverFile);
 
@@ -614,6 +704,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       setBookTotalCopies(1);
       setBookLocation('');
       setBookDescription('');
+      setCustomBookValues({});
       setBookCoverFile(null);
       setBookCoverPreview(null);
       setIsAddBookModalOpen(false);
@@ -1075,8 +1166,36 @@ const LibrarianCategoryBooksPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateBook} className="lib-cat-book-form">
+              <section className="lib-cat-fields-manager" aria-label="Quản lý trường thông tin sách">
+                <div className="lib-cat-fields-manager-heading">
+                  <strong>Trường thông tin sách</strong>
+                  <span>Chọn trường hiển thị cho biểu mẫu và trang chi tiết độc giả.</span>
+                </div>
+                <div className="lib-cat-fields-manager-list">
+                  {bookFields.map((field) => (
+                    <div className="lib-cat-field-manager-row" key={field.key}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={field.visible}
+                          disabled={CORE_BOOK_FIELD_KEYS.includes(field.key)}
+                          onChange={(event) => setBookFields((current) => current.map((item) => item.key === field.key ? { ...item, visible: event.target.checked } : item))}
+                        />
+                        <span>{field.label}{CORE_BOOK_FIELD_KEYS.includes(field.key) ? ' · bắt buộc cho quản lý kho' : ''}</span>
+                      </label>
+                      {!CORE_BOOK_FIELD_KEYS.includes(field.key) && (
+                        <button type="button" onClick={() => setBookFields((current) => current.filter((item) => item.key !== field.key))}>Xóa trường</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="lib-cat-add-field-row">
+                  <input value={newBookFieldLabel} onChange={(event) => setNewBookFieldLabel(event.target.value)} maxLength={80} placeholder="Tên trường mới, ví dụ: Nhà xuất bản" />
+                  <button type="button" onClick={addBookField} disabled={!newBookFieldLabel.trim()}><Plus size={14} /> Thêm trường</button>
+                </div>
+              </section>
               <div className="lib-cat-form-grid-2">
-                <div className="lib-cat-form-group col-span-2">
+                {bookFields.find((field) => field.key === 'title')?.visible && <div className="lib-cat-form-group col-span-2">
                   <label htmlFor="book-title">
                     <FileText size={14} />
                     <span>Tiêu đề sách</span>
@@ -1090,9 +1209,9 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                     placeholder="Ví dụ: Lập trình C# căn bản, Clean Code..."
                     required
                   />
-                </div>
+                </div>}
 
-                <div className="lib-cat-form-group">
+                {bookFields.find((field) => field.key === 'code')?.visible && <div className="lib-cat-form-group">
                   <label htmlFor="book-code">
                     <Barcode size={14} />
                     <span>Mã sách</span>
@@ -1132,9 +1251,9 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                     {bookCodeAvailability === 'error' && 'Không kiểm tra được mã. Vui lòng thử lại.'}
                     {bookCodeAvailability === 'idle' && 'Mã bản sao sẽ theo dạng mã sách-01, mã sách-02...'}
                   </small>
-                </div>
+                </div>}
 
-                <div className="lib-cat-form-group">
+                {bookFields.find((field) => field.key === 'author')?.visible && <div className="lib-cat-form-group">
                   <label htmlFor="book-author">
                     <User size={14} />
                     <span>Tác giả</span>
@@ -1146,9 +1265,9 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                     onChange={(e) => setBookAuthor(e.target.value)}
                     placeholder="Ví dụ: Robert C. Martin, Nguyễn Nhật Ánh..."
                   />
-                </div>
+                </div>}
 
-                <div className="lib-cat-form-group">
+                {bookFields.find((field) => field.key === 'isbn')?.visible && <div className="lib-cat-form-group">
                   <label htmlFor="book-isbn">
                     <Barcode size={14} />
                     <span>Mã ISBN</span>
@@ -1160,9 +1279,9 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                     onChange={(e) => setBookIsbn(e.target.value)}
                     placeholder="Ví dụ: 978-0132350884..."
                   />
-                </div>
+                </div>}
 
-                <div className="lib-cat-form-group">
+                {bookFields.find((field) => field.key === 'year')?.visible && <div className="lib-cat-form-group">
                   <label htmlFor="book-year">
                     <Calendar size={14} />
                     <span>Năm xuất bản</span>
@@ -1176,9 +1295,9 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                     onChange={(e) => setBookYear(e.target.value)}
                     placeholder={`Ví dụ: ${new Date().getFullYear()}`}
                   />
-                </div>
+                </div>}
 
-                <div className="lib-cat-form-group">
+                {bookFields.find((field) => field.key === 'copies')?.visible && <div className="lib-cat-form-group">
                   <label htmlFor="book-copies">
                     <Copy size={14} />
                     <span>Số lượng cuốn bản sao</span>
@@ -1192,9 +1311,9 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                     onChange={(e) => setBookTotalCopies(parseInt(e.target.value, 10) || 1)}
                   />
                   <small>Hệ thống tự tạo mã riêng cho từng cuốn.</small>
-                </div>
+                </div>}
 
-                <div className="lib-cat-form-group">
+                {bookFields.find((field) => field.key === 'language')?.visible && <div className="lib-cat-form-group">
                   <label htmlFor="book-lang">
                     <Globe size={14} />
                     <span>Ngôn ngữ</span>
@@ -1210,7 +1329,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                     <option value="ko">Tiếng Hàn (ko)</option>
                     <option value="custom">Thêm ngôn ngữ mới...</option>
                   </select>
-                </div>
+                </div>}
 
                 {bookLanguage === 'custom' && (
                   <div className="lib-cat-form-group">
@@ -1231,24 +1350,15 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                   </div>
                 )}
 
-                <div className="lib-cat-form-group">
-                  <label htmlFor="book-location">
-                    <MapPin size={14} />
-                    <span>Vị trí kệ sách</span>
-                  </label>
-                  <select
-                    id="book-location"
-                    value={bookLocation}
-                    onChange={(e) => setBookLocation(e.target.value)}
-                  >
+                {bookFields.find((field) => field.key === 'location')?.visible && <div className="lib-cat-form-group">
+                  <label htmlFor="book-location"><MapPin size={14} /><span>Vị trí kệ sách</span></label>
+                  <select id="book-location" value={bookLocation} onChange={(e) => setBookLocation(e.target.value)}>
                     <option value="">Chưa xếp kệ</option>
-                    {STORAGE_LOCATIONS.map((location) => (
-                      <option value={location} key={location}>{location}</option>
-                    ))}
+                    {STORAGE_LOCATIONS.map((location) => <option value={location} key={location}>{location}</option>)}
                   </select>
-                </div>
+                </div>}
 
-                <div className="lib-cat-form-group col-span-2">
+                {bookFields.find((field) => field.key === 'description')?.visible && <div className="lib-cat-form-group col-span-2">
                   <label htmlFor="book-desc">Mô tả tóm tắt nội dung</label>
                   <textarea
                     id="book-desc"
@@ -1257,7 +1367,18 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                     onChange={(e) => setBookDescription(e.target.value)}
                     placeholder="Mô tả nội dung cuốn sách, mục lục tóm lược hoặc ghi chú..."
                   />
-                </div>
+                </div>}
+
+                {bookFields.filter((field) => field.key.startsWith('custom_') && field.visible).map((field) => (
+                  <div className={`lib-cat-form-group ${field.type === 'textarea' ? 'col-span-2' : ''}`} key={field.key}>
+                    <label htmlFor={`custom-book-field-${field.key}`}>{field.label}</label>
+                    {field.type === 'textarea'
+                      ? <textarea id={`custom-book-field-${field.key}`} rows={3} value={customBookValues[field.key] || ''} onChange={(event) => setCustomBookValues((current) => ({ ...current, [field.key]: event.target.value }))} />
+                      : <input id={`custom-book-field-${field.key}`} type={field.type} value={customBookValues[field.key] || ''} onChange={(event) => setCustomBookValues((current) => ({ ...current, [field.key]: event.target.value }))} />}
+                  </div>
+                ))}
+
+                {bookFields.find((field) => field.key === 'copies')?.visible === false && <input type="hidden" value={bookTotalCopies} />}
 
                 {/* Cover Image Upload */}
                 <div className="lib-cat-form-group col-span-2">

@@ -1007,6 +1007,19 @@
   gap: 16px;
 }
 
+.lib-cat-fields-manager { display: grid; gap: 10px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; padding: 13px; }
+.lib-cat-fields-manager-heading { display: grid; gap: 3px; color: #1e293b; font-size: 13px; }
+.lib-cat-fields-manager-heading span { color: #64748b; font-size: 11px; }
+.lib-cat-fields-manager-list { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; }
+.lib-cat-field-manager-row { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 5px; font-size: 11px; }
+.lib-cat-field-manager-row label { display: flex; min-width: 0; align-items: center; gap: 6px; }
+.lib-cat-field-manager-row label input { accent-color: #ea580c; }
+.lib-cat-field-manager-row button { border: 0; background: transparent; color: #b42318; font-size: 10px; cursor: pointer; }
+.lib-cat-add-field-row { display: flex; gap: 8px; }
+.lib-cat-add-field-row input { min-width: 0; flex: 1; }
+.lib-cat-add-field-row button { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 8px; background: #fff1e7; padding: 0 11px; color: #c2410c; font-size: 11px; font-weight: 700; cursor: pointer; }
+.lib-cat-add-field-row button:disabled { opacity: .5; cursor: not-allowed; }
+
 .lib-cat-form-grid-2 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

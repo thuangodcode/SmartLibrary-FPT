@@ -1,4 +1,5 @@
 using AutoMapper;
+using System.Text.Json;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Books.DTOs;
 using SmartLibrary.Application.Features.Rag;
@@ -39,7 +40,7 @@ public class BookService
     public async Task<PagedResult<BookDto>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, CancellationToken ct = default)
     {
         var pagedBooks = await _bookRepository.GetPagedAsync(page, pageSize, search, categoryId, ct);
-        var dtos = _mapper.Map<IReadOnlyList<BookDto>>(pagedBooks.Items);
+        var dtos = pagedBooks.Items.Select(ToBookDto).ToList();
         return new PagedResult<BookDto>(dtos, pagedBooks.TotalCount, pagedBooks.Page, pagedBooks.PageSize);
     }
 
@@ -49,7 +50,7 @@ public class BookService
         if (book is null)
             return Result<BookDto>.Failure(Errors.NotFound);
 
-        return Result<BookDto>.Success(_mapper.Map<BookDto>(book));
+        return Result<BookDto>.Success(ToBookDto(book));
     }
 
     public async Task<Result<BookAvailabilityDto>> GetAvailabilityAsync(Guid id, CancellationToken ct = default)
@@ -78,7 +79,7 @@ public class BookService
         await _bookRepository.AddAsync(book, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
-        return Result<BookDto>.Success(_mapper.Map<BookDto>(book));
+        return Result<BookDto>.Success(ToBookDto(book));
     }
 
     public async Task<bool> IsBookCodeAvailableAsync(string? code, CancellationToken ct = default)
@@ -133,6 +134,7 @@ public class BookService
             Title = trimmedTitle,
             Isbn = string.IsNullOrWhiteSpace(form.Isbn) ? null : form.Isbn.Trim(),
             Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
+            CustomFieldsJson = NormalizeCustomFieldsJson(form.CustomFieldsJson),
             CoverImageUrl = coverUrl,
             PublishedYear = form.PublishedYear,
             Language = string.IsNullOrWhiteSpace(form.Language) ? "vi" : form.Language.Trim(),
@@ -190,7 +192,7 @@ public class BookService
         await SyncRagBookAsync(book.Id, deleted: false, ct);
 
         var createdBook = await _bookRepository.GetWithDetailsAsync(book.Id, ct);
-        return Result<BookDto>.Success(_mapper.Map<BookDto>(createdBook ?? book));
+        return Result<BookDto>.Success(ToBookDto(createdBook ?? book));
     }
 
     public async Task<Result<BookDto>> UpdateAsync(Guid id, UpdateBookRequest request, CancellationToken ct = default)
@@ -204,7 +206,7 @@ public class BookService
         await _unitOfWork.SaveChangesAsync(ct);
         await SyncRagBookAsync(book.Id, deleted: false, ct);
 
-        return Result<BookDto>.Success(_mapper.Map<BookDto>(book));
+        return Result<BookDto>.Success(ToBookDto(book));
     }
 
     public async Task<Result<BookDto>> UpdateFromFormAsync(Guid id, UpdateBookForm form, CancellationToken ct = default)
@@ -273,6 +275,8 @@ public class BookService
         book.Title = form.Title.Trim();
         book.Isbn = string.IsNullOrWhiteSpace(form.Isbn) ? null : form.Isbn.Trim();
         book.Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim();
+        if (form.CustomFieldsJson is not null)
+            book.CustomFieldsJson = NormalizeCustomFieldsJson(form.CustomFieldsJson);
         book.PublishedYear = form.PublishedYear;
         book.Language = string.IsNullOrWhiteSpace(form.Language) ? "vi" : form.Language.Trim();
         book.PageCount = form.PageCount;
@@ -337,7 +341,30 @@ public class BookService
         await SyncRagBookAsync(book.Id, deleted: false, ct);
 
         var updatedBook = await _bookRepository.GetWithDetailsAsync(id, ct);
-        return Result<BookDto>.Success(_mapper.Map<BookDto>(updatedBook ?? book));
+        return Result<BookDto>.Success(ToBookDto(updatedBook ?? book));
+    }
+
+    private BookDto ToBookDto(Book book)
+    {
+        var dto = _mapper.Map<BookDto>(book);
+        dto.CustomFields = ParseCustomFields(book.CustomFieldsJson);
+        return dto;
+    }
+
+    private static string NormalizeCustomFieldsJson(string? json)
+        => JsonSerializer.Serialize(ParseCustomFields(json));
+
+    private static Dictionary<string, string> ParseCustomFields(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new Dictionary<string, string>();
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>();
+        }
+        catch (JsonException)
+        {
+            return new Dictionary<string, string>();
+        }
     }
 
     private static string? NormalizeBookCode(string? code)

@@ -9,6 +9,7 @@ public class CreateBookForm
     public string? AuthorName { get; set; }
     public string? Isbn { get; set; }
     public string? Description { get; set; }
+    public string? CustomFieldsJson { get; set; }
     public int? PublishedYear { get; set; }
     public string Language { get; set; } = "vi";
     public int? PageCount { get; set; }

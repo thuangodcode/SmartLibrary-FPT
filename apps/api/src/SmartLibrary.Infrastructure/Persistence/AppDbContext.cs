@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     public DbSet<Book> Books => Set<Book>();
+    public DbSet<BookFieldConfiguration> BookFieldConfigurations => Set<BookFieldConfiguration>();
     public DbSet<BookCopy> BookCopies => Set<BookCopy>();
     public DbSet<Author> Authors => Set<Author>();
     public DbSet<Category> Categories => Set<Category>();
@@ -56,6 +57,14 @@ public class AppDbContext : DbContext
 
         // Apply all configurations from this assembly
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+        modelBuilder.Entity<BookFieldConfiguration>(entity =>
+        {
+            entity.ToTable("book_field_configurations");
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.FieldsJson).HasColumnName("fields").HasColumnType("jsonb").IsRequired();
+            entity.Property(item => item.UpdatedAt).HasColumnName("updated_at");
+        });
 
         modelBuilder.Entity<RolePermission>(entity =>
         {

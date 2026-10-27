@@ -12,6 +12,7 @@ public class Book : AuditableEntity, ISoftDeletable
     public string Title { get; set; } = string.Empty;
     public string? Isbn { get; set; }
     public string? Description { get; set; }
+    public string CustomFieldsJson { get; set; } = "{}";
     public string? CoverImageUrl { get; set; }
     public Guid? PublisherId { get; set; }
     public int? PublishedYear { get; set; }

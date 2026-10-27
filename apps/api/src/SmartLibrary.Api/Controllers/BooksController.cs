@@ -18,11 +18,39 @@ public class BooksController : ControllerBase
 {
     private readonly BookService _bookService;
     private readonly CirculationService _circulation;
+    private readonly SmartLibrary.Infrastructure.Persistence.AppDbContext _db;
 
-    public BooksController(BookService bookService, CirculationService circulation)
+    public BooksController(BookService bookService, CirculationService circulation, SmartLibrary.Infrastructure.Persistence.AppDbContext db)
     {
         _bookService = bookService;
         _circulation = circulation;
+        _db = db;
+    }
+
+    [HttpGet("field-config")]
+    public async Task<IActionResult> GetFieldConfig(CancellationToken ct)
+    {
+        var config = await _db.BookFieldConfigurations.AsNoTracking().OrderByDescending(item => item.UpdatedAt).FirstOrDefaultAsync(ct);
+        return Ok(ApiResponse<object>.Ok(config is null ? new { fields = (object?)null } : new { fields = System.Text.Json.JsonSerializer.Deserialize<object>(config.FieldsJson) }));
+    }
+
+    [HttpPut("field-config")]
+    [Authorize(Policy = "LibrarianOnly")]
+    public async Task<IActionResult> UpdateFieldConfig([FromBody] System.Text.Json.JsonElement body, CancellationToken ct)
+    {
+        if (!body.TryGetProperty("fields", out var fields) || fields.ValueKind != System.Text.Json.JsonValueKind.Array)
+            return BadRequest(ApiResponse<object>.Fail("Danh sách trường thông tin không hợp lệ."));
+        var json = fields.GetRawText();
+        var config = await _db.BookFieldConfigurations.FirstOrDefaultAsync(ct);
+        if (config is null)
+            _db.BookFieldConfigurations.Add(new SmartLibrary.Domain.Entities.BookFieldConfiguration { FieldsJson = json, UpdatedAt = DateTime.UtcNow });
+        else
+        {
+            config.FieldsJson = json;
+            config.UpdatedAt = DateTime.UtcNow;
+        }
+        await _db.SaveChangesAsync(ct);
+        return Ok(ApiResponse<object>.Ok(new { fields }));
     }
 
     /// <summary>

@@ -75,6 +75,7 @@ const BookDetailPage = () => {
   const [pickupSlotsError, setPickupSlotsError] = useState<string | null>(null);
   const [loadingPickupSlots, setLoadingPickupSlots] = useState(false);
   const book = bookQuery.data;
+  const [bookFieldLabels, setBookFieldLabels] = useState<Record<string, string>>({});
   const reviews = reviewsQuery.data ?? [];
   const myReview = reviews.find((review) => review.isMine);
   const draftSource = myReview?.id ?? 'new';
@@ -86,6 +87,19 @@ const BookDetailPage = () => {
   const myReservation = reservationQuery.data?.find((item) => item.bookId === bookId);
   const hasPendingReservation = myReservation?.status.toLowerCase() === 'pending';
   const hasReadyReservation = myReservation?.status.toLowerCase() === 'ready';
+
+  useEffect(() => {
+    const loadFieldLabels = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/books/field-config`);
+        const result = await parseApiResponse<ApiEnvelope<{ fields: Array<{ key: string; label: string; visible: boolean }> }>>(response);
+        if (response.ok && result?.success && Array.isArray(result.data?.fields)) {
+          setBookFieldLabels(Object.fromEntries(result.data.fields.map((field) => [field.key, field.visible ? field.label : ''])));
+        }
+      } catch { /* book details remain available if field labels cannot load */ }
+    };
+    void loadFieldLabels();
+  }, []);
 
   useEffect(() => {
     const handleReservationReady = (event: Event) => {
@@ -402,18 +416,24 @@ const BookDetailPage = () => {
             )}
 
             <dl className="book-detail-facts">
-              <div><dt><BookOpen size={16} /> Mã sách</dt><dd>{book.code || 'Chưa cập nhật'}</dd></div>
-              <div><dt><UserRound size={16} /> Tác giả</dt><dd>{book.authorNames.join(', ') || 'Chưa cập nhật'}</dd></div>
-              <div><dt><CalendarDays size={16} /> Năm xuất bản</dt><dd>{book.publishedYear || 'Chưa cập nhật'}</dd></div>
-              <div><dt><Globe2 size={16} /> Ngôn ngữ</dt><dd>{book.language || 'Chưa cập nhật'}</dd></div>
-              <div><dt><BookOpen size={16} /> ISBN</dt><dd>{book.isbn || 'Chưa cập nhật'}</dd></div>
+              {bookFieldLabels.code !== '' && <div><dt><BookOpen size={16} /> {bookFieldLabels.code || 'Mã sách'}</dt><dd>{book.code || 'Chưa cập nhật'}</dd></div>}
+              {bookFieldLabels.author !== '' && <div><dt><UserRound size={16} /> {bookFieldLabels.author || 'Tác giả'}</dt><dd>{book.authorNames.join(', ') || 'Chưa cập nhật'}</dd></div>}
+              {bookFieldLabels.year !== '' && <div><dt><CalendarDays size={16} /> {bookFieldLabels.year || 'Năm xuất bản'}</dt><dd>{book.publishedYear || 'Chưa cập nhật'}</dd></div>}
+              {bookFieldLabels.language !== '' && <div><dt><Globe2 size={16} /> {bookFieldLabels.language || 'Ngôn ngữ'}</dt><dd>{book.language || 'Chưa cập nhật'}</dd></div>}
+              {bookFieldLabels.isbn !== '' && <div><dt><BookOpen size={16} /> {bookFieldLabels.isbn || 'ISBN'}</dt><dd>{book.isbn || 'Chưa cập nhật'}</dd></div>}
               <div><dt><CheckCircle2 size={16} /> Tổng bản sao</dt><dd>{availabilityQuery.data?.totalCopies ?? book.totalCopies}</dd></div>
-              {book.copyLocations !== undefined && (
+              {bookFieldLabels.location !== '' && book.copyLocations !== undefined && (
                 <div className="book-detail-fact-location">
-                  <dt><MapPin size={16} /> Vị trí kệ</dt>
+                  <dt><MapPin size={16} /> {bookFieldLabels.location || 'Vị trí kệ'}</dt>
                   <dd>{book.copyLocations.join(' · ') || 'Chưa xếp kệ'}</dd>
                 </div>
               )}
+              {Object.entries(book.customFields ?? {}).filter((entry) => Boolean(entry[1]?.trim()) && bookFieldLabels[entry[0]] !== '').map(([key, value]) => (
+                <div className="book-detail-custom-fact" key={key}>
+                  <dt>{bookFieldLabels[key] || 'Thông tin bổ sung'}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
             </dl>
           </div>
         </section>
