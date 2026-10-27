@@ -34,6 +34,7 @@ public sealed class WorkflowCollection : ICollectionFixture<WorkflowFixture> { }
 /// This is API integration coverage, not Supabase login or deployed browser E2E evidence.</summary>
 public sealed class WorkflowFixture : IAsyncLifetime
 {
+    public bool UseNetwork { get; init; }
     private WebApplication _app = null!;
     private string _connection = "";
     public readonly Mock<IPayOSPaymentGateway> PayOS = new();
@@ -50,7 +51,7 @@ public sealed class WorkflowFixture : IAsyncLifetime
 
     public HttpClient Client(string? role = null, Guid? id = null)
     {
-        var client = _app.GetTestClient();
+        var client = UseNetwork ? new HttpClient { BaseAddress = new Uri(_app.Urls.Single()) } : _app.GetTestClient();
         if (role != null)
         {
             client.DefaultRequestHeaders.Add("X-Test-Role", role);
@@ -101,8 +102,12 @@ public sealed class WorkflowFixture : IAsyncLifetime
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
         builder.Configuration.Sources.Clear();
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:DefaultConnection"] = _connection });
-        builder.WebHost.UseTestServer();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> {
+            ["ConnectionStrings:DefaultConnection"] = _connection,
+            ["Ai:EncryptionKey"] = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
+        });
+        if (UseNetwork) builder.WebHost.UseKestrel().UseUrls("http://127.0.0.1:0");
+        else builder.WebHost.UseTestServer();
         builder.Logging.ClearProviders();
         builder.Services.AddControllers().AddApplicationPart(typeof(BooksController).Assembly)
             .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
