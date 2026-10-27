@@ -54,6 +54,27 @@
   .rag-ask-launcher { right: 16px; bottom: 16px; width: 52px; height: 52px; }
 }
 
+html.dark .rag-ask {
+  border-color: #35443b;
+  background: #151e19;
+  color: #edf4ee;
+}
+html.dark .rag-ask :is(.rag-ask-heading, .rag-ask-welcome, .rag-topic-option, .rag-session-intro, .rag-ask-assistant-message, .rag-ask-book-result) {
+  border-color: #35443b;
+  background-color: #1b2520;
+  color: #edf4ee;
+}
+html.dark .rag-ask :is(strong, h2, h3, .rag-ask-heading > div > strong, .rag-ask-book-copy strong) { color: #edf4ee; }
+html.dark .rag-ask :is(small, p, .rag-ask-hint, .rag-ask-count, .rag-ask-book-copy small, .rag-ask-more-results) { color: #c4d0c8; }
+html.dark .rag-ask :is(textarea, input) { border-color: #45564b; background: #111916; color: #edf4ee; color-scheme: dark; }
+html.dark .rag-ask textarea::placeholder { color: #a4b2a8; }
+html.dark .rag-ask :is(.rag-ask-close, .rag-ask-suggestions button, .rag-ask-retry, .rag-session-start) {
+  border-color: #45564b;
+  background: #26372b;
+  color: #e1ece4;
+}
+html.dark .rag-ask .rag-ask-stats > div { border-color: #45564b; background: #202c26; color: #edf4ee; }
+
 .rag-ask-heading {
   display: flex;
   align-items: center;
@@ -386,3 +407,12 @@
   max-height: min(44vh, 420px);
 }
 .rag-ask:not(.is-setup) .rag-prompt-composer { flex: 0 0 auto; }
+
+html.dark .rag-ask { border-color: #35443b; background: #151e19; color: #edf4ee; }
+html.dark .rag-ask :is(.rag-session-intro, .rag-topic-option, .rag-chat-assistant-message, .rag-ask-book-result, .rag-empty) { border-color: #35443b; background: #1b2520; color: #edf4ee; }
+html.dark .rag-ask :is(strong, h2, h3, .rag-ask-heading > div > strong, .rag-ask-book-copy strong) { color: #edf4ee; }
+html.dark .rag-ask :is(small, p, .rag-ask-hint, .rag-ask-count, .rag-setup-suggestions-heading > span, .rag-ask-book-copy small, .rag-ask-more-results) { color: #c4d0c8; }
+html.dark .rag-ask :is(textarea, input) { border-color: #45564b; background: #111916; color: #edf4ee; color-scheme: dark; }
+html.dark .rag-ask textarea::placeholder { color: #a4b2a8; }
+html.dark .rag-ask :is(.rag-ask-close, .rag-ask-suggestions button, .rag-setup-suggestions button, .rag-ask-retry, .rag-session-start) { border-color: #45564b; background: #26372b; color: #e1ece4; }
+html.dark .rag-ask .rag-ask-stats > div { border-color: #45564b; background: #202c26; color: #edf4ee; }

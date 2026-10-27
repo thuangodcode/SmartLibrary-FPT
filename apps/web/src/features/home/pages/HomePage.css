@@ -490,6 +490,29 @@ html.dark .annual-home.annual-book-detail-page .book-review-form > label { color
 html.dark .annual-home.annual-info-page .news-live-banner,
 html.dark .annual-home.annual-info-page .news-card,
 html.dark .annual-home.annual-info-page .news-article { border-color: #35443b; background: #1b2520; color: #edf4ee; }
+html.dark .annual-home :is(.book-detail-visual, .book-review-item, .book-review-card, .news-filter-bar, .news-article-body, .catalog-filter-panel) {
+  border-color: #35443b;
+  background-color: #1b2520;
+  color: #edf4ee;
+}
+html.dark .annual-home :is(.book-detail-overview, .book-detail-information, .book-reviews-section, .annual-info-page) :is(p, small, dd, dt, label, .muted, .news-meta, .news-summary) {
+  color: #c4d0c8;
+}
+html.dark .annual-home :is(.book-detail-overview, .book-detail-information, .book-reviews-section, .annual-info-page) :is(h1, h2, h3, strong, b) {
+  color: #edf4ee;
+}
+html.dark .annual-home :is(.book-detail-overview, .book-detail-information, .book-reviews-section) :is(button, a:not(.book-detail-borrow-button)) {
+  color: #dce7df;
+}
+html.dark .annual-home.annual-book-detail-page :is(.book-detail-availability, .book-detail-borrow-panel, .book-detail-pickup) {
+  border-color: #355d40;
+  background: #26392c;
+  color: #d9f0df;
+}
+html.dark .annual-home.annual-book-detail-page .book-detail-overview button:disabled { color: #c4d0c8; background: #26372b; border-color: #45564b; }
+html.dark .annual-home.annual-book-detail-page input::placeholder,
+html.dark .annual-home.annual-book-detail-page textarea::placeholder { color: #a4b2a8; }
+html.dark .annual-home.annual-info-page :is(.news-filter, .news-category, .news-tag) { border-color: #45564b; background: #26372b; color: #dce7df; }
 
 /* Keep the shared Reader brand near the viewport edge while giving book search
    enough width to read as the primary navbar action. */

@@ -140,8 +140,6 @@ export const DEFAULT_PARAMS: Record<PolicyType, PolicyParameter[]> = {
   Renewal: [
     { key: 'max_renewals', value: '', label: 'Số lần gia hạn tối đa' },
     { key: 'renewal_days', value: '', label: 'Số ngày mỗi lần gia hạn' },
-    { key: 'renewal_days_vi', value: '', label: 'Số ngày gia hạn sách tiếng Việt (tùy chọn)' },
-    { key: 'renewal_days_foreign', value: '', label: 'Số ngày gia hạn sách ngoại văn (tùy chọn)' },
     { key: 'self_renew_before_days', value: '', label: 'Tự gia hạn trước hạn (ngày)' },
     { key: 'self_renew_after_days', value: '', label: 'Tự gia hạn sau hạn (ngày)' },
     { key: 'block_if_overdue', value: 'true', label: 'Không gia hạn khi quá hạn' },
@@ -197,7 +195,13 @@ export function paramKind(key: string): PolicyParamKind {
 }
 
 export function isVisiblePolicyParameter(type: PolicyType, key: string): boolean {
-  return !(type === 'BorrowLimit' && ['max_books_student', 'max_books_lecturer', 'exception_note'].includes(key));
+  if (type === 'BorrowLimit' && ['max_books_student', 'max_books_lecturer', 'exception_note'].includes(key)) return false;
+  if (type === 'Renewal' && ['renewal_days_vi', 'renewal_days_foreign', 'renewal_days_en'].includes(key)) return false;
+  return true;
+}
+
+export function isMoneyPolicyParameter(key: string): boolean {
+  return FEE_KEYS.has(key);
 }
 
 export function paramLimits(key: string): { min: number; max: number } {
@@ -258,6 +262,11 @@ export const emptyForm = (type: PolicyType = 'BorrowLimit'): FormState => ({
 });
 
 export function formFromDetail(data: PolicyDetail): FormState {
+  const legacyRenewalDays = data.parameters
+    .filter((parameter) => ['renewal_days_vi', 'renewal_days_foreign', 'renewal_days_en'].includes(parameter.key) && /^\d+$/.test(parameter.value))
+    .map((parameter) => Number(parameter.value));
+  const savedRenewalDays = data.parameters.find((parameter) => parameter.key === 'renewal_days')?.value
+    || (legacyRenewalDays.length ? String(Math.min(...legacyRenewalDays)) : '');
   const legacyBookLimits = data.parameters
     .filter((parameter) => ['max_books_student', 'max_books_lecturer'].includes(parameter.key) && /^\d+$/.test(parameter.value))
     .map((parameter) => Number(parameter.value));
@@ -275,12 +284,16 @@ export function formFromDetail(data: PolicyDetail): FormState {
       return configured
         ? {
           ...defaultParameter,
-          value: configured.value,
+          value: data.policyType === 'Renewal' && defaultParameter.key === 'renewal_days'
+            ? configured.value || savedRenewalDays
+            : configured.value,
           label: data.policyType === 'BorrowLimit' && defaultParameter.key === 'max_books'
             ? defaultParameter.label
             : configured.label ?? defaultParameter.label,
         }
-        : { ...defaultParameter, value: data.policyType === 'BorrowLimit' && defaultParameter.key === 'max_books' ? savedMaxBooks : '' };
+        : { ...defaultParameter, value: data.policyType === 'BorrowLimit' && defaultParameter.key === 'max_books'
+          ? savedMaxBooks
+          : data.policyType === 'Renewal' && defaultParameter.key === 'renewal_days' ? savedRenewalDays : '' };
     }).concat(data.parameters
       .filter((parameter) => isVisiblePolicyParameter(data.policyType, parameter.key)
         && !DEFAULT_PARAMS[data.policyType].some((defaultParameter) => defaultParameter.key === parameter.key))

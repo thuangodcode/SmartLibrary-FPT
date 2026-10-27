@@ -28,6 +28,7 @@ import {
   paramKind,
   paramLimits,
   isVisiblePolicyParameter,
+  isMoneyPolicyParameter,
   policyHref,
   usePolicyClient,
   validatePolicyForm,
@@ -657,6 +658,7 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
           <div className="pol-form-grid">
             {form.parameters.map((p, idx) => {
               const kind = paramKind(p.key);
+              const isMoney = isMoneyPolicyParameter(p.key);
               const limits = paramLimits(p.key);
               const hint = paramHint(p.key);
               return (
@@ -670,14 +672,14 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
                     </select>
                   ) : kind === 'integer' ? (
                     <input
-                      type="number"
+                      type={isMoney ? 'text' : 'number'}
                       inputMode="numeric"
-                      min={limits.min}
-                      max={limits.max}
-                      step={1}
-                      value={p.value}
-                      placeholder="Nhập số nguyên dương"
-                      onChange={(e) => setParam(idx, e.target.value)}
+                      min={isMoney ? undefined : limits.min}
+                      max={isMoney ? undefined : limits.max}
+                      step={isMoney ? undefined : 1}
+                      value={isMoney && p.value ? Number(p.value).toLocaleString('vi-VN') : p.value}
+                      placeholder={isMoney ? 'Ví dụ: 20.000' : 'Nhập số nguyên dương'}
+                      onChange={(e) => setParam(idx, isMoney ? e.target.value.replace(/\D/g, '') : e.target.value)}
                     />
                   ) : (
                     <input value={p.value} onChange={(e) => setParam(idx, e.target.value)} />

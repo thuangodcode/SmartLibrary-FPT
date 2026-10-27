@@ -9,6 +9,24 @@
   color: #263247;
 }
 
+html.dark .profile-page {
+  color: #edf4ee;
+}
+html.dark .profile-page :is(.profile-card, .profile-account-details, .profile-doc-card, .profile-documents-section, .profile-email-verification, .profile-doc-lightbox > div) {
+  border-color: #35443b;
+  background: #1b2520;
+  color: #edf4ee;
+}
+html.dark .profile-page :is(h1, h2, h3, strong, dt, label) { color: #edf4ee; }
+html.dark .profile-page :is(p, span, dd, small, .profile-card-description, .profile-page-heading > span) { color: #c4d0c8; }
+html.dark .profile-page :is(input, textarea) { border-color: #45564b; background: #111916; color: #edf4ee; color-scheme: dark; }
+html.dark .profile-page :is(input, textarea)::placeholder { color: #a4b2a8; }
+html.dark .profile-page :is(.profile-page-heading > a, .profile-btn-edit-header, .profile-btn-cancel, .profile-doc-toggle, .profile-email-resend) {
+  border-color: #45564b;
+  background: #26372b;
+  color: #e1ece4;
+}
+
 .profile-main {
   width: min(100%, 1400px);
   min-height: calc(100vh - 150px);

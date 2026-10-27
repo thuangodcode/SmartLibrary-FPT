@@ -2,6 +2,30 @@
   padding: 22px 28px 28px;
 }
 
+html.dark .pol-page {
+  --pol-orange-soft: #3a2a20;
+  --pol-text: #edf4ee;
+  --pol-muted: #b1beb5;
+  --pol-line: #35443b;
+  color: var(--pol-text);
+}
+html.dark .pol-page :is(.pol-card, .pol-detail-card, .pol-form, .pol-history-card, .pol-target-card) {
+  border-color: #35443b;
+  background: #1b2520;
+  color: #edf4ee;
+}
+html.dark .pol-page :is(h1, h2, h3, strong, th, .pol-crumb strong) { color: #edf4ee; }
+html.dark .pol-page :is(p, small, .pol-field-hint, .pol-muted, td) { color: #c4d0c8; }
+html.dark .pol-page :is(input, textarea, select, .pol-search, .pol-chips button, .pol-btn) {
+  border-color: #45564b;
+  background-color: #202c26;
+  color: #edf4ee;
+}
+html.dark .pol-page :is(input, textarea)::placeholder { color: #a4b2a8; }
+html.dark .pol-page :is(.pol-table th, .pol-table td, .pol-table tr, .pol-form-grid > label, .pol-section-title) { border-color: #35443b; }
+html.dark .pol-page .pol-chips button.is-active,
+html.dark .pol-page .pol-btn--primary { background: var(--pol-orange); color: white; }
+
 .pol-page {
   --pol-orange: #e86b24;
   --pol-orange-soft: #fff4ec;

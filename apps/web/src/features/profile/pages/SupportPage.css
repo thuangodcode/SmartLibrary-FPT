@@ -2,6 +2,20 @@
   min-height: 100vh;
 }
 
+html.dark .support-page { color: #edf4ee; }
+html.dark .support-page :is(.support-chat-card, .support-complaint-form, .support-complaint-list, .support-ticket, .support-chat-bubble) {
+  border-color: #35443b;
+  background: #1b2520;
+  color: #edf4ee;
+}
+html.dark .support-page :is(h1, h2, h3, strong, label) { color: #edf4ee; }
+html.dark .support-page :is(p, span, time, .support-chat-empty, .support-form-hint, .support-ticket-handling) { color: #c4d0c8; }
+html.dark .support-page :is(input, textarea, select) { border-color: #45564b; background: #111916; color: #edf4ee; color-scheme: dark; }
+html.dark .support-page :is(input, textarea)::placeholder { color: #a4b2a8; }
+html.dark .support-page :is(.support-tabs, .support-chat-header, .support-ticket-handling) { border-color: #35443b; }
+html.dark .support-page .support-tabs button { color: #c4d0c8; }
+html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-bottom-color: #91cba4; }
+
 .support-main {
   width: min(calc(100% - 40px), 1120px);
   min-height: calc(100vh - 162px);
