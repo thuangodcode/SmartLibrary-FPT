@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { HubConnectionBuilder, HubConnectionState, LogLevel, type HubConnection } from '@microsoft/signalr';
-import { Bell, BookOpen, ChevronDown, CircleHelp, Heart, History, LoaderCircle, LogOut, Menu, Search, ShieldCheck, UserRound, X } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Bell, BookOpen, ChevronDown, CircleHelp, Heart, History, LoaderCircle, LogOut, Menu, Moon, Search, ShieldCheck, Sun, UserRound, X } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import smartLibraryLogo from '../../../assets/figma/smartlibrary-logo.png';
 import { useToast } from '../../../components/ui/useToast';
 import { API_BASE_URL } from '../../../config';
@@ -149,6 +149,9 @@ const BookSearch: React.FC = () => {
 };
 
 const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactNode }> = ({ activeSection, searchSlot }) => {
+  const location = useLocation();
+  const isHistoryPage = location.pathname === '/history';
+  const [darkTheme, setDarkTheme] = useState(() => window.localStorage.getItem('smartlibrary.reader-theme') === 'dark');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -172,6 +175,13 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
   const categoriesQuery = useHomeCategories();
   const { showToast } = useToast();
   const categories = categoriesQuery.data ?? [];
+
+  const toggleReaderTheme = () => {
+    const nextDark = !darkTheme;
+    setDarkTheme(nextDark);
+    window.localStorage.setItem('smartlibrary.reader-theme', nextDark ? 'dark' : 'light');
+    window.dispatchEvent(new CustomEvent('smartlibrary-reader-theme-change', { detail: { darkTheme: nextDark } }));
+  };
 
   const loadReaderNotifications = useCallback(async () => {
     if (!accessToken) return;
@@ -394,7 +404,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
   };
 
   return (
-    <header className="annual-header">
+    <header className={`annual-header${isHistoryPage ? ' annual-header--history' : ''}`}>
       <div className="annual-frame annual-header-inner">
         <Link to="/" className="annual-brand" aria-label="SmartLibrary - Trang chủ">
           <img src={smartLibraryLogo} alt="SmartLibrary" />
@@ -405,6 +415,19 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
             {user.role === 'Admin' && <Link to="/admin" onClick={closeMenu}><ShieldCheck size={16} /> Quản trị</Link>}
             {user.role === 'Librarian' && <Link to="/librarian" onClick={closeMenu}><BookOpen size={16} /> Thủ thư</Link>}
             {user.role === 'Reader' && (
+              <>
+              {isHistoryPage && (
+                <button
+                  type="button"
+                  className="annual-theme-toggle"
+                  onClick={toggleReaderTheme}
+                  aria-pressed={darkTheme}
+                  aria-label={darkTheme ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
+                  title={darkTheme ? 'Giao diện sáng' : 'Giao diện tối'}
+                >
+                  {darkTheme ? <Moon size={18} /> : <Sun size={18} />}
+                </button>
+              )}
               <div ref={notificationsRef} className={`annual-reader-notifications${notificationsOpen ? ' is-open' : ''}`}>
                 <button
                   type="button"
@@ -468,6 +491,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
                   </section>
                 )}
               </div>
+              </>
             )}
             <div
               className={`annual-user-menu${isUserMenuOpen ? ' is-open' : ''}`}

@@ -11,8 +11,6 @@ import {
   Clock3,
   LoaderCircle,
   RefreshCw,
-  Sun,
-  Moon,
   Wallet,
 } from 'lucide-react';
 import HomeNavbar from '../../home/components/HomeNavbar';
@@ -164,6 +162,15 @@ const HistoryPage = () => {
   useEffect(() => {
     window.localStorage.setItem('smartlibrary.reader-theme', darkTheme ? 'dark' : 'light');
   }, [darkTheme]);
+
+  useEffect(() => {
+    const syncTheme = (event: Event) => {
+      const customEvent = event as CustomEvent<{ darkTheme?: boolean }>;
+      if (typeof customEvent.detail?.darkTheme === 'boolean') setDarkTheme(customEvent.detail.darkTheme);
+    };
+    window.addEventListener('smartlibrary-reader-theme-change', syncTheme);
+    return () => window.removeEventListener('smartlibrary-reader-theme-change', syncTheme);
+  }, []);
 
   useEffect(() => {
     const refreshFromRealtime = () => setRefreshKey((current) => current + 1);
@@ -395,17 +402,6 @@ const HistoryPage = () => {
             <h1>Mượn & trả</h1>
             <span>Theo dõi phiếu mượn, hạn trả và các khoản phí trong một nơi.</span>
           </div>
-          <button
-            type="button"
-            className="history-theme-toggle"
-            role="switch"
-            aria-checked={darkTheme}
-            aria-label={darkTheme ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
-            onClick={() => setDarkTheme((current) => !current)}
-          >
-            <span className="history-theme-toggle-icon">{darkTheme ? <Moon size={16} /> : <Sun size={16} />}</span>
-            <span>{darkTheme ? 'Giao diện tối' : 'Giao diện sáng'}</span>
-          </button>
         </header>
 
         <section className="history-summary" aria-label="Tổng quan mượn trả">
