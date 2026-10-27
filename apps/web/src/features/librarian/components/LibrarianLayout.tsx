@@ -38,7 +38,7 @@ const circulationChildren = [
   { label: 'Mượn sách', to: '/librarian/circulation/loans', icon: BookOpen, end: false },
   { label: 'Trả sách', to: '/librarian/circulation/return', icon: RotateCcw, end: false },
   { label: 'Đặt chỗ', to: '/librarian/circulation/reservations', icon: Bookmark, end: false },
-  { label: 'Quá hạn', to: '/librarian/circulation/overdue', icon: Clock3, end: false },
+  { label: 'Quá hạn & Sự cố', to: '/librarian/circulation/overdue', icon: Clock3, end: false },
   { label: 'Phí phạt', to: '/librarian/circulation/fines', icon: Wallet, end: false },
 ];
 

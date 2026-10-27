@@ -164,9 +164,9 @@ export const TABS = [
   {
     id: 'overdue',
     to: '/librarian/circulation/overdue',
-    label: 'Quá hạn',
-    crumb: 'Quá hạn',
-    description: 'Theo dõi phiếu quá hạn và xác minh hồ sơ mất sách, hư hỏng.',
+    label: 'Quá hạn & Sự cố',
+    crumb: 'Quá hạn & Sự cố',
+    description: 'Theo dõi phiếu quá hạn và xử lý hồ sơ sự cố hư hỏng, thất lạc sách.',
   },
   {
     id: 'fines',

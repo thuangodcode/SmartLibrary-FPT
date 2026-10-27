@@ -935,6 +935,8 @@ function ReturnView() {
   const [loansError, setLoansError] = useState<string | null>(null);
   const [conditions, setConditions] = useState<Record<string, string>>({});
   const [returningBarcode, setReturningBarcode] = useState<string | null>(null);
+  const [returnMode, setReturnMode] = useState<'reader' | 'barcode'>(params.get('barcode') ? 'barcode' : 'reader');
+  const [defaultCondition, setDefaultCondition] = useState('Good');
   const [manualBarcode, setManualBarcode] = useState(params.get('barcode') ?? '');
   const [manualCondition, setManualCondition] = useState('Good');
   const [message, setMessage] = useState<string | null>(null);
@@ -1039,146 +1041,223 @@ function ReturnView() {
         <div className="circ-return-section-header">
           <div>
             <h2>Trả sách</h2>
-            <p>Nhập thông tin độc giả để kiểm tra các cuốn sách đang mượn và chọn cuốn muốn trả, hoặc quét nhanh mã vạch.</p>
+            <p>Ghi nhận trả sách và kiểm tra tình trạng bản sao, đối chiếu tính toán phí phạt quá hạn hoặc bồi thường.</p>
+          </div>
+          <div className="circ-return-mode-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={returnMode === 'reader'}
+              className={`circ-return-tab-btn ${returnMode === 'reader' ? 'is-active' : ''}`}
+              onClick={() => setReturnMode('reader')}
+            >
+              <UserRound size={15} />
+              <span>Trả theo độc giả</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={returnMode === 'barcode'}
+              className={`circ-return-tab-btn ${returnMode === 'barcode' ? 'is-active' : ''}`}
+              onClick={() => setReturnMode('barcode')}
+            >
+              <BookOpen size={15} />
+              <span>Trả nhanh theo mã vạch</span>
+            </button>
           </div>
         </div>
 
-        {/* Bước 1: Chọn độc giả */}
-        <div className="circ-return-reader-search">
-          <ReservationAutocomplete
-            label="Nhập tên độc giả, mã thẻ hoặc MSSV"
-            step="BƯỚC 1"
-            placeholder="Tìm theo họ tên, mã sinh viên (ví dụ SE1...), email..."
-            endpoint="reader"
-            value={readerSearch}
-            selected={selectedReader}
-            onChange={setReaderSearch}
-            onSelect={(opt) => {
-              setSelectedReader(opt);
-              setReaderSearch(opt.label);
-            }}
-            onClear={() => {
-              setSelectedReader(null);
-              setReaderSearch('');
-              setActiveLoans([]);
-            }}
-          />
-        </div>
+        {returnMode === 'reader' ? (
+          <>
+            {/* Hàng chọn độc giả và tình trạng sách khi trả */}
+            <div className="circ-return-reader-grid">
+              <div className="circ-return-reader-search">
+                <ReservationAutocomplete
+                  label="Nhập tên độc giả, mã thẻ hoặc MSSV"
+                  placeholder="Tìm theo họ tên, mã sinh viên (ví dụ SE1...), email..."
+                  endpoint="reader"
+                  value={readerSearch}
+                  selected={selectedReader}
+                  onChange={setReaderSearch}
+                  onSelect={(opt) => {
+                    setSelectedReader(opt);
+                    setReaderSearch(opt.label);
+                  }}
+                  onClear={() => {
+                    setSelectedReader(null);
+                    setReaderSearch('');
+                    setActiveLoans([]);
+                  }}
+                />
+              </div>
 
-        {/* Bước 2: Danh sách sách độc giả đang mượn */}
-        {selectedReader && (
-          <div className="circ-reader-loans-panel">
-            <div className="circ-reader-loans-header">
-              <h3>
-                <BookOpen size={16} />
-                Sách đang mượn ({activeLoans.length})
-              </h3>
-              <span>Độc giả: <strong>{selectedReader.label}</strong> {selectedReader.detail && `· ${selectedReader.detail}`}</span>
+              <label className="circ-field circ-return-condition-field">
+                <span>Tình trạng sách khi trả</span>
+                <select
+                  value={defaultCondition}
+                  disabled={busy}
+                  onChange={(e) => {
+                    const nextVal = e.target.value;
+                    setDefaultCondition(nextVal);
+                    if (activeLoans.length > 0) {
+                      const updated: Record<string, string> = {};
+                      activeLoans.forEach((l) => { updated[l.id] = nextVal; });
+                      setConditions(updated);
+                    }
+                  }}
+                >
+                  <option value="Good">Bình thường (Đạt tiêu chuẩn)</option>
+                  <option value="Fair">Hơi cũ (Còn nguyên vẹn)</option>
+                  <option value="Damaged">Hư hỏng (Chờ xác minh bồi thường)</option>
+                  <option value="Lost">Thất lạc (Chờ xác minh bồi thường)</option>
+                </select>
+              </label>
             </div>
 
-            {loadingLoans ? (
-              <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang kiểm tra sách độc giả đang mượn...</p>
-            ) : loansError ? (
-              <p className="circ-banner is-err">{loansError}</p>
-            ) : activeLoans.length === 0 ? (
-              <div className="circ-no-loans-box">
-                <Check size={18} />
-                <div>
-                  <strong>Độc giả hiện không có sách nào đang mượn.</strong>
-                  <p>Tất cả sách trước đó đã được hoàn trả đầy đủ vào thư viện.</p>
-                </div>
+            {/* Khối quy tắc tính phạt */}
+            <div className="circ-return-policy-box">
+              <div className="circ-policy-item">
+                <strong>Quy định phạt quá hạn:</strong>
+                <span>Trễ hạn tính phạt {stats?.suggestedFinePerDay ? `${formatMoney(stats.suggestedFinePerDay)}/ngày` : 'theo chính sách thư viện'}.</span>
               </div>
-            ) : (
-              <div className="circ-active-loans-grid">
-                {activeLoans.map((loan) => {
-                  const cond = conditions[loan.id] || 'Good';
-                  const isProcessing = busy && returningBarcode === loan.barcode;
-                  return (
-                    <article className="circ-active-loan-card" key={loan.id}>
-                      <div className="circ-loan-card-info">
-                        <h4>{loan.bookTitle}</h4>
-                        <div className="circ-loan-card-meta">
-                          <span>Mã vạch: <strong>{loan.barcode}</strong></span>
-                          <span>Mượn: {formatDate(loan.borrowDate)}</span>
-                          <span>Hạn trả: <strong>{formatDate(loan.dueDate)}</strong></span>
-                        </div>
-                        <div className="circ-loan-card-status">
-                          <span className={`circ-badge is-${loan.status.toLowerCase()}`}>
-                            {loan.status === 'Overdue' ? `Quá hạn ${loan.overdueDays} ngày` : 'Đang mượn'}
-                          </span>
-                          {loan.overdueDays > 0 && loan.createdFineAmount ? (
-                            <span className="circ-fine-tag">Phí dự kiến: {formatMoney(loan.createdFineAmount)}</span>
-                          ) : null}
-                        </div>
-                      </div>
+              <div className="circ-policy-item">
+                <strong>Sự cố Hư hỏng & Thất lạc:</strong>
+                <span>Sách hư hỏng hoặc mất sẽ tự động lập hồ sơ chuyển qua mục <strong>Quá hạn & Sự cố</strong> để xác nhận bồi thường.</span>
+              </div>
+            </div>
 
-                      <div className="circ-loan-card-action">
-                        <label className="circ-condition-select">
-                          <span>Tình trạng khi trả:</span>
-                          <select
-                            value={cond}
-                            disabled={busy}
-                            onChange={(e) => setConditions((prev) => ({ ...prev, [loan.id]: e.target.value }))}
-                          >
-                            <option value="Good">Bình thường</option>
-                            <option value="Fair">Hơi cũ</option>
-                            <option value="Damaged">Hư hỏng</option>
-                            <option value="Lost">Thất lạc</option>
-                          </select>
-                        </label>
-                        <button
-                          type="button"
-                          className="circ-btn circ-btn--primary"
-                          disabled={busy}
-                          onClick={() => void returnBook(loan.barcode, cond)}
-                        >
-                          {isProcessing ? <LoaderCircle className="spin" size={14} /> : <RotateCcw size={14} />}
-                          {isProcessing ? 'Đang ghi nhận...' : 'Ghi nhận trả sách'}
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
+            {/* Danh sách sách độc giả đang mượn */}
+            {selectedReader && (
+              <div className="circ-reader-loans-panel">
+                <div className="circ-reader-loans-header">
+                  <h3>
+                    <BookOpen size={16} />
+                    Sách đang mượn ({activeLoans.length})
+                  </h3>
+                  <span>Độc giả: <strong>{selectedReader.label}</strong> {selectedReader.detail && `· ${selectedReader.detail}`}</span>
+                </div>
+
+                {loadingLoans ? (
+                  <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang kiểm tra sách độc giả đang mượn...</p>
+                ) : loansError ? (
+                  <p className="circ-banner is-err">{loansError}</p>
+                ) : activeLoans.length === 0 ? (
+                  <div className="circ-no-loans-box">
+                    <Check size={18} />
+                    <div>
+                      <strong>Độc giả hiện không có sách nào đang mượn.</strong>
+                      <p>Tất cả sách trước đó đã được hoàn trả đầy đủ vào thư viện.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="circ-active-loans-grid">
+                    {activeLoans.map((loan) => {
+                      const cond = conditions[loan.id] || defaultCondition;
+                      const isProcessing = busy && returningBarcode === loan.barcode;
+                      return (
+                        <article className="circ-active-loan-card" key={loan.id}>
+                          <div className="circ-loan-card-info">
+                            <h4>{loan.bookTitle}</h4>
+                            <div className="circ-loan-card-meta">
+                              <span>Mã vạch: <strong>{loan.barcode}</strong></span>
+                              <span>Mượn: {formatDate(loan.borrowDate)}</span>
+                              <span>Hạn trả: <strong>{formatDate(loan.dueDate)}</strong></span>
+                            </div>
+                            <div className="circ-loan-card-status">
+                              <span className={`circ-badge is-${loan.status.toLowerCase()}`}>
+                                {loan.status === 'Overdue' ? `Quá hạn ${loan.overdueDays} ngày` : 'Đang mượn'}
+                              </span>
+                              {loan.overdueDays > 0 && loan.createdFineAmount ? (
+                                <span className="circ-fine-tag">Phí quá hạn: {formatMoney(loan.createdFineAmount)}</span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="circ-loan-card-action">
+                            <label className="circ-condition-select">
+                              <span>Tình trạng khi trả:</span>
+                              <select
+                                value={cond}
+                                disabled={busy}
+                                onChange={(e) => setConditions((prev) => ({ ...prev, [loan.id]: e.target.value }))}
+                              >
+                                <option value="Good">Bình thường</option>
+                                <option value="Fair">Hơi cũ</option>
+                                <option value="Damaged">Hư hỏng</option>
+                                <option value="Lost">Thất lạc</option>
+                              </select>
+                            </label>
+                            <button
+                              type="button"
+                              className="circ-btn circ-btn--primary"
+                              disabled={busy}
+                              onClick={() => void returnBook(loan.barcode, cond)}
+                            >
+                              {isProcessing ? <LoaderCircle className="spin" size={14} /> : <RotateCcw size={14} />}
+                              {isProcessing ? 'Đang ghi nhận...' : 'Ghi nhận trả sách'}
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Quét mã vạch trực tiếp */}
-        <details className="circ-quick-barcode-accordion">
-          <summary>
-            <span>Hoặc quét nhanh mã vạch bản sao</span>
-          </summary>
+          </>
+        ) : (
+          /* Trả nhanh theo mã vạch bản sao */
           <form
-            className="circ-quick-barcode-form"
+            className="circ-barcode-return-form"
             onSubmit={(e) => {
               e.preventDefault();
               if (manualBarcode.trim()) void returnBook(manualBarcode.trim(), manualCondition);
             }}
           >
-            <label className="circ-field">
-              Mã vạch bản sao
-              <input
-                value={manualBarcode}
-                onChange={(e) => setManualBarcode(e.target.value)}
-                placeholder="Quét hoặc nhập mã bản sao (ví dụ py01-01)"
-              />
-            </label>
-            <label className="circ-field">
-              Tình trạng khi trả
-              <select value={manualCondition} onChange={(e) => setManualCondition(e.target.value)}>
-                <option value="Good">Bình thường</option>
-                <option value="Fair">Hơi cũ</option>
-                <option value="Damaged">Hư hỏng</option>
-                <option value="Lost">Thất lạc</option>
-              </select>
-            </label>
-            <button type="submit" className="circ-btn circ-btn--primary" disabled={busy || !manualBarcode.trim()}>
-              {busy ? <LoaderCircle className="spin" size={14} /> : null}
-              {busy ? 'Đang ghi nhận...' : 'Ghi nhận trả theo mã vạch'}
-            </button>
+            <div className="circ-return-reader-grid">
+              <label className="circ-field">
+                <span>Mã vạch sách cần trả</span>
+                <input
+                  value={manualBarcode}
+                  onChange={(e) => setManualBarcode(e.target.value)}
+                  placeholder="Quét hoặc nhập mã bản sao (ví dụ py01-01)"
+                  autoFocus
+                />
+              </label>
+              <label className="circ-field circ-return-condition-field">
+                <span>Tình trạng khi trả</span>
+                <select value={manualCondition} onChange={(e) => setManualCondition(e.target.value)}>
+                  <option value="Good">Bình thường (Đạt tiêu chuẩn)</option>
+                  <option value="Fair">Hơi cũ (Còn nguyên vẹn)</option>
+                  <option value="Damaged">Hư hỏng (Chờ xác minh bồi thường)</option>
+                  <option value="Lost">Thất lạc (Chờ xác minh bồi thường)</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="circ-return-policy-box">
+              <div className="circ-policy-item">
+                <strong>Quy định phạt quá hạn:</strong>
+                <span>Trễ hạn tính phạt {stats?.suggestedFinePerDay ? `${formatMoney(stats.suggestedFinePerDay)}/ngày` : 'theo chính sách thư viện'}.</span>
+              </div>
+              <div className="circ-policy-item">
+                <strong>Sự cố Hư hỏng & Thất lạc:</strong>
+                <span>Sách hư hỏng hoặc mất sẽ tự động lập hồ sơ chuyển qua mục <strong>Quá hạn & Sự cố</strong> để xác nhận bồi thường.</span>
+              </div>
+            </div>
+
+            <div className="circ-return-actions-row">
+              <button
+                type="submit"
+                className="circ-btn circ-btn--primary"
+                disabled={busy || !manualBarcode.trim()}
+              >
+                {busy ? <LoaderCircle className="spin" size={14} /> : <RotateCcw size={14} />}
+                {busy ? 'Đang ghi nhận...' : 'Ghi nhận trả sách'}
+              </button>
+            </div>
           </form>
-        </details>
+        )}
       </div>
       <div className="circ-card">
         <h2>Giao dịch gần đây</h2>
