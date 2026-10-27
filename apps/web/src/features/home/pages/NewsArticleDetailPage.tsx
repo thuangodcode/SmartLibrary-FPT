@@ -55,7 +55,9 @@ const NewsArticleDetailPage: React.FC<{ librarianMode?: boolean }> = ({ libraria
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
   const canModerate = user?.role === 'Librarian' || user?.role === 'Admin';
-  const canComment = user?.role === 'Reader' && Boolean(accessToken);
+  const canComment = Boolean(accessToken) && (
+    user?.role === 'Reader' || user?.role === 'Librarian' || user?.role === 'Admin'
+  );
 
   const loadComments = useCallback(async () => {
     if (!articleId) return;
@@ -278,11 +280,11 @@ const NewsArticleDetailPage: React.FC<{ librarianMode?: boolean }> = ({ libraria
               </header>
               {canComment ? (
                 <form className="news-comment-form" onSubmit={(event) => void postComment(event)}>
-                  <label htmlFor="news-comment-draft">Viết bình luận</label>
-                  <textarea id="news-comment-draft" maxLength={2000} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Hãy giữ trao đổi lịch sự và liên quan đến bài viết..." />
+                  <label htmlFor="news-comment-draft">{canModerate ? 'Chia sẻ thông tin từ thư viện' : 'Viết bình luận'}</label>
+                  <textarea id="news-comment-draft" maxLength={2000} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={canModerate ? 'Nhập thông tin hoặc phản hồi từ thư viện...' : 'Hãy giữ trao đổi lịch sự và liên quan đến bài viết...'} />
                   <div className="news-comment-form-footer"><span>{draft.length}/2000</span><button type="submit" className="news-comment-primary" disabled={!draft.trim() || submitting}><Send size={16} /> Đăng bình luận</button></div>
                 </form>
-              ) : <div className="news-comment-signin"><span>Đăng nhập bằng tài khoản độc giả để tham gia bình luận.</span><Link to="/login">Đăng nhập</Link></div>}
+              ) : <div className="news-comment-signin"><span>Đăng nhập để tham gia trao đổi về bài viết.</span><Link to="/login">Đăng nhập</Link></div>}
 
               {commentsError && <div className="news-comments-error" role="alert">{commentsError}<button type="button" onClick={() => void loadComments()}>Thử lại</button></div>}
               {loadingComments ? <div className="news-comments-state">Đang tải bình luận...</div>

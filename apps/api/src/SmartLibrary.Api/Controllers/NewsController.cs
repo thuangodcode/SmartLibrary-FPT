@@ -182,10 +182,6 @@ public class NewsController : ControllerBase
             if (!parentExists)
                 return BadRequest(ApiResponse<object>.Fail("Không tìm thấy bình luận cần phản hồi."));
         }
-        else if (!isReader)
-        {
-            return BadRequest(ApiResponse<object>.Fail("Thủ thư cần chọn bình luận độc giả để trả lời."));
-        }
 
         var now = DateTime.UtcNow;
         var comment = new NewsComment
