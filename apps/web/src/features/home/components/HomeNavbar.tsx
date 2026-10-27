@@ -180,8 +180,27 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
     const nextDark = !darkTheme;
     setDarkTheme(nextDark);
     window.localStorage.setItem('smartlibrary.reader-theme', nextDark ? 'dark' : 'light');
+    document.documentElement.classList.toggle('dark', nextDark);
     window.dispatchEvent(new CustomEvent('smartlibrary-reader-theme-change', { detail: { darkTheme: nextDark } }));
   };
+
+  useEffect(() => {
+    const syncTheme = (event?: Event) => {
+      const customEvent = event as CustomEvent<{ darkTheme?: boolean }> | undefined;
+      const nextDark = typeof customEvent?.detail?.darkTheme === 'boolean'
+        ? customEvent.detail.darkTheme
+        : window.localStorage.getItem('smartlibrary.reader-theme') === 'dark';
+      setDarkTheme(nextDark);
+      document.documentElement.classList.toggle('dark', nextDark);
+    };
+    syncTheme();
+    window.addEventListener('smartlibrary-reader-theme-change', syncTheme);
+    window.addEventListener('storage', syncTheme);
+    return () => {
+      window.removeEventListener('smartlibrary-reader-theme-change', syncTheme);
+      window.removeEventListener('storage', syncTheme);
+    };
+  }, []);
 
   const loadReaderNotifications = useCallback(async () => {
     if (!accessToken) return;
@@ -412,22 +431,20 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
         <div className="annual-header-search">{searchSlot ?? defaultSearch}</div>
         {isAuthenticated && user ? (
           <div className="annual-account annual-header-actions">
+            <button
+              type="button"
+              className="annual-theme-toggle"
+              onClick={toggleReaderTheme}
+              aria-pressed={darkTheme}
+              aria-label={darkTheme ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
+              title={darkTheme ? 'Giao diện sáng' : 'Giao diện tối'}
+            >
+              {darkTheme ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
             {user.role === 'Admin' && <Link to="/admin" onClick={closeMenu}><ShieldCheck size={16} /> Quản trị</Link>}
             {user.role === 'Librarian' && <Link to="/librarian" onClick={closeMenu}><BookOpen size={16} /> Thủ thư</Link>}
             {user.role === 'Reader' && (
               <>
-              {isHistoryPage && (
-                <button
-                  type="button"
-                  className="annual-theme-toggle"
-                  onClick={toggleReaderTheme}
-                  aria-pressed={darkTheme}
-                  aria-label={darkTheme ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
-                  title={darkTheme ? 'Giao diện sáng' : 'Giao diện tối'}
-                >
-                  {darkTheme ? <Moon size={18} /> : <Sun size={18} />}
-                </button>
-              )}
               <div ref={notificationsRef} className={`annual-reader-notifications${notificationsOpen ? ' is-open' : ''}`}>
                 <button
                   type="button"
@@ -541,6 +558,16 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
           </div>
         ) : (
           <div className="annual-auth annual-header-actions">
+            <button
+              type="button"
+              className="annual-theme-toggle"
+              onClick={toggleReaderTheme}
+              aria-pressed={darkTheme}
+              aria-label={darkTheme ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
+              title={darkTheme ? 'Giao diện sáng' : 'Giao diện tối'}
+            >
+              {darkTheme ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
             <Link to="/login" onClick={closeMenu}>Đăng nhập</Link>
             <Link to="/register" className="annual-action" onClick={closeMenu}>Đăng ký</Link>
           </div>

@@ -231,6 +231,28 @@ public static class SearchTopicGuard
             "dat truoc",
             "the thu vien",
             "dang ky the",
+            "dang ky tai khoan",
+            "dang ky",
+            "tai khoan",
+            "quen thong tin",
+            "quen mat khau",
+            "ho tro tai khoan",
+            "gio mo cua",
+            "mo cua luc nao",
+            "dia chi thu vien",
+            "lien he thu vien",
+            "wifi",
+            "khong gian hoc tap",
+            "dich vu thu vien",
+            "quy dinh su dung",
+            "register",
+            "sign up",
+            "membership",
+            "library card",
+            "account",
+            "opening hours",
+            "library hours",
+            "contact librarian",
             "mat sach",
             "sach hong",
             "borrow policy",
@@ -238,6 +260,18 @@ public static class SearchTopicGuard
             "return policy",
             "renewal policy",
             "library rules");
+    }
+
+    public static bool IsFollowUpQuestion(string query)
+    {
+        var fold = Fold(query);
+        return ContainsAny(fold,
+            "cuon do", "sach do", "quyen do", "tac gia do", "ma sach do",
+            "cai do", "loai do", "no thi", "cuon nay", "sach nay",
+            "con cuon", "con sach", "con loai nao", "con thong tin nao",
+            "noi ro hon", "giai thich them", "vi sao vay", "the nao vay",
+            "vay con", "con khong", "nhu vay", "y vua noi", "vua noi",
+            "those books", "that book", "it available", "tell me more", "why is that");
     }
 
     public static SearchIntent Parse(string query)

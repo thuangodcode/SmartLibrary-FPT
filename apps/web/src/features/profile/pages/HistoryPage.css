@@ -615,11 +615,6 @@
 .history-heading { position: relative; justify-content: center; text-align: center; }
 .history-heading-copy { width: 100%; }
 .history-heading-copy > p { text-align: center; }
-.annual-theme-toggle { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border: 1px solid transparent; border-radius: 50%; background: transparent; color: #53675a; cursor: pointer; transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease; }
-.annual-theme-toggle:hover { transform: rotate(-10deg) scale(1.06); border-color: #d8e4da; background: #edf3ed; color: #244d39; }
-.annual-theme-toggle:focus-visible { outline: 3px solid rgb(43 127 255 / 50%); outline-offset: 2px; }
-.history-page.theme-dark .annual-theme-toggle { color: #e5c977; }
-.history-page.theme-dark .annual-theme-toggle:hover { border-color: #45564b; background: #26372b; }
 
 .annual-header--history .annual-header-inner { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(540px, 760px) minmax(0, 1fr); grid-template-areas: "brand search actions"; align-items: center; gap: 22px; }
 .annual-header--history .annual-header-search { grid-area: search; width: 100%; min-width: 0; max-width: none; flex: initial; margin: 0; }

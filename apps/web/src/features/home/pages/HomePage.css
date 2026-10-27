@@ -412,6 +412,84 @@
 }
 
 .annual-home { --paper: #f6f7f5; --paper-deep: #e9eeeb; }
+
+/* Reader theme is stored on the document root so every page using the shared
+   Reader shell can follow the same preference, including across navigation. */
+html.dark .annual-home {
+  --paper: #111916;
+  --paper-deep: #202c26;
+  --ink: #edf4ee;
+  --soft: #a4b2a8;
+  --green: #91cba4;
+  --sage: #45564b;
+  background: var(--paper);
+  color: var(--ink);
+  color-scheme: dark;
+}
+html.dark .annual-home .annual-header,
+html.dark .annual-home .annual-hero,
+html.dark .annual-home .annual-footer { background: #111916; color: #edf4ee; }
+html.dark .annual-home .annual-nav-row { border-color: #35443b; }
+html.dark .annual-home .annual-nav-submenu,
+html.dark .annual-home .annual-search-suggestions,
+html.dark .annual-home .annual-search-suggestion { border-color: #35443b; background: #1b2520; color: #edf4ee; }
+html.dark .annual-home .annual-search { border-color: #46554b; background: #1b2520; color: #edf4ee; }
+html.dark .annual-home .annual-search input { background: transparent; color: #edf4ee; }
+html.dark .annual-home .annual-search input::placeholder { color: #a4b2a8; }
+html.dark .annual-home .annual-search-suggestion { border-bottom-color: #35443b; }
+html.dark .annual-home .annual-search-suggestion:hover,
+html.dark .annual-home .annual-search-suggestion.is-active { background: #26372b; }
+html.dark .annual-home .annual-books,
+html.dark .annual-home .annual-section { background-color: #17211b; color: #edf4ee; }
+html.dark .annual-home .annual-live-category-list > button,
+html.dark .annual-home .book-card,
+html.dark .annual-home .annual-info-card { border-color: #35443b; background-color: #1b2520; color: #edf4ee; }
+html.dark .annual-home .annual-books .book-card { color: #edf4ee; }
+html.dark .annual-home input,
+html.dark .annual-home textarea,
+html.dark .annual-home select { border-color: #45564b; background-color: #1b2520; color: #edf4ee; color-scheme: dark; }
+html.dark .annual-home .annual-footer a,
+html.dark .annual-home .annual-footer p { color: #a4b2a8; }
+html.dark .annual-home.annual-catalog-page {
+  --catalog-ground: #111916;
+  --catalog-surface: #1b2520;
+  --catalog-ink: #edf4ee;
+  --catalog-soft: #a4b2a8;
+  --catalog-green: #91cba4;
+  background: var(--catalog-ground);
+}
+html.dark .annual-home.annual-book-detail-page {
+  --detail-paper: #111916;
+  --detail-ink: #edf4ee;
+  --detail-green: #91cba4;
+  --detail-soft: #a4b2a8;
+  --detail-sage: #26372b;
+  --detail-warm: #302b22;
+}
+html.dark .annual-home.annual-info-page {
+  --news-paper: #111916;
+  --news-surface: #1b2520;
+  --news-ink: #edf4ee;
+  --news-muted: #a4b2a8;
+  --news-green: #91cba4;
+  --news-green-dark: #244d39;
+}
+html.dark .annual-home.annual-catalog-page .catalog-category-list button:nth-child(even),
+html.dark .annual-home.annual-catalog-page .catalog-message,
+html.dark .annual-home.annual-catalog-page .catalog-pagination button,
+html.dark .annual-home.annual-catalog-page .catalog-featured-empty { background: #202c26; color: #edf4ee; }
+html.dark .annual-home.annual-book-detail-page .book-detail-overview,
+html.dark .annual-home.annual-book-detail-page .book-detail-information,
+html.dark .annual-home.annual-book-detail-page .book-reviews-section { border-color: #35443b; background: #1b2520; color: #edf4ee; }
+html.dark .annual-home.annual-book-detail-page .book-detail-facts > div,
+html.dark .annual-home.annual-book-detail-page .book-review-form,
+html.dark .annual-home.annual-book-detail-page .book-review-form textarea { border-color: #35443b; background: #202c26; color: #edf4ee; }
+html.dark .annual-home.annual-book-detail-page .book-detail-facts dd,
+html.dark .annual-home.annual-book-detail-page .book-detail-facts dt,
+html.dark .annual-home.annual-book-detail-page .book-review-form > label { color: #c4d0c8; }
+html.dark .annual-home.annual-info-page .news-live-banner,
+html.dark .annual-home.annual-info-page .news-card,
+html.dark .annual-home.annual-info-page .news-article { border-color: #35443b; background: #1b2520; color: #edf4ee; }
 .annual-categories { padding-block: clamp(56px, 6vw, 84px); }
 .annual-live-section-heading { margin-bottom: 28px; }
 .annual-live-section-heading h2 { font-size: clamp(38px, 4.5vw, 62px); }

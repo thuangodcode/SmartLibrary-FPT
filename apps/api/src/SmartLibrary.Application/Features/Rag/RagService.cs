@@ -279,7 +279,7 @@ public class RagService
                 {(policyQuestion
                     ? "Đây là câu hỏi về dịch vụ hoặc quy định thư viện. Chỉ dùng chính sách phù hợp nhất bên dưới để trả lời đúng điều người dùng hỏi. Trả lời trực tiếp trong 1-2 câu, tối đa 35 từ. Không liệt kê các chính sách khác, không lặp nguồn, không đề xuất sách. Nếu dữ liệu không nêu rõ, hãy nói chưa có thông tin và hướng dẫn liên hệ Thủ thư."
                     : "Chỉ giải thích các đầu sách/chính sách đã truy xuất bên dưới. Không thêm sách khác. Không bịa tên sách, tác giả, ISBN, mã sách, số lượng hoặc tình trạng mượn.")}
-                Trả lời tiếng Việt, ngắn gọn và không lặp lại danh sách nguồn.
+                Trả lời tiếng Việt, trực tiếp và dễ hiểu. Với quy định, trả lời trong 1-2 câu và chỉ nêu điều người dùng hỏi. Với sách, nêu tối đa 3 gợi ý và giải thích ngắn. Không lặp danh sách nguồn.
 
                 Dữ liệu thư viện đã truy xuất:
                 {BuildContext(hits)}
@@ -342,15 +342,20 @@ public class RagService
     private static string BuildContextualQuery(string? context, string query)
     {
         var currentIntent = SearchTopicGuard.Parse(query);
-        if (currentIntent.Language is not null || SearchTopicGuard.IsPolicyQuestion(query))
+        if (currentIntent.Language is not null
+            || SearchTopicGuard.IsPolicyQuestion(query)
+            || !SearchTopicGuard.IsFollowUpQuestion(query))
             return query;
 
-        var trimmed = context?.Trim();
+        var trimmed = string.Join('\n', (context ?? string.Empty)
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Where(line => !line.TrimStart().StartsWith("Phạm vi phiên:", StringComparison.OrdinalIgnoreCase)))
+            .Trim();
         if (string.IsNullOrWhiteSpace(trimmed))
             return query;
         if (trimmed.Length > 2000)
             trimmed = trimmed[^2000..];
-        return $"{trimmed}\nCâu hỏi hiện tại: {query}";
+        return $"Ngữ cảnh gần nhất để hiểu đại từ hoặc câu hỏi nối tiếp: {trimmed}\nCâu hỏi hiện tại (ưu tiên nội dung câu này): {query}";
     }
 
     private static string EmptyAnswer(string query)
@@ -380,14 +385,16 @@ public class RagService
         var policies = hits.Where(hit => hit.SourceType == "policy").ToList();
         if (policies.Count > 0 && SearchTopicGuard.IsPolicyQuestion(query))
         {
-            var policyAnswer = new StringBuilder("Thông tin từ chính sách thư viện đang áp dụng: ");
-            foreach (var policy in policies.Take(1))
-            {
-                policyAnswer.Append(policy.Title).Append(". ");
-                if (!string.IsNullOrWhiteSpace(policy.Content))
-                    policyAnswer.Append(policy.Content.Trim()).Append(' ');
-            }
-            return policyAnswer.ToString().Trim();
+            var policy = policies[0];
+            var name = policy.Title.Split('·', 2, StringSplitOptions.TrimEntries).Last();
+            var description = policy.Content
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .FirstOrDefault(line => line.StartsWith("Mô tả:", StringComparison.OrdinalIgnoreCase))?
+                .Replace("Mô tả:", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Trim();
+            return string.IsNullOrWhiteSpace(description)
+                ? $"Theo chính sách \"{name}\" của thư viện. Vui lòng liên hệ Thủ thư để biết thêm chi tiết."
+                : $"Theo chính sách \"{name}\", {description}";
         }
 
         var books = hits.Where(hit => hit.SourceType == "book").ToList();

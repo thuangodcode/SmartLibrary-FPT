@@ -37,6 +37,22 @@ const TOPICS = [
 
 type ChatTopic = typeof TOPICS[number];
 
+function topicForQuestion(questionText: string): ChatTopic {
+  const normalized = questionText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase();
+  const topicId = /phi|phat|boi thuong|mat sach|hong sach/.test(normalized) ? 'fees'
+    : /tai khoan|the thu vien|dang ky|quen mat khau|quen thong tin/.test(normalized) ? 'account'
+      : /dat truoc|dich vu|tien ich|khong gian|gio mo cua/.test(normalized) ? 'services'
+        : /muon|tra sach|gia han|thoi han|han tra|so luong sach/.test(normalized) ? 'borrowing'
+          : /sach|tac gia|isbn|ngon ngu|doc gi|tim/.test(normalized) ? 'books'
+            : 'general';
+  return TOPICS.find((topic) => topic.id === topicId) ?? TOPICS[TOPICS.length - 1];
+}
+
+function questionsForTopic(topic: ChatTopic, managedQuestions: string[]): string[] {
+  const matching = managedQuestions.filter((item) => topicForQuestion(item).id === topic.id);
+  return [...new Set([...matching, ...topic.questions])].slice(0, 6);
+}
+
 function friendlyAskError(error: unknown): string {
   const message = error instanceof Error ? error.message.trim() : '';
   if (/chưa cấu hình api key|hệ thống ai đang tắt|độc giả đang tắt/i.test(message)) return message;
@@ -86,14 +102,16 @@ const RagAskPanel = () => {
     return () => { cancelled = true; };
   }, [isOpen, accessToken]);
 
-  const startSession = (initialQuestion?: string) => {
-    if (!selectedTopic) return;
+  const startSession = (initialQuestion?: string, topicOverride?: ChatTopic) => {
+    const topic = selectedTopic ?? topicOverride;
+    if (!topic) return;
     setTurns([]);
     const firstQuestion = initialQuestion ?? prefilledQuestion;
     setQuestion(firstQuestion);
     setPrefilledQuestion('');
+    setSelectedTopic(topic);
     setSessionActive(true);
-    if (firstQuestion.trim().length >= 3) void runAsk(firstQuestion);
+    if (firstQuestion.trim().length >= 3) void runAsk(firstQuestion, undefined, topic, true);
     else window.setTimeout(() => questionRef.current?.focus(), 0);
   };
 
@@ -109,14 +127,17 @@ const RagAskPanel = () => {
     if (conversation) conversation.scrollTo({ top: conversation.scrollHeight, behavior: 'smooth' });
   }, [isOpen, turns]);
 
-  const runAsk = async (prompt: string, retryId?: number) => {
+  const runAsk = async (prompt: string, retryId?: number, topicOverride?: ChatTopic, resetContext = false) => {
     if (!accessToken || !prompt.trim() || sending) return;
     const id = retryId ?? ++nextIdRef.current;
-    const previousTurns = retryId
+    const previousTurns = resetContext
+      ? []
+      : retryId
       ? turns.filter((turn) => turn.id !== retryId)
       : turns;
-    const topicScope = selectedTopic
-      ? `Phạm vi phiên: ${selectedTopic.label}. Ưu tiên trả lời trong phạm vi này. Nếu câu hỏi nằm ngoài phạm vi, hãy trả lời ngắn gọn và hướng người đọc sang chủ đề phù hợp.`
+    const activeTopic = topicOverride ?? selectedTopic;
+    const topicScope = activeTopic
+      ? `Phạm vi phiên: ${activeTopic.label}. Ưu tiên trả lời trong phạm vi này. Nếu câu hỏi nằm ngoài phạm vi, hãy trả lời ngắn gọn và hướng người đọc sang chủ đề phù hợp.`
       : '';
     const recentContext = previousTurns
       .filter((turn) => turn.result)
@@ -170,7 +191,7 @@ const RagAskPanel = () => {
         <img src={robotLogo} alt="" aria-hidden="true" />
       </button>
       {isOpen && <div className="rag-ask-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsOpen(false); }}>
-        <section className="rag-ask" aria-label="Hỏi trợ lý thư viện" role="dialog" aria-modal="true" aria-labelledby="rag-ask-title">
+        <section className={`rag-ask${sessionActive ? '' : ' is-setup'}`} aria-label="Hỏi trợ lý thư viện" role="dialog" aria-modal="true" aria-labelledby="rag-ask-title">
           <div className="rag-ask-heading">
             <span className="rag-ask-heading-icon"><img src={talkingRobotLogo} alt="" /></span>
             <div><strong id="rag-ask-title">Trò chuyện với trợ lý thư viện</strong><small>Hỏi về sách, dịch vụ và chính sách thư viện</small></div>
@@ -195,11 +216,11 @@ const RagAskPanel = () => {
                     })}
                   </div>
                   <div className="rag-setup-suggestions">
-                    <strong>Câu hỏi gợi ý</strong>
-                    <div>{(selectedTopic?.questions ?? suggestions.slice(0, 4)).map((item) => <button type="button" key={item} onClick={() => { if (selectedTopic) startSession(item); }}>{item}</button>)}</div>
+                    <div className="rag-setup-suggestions-heading"><strong>Câu hỏi gợi ý</strong><span>{selectedTopic ? `Theo chủ đề ${selectedTopic.label}` : 'Chọn chủ đề để xem gợi ý phù hợp'}</span></div>
+                    <div>{(selectedTopic ? questionsForTopic(selectedTopic, suggestions) : suggestions.slice(0, 6)).map((item) => <button type="button" key={item} onClick={() => startSession(item, selectedTopic ?? topicForQuestion(item))}>{item}<ArrowUp size={12} /></button>)}</div>
                     {loadingSuggestions && <small>Đang cập nhật câu hỏi…</small>}
                   </div>
-                  <button type="button" className="rag-session-start" disabled={!selectedTopic} onClick={() => startSession(prefilledQuestion || undefined)}>Bắt đầu trò chuyện <ArrowUp size={16} /></button>
+                  <div className="rag-session-footer"><span>{selectedTopic ? 'Bạn có thể đổi chủ đề bất cứ lúc nào trước khi bắt đầu.' : 'Chọn một chủ đề để cá nhân hóa câu trả lời.'}</span><button type="button" className="rag-session-start" disabled={!selectedTopic} onClick={() => startSession(prefilledQuestion || undefined)}>Bắt đầu trò chuyện <ArrowUp size={16} /></button></div>
                 </div>
               ) : (
               <>
@@ -253,7 +274,7 @@ const RagAskPanel = () => {
                               {bookSources.length > 4 && <small className="rag-ask-more-results">Còn {bookSources.length - 4} đầu sách phù hợp khác.</small>}
                             </>
                           )}
-                          {policySources.length > 0 && <div className="rag-policy-source">Theo chính sách: {policySources[0].title}</div>}
+                          {policySources.length > 0 && <div className="rag-policy-source"><span className="rag-source-dot" />Nguồn tham khảo <strong>{policySources[0].title}</strong></div>}
                           {turn.result.sources.length === 0 && <p className="rag-chat-no-source">Câu trả lời dựa trên dữ liệu thư viện hiện có.</p>}
                         </div>
                       )}
@@ -265,7 +286,7 @@ const RagAskPanel = () => {
                 <div className="rag-ask-suggestions">
                   <span>Câu hỏi gợi ý</span>
                   <div>
-                    {selectedTopic.questions.slice(0, 4).map((item) => (
+                    {questionsForTopic(selectedTopic, suggestions).slice(0, 4).map((item) => (
                       <button type="button" key={item} disabled={sending} onClick={() => submitQuestion(item)}>{item}</button>
                     ))}
                     {loadingSuggestions && <small>Đang cập nhật…</small>}
