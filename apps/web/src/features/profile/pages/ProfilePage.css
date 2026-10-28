@@ -26,6 +26,21 @@ html.dark .profile-page :is(.profile-page-heading > a, .profile-btn-edit-header,
   background: #26372b;
   color: #e1ece4;
 }
+html.dark .profile-page .profile-btn-doc-toggle {
+  border-color: #8a5638;
+  background: #38291f;
+  color: #ffd0ae;
+}
+html.dark .profile-page .profile-btn-doc-toggle:hover,
+html.dark .profile-page .profile-btn-doc-toggle:focus-visible {
+  border-color: #f08a53;
+  background: #4a3022;
+  color: #ffe3d0;
+}
+html.dark .profile-page .profile-btn-doc-toggle:focus-visible {
+  outline: 3px solid rgb(240 138 83 / 30%);
+  outline-offset: 2px;
+}
 
 .profile-main {
   width: min(100%, 1400px);
@@ -540,6 +555,11 @@ html.dark .profile-page :is(.profile-page-heading > a, .profile-btn-edit-header,
   background: #fff1e8;
   border-color: #f7a980;
   color: #b5491a;
+}
+
+.profile-btn-doc-toggle svg {
+  display: block;
+  flex: 0 0 auto;
 }
 
 .profile-documents-grid {

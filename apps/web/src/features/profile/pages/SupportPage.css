@@ -2,44 +2,57 @@
   min-height: 100vh;
 }
 
-html.dark .support-page { color: #edf4ee; }
-html.dark .support-page .support-heading { border-color: #35443b; background: linear-gradient(115deg, #1b2520 0%, #202b24 100%); }
-html.dark .support-page .support-heading h1 { color: #edf4ee; }
-html.dark .support-page .support-heading > span { color: #c4d0c8; }
-html.dark .support-page :is(.support-chat-card, .support-complaint-form, .support-complaint-list, .support-chat-bubble) {
+html.dark .support-main { color: #edf4ee; }
+html.dark .support-main .support-heading { border-color: #35443b; background: linear-gradient(115deg, #1b2520 0%, #202b24 100%); }
+html.dark .support-main .support-heading h1 { color: #edf4ee; }
+html.dark .support-main .support-heading > span { color: #c4d0c8; }
+html.dark .support-main :is(.support-chat-card, .support-complaint-form, .support-complaint-list, .support-chat-bubble) {
   border-color: #35443b;
   background: #1b2520;
   color: #edf4ee;
 }
-html.dark .support-page .support-detail-modal { border-color: #35443b; background: #1b2520; color: #edf4ee; }
-html.dark .support-page :is(.support-detail-content, .support-detail-handling, .support-detail-replies) { border-color: #35443b; background: #202c25; color: #edf4ee; }
-html.dark .support-page .support-detail-modal > footer button { border-color: #536a59; background: #244d39; color: #fff; }
-html.dark .support-page :is(h1, h2, h3, strong, label) { color: #edf4ee; }
-html.dark .support-page :is(p, span, time, .support-chat-empty, .support-form-hint) { color: #c4d0c8; }
-html.dark .support-page :is(input, textarea, select) { border-color: #45564b; background: #111916; color: #edf4ee; color-scheme: dark; }
-html.dark .support-page :is(input, textarea)::placeholder { color: #a4b2a8; }
-html.dark .support-page :is(.support-tabs, .support-chat-header, .support-ticket-handling) { border-color: #35443b; }
-html.dark .support-page .support-tabs button { color: #c4d0c8; }
-html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-bottom-color: #91cba4; }
-html.dark .support-page :is(.support-heading p, .support-section-eyebrow) { color: #ff9a66; }
-html.dark .support-page .support-ticket { --support-ticket-surface: #1b2520; color: #edf4ee; }
-html.dark .support-page .support-ticket-top > strong,
-html.dark .support-page .support-ticket > p,
-html.dark .support-page .support-detail-content,
-html.dark .support-page .support-detail-replies > p { color: #e0e9e2; }
-html.dark .support-page .support-ticket > footer { border-color: #35443b; }
-html.dark .support-page .support-ticket > footer :is(time, span) { color: #bbc9be; }
-html.dark .support-page .support-ticket > footer button { border-color: #536a59; background: #26372d; color: #dff1e3; }
-html.dark .support-page .support-ticket-status { background: #54351f; color: #ffd0a8; }
-html.dark .support-page .support-ticket-status--inprogress,
-html.dark .support-page .support-ticket-status--resolved { background: #244832; color: #b8e8c4; }
-html.dark .support-page .support-detail-modal > header,
-html.dark .support-page .support-detail-modal > footer { border-color: #35443b; }
-html.dark .support-page .support-detail-modal > header button { border-color: #536a59; color: #d6e4d9; }
-html.dark .support-page .support-detail-meta { color: #bdcbbf; }
-html.dark .support-page .support-detail-handling :is(strong, span) { color: #d5e1d7; }
-html.dark .support-page .support-ticket-reply { border-left-color: #79b389; background: #26372d; }
-html.dark .support-page .support-ticket-reply :is(strong, p, time) { color: #d8e8dc; }
+html.dark .support-main .support-detail-modal { border-color: #35443b; background: #1b2520; color: #edf4ee; }
+html.dark .support-main :is(.support-detail-content, .support-detail-handling, .support-detail-replies) { border-color: #35443b; background: #202c25; color: #edf4ee; }
+html.dark .support-main .support-detail-modal > footer button { border-color: #536a59; background: #244d39; color: #fff; }
+html.dark .support-main :is(h1, h2, h3, strong, label) { color: #edf4ee; }
+html.dark .support-main :is(p, span, time, .support-chat-empty, .support-form-hint) { color: #c4d0c8; }
+html.dark .support-main :is(input, textarea, select) { border-color: #45564b; background: #111916; color: #edf4ee; color-scheme: dark; }
+html.dark .support-main :is(input, textarea)::placeholder { color: #a4b2a8; }
+html.dark .support-main :is(.support-tabs, .support-chat-header, .support-ticket-handling, .support-chat-composer) { border-color: #35443b; }
+html.dark .support-main .support-tabs button { color: #c4d0c8; }
+html.dark .support-main .support-tabs button.is-active { color: #91cba4; border-bottom-color: #91cba4; }
+html.dark .support-main :is(.support-heading p, .support-section-eyebrow) { color: #ff9a66; }
+html.dark .support-main .support-ticket { --support-ticket-surface: #1b2520; color: #edf4ee; }
+html.dark .support-main .support-ticket-top > strong,
+html.dark .support-main .support-ticket > p,
+html.dark .support-main .support-detail-content,
+html.dark .support-main .support-detail-replies > p { color: #e0e9e2; }
+html.dark .support-main .support-ticket > footer { border-color: #35443b; }
+html.dark .support-main .support-ticket > footer :is(time, span) { color: #bbc9be; }
+html.dark .support-main .support-ticket > footer button { border-color: #536a59; background: #26372d; color: #dff1e3; }
+html.dark .support-main .support-ticket-status { background: #54351f; color: #ffd0a8; }
+html.dark .support-main .support-ticket-status--inprogress,
+html.dark .support-main .support-ticket-status--resolved { background: #244832; color: #b8e8c4; }
+html.dark .support-main .support-detail-modal > header,
+html.dark .support-main .support-detail-modal > footer { border-color: #35443b; }
+html.dark .support-main .support-detail-modal > header button { border-color: #536a59; color: #d6e4d9; }
+html.dark .support-main .support-detail-meta { color: #bdcbbf; }
+html.dark .support-main .support-detail-handling :is(strong, span) { color: #d5e1d7; }
+html.dark .support-main .support-ticket-reply { border-left-color: #79b389; background: #26372d; }
+html.dark .support-main .support-ticket-reply :is(strong, p, time) { color: #d8e8dc; }
+html.dark .support-main .support-chat-messages { background: #111916; }
+html.dark .support-main .support-chat-header strong,
+html.dark .support-main .support-chat-bubble p { color: #e3ece5; }
+html.dark .support-main .support-chat-header span:not(.support-live-dot),
+html.dark .support-main .support-chat-bubble time { color: #aab9ae; }
+html.dark .support-main .support-chat-message:not(.is-mine) .support-chat-bubble { border-color: #3a4b40; background: #202c25; }
+html.dark .support-main .support-chat-message.is-mine .support-chat-bubble { border-color: #397653; background: #244d39; }
+html.dark .support-main .support-chat-message.is-mine .support-chat-bubble :is(strong, p, time) { color: #f0f6f1; }
+html.dark .support-main .support-chat-avatar,
+html.dark .support-main .support-chat-mark { background: #26372d; color: #a9d9b5; }
+html.dark .support-main .support-complaint-form > header p,
+html.dark .support-main .support-ticket-handling span { color: #c4d0c8; }
+html.dark .support-main .support-ticket-top > span { color: #edf4ee; }
 
 .annual-home > main.support-main {
   width: min(calc(100% - 64px), 1260px);

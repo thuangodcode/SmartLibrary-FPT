@@ -9,7 +9,7 @@
   background: var(--catalog-ground);
 }
 
-.annual-home > main.catalog-main { width: min(calc(100% - 64px), 1520px); margin: 0 auto; padding: 48px 0 88px; }
+.annual-home > main.catalog-main { width: min(calc(100% - 64px), 1680px); margin: 0 auto; padding: 48px 0 88px; }
 .catalog-mobile-categories { display: none; }
 
 .catalog-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start; gap: 32px; scroll-margin-top: 160px; }
@@ -40,7 +40,7 @@
 .catalog-active-filters button { display: inline-flex; min-height: 34px; align-items: center; gap: 6px; border: 0; background: transparent; padding: 0 8px; color: #526159; font-size: 12px; font-weight: 700; cursor: pointer; }
 .catalog-active-filters button svg { width: 15px; height: 15px; }
 
-.catalog-book-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); align-items: stretch; gap: 22px 16px; }
+.catalog-book-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: stretch; gap: 22px 18px; }
 .catalog-book-grid .book-card {
   --book-card-ink: #17231d;
   --book-card-soft: #617067;
@@ -55,6 +55,11 @@ html.dark .annual-catalog-page .catalog-category-list button:hover { background:
 html.dark .annual-catalog-page .catalog-category-list button.is-active,
 html.dark .annual-catalog-page .catalog-mobile-categories__rail button.is-active { background: #2b6545; color: #fff; }
 html.dark .annual-catalog-page .catalog-book-grid .book-card { --book-card-ink: #edf4ee; --book-card-soft: #bdcbbf; --book-card-surface: #1b2520; }
+html.dark .annual-catalog-page .catalog-book-grid .book-card__action { background: #f36f21; color: #fff; }
+html.dark .annual-catalog-page .catalog-book-grid .book-card__action:hover { background: #ff8740; color: #fff; }
+html.dark .annual-catalog-page .catalog-book-grid .favorite-book-button--card { border-color: #62766a; background: #f3f7f4; color: #244d39; }
+html.dark .annual-catalog-page .catalog-book-grid .favorite-book-button--card:hover:not(:disabled) { border-color: #ff8d96; background: #fff1f2; color: #c43145; }
+html.dark .annual-catalog-page .catalog-book-grid .favorite-book-button--card.is-favorite { border-color: #f3a3aa; background: #fff0f1; color: #c43145; }
 html.dark .annual-catalog-page .book-card__category { color: #9bd2aa; }
 html.dark .annual-catalog-page .book-card__reason { background: #24362b; }
 html.dark .annual-catalog-page .book-card__reason p { color: #d3e3d7; }
@@ -107,6 +112,10 @@ html.dark .annual-catalog-page .book-card__borrow-count { color: #9bd2aa; }
   .annual-home > main.catalog-main { width: min(calc(100% - 48px), 980px); }
   .catalog-layout { grid-template-columns: 190px minmax(0, 1fr); gap: 24px; }
   .catalog-book-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1121px) and (max-width: 1450px) {
+  .catalog-book-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {

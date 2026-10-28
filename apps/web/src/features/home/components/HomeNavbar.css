@@ -9,12 +9,14 @@
   background: transparent;
   color: #53675a;
   cursor: pointer;
-  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease;
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease, box-shadow 180ms ease;
 }
-.annual-theme-toggle:hover { transform: rotate(-10deg) scale(1.06); border-color: #d8e4da; background: #edf3ed; color: #244d39; }
+.annual-theme-toggle:hover { border-color: #d8e4da; background: #edf3ed; color: #244d39; box-shadow: 0 3px 10px rgb(23 35 29 / 10%); }
+.annual-theme-toggle svg { display: block; width: 18px; height: 18px; margin: auto; flex: 0 0 auto; transition: transform 180ms ease; }
+.annual-theme-toggle:hover svg { transform: scale(1.08); }
 .annual-theme-toggle:focus-visible { outline: 3px solid rgb(43 127 255 / 50%); outline-offset: 2px; }
 html.dark .annual-theme-toggle { color: #e5c977; }
-html.dark .annual-theme-toggle:hover { border-color: #45564b; background: #26372b; }
+html.dark .annual-theme-toggle:hover { border-color: #526b59; background: #26372b; color: #ffe49a; box-shadow: 0 3px 12px rgb(0 0 0 / 28%); }
 
 .annual-search-container {
   position: relative;
@@ -460,6 +462,36 @@ html.dark .annual-home .annual-user-popover button:hover,
 html.dark .annual-home .annual-user-popover a:focus-visible,
 html.dark .annual-home .annual-user-popover button:focus-visible { background: #31483a; color: #fff; }
 html.dark .annual-home .annual-user-trigger { color: #edf4ee; }
+html.dark .annual-home .annual-reader-notifications-popover {
+  border-color: #45564b;
+  background: #202c26;
+  color: #e4eee7;
+  box-shadow: 0 16px 36px rgb(0 0 0 / 38%);
+}
+html.dark .annual-home .annual-reader-notifications-popover > header {
+  border-bottom-color: #45564b;
+  background: #202c26;
+  color: #edf4ee;
+}
+html.dark .annual-home .annual-reader-notifications-popover > header span,
+html.dark .annual-home .annual-reader-notification-item small,
+html.dark .annual-home .annual-reader-notifications-empty,
+html.dark .annual-home .annual-reader-notifications-error { color: #aebdb2; }
+html.dark .annual-home .annual-reader-notifications-popover .annual-reader-notification-item {
+  border-bottom-color: #35443b;
+  color: #dce8df;
+}
+html.dark .annual-home .annual-reader-notification-item strong { color: #edf4ee; }
+html.dark .annual-home .annual-reader-notification-item > div > span { color: #c4d0c8; }
+html.dark .annual-home .annual-reader-notification-item:hover,
+html.dark .annual-home .annual-reader-notification-item:focus-visible,
+html.dark .annual-home .annual-reader-notification-item.is-unread { background: #26372b; }
+html.dark .annual-home .annual-reader-notification-item.is-unread:hover,
+html.dark .annual-home .annual-reader-notification-item.is-unread:focus-visible { background: #31483a; }
+html.dark .annual-home .annual-reader-notifications-pagination { border-top: 1px solid #45564b; background: #202c26; }
+html.dark .annual-home .annual-reader-notifications-pagination button { background: #26372d; color: #b8e8c4; }
+html.dark .annual-home .annual-reader-notifications-pagination button:disabled,
+html.dark .annual-home .annual-reader-notifications-pagination span { color: #9eafa3; }
 
 @media (max-width: 760px) {
   .annual-user-menu {

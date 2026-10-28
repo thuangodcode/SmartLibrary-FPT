@@ -440,7 +440,6 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
               onClick={toggleReaderTheme}
               aria-pressed={darkTheme}
               aria-label={darkTheme ? t('header.lightTheme') : t('header.darkTheme')}
-              title={darkTheme ? t('header.lightThemeTitle') : t('header.darkThemeTitle')}
             >
               {darkTheme ? <Moon size={18} /> : <Sun size={18} />}
             </button>
@@ -567,7 +566,6 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
               onClick={toggleReaderTheme}
               aria-pressed={darkTheme}
               aria-label={darkTheme ? t('header.lightTheme') : t('header.darkTheme')}
-              title={darkTheme ? t('header.lightThemeTitle') : t('header.darkThemeTitle')}
             >
               {darkTheme ? <Moon size={18} /> : <Sun size={18} />}
             </button>

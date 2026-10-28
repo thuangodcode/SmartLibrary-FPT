@@ -43,6 +43,26 @@ html.dark .annual-home .annual-books .book-card {
   color: #edf4ee;
 }
 
+html.dark .annual-home .book-card__action {
+  background: #f36f21;
+  color: #fff;
+}
+html.dark .annual-home .book-card__action:hover { background: #ff8740; color: #fff; }
+html.dark .annual-home .favorite-book-button--card {
+  border-color: #62766a;
+  background: #f3f7f4;
+  color: #244d39;
+}
+html.dark .annual-home .favorite-book-button--card:hover:not(:disabled) {
+  border-color: #ff8d96;
+  background: #fff1f2;
+  color: #c43145;
+}
+html.dark .annual-home .favorite-book-button--card.is-favorite {
+  border-color: #f3a3aa;
+  background: #fff0f1;
+  color: #c43145;
+}
 html.dark .book-card__category { color: #9bd2aa; }
 html.dark .book-card__reason { background: #24362b; }
 html.dark .book-card__reason p { color: #d3e3d7; }
