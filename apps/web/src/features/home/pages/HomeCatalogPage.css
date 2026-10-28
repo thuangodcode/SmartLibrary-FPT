@@ -40,7 +40,7 @@
 .catalog-active-filters button { display: inline-flex; min-height: 34px; align-items: center; gap: 6px; border: 0; background: transparent; padding: 0 8px; color: #526159; font-size: 12px; font-weight: 700; cursor: pointer; }
 .catalog-active-filters button svg { width: 15px; height: 15px; }
 
-.catalog-book-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 22px 16px; }
+.catalog-book-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; gap: 22px 16px; }
 .catalog-book-skeleton { min-height: 430px; background: #e2e7e3; animation: catalog-pulse 1.1s ease-in-out infinite alternate; }
 @keyframes catalog-pulse { to { opacity: .48; } }
 
@@ -88,7 +88,7 @@
 @media (max-width: 1120px) {
   .annual-home > main.catalog-main { width: min(calc(100% - 48px), 980px); }
   .catalog-layout { grid-template-columns: 190px minmax(0, 1fr); gap: 24px; }
-  .catalog-book-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .catalog-book-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {

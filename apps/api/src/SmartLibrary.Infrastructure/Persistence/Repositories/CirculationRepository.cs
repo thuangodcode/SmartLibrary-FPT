@@ -400,6 +400,13 @@ public class CirculationRepository : ICirculationRepository
             (x.Status == BookIncidentStatus.PendingReview
              || x.Status == BookIncidentStatus.CompensationPending), ct);
 
+    public Task<Guid?> GetOpenIncidentIdAsync(Guid borrowRecordId, CancellationToken ct)
+        => _db.BookIncidents
+            .Where(x => x.BorrowRecordId == borrowRecordId &&
+                (x.Status == BookIncidentStatus.PendingReview || x.Status == BookIncidentStatus.CompensationPending))
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(ct);
+
     public async Task AddIncidentAsync(BookIncident incident, CancellationToken ct)
         => await _db.BookIncidents.AddAsync(incident, ct);
 

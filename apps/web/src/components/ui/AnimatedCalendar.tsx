@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import './AnimatedCalendar.css';
 
 export type AnimatedCalendarMode = 'multiple' | 'range' | 'single';
@@ -88,6 +88,7 @@ export function AnimatedCalendar({
         <CalendarDays size={17} aria-hidden="true" />
         <span className={value.length ? '' : 'is-placeholder'}>{label}</span>
         {mode === 'multiple' && value.length > 0 && <b>{value.length}</b>}
+        <ChevronDown className={open ? 'is-open' : ''} size={16} aria-hidden="true" />
       </button>
       {open && (
         <div className="animated-calendar-popover" role="dialog" aria-label="Lịch chọn ngày">

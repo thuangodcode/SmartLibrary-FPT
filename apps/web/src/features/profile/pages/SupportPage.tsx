@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
-import { AlertCircle, Camera, Check, CircleHelp, LoaderCircle, MessageCircle, Send, UserRound } from 'lucide-react';
+import { AlertCircle, Camera, Check, CircleHelp, LoaderCircle, MessageCircle, Send, UserRound, X } from 'lucide-react';
 import HomeNavbar from '../../home/components/HomeNavbar';
 import HomeFooter from '../../home/components/HomeFooter';
 import { API_BASE_URL } from '../../../config';
@@ -101,6 +101,7 @@ const SupportPage = () => {
   const [types, setTypes] = useState<RequestType[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [draft, setDraft] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
   const [connection, setConnection] = useState<HubConnection | null>(null);
@@ -114,6 +115,15 @@ const SupportPage = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!selectedComplaint) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedComplaint(null);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [selectedComplaint]);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -353,6 +363,18 @@ const SupportPage = () => {
           </section>
         ) : (
           <div className="support-complaint-layout">
+            <section className="support-complaint-list">
+              <header><div><span className="support-section-eyebrow">THEO DÕI YÊU CẦU</span><h2>Đơn của tôi</h2></div><span>{complaints.length}</span></header>
+              {loading ? <div className="support-chat-empty"><LoaderCircle className="support-spinner" size={21} />Đang tải đơn...</div> :
+                complaints.length ? complaints.map((complaint) => (
+                  <article className="support-ticket" key={complaint.id}>
+                    <div className="support-ticket-top"><strong>{complaint.requestType}</strong><span className={`support-ticket-status support-ticket-status--${complaint.status.toLowerCase()}`}>{statusLabel[complaint.status] ?? complaint.status}</span></div>
+                    <p>{complaint.content}</p>
+                    <footer><time>{dateTime(complaint.createdAt)}</time><span>{complaint.replies.length} phản hồi</span><button type="button" onClick={() => setSelectedComplaint(complaint)}>Xem chi tiết</button></footer>
+                  </article>
+                )) : <div className="support-chat-empty"><CircleHelp size={22} />Bạn chưa gửi đơn hỗ trợ nào.</div>}
+            </section>
+
             <form className="support-complaint-form" onSubmit={(event) => void sendComplaint(event)}>
               <header><span className="support-form-icon"><CircleHelp size={19} /></span><div><h2>Gửi đơn hỗ trợ</h2><p>Đơn sẽ được chuyển đến bộ phận thư viện.</p></div></header>
               <label>
@@ -386,35 +408,24 @@ const SupportPage = () => {
                 Gửi đơn
               </button>
             </form>
-
-            <section className="support-complaint-list">
-              <header><h2>Đơn của tôi</h2><span>{complaints.length}</span></header>
-              {loading ? <div className="support-chat-empty"><LoaderCircle className="support-spinner" size={21} />Đang tải đơn...</div> :
-                complaints.length ? complaints.map((complaint) => (
-                  <article className="support-ticket" key={complaint.id}>
-                    <div className="support-ticket-top"><strong>{complaint.requestType}</strong><span className={`support-ticket-status support-ticket-status--${complaint.status.toLowerCase()}`}>{statusLabel[complaint.status] ?? complaint.status}</span></div>
-                    <div className="support-ticket-handling" aria-label="Thông tin tiếp nhận và xử lý">
-                      <div><strong>Tiếp nhận</strong><span>{complaint.acceptedByName
-                        ? `${complaint.acceptedByName}${complaint.acceptedAt ? ` · ${dateTime(complaint.acceptedAt)}` : ''}`
-                        : 'Đang chờ thủ thư tiếp nhận'}</span></div>
-                      {complaint.dueAt && <div><strong>Hạn xử lý dự kiến</strong><span>{dateTime(complaint.dueAt)}</span></div>}
-                      {complaint.firstRespondedAt && <div><strong>Phản hồi lần đầu</strong><span>{dateTime(complaint.firstRespondedAt)}</span></div>}
-                    </div>
-                    <p>{complaint.content}</p>
-                    {complaint.attachmentUrl && <a href={complaint.attachmentUrl} target="_blank" rel="noreferrer">Xem ảnh đính kèm</a>}
-                    <time>{dateTime(complaint.createdAt)}</time>
-                    {complaint.replies.map((reply) => (
-                      <div className="support-ticket-reply" key={reply.id}>
-                        <strong>Phản hồi từ {reply.senderRole === 'Librarian' ? 'thủ thư' : reply.senderName}</strong>
-                        <p>{reply.message}</p><time>{dateTime(reply.createdAt)}</time>
-                      </div>
-                    ))}
-                  </article>
-                )) : <div className="support-chat-empty"><CircleHelp size={22} />Bạn chưa gửi đơn hỗ trợ nào.</div>}
-            </section>
           </div>
         )}
       </main>
+      {selectedComplaint && <div className="support-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedComplaint(null); }}>
+        <section className="support-detail-modal" role="dialog" aria-modal="true" aria-labelledby="support-detail-title">
+          <header><div><span className="support-section-eyebrow">CHI TIẾT ĐƠN HỖ TRỢ</span><h2 id="support-detail-title">{selectedComplaint.requestType}</h2></div><button type="button" aria-label="Đóng chi tiết" onClick={() => setSelectedComplaint(null)}><X size={19} /></button></header>
+          <div className="support-detail-meta"><span className={`support-ticket-status support-ticket-status--${selectedComplaint.status.toLowerCase()}`}>{statusLabel[selectedComplaint.status] ?? selectedComplaint.status}</span><time>Gửi lúc {dateTime(selectedComplaint.createdAt)}</time></div>
+          <div className="support-detail-handling">
+            <div><strong>Tiếp nhận</strong><span>{selectedComplaint.acceptedByName ? `${selectedComplaint.acceptedByName}${selectedComplaint.acceptedAt ? ` · ${dateTime(selectedComplaint.acceptedAt)}` : ''}` : 'Đang chờ thủ thư tiếp nhận'}</span></div>
+            {selectedComplaint.dueAt && <div><strong>Hạn xử lý dự kiến</strong><span>{dateTime(selectedComplaint.dueAt)}</span></div>}
+            {selectedComplaint.firstRespondedAt && <div><strong>Phản hồi lần đầu</strong><span>{dateTime(selectedComplaint.firstRespondedAt)}</span></div>}
+          </div>
+          <div className="support-detail-content">{selectedComplaint.content}</div>
+          {selectedComplaint.attachmentUrl && <a className="support-detail-attachment" href={selectedComplaint.attachmentUrl} target="_blank" rel="noreferrer"><Camera size={16} /> Xem ảnh đính kèm</a>}
+          <div className="support-detail-replies"><h3>Trao đổi ({selectedComplaint.replies.length})</h3>{selectedComplaint.replies.length ? selectedComplaint.replies.map((reply) => <article className="support-ticket-reply" key={reply.id}><strong>Phản hồi từ {reply.senderRole === 'Librarian' ? 'thủ thư' : reply.senderName}</strong><p>{reply.message}</p><time>{dateTime(reply.createdAt)}</time></article>) : <p>Chưa có phản hồi cho đơn này.</p>}</div>
+          <footer><button type="button" onClick={() => setSelectedComplaint(null)}>Đóng</button></footer>
+        </section>
+      </div>}
       <HomeFooter />
     </div>
   );

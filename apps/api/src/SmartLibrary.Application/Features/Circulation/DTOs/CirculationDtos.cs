@@ -50,6 +50,7 @@ public record CirculationLoanDto
     public string? Language { get; init; }
     public decimal? CreatedFineAmount { get; init; }
     public bool IncidentOpened { get; init; }
+    public Guid? IncidentId { get; init; }
     public Guid? ReadyReservationReaderId { get; init; }
     public Guid? ReadyReservationBookId { get; init; }
     public string? ReadyReservationBookTitle { get; init; }

@@ -277,7 +277,10 @@
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
+
+.admin-assignment-filters button:hover { transform: translateY(-1px); border-color: #9eb4d1; background: #f6f9fd; box-shadow: 0 4px 11px rgb(32 63 100 / 8%); }
 
 .admin-assignment-filters button.active {
   border-color: #244e7d;

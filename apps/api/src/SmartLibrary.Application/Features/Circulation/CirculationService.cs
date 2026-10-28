@@ -276,6 +276,7 @@ public class CirculationService
                 MarkReturned(loan.BookCopy, condition, keepUnavailable: isLostOrDamaged);
 
             var incidentOpened = false;
+            Guid? incidentId = null;
             decimal? createdFine = null;
             Reservation? readyReservation = null;
             if (isLostOrDamaged)
@@ -306,6 +307,8 @@ public class CirculationService
                 createdFine is > 0 || incidentOpened ? "fine" : "return", ct);
 
             await _unitOfWork.SaveChangesAsync(ct);
+            if (isLostOrDamaged)
+                incidentId = await _repository.GetOpenIncidentIdAsync(loan.Id, ct);
             var saved = await _repository.GetLoanAsync(loan.Id, settings.FinePerDay, ct);
             if (saved is null)
                 return Result<CirculationLoanDto>.Failure("Không đọc được phiếu sau khi trả.");
@@ -314,6 +317,7 @@ public class CirculationService
                 CreatedFineAmount = createdFine,
                 OverdueDays = overdueDays,
                 IncidentOpened = incidentOpened,
+                IncidentId = incidentId,
                 ReadyReservationReaderId = readyReservation?.ReaderId,
                 ReadyReservationBookId = readyReservation?.BookId,
                 ReadyReservationBookTitle = readyReservation?.Book.Title

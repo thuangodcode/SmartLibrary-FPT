@@ -45,6 +45,7 @@ public interface ICirculationRepository
     Task<bool> HasOverdueFineAsync(Guid borrowRecordId, CancellationToken ct);
     Task<bool> HasCompensationFineAsync(Guid borrowRecordId, CancellationToken ct);
     Task<bool> HasOpenIncidentAsync(Guid borrowRecordId, CancellationToken ct);
+    Task<Guid?> GetOpenIncidentIdAsync(Guid borrowRecordId, CancellationToken ct);
     Task AddFineAsync(Fine fine, CancellationToken ct);
     Task AddIncidentAsync(BookIncident incident, CancellationToken ct);
     Task<BookIncident?> GetTrackedIncidentAsync(Guid id, CancellationToken ct);

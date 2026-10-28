@@ -583,6 +583,43 @@
   font-size: 14px;
 }
 
+.circ-overdue-filters {
+  display: grid;
+  grid-template-columns: minmax(190px, 250px) minmax(250px, 340px) auto;
+  align-items: center;
+  justify-content: start;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.circ-overdue-filters select { width: 100%; min-height: 44px; }
+.circ-overdue-filters .animated-calendar { width: 100%; }
+.circ-page--overdue .circ-card-head { align-items: flex-start; }
+.circ-page--overdue .circ-card-head p { margin: 4px 0 0; color: #64748b; }
+.circ-page--overdue .circ-table td small { display: block; margin-top: 4px; color: #718096; }
+
+.circ-incident-detail-card { display: grid; gap: 22px; }
+.circ-incident-detail-card .circ-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.circ-incident-detail-card .circ-card-head h2 { margin: 6px 0; font-size: 24px; }
+.circ-incident-detail-card .circ-card-head p { margin: 0; color: #64748b; }
+.circ-eyebrow { color: #d14d1c; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.circ-incident-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.circ-incident-detail-grid > div { padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; }
+.circ-incident-detail-grid dt { margin-bottom: 6px; color: #64748b; font-size: 12px; }
+.circ-incident-detail-grid dd { margin: 0; color: #172b4d; font-size: 15px; font-weight: 700; }
+.circ-incident-detail-note { padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 12px; color: #475569; line-height: 1.65; }
+.circ-incident-detail-form { display: grid; gap: 16px; padding-top: 18px; border-top: 1px solid #e8edf4; }
+.circ-incident-detail-form .circ-actions { flex-wrap: wrap; }
+
+@media (max-width: 760px) {
+  .circ-overdue-filters { grid-template-columns: 1fr; }
+  .circ-incident-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .circ-incident-detail-grid { grid-template-columns: 1fr; }
+  .circ-incident-detail-card .circ-card-head { flex-direction: column; }
+}
+
 .circ-page--overdue .circ-badge {
   padding: 5px 10px;
   font-size: 12px;

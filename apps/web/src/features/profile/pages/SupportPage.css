@@ -3,11 +3,17 @@
 }
 
 html.dark .support-page { color: #edf4ee; }
+html.dark .support-page .support-heading { border-color: #35443b; background: linear-gradient(115deg, #1b2520 0%, #202b24 100%); }
+html.dark .support-page .support-heading h1 { color: #edf4ee; }
+html.dark .support-page .support-heading > span { color: #c4d0c8; }
 html.dark .support-page :is(.support-chat-card, .support-complaint-form, .support-complaint-list, .support-ticket, .support-chat-bubble) {
   border-color: #35443b;
   background: #1b2520;
   color: #edf4ee;
 }
+html.dark .support-page .support-detail-modal { border-color: #35443b; background: #1b2520; color: #edf4ee; }
+html.dark .support-page :is(.support-detail-content, .support-detail-handling, .support-detail-replies) { border-color: #35443b; background: #202c25; color: #edf4ee; }
+html.dark .support-page .support-detail-modal > footer button { border-color: #536a59; background: #244d39; color: #fff; }
 html.dark .support-page :is(h1, h2, h3, strong, label) { color: #edf4ee; }
 html.dark .support-page :is(p, span, time, .support-chat-empty, .support-form-hint, .support-ticket-handling) { color: #c4d0c8; }
 html.dark .support-page :is(input, textarea, select) { border-color: #45564b; background: #111916; color: #edf4ee; color-scheme: dark; }
@@ -29,6 +35,14 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
   font-size: 11px;
   font-weight: 800;
   letter-spacing: .12em;
+}
+
+.support-heading {
+  border: 1px solid #f1dfd3;
+  border-radius: 20px;
+  background: linear-gradient(115deg, #fff 0%, #fff8f2 100%);
+  padding: 24px 28px;
+  box-shadow: 0 12px 32px rgb(28 48 35 / 5%);
 }
 
 .support-heading h1 {
@@ -106,8 +120,11 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
 
 .support-chat-card {
   display: flex;
-  min-height: 560px;
+  min-height: 460px;
   flex-direction: column;
+  overflow: hidden;
+  border-radius: 18px;
+  box-shadow: 0 14px 36px rgb(28 48 35 / 6%);
 }
 
 .support-chat-header {
@@ -174,7 +191,7 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
   flex-direction: column;
   gap: 15px;
   overflow-y: auto;
-  padding: 22px;
+  padding: 18px 22px;
   background: #fbfcfb;
 }
 
@@ -231,7 +248,7 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
 
 .support-chat-composer {
   display: flex;
-  min-height: 68px;
+  min-height: 62px;
   align-items: center;
   gap: 10px;
   border-top: 1px solid #edf0ed;
@@ -295,15 +312,17 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
 
 .support-complaint-layout {
   display: grid;
-  grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
   align-items: start;
-  gap: 18px;
+  gap: 20px;
 }
 
 .support-complaint-form {
   display: grid;
   gap: 16px;
   padding: 22px;
+  border-radius: 18px;
+  box-shadow: 0 14px 36px rgb(28 48 35 / 6%);
 }
 
 .support-complaint-form > header {
@@ -431,6 +450,8 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
   display: grid;
   gap: 12px;
   padding: 18px;
+  border-radius: 18px;
+  box-shadow: 0 14px 36px rgb(28 48 35 / 6%);
 }
 
 .support-complaint-list > header {
@@ -438,6 +459,8 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
   align-items: center;
   justify-content: space-between;
 }
+
+.support-section-eyebrow { display: block; margin-bottom: 5px; color: #d45b25; font-size: 10px; font-weight: 800; letter-spacing: .1em; }
 
 .support-complaint-list > header > span {
   display: grid;
@@ -453,8 +476,12 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
 
 .support-ticket {
   border: 1px solid #e9ede9;
-  padding: 13px;
+  border-radius: 13px;
+  background: #fff;
+  padding: 14px;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
+.support-ticket:hover { transform: translateY(-1px); border-color: #c8d9ca; box-shadow: 0 8px 20px rgb(28 48 35 / 6%); }
 
 .support-ticket-top {
   display: flex;
@@ -509,12 +536,22 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
 }
 
 .support-ticket > p {
-  margin: 10px 0 7px;
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 9px 0 12px;
   color: #505a52;
   font-size: 12px;
   line-height: 1.6;
   white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
+
+.support-ticket > footer { display: flex; align-items: center; gap: 12px; border-top: 1px solid #edf0ed; padding-top: 10px; }
+.support-ticket > footer time, .support-ticket > footer > span { margin: 0; color: #7b877e; font-size: 10px; }
+.support-ticket > footer > span { margin-left: auto; }
+.support-ticket > footer button { min-height: 32px; border: 1px solid #d8e3d9; border-radius: 9px; background: #f7faf7; padding: 0 10px; color: #244d39; font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
+.support-ticket > footer button:hover { border-color: #244d39; background: #244d39; color: #fff; }
 
 .support-ticket > a {
   color: #3e7148;
@@ -542,6 +579,27 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
   white-space: pre-wrap;
 }
 
+.support-detail-backdrop { position: fixed; z-index: 1200; inset: 0; display: grid; place-items: center; overflow: auto; background: rgb(12 20 15 / 55%); padding: 24px; animation: support-fade-in 160ms ease-out; }
+.support-detail-modal { display: grid; width: min(100%, 680px); max-height: min(84vh, 820px); gap: 18px; overflow: auto; border: 1px solid #e1e8e1; border-radius: 20px; background: #fff; padding: 24px; color: #26372b; box-shadow: 0 28px 80px rgb(13 28 18 / 25%); animation: support-modal-in 200ms cubic-bezier(.2,.8,.2,1); }
+.support-detail-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; border-bottom: 1px solid #e7ece7; padding-bottom: 16px; }
+.support-detail-modal > header h2 { margin: 0; font-size: 22px; }
+.support-detail-modal > header button { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border: 1px solid #dce5dc; border-radius: 11px; background: transparent; color: #536359; cursor: pointer; }
+.support-detail-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #758178; font-size: 11px; }
+.support-detail-handling { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; border: 1px solid #e4ebe4; border-radius: 12px; background: #f7faf7; padding: 14px; }
+.support-detail-handling > div { display: grid; gap: 5px; }
+.support-detail-handling strong { color: #758178; font-size: 10px; }
+.support-detail-handling span { color: #35483a; font-size: 12px; line-height: 1.5; }
+.support-detail-content { border: 1px solid #e5ebe5; border-radius: 12px; background: #fff; padding: 16px; color: #344238; font-size: 13px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.support-detail-attachment { display: inline-flex; align-items: center; gap: 7px; color: #2d6740; font-size: 12px; font-weight: 700; }
+.support-detail-replies { display: grid; gap: 10px; }
+.support-detail-replies h3 { margin: 0; font-size: 14px; }
+.support-detail-replies > p { margin: 0; color: #758178; font-size: 12px; }
+.support-detail-replies .support-ticket-reply { margin: 0; border-radius: 0 10px 10px 0; }
+.support-detail-modal > footer { display: flex; justify-content: flex-end; border-top: 1px solid #e7ece7; padding-top: 14px; }
+.support-detail-modal > footer button { min-height: 40px; border: 0; border-radius: 10px; background: #244d39; padding: 0 18px; color: #fff; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+@keyframes support-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes support-modal-in { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
 .support-spinner {
   animation: support-spin 1s linear infinite;
 }
@@ -560,8 +618,11 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
     grid-template-columns: 1fr;
   }
 
+  .support-detail-backdrop { padding: 12px; }
+  .support-detail-modal { max-height: 92vh; padding: 18px; }
+
   .support-chat-card {
-    min-height: 520px;
+    min-height: 440px;
   }
 
   .support-chat-messages {

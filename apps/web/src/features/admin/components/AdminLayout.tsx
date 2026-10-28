@@ -37,10 +37,10 @@ const navigation = [
 ];
 
 const reportNavigation = [
-  { label: 'Theo dõi giao việc', to: '/admin/reports/assignments', icon: ClipboardList },
   { label: 'Hoạt động thư viện', to: '/admin/reports/activity', icon: BookOpenCheck },
   { label: 'Tài chính', to: '/admin/reports/finance', icon: CircleDollarSign },
   { label: 'Kho sách', to: '/admin/collection', icon: Boxes },
+  { label: 'Theo dõi giao việc', to: '/admin/reports/assignments', icon: ClipboardList },
   { label: 'Thư viện báo cáo', to: '/admin/reports/library', icon: FileText },
   { label: 'Quản lý mẫu báo cáo', to: '/admin/reports/templates', icon: FileText },
 ];
