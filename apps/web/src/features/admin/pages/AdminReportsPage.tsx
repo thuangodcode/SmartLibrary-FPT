@@ -22,7 +22,7 @@ interface FinanceFine { id: string; code: string; readerName: string; bookTitle:
 
 const number = (value: number) => value.toLocaleString('vi-VN');
 const money = (value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value);
-const date = (value: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(value));
+const date = (value: string) => new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(value)).replaceAll('/', '-');
 const reportTypeLabel = (type: string) => ({ Activity: 'Hoạt động mượn trả', Finance: 'Tài chính', Collection: 'Kho sách', Periodic: 'Định kỳ' }[type] ?? type);
 const inputDate = (value: string) => {
   const parsed = new Date(value);
@@ -56,6 +56,7 @@ const AdminReportsPage: React.FC = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [requests, setRequests] = useState<ReportRequest[]>([]);
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'waiting' | 'review' | 'approved'>('all');
+  const [assignmentDates, setAssignmentDates] = useState<Date[]>([]);
   const [librarians, setLibrarians] = useState<Librarian[]>([]);
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -241,18 +242,35 @@ const AdminReportsPage: React.FC = () => {
   const selectedRequestTemplate = templates.find((template) => template.id === requestTemplateId);
   const assignedRequests = useMemo(() => requests.filter((request) => !request.isSelfSubmitted), [requests]);
   const selfSubmittedReports = useMemo(() => requests.filter((request) => request.isSelfSubmitted), [requests]);
+  const matchesAssignmentPeriod = (periodStart: string, periodEnd: string) => {
+    if (assignmentDates.length !== 2) return true;
+    const start = dateFromInput(periodStart.slice(0, 10));
+    const end = dateFromInput(periodEnd.slice(0, 10));
+    end.setDate(end.getDate() - 1);
+    const filterStart = new Date(assignmentDates[0].getFullYear(), assignmentDates[0].getMonth(), assignmentDates[0].getDate());
+    const filterEnd = new Date(assignmentDates[1].getFullYear(), assignmentDates[1].getMonth(), assignmentDates[1].getDate());
+    return start <= filterEnd && end >= filterStart;
+  };
+  const periodAssignedRequests = useMemo(
+    () => assignedRequests.filter((request) => matchesAssignmentPeriod(request.periodStart, request.periodEnd)),
+    [assignedRequests, assignmentDates],
+  );
+  const periodSelfSubmittedReports = useMemo(
+    () => selfSubmittedReports.filter((report) => matchesAssignmentPeriod(report.periodStart, report.periodEnd)),
+    [selfSubmittedReports, assignmentDates],
+  );
   const assignmentCounts = useMemo(() => ({
     all: assignedRequests.length,
     waiting: assignedRequests.filter((request) => request.status !== 'Submitted' || request.lastReportStatus === 'Rejected').length,
     review: assignedRequests.filter((request) => request.status === 'Submitted' && !['Approved', 'Rejected'].includes(request.lastReportStatus ?? '')).length,
     approved: assignedRequests.filter((request) => request.lastReportStatus === 'Approved').length,
   }), [assignedRequests]);
-  const visibleRequests = useMemo(() => assignedRequests.filter((request) => {
+  const visibleRequests = useMemo(() => periodAssignedRequests.filter((request) => {
     if (assignmentFilter === 'waiting') return request.status !== 'Submitted' || request.lastReportStatus === 'Rejected';
     if (assignmentFilter === 'review') return request.status === 'Submitted' && !['Approved', 'Rejected'].includes(request.lastReportStatus ?? '');
     if (assignmentFilter === 'approved') return request.lastReportStatus === 'Approved';
     return true;
-  }), [assignmentFilter, assignedRequests]);
+  }), [assignmentFilter, periodAssignedRequests]);
 
   const exportCsv = async (reportId?: string) => {
     try {
@@ -332,14 +350,14 @@ const AdminReportsPage: React.FC = () => {
         <div className="admin-assignments-hero-aside">
           <span><UsersRound size={17}/> Phạm vi quản lý</span>
           <strong>Toàn bộ Thủ thư</strong>
-          <button type="button" className="reports-button primary" onClick={() => setRequestFormOpen((open) => !open)}>{requestFormOpen ? <X size={16}/> : <Plus size={16}/>} {requestFormOpen ? 'Đóng biểu mẫu' : 'Giao báo cáo cho Thủ thư'}</button>
+          <button type="button" className="reports-button primary" onClick={() => setRequestFormOpen((open) => !open)}>{requestFormOpen ? <X size={17}/> : <Plus size={17}/>} {requestFormOpen ? 'Đóng biểu mẫu' : 'Giao báo cáo'}</button>
         </div>
       </header>
     ) : (
       <div className="reports-heading"><div><p className="reports-eyebrow">QUẢN TRỊ HỆ THỐNG</p><h1>{sectionDetails[activeSection].title}</h1><p>{sectionDetails[activeSection].description}</p></div><div className="reports-actions">{['activity', 'finance'].includes(activeSection) && <button type="button" className="reports-button secondary" onClick={() => void exportCsv()}><FileSpreadsheet size={16}/> Xuất CSV</button>}</div></div>
     )}
     {['activity', 'finance'].includes(activeSection) && <section className="reports-panel reports-period-filter" aria-label="Lọc khoảng thời gian">
-      <div><span className="reports-period-filter-kicker">KHOẢNG THỜI GIAN</span><strong>{reportDates.length === 2 ? `${dateToInput(reportDates[0])} – ${dateToInput(reportDates[1])}` : 'Chọn ngày bắt đầu và kết thúc'}</strong></div>
+      <div><span className="reports-period-filter-kicker">KHOẢNG THỜI GIAN</span><strong>{reportDates.length === 2 ? `${date(dateToInput(reportDates[0]))} – ${date(dateToInput(reportDates[1]))}` : 'Chọn ngày bắt đầu và kết thúc'}</strong></div>
       <AnimatedCalendar
         mode="range"
         value={reportDates}
@@ -413,6 +431,18 @@ const AdminReportsPage: React.FC = () => {
           </button>
         ))}
       </div>
+      <div className="reports-panel reports-period-filter admin-assignment-period-filter" aria-label="Lọc kỳ báo cáo">
+        <div><span className="reports-period-filter-kicker">LỌC THEO KỲ BÁO CÁO</span><strong>{assignmentDates.length === 2 ? `${date(dateToInput(assignmentDates[0]))} – ${date(dateToInput(assignmentDates[1]))}` : 'Đang hiển thị tất cả các kỳ'}</strong></div>
+        <AnimatedCalendar
+          mode="range"
+          value={assignmentDates}
+          onChange={setAssignmentDates}
+          placeholder="Chọn khoảng ngày báo cáo"
+          ariaLabel="Lọc theo khoảng ngày báo cáo"
+          className="reports-period-calendar"
+        />
+        {assignmentDates.length > 0 && <button type="button" className="reports-period-reset" onClick={() => setAssignmentDates([])}>Xóa bộ lọc</button>}
+      </div>
       {requestError ? <div className="reports-error" role="alert"><AlertCircle size={17}/><span>{requestError}</span><button type="button" onClick={() => void loadAssignmentData()}>Thử lại</button></div>
          : visibleRequests.length ? <div className="reports-table-wrap reports-assignment-table-wrap"><table className="reports-table"><thead><tr><th>Thủ thư phụ trách</th><th>Báo cáo</th><th>Kỳ báo cáo</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{visibleRequests.map((request) => {
           const approved = request.lastReportStatus === 'Approved';
@@ -431,10 +461,10 @@ const AdminReportsPage: React.FC = () => {
     {activeSection === 'assignments' && <section className="reports-panel reports-self-submissions">
       <div className="reports-panel-title admin-assignment-panel-heading">
         <div><span className="admin-report-section-kicker">02 · THỦ THƯ CHỦ ĐỘNG GỬI</span><h2>Báo cáo gửi không cần phân công</h2><p>Thủ thư tự tạo và gửi báo cáo; các báo cáo này được tổng hợp riêng tại đây.</p></div>
-        <span className="reports-assignment-count"><Send size={15}/>{selfSubmittedReports.length} báo cáo</span>
+        <span className="reports-assignment-count"><Send size={15}/>{periodSelfSubmittedReports.length} báo cáo</span>
       </div>
       {requestError ? <div className="reports-error" role="alert"><AlertCircle size={17}/><span>{requestError}</span><button type="button" onClick={() => void loadAssignmentData()}>Thử lại</button></div>
-         : selfSubmittedReports.length ? <div className="reports-table-wrap reports-assignment-table-wrap"><table className="reports-table"><thead><tr><th>Thủ thư</th><th>Báo cáo</th><th>Kỳ báo cáo</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{selfSubmittedReports.map((report) => {
+         : periodSelfSubmittedReports.length ? <div className="reports-table-wrap reports-assignment-table-wrap"><table className="reports-table"><thead><tr><th>Thủ thư</th><th>Báo cáo</th><th>Kỳ báo cáo</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{periodSelfSubmittedReports.map((report) => {
           const approved = report.lastReportStatus === 'Approved';
           const rejected = report.lastReportStatus === 'Rejected';
           return <tr key={report.id}>

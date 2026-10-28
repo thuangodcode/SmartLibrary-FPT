@@ -1151,7 +1151,10 @@
 .reports-standard-table-panel .reports-table-wrap { width: 100%; overflow-x: auto; border: 1px solid #e7ebf2; border-radius: 12px; }
 .reports-standard-table-panel .reports-table th { background: #f7f9fc; }
 .reports-standard-table-panel .reports-table tfoot th { padding: 14px; border-top: 1px solid #e7ebf2; background: #f7f9fc; color: #36465e; font-size: 12px; }
+.reports-activity-table th:first-child,
+.reports-activity-table td:first-child { width: auto; }
 .reports-activity-table td:first-child { display: flex; align-items: center; gap: 10px; }
+.reports-activity-table td:first-child strong { min-width: 0; white-space: normal; overflow: visible; text-overflow: clip; }
 .reports-table-rank { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border-radius: 9px; background: #eff4fb; color: #496b9f; font-size: 10px; font-weight: 750; }
 .reports-activity-table td strong { max-width: none; color: #334155; font-size: 13px; }
 .reports-percent-pill { display: inline-flex; min-width: 64px; justify-content: center; padding: 6px 9px; border-radius: 20px; background: #eaf8f0; color: #16804c; font-size: 11px; font-weight: 750; }
@@ -1169,7 +1172,8 @@
 .reports-assignment-table-wrap .reports-assignment-link:hover { border-color: #f3a16f; background: #fff7f1; text-decoration: none; }
 
 @media (max-width: 760px) {
-  .reports-period-filter { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+  .reports-period-filter,
+  .admin-assignment-period-filter { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
   .reports-period-reset { justify-self: start; }
 }
 
