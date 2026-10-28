@@ -28,6 +28,8 @@ function Marquee({
   const pausedRef = useRef(false);
   const initializedRef = useRef(false);
   const draggingRef = useRef(false);
+  const dragBlockedRef = useRef(false);
+  const pointerIdRef = useRef<number | null>(null);
   const dragStartRef = useRef(0);
   const dragOriginRef = useRef(0);
   const lastPointerRef = useRef({ position: 0, time: 0 });
@@ -85,23 +87,36 @@ function Marquee({
   const getPointerPosition = (event: ReactPointerEvent<HTMLDivElement>) => vertical ? event.clientY : event.clientX;
   const startDragging = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    draggingRef.current = true;
+    const target = event.target;
+    dragBlockedRef.current = target instanceof Element && Boolean(target.closest(
+      '.book-card__action, .favorite-book-button, a, input, textarea, select, [data-marquee-no-drag]'
+    ));
+    if (dragBlockedRef.current) return;
+
+    // Wait for actual movement before capturing the pointer. This lets buttons
+    // inside the marquee receive normal click events.
+    draggingRef.current = false;
+    pointerIdRef.current = event.pointerId;
     pausedRef.current = true;
     inertiaRef.current = 0;
     velocityRef.current = 0;
     dragStartRef.current = getPointerPosition(event);
     dragOriginRef.current = positionRef.current;
     lastPointerRef.current = { position: dragStartRef.current, time: performance.now() };
-    event.currentTarget.classList.add('is-dragging');
-    event.currentTarget.setPointerCapture(event.pointerId);
   };
   const drag = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
+    if (dragBlockedRef.current || pointerIdRef.current !== event.pointerId) return;
     const position = getPointerPosition(event);
     const now = performance.now();
     const elapsed = Math.max(1, now - lastPointerRef.current.time);
     const delta = position - dragStartRef.current;
-    if (Math.abs(delta) > 5) suppressClickRef.current = true;
+    if (!draggingRef.current && Math.abs(delta) > 5) {
+      draggingRef.current = true;
+      suppressClickRef.current = true;
+      event.currentTarget.classList.add('is-dragging');
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    if (!draggingRef.current) return;
     velocityRef.current = ((position - lastPointerRef.current.position) / elapsed) * 1000;
     lastPointerRef.current = { position, time: now };
     positionRef.current = dragOriginRef.current + delta;
@@ -113,7 +128,13 @@ function Marquee({
     }
   };
   const stopDragging = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
+    if (pointerIdRef.current !== event.pointerId) return;
+    pointerIdRef.current = null;
+    dragBlockedRef.current = false;
+    if (!draggingRef.current) {
+      pausedRef.current = false;
+      return;
+    }
     draggingRef.current = false;
     pausedRef.current = false;
     inertiaRef.current = Math.max(-1200, Math.min(1200, velocityRef.current * 0.35));
@@ -121,7 +142,7 @@ function Marquee({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    window.setTimeout(() => { suppressClickRef.current = false; }, 0);
+    window.setTimeout(() => { suppressClickRef.current = false; }, 80);
   };
 
   const repeatCount = Math.max(2, Math.floor(repeat));
