@@ -83,9 +83,9 @@ export function useHomeCategories() {
   });
 }
 
-export function useHomeBooks(categoryId: string, search: string, page: number, enabled = true) {
+export function useHomeBooks(categoryId: string, search: string, page: number, enabled = true, sortByReviewCount = false, reviewCountAscending = false) {
   return useQuery({
-    queryKey: ['public-home-books', categoryId, search, page],
+    queryKey: ['public-home-books', categoryId, search, page, sortByReviewCount, reviewCountAscending],
     enabled,
     queryFn: async ({ signal }) => {
       const params = new URLSearchParams({
@@ -94,6 +94,10 @@ export function useHomeBooks(categoryId: string, search: string, page: number, e
       });
       if (categoryId) params.set('categoryId', categoryId);
       if (search.trim()) params.set('search', search.trim());
+      if (sortByReviewCount) {
+        params.set('sortByReviewCount', 'true');
+        params.set('reviewCountAscending', String(reviewCountAscending));
+      }
 
       const response = await fetch(`${API_BASE_URL}/api/v1/books?${params}`, { signal });
       const result = await getApiData<HomeBook[]>(response, 'Không tải được đầu sách');

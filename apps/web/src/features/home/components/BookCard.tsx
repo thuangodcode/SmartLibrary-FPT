@@ -63,7 +63,7 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
         <div className="book-card__copy">
           <div className="book-card__meta">
             <span className="book-card__category">{book.category}</span>
-            <div className={`book-card__rating${book.borrowCount !== undefined ? ' has-metrics' : ''}`} aria-label={`${book.rating} trên 5 sao, ${book.reviewCount} đánh giá`}>
+            <div className={`book-card__rating${book.reviewCount > 0 || book.borrowCount !== undefined ? ' has-metrics' : ''}`} aria-label={`${book.rating} trên 5 sao, ${book.reviewCount} đánh giá`}>
               <Star aria-hidden="true" />
               <span>{book.rating.toFixed(1)}</span>
               <small>{book.reviewCount ? `${book.reviewCount} đánh giá` : 'Chưa có đánh giá'}</small>

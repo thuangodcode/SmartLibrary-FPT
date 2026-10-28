@@ -1,4 +1,5 @@
 using SmartLibrary.Domain.Common;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SmartLibrary.Domain.Entities;
 
@@ -22,6 +23,9 @@ public class Book : AuditableEntity, ISoftDeletable
     public int AvailableCopies { get; set; }
     public decimal AverageRating { get; set; }
     public bool IsDeleted { get; set; }
+
+    [NotMapped]
+    public int ReviewCount { get; set; }
 
     // Navigation properties
     public Publisher? Publisher { get; set; }

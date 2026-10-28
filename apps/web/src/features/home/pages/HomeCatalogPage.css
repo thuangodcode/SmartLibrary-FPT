@@ -35,6 +35,15 @@
 .catalog-results-heading p { max-width: 560px; margin: 14px 0 0; color: var(--catalog-soft); font-size: 15px; line-height: 1.5; }
 .catalog-result-count { display: inline-flex; align-items: center; gap: 9px; color: var(--catalog-soft); font-size: 13px; white-space: nowrap; }
 .catalog-result-count svg { width: 18px; height: 18px; color: var(--catalog-orange); }
+.catalog-sort-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin: -10px 0 22px; }
+.catalog-sort-toolbar > span { display: inline-flex; align-items: center; gap: 7px; margin-right: 3px; color: var(--catalog-soft); font-size: 13px; font-weight: 650; }
+.catalog-sort-toolbar > span svg { width: 15px; height: 15px; color: var(--catalog-orange); }
+.catalog-sort-button, .catalog-sort-reset { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 7px; border: 1px solid #d7e1da; border-radius: 999px; background: #fff; padding: 0 14px; color: #365443; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease; }
+.catalog-sort-button svg { width: 15px; height: 15px; }
+.catalog-sort-button:hover, .catalog-sort-reset:hover { transform: translateY(-1px); border-color: #73947e; background: #edf4ef; color: #1d5137; }
+.catalog-sort-button.is-active { border-color: var(--catalog-green); background: var(--catalog-green); color: #fff; box-shadow: 0 4px 12px rgb(36 77 57 / 18%); }
+.catalog-sort-button.is-active:hover { border-color: #173d2b; background: #173d2b; color: #fff; }
+.catalog-sort-button:focus-visible, .catalog-sort-reset:focus-visible { outline: 3px solid rgb(243 111 33 / 38%); outline-offset: 2px; }
 .catalog-active-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: -12px 0 24px; }
 .catalog-active-filters span { background: #dfe9e2; padding: 7px 10px; color: #315b40; font-size: 12px; }
 .catalog-active-filters button { display: inline-flex; min-height: 34px; align-items: center; gap: 6px; border: 0; background: transparent; padding: 0 8px; color: #526159; font-size: 12px; font-weight: 700; cursor: pointer; }
@@ -48,6 +57,9 @@
 }
 
 html.dark .annual-catalog-page { --catalog-ground: #111a15; --catalog-surface: #1b2520; --catalog-ink: #edf4ee; --catalog-soft: #bdcbbf; }
+html.dark .annual-catalog-page .catalog-sort-button, html.dark .annual-catalog-page .catalog-sort-reset { border-color: #53685a; background: #202c25; color: #e1ebe4; }
+html.dark .annual-catalog-page .catalog-sort-button:hover, html.dark .annual-catalog-page .catalog-sort-reset:hover { border-color: #8eb99a; background: #2a3b30; color: #fff; }
+html.dark .annual-catalog-page .catalog-sort-button.is-active, html.dark .annual-catalog-page .catalog-sort-button.is-active:hover { border-color: #3a8d5f; background: #286443; color: #fff; }
 html.dark .annual-catalog-page .catalog-category-list button { color: #c4d0c8; }
 html.dark .annual-catalog-page .catalog-category-list button:nth-child(even),
 html.dark .annual-catalog-page .catalog-mobile-categories__rail button { background: #202c25; color: #dce8df; }
@@ -98,7 +110,7 @@ html.dark .annual-catalog-page .book-card__borrow-count { color: #9bd2aa; }
   padding: 16px 18px;
 }
 
-.catalog-featured-page { max-width: 1120px; margin: 0 auto; }
+.catalog-featured-page { width: 100%; max-width: none; margin: 0; }
 .catalog-featured-page > h1 { margin: 8px 0 0; color: var(--catalog-ink); font-family: Newsreader, Georgia, serif; font-size: clamp(38px, 5vw, 58px); letter-spacing: -.045em; }
 .catalog-featured-intro { margin: 10px 0 34px; color: var(--catalog-soft); font-size: 15px; line-height: 1.6; }
 .catalog-featured-section { margin-top: 34px; }

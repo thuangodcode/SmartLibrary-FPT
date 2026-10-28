@@ -1,5 +1,5 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, LibraryBig, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, LibraryBig, Star, X } from "lucide-react";
 import { BookCard } from "../components/BookCard";
 import HomeFooter from "../components/HomeFooter";
 import HomeNavbar from "../components/HomeNavbar";
@@ -14,11 +14,13 @@ const HomeCatalogPage = () => {
   const activeCategory = searchParams.get("category") ?? "";
   const search = searchParams.get("q") ?? "";
   const isRecommendations = searchParams.get("view") === "recommended";
+  const sortByReviewCount = searchParams.get("sort")?.startsWith("reviews") ?? false;
+  const reviewCountAscending = searchParams.get("sort") === "reviews-asc";
   const requestedPage = Number(searchParams.get("page") ?? 1);
   const page =
     Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const categoriesQuery = useHomeCategories();
-  const booksQuery = useHomeBooks(activeCategory, search, page, !isRecommendations);
+  const booksQuery = useHomeBooks(activeCategory, search, page, !isRecommendations, sortByReviewCount, reviewCountAscending);
   const highlightsQuery = useHomeBookHighlights(isRecommendations);
   const categories = categoriesQuery.data ?? [];
   const categoryName = categories.find(
@@ -42,6 +44,20 @@ const HomeCatalogPage = () => {
     else nextParams.delete("page");
     setSearchParams(nextParams);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const toggleReviewSort = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("sort", !sortByReviewCount ? "reviews-desc" : reviewCountAscending ? "reviews-desc" : "reviews-asc");
+    nextParams.delete("page");
+    setSearchParams(nextParams);
+  };
+
+  const clearReviewSort = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("sort");
+    nextParams.delete("page");
+    setSearchParams(nextParams);
   };
 
   return (
@@ -173,10 +189,20 @@ const HomeCatalogPage = () => {
               </div>
             </div>
 
-            {(activeCategory || search) && (
+            <div className="catalog-sort-toolbar" aria-label="Sắp xếp sách">
+              <span><Star aria-hidden="true" /> Sắp xếp theo</span>
+              <button type="button" className={`catalog-sort-button${sortByReviewCount ? " is-active" : ""}`} aria-pressed={sortByReviewCount} onClick={toggleReviewSort}>
+                {sortByReviewCount && (reviewCountAscending ? <ArrowUp aria-hidden="true" /> : <ArrowDown aria-hidden="true" />)}
+                Lượt đánh giá {sortByReviewCount ? (reviewCountAscending ? "· ít trước" : "· nhiều trước") : ""}
+              </button>
+              {sortByReviewCount && <button type="button" className="catalog-sort-reset" onClick={clearReviewSort}>Mặc định</button>}
+            </div>
+
+            {(activeCategory || search || sortByReviewCount) && (
               <div className="catalog-active-filters">
                 {categoryName && <span>{categoryName}</span>}
                 {search && <span>Từ khóa: {search}</span>}
+                {sortByReviewCount && <span>{reviewCountAscending ? "Ít lượt đánh giá trước" : "Nhiều lượt đánh giá trước"}</span>}
                 <button type="button" onClick={clearFilters}>
                   <X aria-hidden="true" /> Xóa bộ lọc
                 </button>

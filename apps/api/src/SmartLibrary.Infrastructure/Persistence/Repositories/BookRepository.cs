@@ -19,7 +19,7 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
         _catalog = catalog;
     }
 
-    public async Task<PagedResult<Book>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, CancellationToken ct = default)
+    public async Task<PagedResult<Book>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, bool sortByReviewCount = false, bool reviewCountAscending = false, CancellationToken ct = default)
     {
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -44,11 +44,42 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
                 .ThenBy(item => item.Book.Title)
                 .ToList();
 
+            if (sortByReviewCount)
+            {
+                var matchingIds = ranked.Select(item => item.Book.Id).ToArray();
+                var reviewCounts = await _context.Reviews.AsNoTracking()
+                    .Where(review => !review.IsDeleted && matchingIds.Contains(review.BookId))
+                    .GroupBy(review => review.BookId)
+                    .Select(group => new { BookId = group.Key, Count = group.Count() })
+                    .ToDictionaryAsync(item => item.BookId, item => item.Count, ct);
+
+                ranked = (reviewCountAscending
+                        ? ranked.OrderBy(item => reviewCounts.GetValueOrDefault(item.Book.Id))
+                        : ranked.OrderByDescending(item => reviewCounts.GetValueOrDefault(item.Book.Id)))
+                    .ThenByDescending(item => item.Score)
+                    .ThenBy(item => item.Book.Title)
+                    .ToList();
+            }
+
             var pageBooks = ranked
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .Select(item => ToBook(item.Book))
+                .Select(item =>
+                {
+                    var book = ToBook(item.Book);
+                    return book;
+                })
                 .ToList();
+            if (pageBooks.Count > 0)
+            {
+                var pageIds = pageBooks.Select(book => book.Id).ToArray();
+                var reviewCounts = await _context.Reviews.AsNoTracking()
+                    .Where(review => !review.IsDeleted && pageIds.Contains(review.BookId))
+                    .GroupBy(review => review.BookId)
+                    .Select(group => new { BookId = group.Key, Count = group.Count() })
+                    .ToDictionaryAsync(item => item.BookId, item => item.Count, ct);
+                foreach (var book in pageBooks) book.ReviewCount = reviewCounts.GetValueOrDefault(book.Id);
+            }
             return new PagedResult<Book>(pageBooks, ranked.Count, page, pageSize);
         }
 
@@ -57,7 +88,13 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
             query = query.Where(book => book.Categories.Any(category => category.Id == categoryId.Value && !category.IsDeleted));
 
         var totalCount = await query.CountAsync(ct);
-        var items = await query
+        IOrderedQueryable<Book> orderedQuery = sortByReviewCount
+            ? reviewCountAscending
+                ? query.OrderBy(book => _context.Reviews.Count(review => review.BookId == book.Id && !review.IsDeleted)).ThenBy(book => book.Title)
+                : query.OrderByDescending(book => _context.Reviews.Count(review => review.BookId == book.Id && !review.IsDeleted)).ThenBy(book => book.Title)
+            : query.OrderByDescending(book => book.CreatedAt);
+
+        var items = await orderedQuery
             .AsSplitQuery()
             .Include(book => book.Authors)
             .Include(book => book.Categories)
@@ -65,6 +102,17 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
+
+        if (items.Count > 0)
+        {
+            var pageIds = items.Select(book => book.Id).ToArray();
+            var reviewCounts = await _context.Reviews.AsNoTracking()
+                .Where(review => !review.IsDeleted && pageIds.Contains(review.BookId))
+                .GroupBy(review => review.BookId)
+                .Select(group => new { BookId = group.Key, Count = group.Count() })
+                .ToDictionaryAsync(item => item.BookId, item => item.Count, ct);
+            foreach (var book in items) book.ReviewCount = reviewCounts.GetValueOrDefault(book.Id);
+        }
 
         return new PagedResult<Book>(items, totalCount, page, pageSize);
     }

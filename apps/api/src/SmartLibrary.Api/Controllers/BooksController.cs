@@ -62,9 +62,11 @@ public class BooksController : ControllerBase
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null,
         [FromQuery] Guid? categoryId = null,
+        [FromQuery] bool sortByReviewCount = false,
+        [FromQuery] bool reviewCountAscending = false,
         CancellationToken ct = default)
     {
-        var result = await _bookService.GetPagedAsync(page, pageSize, search, categoryId, ct);
+        var result = await _bookService.GetPagedAsync(page, pageSize, search, categoryId, sortByReviewCount, reviewCountAscending, ct);
         return Ok(ApiResponse<object>.Ok(result.Items, new
         {
             result.TotalCount,
