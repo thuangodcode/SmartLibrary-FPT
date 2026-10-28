@@ -46,7 +46,9 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
 
             if (sortByReviewCount)
             {
-                var matchingIds = ranked.Select(item => item.Book.Id).ToArray();
+                // EF Core 9 may evaluate captured arrays through Span.Contains,
+                // which fails during query parameter extraction on this target.
+                var matchingIds = ranked.Select(item => item.Book.Id).ToList();
                 var reviewCounts = await _context.Reviews.IgnoreQueryFilters().AsNoTracking()
                     .Where(review => !review.IsDeleted && matchingIds.Contains(review.BookId))
                     .GroupBy(review => review.BookId)
@@ -72,7 +74,7 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
                 .ToList();
             if (pageBooks.Count > 0)
             {
-                var pageIds = pageBooks.Select(book => book.Id).ToArray();
+                var pageIds = pageBooks.Select(book => book.Id).ToList();
                 var reviewCounts = await _context.Reviews.IgnoreQueryFilters().AsNoTracking()
                     .Where(review => !review.IsDeleted && pageIds.Contains(review.BookId))
                     .GroupBy(review => review.BookId)
@@ -83,9 +85,7 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
             return new PagedResult<Book>(pageBooks, ranked.Count, page, pageSize);
         }
 
-        // Apply soft-delete predicates explicitly here. The catalog is a high-traffic
-        // query with split collection includes; avoiding composed global filters keeps
-        // EF from evaluating captured filter parameters while compiling this query.
+        // Apply soft-delete predicates explicitly for the root and included relations.
         var query = _dbSet.IgnoreQueryFilters().AsNoTracking().Where(book => !book.IsDeleted);
         if (categoryId.HasValue)
         {
@@ -129,7 +129,7 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
 
         if (items.Count > 0)
         {
-            var pageIds = items.Select(book => book.Id).ToArray();
+            var pageIds = items.Select(book => book.Id).ToList();
             var reviewCounts = await _context.Reviews.IgnoreQueryFilters().AsNoTracking()
                 .Where(review => !review.IsDeleted && pageIds.Contains(review.BookId))
                 .GroupBy(review => review.BookId)
