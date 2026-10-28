@@ -246,8 +246,10 @@ public sealed class ReportService(IReportRepository repository)
 
     public async Task<ReportSummaryDto> SummaryAsync(DateTime? from, DateTime? to, CancellationToken ct)
     {
-        var start = from?.Date ?? DateTime.UtcNow.Date.AddDays(-29);
-        var end = (to?.Date ?? DateTime.UtcNow.Date).AddDays(1);
+        // Date-only query parameters are parsed as Unspecified. Npgsql requires UTC
+        // values for timestamptz comparisons, so treat the selected calendar dates as UTC.
+        var start = DateTime.SpecifyKind(from?.Date ?? DateTime.UtcNow.Date.AddDays(-29), DateTimeKind.Utc);
+        var end = DateTime.SpecifyKind(to?.Date ?? DateTime.UtcNow.Date, DateTimeKind.Utc).AddDays(1);
         var duration = end - start;
         var previousStart = start - duration;
         var loans = repository.BorrowRecords.AsNoTracking();
@@ -302,8 +304,8 @@ public sealed class ReportService(IReportRepository repository)
 
     public async Task<IReadOnlyList<CategoryBorrowDto>> BorrowByCategoryAsync(DateTime? from, DateTime? to, CancellationToken ct)
     {
-        var start = from?.Date ?? DateTime.UtcNow.Date.AddDays(-29);
-        var end = (to?.Date ?? DateTime.UtcNow.Date).AddDays(1);
+        var start = DateTime.SpecifyKind(from?.Date ?? DateTime.UtcNow.Date.AddDays(-29), DateTimeKind.Utc);
+        var end = DateTime.SpecifyKind(to?.Date ?? DateTime.UtcNow.Date, DateTimeKind.Utc).AddDays(1);
         var categories = await repository.BorrowRecords.AsNoTracking().Where(x => x.BorrowDate >= start && x.BorrowDate < end)
             .SelectMany(x => x.BookCopy.Book.Categories.Select(c => c.Name)).GroupBy(name => name)
             .Select(group => new { Category = group.Key, Count = group.Count() }).OrderByDescending(x => x.Count).Take(6).ToListAsync(ct);

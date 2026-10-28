@@ -367,12 +367,12 @@ public class CirculationRepository : ICirculationRepository
 
         if (from.HasValue)
         {
-            var start = from.Value.Date;
+            var start = DateTime.SpecifyKind(from.Value.Date, DateTimeKind.Utc);
             query = query.Where(x => (x.PaidAt ?? x.CreatedAt) >= start);
         }
         if (to.HasValue)
         {
-            var endExclusive = to.Value.Date.AddDays(1);
+            var endExclusive = DateTime.SpecifyKind(to.Value.Date, DateTimeKind.Utc).AddDays(1);
             query = query.Where(x => (x.PaidAt ?? x.CreatedAt) < endExclusive);
         }
 

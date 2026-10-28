@@ -90,6 +90,9 @@ const AdminReportsPage: React.FC = () => {
   const load = useCallback(async (signal?: AbortSignal) => {
     if (!token) { setError('Vui lòng đăng nhập Admin để xem báo cáo.'); setLoading(false); return; }
     setLoading(true); setError(null);
+    const needsSummary = activeSection === 'activity' || activeSection === 'finance';
+    const needsReportList = activeSection === 'library';
+    if (!needsSummary && !needsReportList) { setLoading(false); return; }
     const headers = { Authorization: `Bearer ${token}` };
     const qs = new URLSearchParams({
       page: String(page),
@@ -102,28 +105,35 @@ const AdminReportsPage: React.FC = () => {
     if (reportDates[0]) periodQuery.set('from', dateToInput(reportDates[0]));
     if (reportDates[1]) periodQuery.set('to', dateToInput(reportDates[1]));
     try {
-      const [summaryResponse, categoryResponse, reportsResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/admin/reports/summary?${periodQuery}`, { headers, signal }),
-        fetch(`${API_BASE_URL}/api/admin/reports/summary/borrow-by-category?${periodQuery}`, { headers, signal }),
-        fetch(`${API_BASE_URL}/api/admin/reports?${qs}`, { headers, signal }),
-      ]);
-      if ([summaryResponse, categoryResponse, reportsResponse].some((response) => response.status === 404)) {
-        throw new Error('API đang chạy phiên bản chưa có module báo cáo. Hãy khởi động lại SmartLibrary API mới và áp dụng migration supabase/migrations/00007_reports.sql.');
+      if (needsSummary) {
+        const [summaryResponse, categoryResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/admin/reports/summary?${periodQuery}`, { headers, signal }),
+          fetch(`${API_BASE_URL}/api/admin/reports/summary/borrow-by-category?${periodQuery}`, { headers, signal }),
+        ]);
+        if ([summaryResponse, categoryResponse].some((response) => response.status === 404)) {
+          throw new Error('API đang chạy phiên bản chưa có module báo cáo. Hãy khởi động lại SmartLibrary API mới và áp dụng migration supabase/migrations/00007_reports.sql.');
+        }
+        const [s, c] = await Promise.all([
+          parseApiResponse<ApiEnvelope<Summary>>(summaryResponse),
+          parseApiResponse<ApiEnvelope<CategoryStat[]>>(categoryResponse),
+        ]);
+        if (!summaryResponse.ok || !s?.success || !s.data) throw new Error(s?.error || `Không tải được thống kê (HTTP ${summaryResponse.status}).`);
+        if (!categoryResponse.ok || !c?.success) throw new Error(c?.error || 'Không tải được thống kê nhóm sách.');
+        setSummary(s.data);
+        setCategories(c.data ?? []);
       }
-      const [s, c, r] = await Promise.all([
-        parseApiResponse<ApiEnvelope<Summary>>(summaryResponse),
-        parseApiResponse<ApiEnvelope<CategoryStat[]>>(categoryResponse),
-        parseApiResponse<ApiEnvelope<ReportList>>(reportsResponse),
-      ]);
-      if (!summaryResponse.ok || !s?.success || !s.data) throw new Error(s?.error || `Không tải được thống kê (HTTP ${summaryResponse.status}).`);
-      if (!categoryResponse.ok || !c?.success) throw new Error(c?.error || 'Không tải được thống kê nhóm sách.');
-      if (!reportsResponse.ok || !r?.success || !r.data) throw new Error(r?.error || 'Không tải được danh sách báo cáo.');
-      setSummary(s.data); setCategories(c.data ?? []); setReports(r.data);
+      if (needsReportList) {
+        const reportsResponse = await fetch(`${API_BASE_URL}/api/admin/reports?${qs}`, { headers, signal });
+        if (reportsResponse.status === 404) throw new Error('API đang chạy phiên bản chưa có module báo cáo. Hãy khởi động lại SmartLibrary API mới và áp dụng migration supabase/migrations/00007_reports.sql.');
+        const r = await parseApiResponse<ApiEnvelope<ReportList>>(reportsResponse);
+        if (!reportsResponse.ok || !r?.success || !r.data) throw new Error(r?.error || 'Không tải được danh sách báo cáo.');
+        setReports(r.data);
+      }
     } catch (caught) {
       if (signal?.aborted) return;
       setError(caught instanceof Error ? caught.message : 'Đã xảy ra lỗi khi tải báo cáo.');
     } finally { if (!signal?.aborted) setLoading(false); }
-  }, [page, query, reportDates, token]);
+  }, [activeSection, page, query, reportDates, token]);
 
   useEffect(() => { const controller = new AbortController(); const timer = window.setTimeout(() => { void load(controller.signal); }, 0); return () => { window.clearTimeout(timer); controller.abort(); }; }, [load]);
   useEffect(() => { const timer = window.setTimeout(() => { setParams((current) => { const next = new URLSearchParams(current); if (searchInput.trim()) next.set('search', searchInput.trim()); else next.delete('search'); next.delete('page'); return next; }); }, 350); return () => window.clearTimeout(timer); }, [searchInput, setParams]);
@@ -246,7 +256,14 @@ const AdminReportsPage: React.FC = () => {
 
   const exportCsv = async (reportId?: string) => {
     try {
-      const url = reportId ? `${API_BASE_URL}/api/admin/reports/${reportId}/export?format=csv` : `${API_BASE_URL}/api/admin/reports/export?format=csv`;
+      const exportQuery = new URLSearchParams({ format: 'csv' });
+      if (!reportId) {
+        if (reportDates[0]) exportQuery.set('from', dateToInput(reportDates[0]));
+        if (reportDates[1]) exportQuery.set('to', dateToInput(reportDates[1]));
+      }
+      const url = reportId
+        ? `${API_BASE_URL}/api/admin/reports/${reportId}/export?${exportQuery}`
+        : `${API_BASE_URL}/api/admin/reports/export?${exportQuery}`;
       const response = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!response.ok) { const result = await parseApiResponse<ApiEnvelope<never>>(response); throw new Error(result?.error || 'Không thể xuất CSV.'); }
       const blob = await response.blob(); const anchor = document.createElement('a'); anchor.href = URL.createObjectURL(blob); anchor.download = reportId ? 'bao-cao.csv' : 'thong-ke-thu-vien.csv'; anchor.click(); URL.revokeObjectURL(anchor.href);
