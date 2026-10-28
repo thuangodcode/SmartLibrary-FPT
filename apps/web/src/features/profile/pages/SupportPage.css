@@ -6,7 +6,7 @@ html.dark .support-page { color: #edf4ee; }
 html.dark .support-page .support-heading { border-color: #35443b; background: linear-gradient(115deg, #1b2520 0%, #202b24 100%); }
 html.dark .support-page .support-heading h1 { color: #edf4ee; }
 html.dark .support-page .support-heading > span { color: #c4d0c8; }
-html.dark .support-page :is(.support-chat-card, .support-complaint-form, .support-complaint-list, .support-ticket, .support-chat-bubble) {
+html.dark .support-page :is(.support-chat-card, .support-complaint-form, .support-complaint-list, .support-chat-bubble) {
   border-color: #35443b;
   background: #1b2520;
   color: #edf4ee;
@@ -15,15 +15,34 @@ html.dark .support-page .support-detail-modal { border-color: #35443b; backgroun
 html.dark .support-page :is(.support-detail-content, .support-detail-handling, .support-detail-replies) { border-color: #35443b; background: #202c25; color: #edf4ee; }
 html.dark .support-page .support-detail-modal > footer button { border-color: #536a59; background: #244d39; color: #fff; }
 html.dark .support-page :is(h1, h2, h3, strong, label) { color: #edf4ee; }
-html.dark .support-page :is(p, span, time, .support-chat-empty, .support-form-hint, .support-ticket-handling) { color: #c4d0c8; }
+html.dark .support-page :is(p, span, time, .support-chat-empty, .support-form-hint) { color: #c4d0c8; }
 html.dark .support-page :is(input, textarea, select) { border-color: #45564b; background: #111916; color: #edf4ee; color-scheme: dark; }
 html.dark .support-page :is(input, textarea)::placeholder { color: #a4b2a8; }
 html.dark .support-page :is(.support-tabs, .support-chat-header, .support-ticket-handling) { border-color: #35443b; }
 html.dark .support-page .support-tabs button { color: #c4d0c8; }
 html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-bottom-color: #91cba4; }
+html.dark .support-page :is(.support-heading p, .support-section-eyebrow) { color: #ff9a66; }
+html.dark .support-page .support-ticket { --support-ticket-surface: #1b2520; color: #edf4ee; }
+html.dark .support-page .support-ticket-top > strong,
+html.dark .support-page .support-ticket > p,
+html.dark .support-page .support-detail-content,
+html.dark .support-page .support-detail-replies > p { color: #e0e9e2; }
+html.dark .support-page .support-ticket > footer { border-color: #35443b; }
+html.dark .support-page .support-ticket > footer :is(time, span) { color: #bbc9be; }
+html.dark .support-page .support-ticket > footer button { border-color: #536a59; background: #26372d; color: #dff1e3; }
+html.dark .support-page .support-ticket-status { background: #54351f; color: #ffd0a8; }
+html.dark .support-page .support-ticket-status--inprogress,
+html.dark .support-page .support-ticket-status--resolved { background: #244832; color: #b8e8c4; }
+html.dark .support-page .support-detail-modal > header,
+html.dark .support-page .support-detail-modal > footer { border-color: #35443b; }
+html.dark .support-page .support-detail-modal > header button { border-color: #536a59; color: #d6e4d9; }
+html.dark .support-page .support-detail-meta { color: #bdcbbf; }
+html.dark .support-page .support-detail-handling :is(strong, span) { color: #d5e1d7; }
+html.dark .support-page .support-ticket-reply { border-left-color: #79b389; background: #26372d; }
+html.dark .support-page .support-ticket-reply :is(strong, p, time) { color: #d8e8dc; }
 
-.support-main {
-  width: min(calc(100% - 40px), 1120px);
+.annual-home > main.support-main {
+  width: min(calc(100% - 64px), 1260px);
   min-height: calc(100vh - 162px);
   margin: 0 auto;
   padding: 44px 0 76px;
@@ -38,19 +57,27 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
 }
 
 .support-heading {
+  display: grid;
+  justify-items: center;
+  text-align: center;
   border: 1px solid #f1dfd3;
   border-radius: 20px;
   background: linear-gradient(115deg, #fff 0%, #fff8f2 100%);
-  padding: 24px 28px;
+  padding: 26px 28px;
   box-shadow: 0 12px 32px rgb(28 48 35 / 5%);
+}
+
+.support-heading p {
+  margin-bottom: 8px;
 }
 
 .support-heading h1 {
   margin: 0;
   color: #1b2820;
-  font-family: Newsreader, Georgia, serif;
-  font-size: clamp(40px, 6vw, 64px);
-  letter-spacing: -.045em;
+  font-family: inherit;
+  font-size: clamp(32px, 4vw, 44px);
+  font-weight: 750;
+  letter-spacing: -.04em;
 }
 
 .support-heading > span {
@@ -475,13 +502,19 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
 }
 
 .support-ticket {
-  border: 1px solid #e9ede9;
+  --support-angle: 0deg;
+  --support-ticket-surface: #fff;
+  border: 1px solid transparent;
   border-radius: 13px;
-  background: #fff;
+  background: linear-gradient(var(--support-ticket-surface), var(--support-ticket-surface)) padding-box,
+    conic-gradient(from var(--support-angle), #f36f21, #f4c95d, #42b883, #49a6db, #a677d5, #f36f21) border-box;
   padding: 14px;
+  animation: support-rainbow-turn 12s linear infinite;
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
-.support-ticket:hover { transform: translateY(-1px); border-color: #c8d9ca; box-shadow: 0 8px 20px rgb(28 48 35 / 6%); }
+.support-ticket:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgb(28 48 35 / 8%); }
+@property --support-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes support-rainbow-turn { to { --support-angle: 360deg; } }
 
 .support-ticket-top {
   display: flex;
@@ -609,7 +642,7 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
 }
 
 @media (max-width: 760px) {
-  .support-main {
+  .annual-home > main.support-main {
     width: min(calc(100% - 28px), 1120px);
     padding-top: 30px;
   }
@@ -636,4 +669,9 @@ html.dark .support-page .support-tabs button.is-active { color: #91cba4; border-
   .support-chat-composer button {
     padding: 0 12px;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .support-ticket { animation: none; transition-duration: .01ms !important; }
+  .support-detail-backdrop, .support-detail-modal { animation-duration: .01ms !important; }
 }
