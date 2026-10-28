@@ -318,9 +318,9 @@ function PolicyView() {
       }, 0);
       return () => window.clearTimeout(timer);
     }
-    setTab('rules');
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
+      setTab('rules');
       void loadDetail(policyCode, controller.signal);
       setMenuOpen(false);
     }, 0);

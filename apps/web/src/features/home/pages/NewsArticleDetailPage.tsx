@@ -7,7 +7,7 @@ import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
-import { FALLBACK_NEWS, type NewsArticleItem } from './HomeInfoPage';
+import { FALLBACK_NEWS, type NewsArticleItem } from './newsData';
 import './HomePage.css';
 import './HomeInfoPage.css';
 import './NewsArticleDetailPage.css';
@@ -107,7 +107,8 @@ const NewsArticleDetailPage: React.FC<{ librarianMode?: boolean }> = ({ libraria
   }, [articleId]);
 
   useEffect(() => {
-    void loadComments();
+    const timer = window.setTimeout(() => { void loadComments(); }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadComments]);
 
   const topLevelComments = useMemo(() => comments.filter((comment) => !comment.parentCommentId), [comments]);

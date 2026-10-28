@@ -257,7 +257,7 @@ const AdminReportsPage: React.FC = () => {
   const selectedRequestTemplate = templates.find((template) => template.id === requestTemplateId);
   const assignedRequests = useMemo(() => requests.filter((request) => !request.isSelfSubmitted), [requests]);
   const selfSubmittedReports = useMemo(() => requests.filter((request) => request.isSelfSubmitted), [requests]);
-  const matchesAssignmentPeriod = (periodStart: string, periodEnd: string) => {
+  const matchesAssignmentPeriod = useCallback((periodStart: string, periodEnd: string) => {
     if (assignmentDates.length !== 2) return true;
     const start = dateFromInput(periodStart.slice(0, 10));
     const end = dateFromInput(periodEnd.slice(0, 10));
@@ -265,14 +265,14 @@ const AdminReportsPage: React.FC = () => {
     const filterStart = new Date(assignmentDates[0].getFullYear(), assignmentDates[0].getMonth(), assignmentDates[0].getDate());
     const filterEnd = new Date(assignmentDates[1].getFullYear(), assignmentDates[1].getMonth(), assignmentDates[1].getDate());
     return start <= filterEnd && end >= filterStart;
-  };
+  }, [assignmentDates]);
   const periodAssignedRequests = useMemo(
     () => assignedRequests.filter((request) => matchesAssignmentPeriod(request.periodStart, request.periodEnd)),
-    [assignedRequests, assignmentDates],
+    [assignedRequests, matchesAssignmentPeriod],
   );
   const periodSelfSubmittedReports = useMemo(
     () => selfSubmittedReports.filter((report) => matchesAssignmentPeriod(report.periodStart, report.periodEnd)),
-    [selfSubmittedReports, assignmentDates],
+    [selfSubmittedReports, matchesAssignmentPeriod],
   );
   const assignmentCounts = useMemo(() => ({
     all: assignedRequests.length,

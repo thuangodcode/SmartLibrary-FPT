@@ -88,17 +88,35 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
             query = query.Where(book => book.Categories.Any(category => category.Id == categoryId.Value && !category.IsDeleted));
 
         var totalCount = await query.CountAsync(ct);
-        IOrderedQueryable<Book> orderedQuery = sortByReviewCount
-            ? reviewCountAscending
-                ? query.OrderBy(book => _context.Reviews.Count(review => review.BookId == book.Id && !review.IsDeleted)).ThenBy(book => book.Title)
-                : query.OrderByDescending(book => _context.Reviews.Count(review => review.BookId == book.Id && !review.IsDeleted)).ThenBy(book => book.Title)
-            : query.OrderByDescending(book => book.CreatedAt);
+        IQueryable<Book> orderedQuery;
+        if (sortByReviewCount)
+        {
+            var reviewCounts = _context.Reviews.AsNoTracking()
+                .Where(review => !review.IsDeleted)
+                .GroupBy(review => review.BookId)
+                .Select(group => new { BookId = group.Key, Count = group.Count() });
+
+            orderedQuery = reviewCountAscending
+                ? from book in query
+                  join reviewCount in reviewCounts on book.Id equals reviewCount.BookId into counts
+                  from reviewCount in counts.DefaultIfEmpty()
+                  orderby reviewCount == null ? 0 : reviewCount.Count, book.Title
+                  select book
+                : from book in query
+                  join reviewCount in reviewCounts on book.Id equals reviewCount.BookId into counts
+                  from reviewCount in counts.DefaultIfEmpty()
+                  orderby reviewCount == null ? 0 : reviewCount.Count descending, book.Title
+                  select book;
+        }
+        else
+        {
+            orderedQuery = query.OrderByDescending(book => book.CreatedAt);
+        }
 
         var items = await orderedQuery
             .AsSplitQuery()
             .Include(book => book.Authors)
             .Include(book => book.Categories)
-            .OrderByDescending(book => book.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
