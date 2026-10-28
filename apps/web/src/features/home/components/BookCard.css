@@ -1,4 +1,8 @@
 .book-card {
+  --book-card-rainbow-angle: 0deg;
+  --book-card-border-width: 2px;
+  --book-card-border-radius: 16px;
+  --book-card-surface: #fff;
   --book-card-ground: #eef1ee;
   --book-card-ink: #17231d;
   --book-card-soft: #627067;
@@ -7,11 +11,42 @@
   min-width: 0;
   height: 100%;
   flex-direction: column;
-  background: #fff;
+  border: var(--book-card-border-width) solid transparent;
+  border-radius: var(--book-card-border-radius);
+  background: linear-gradient(var(--book-card-surface), var(--book-card-surface)) padding-box,
+    conic-gradient(from var(--book-card-rainbow-angle), #e84b16 0deg, #f0a900 65deg, #16a66a 130deg, #0789d1 195deg, #7544c8 260deg, #d92c77 315deg, #e84b16 360deg) border-box;
   color: var(--book-card-ink);
   isolation: isolate;
   position: relative;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgb(23 35 29 / 8%);
+  animation: book-card-rainbow-turn 10s linear infinite;
+  transition: transform 180ms ease, box-shadow 180ms ease;
 }
+
+.book-card:hover,
+.book-card:focus-within { transform: translateY(-3px); box-shadow: 0 14px 28px rgb(23 35 29 / 15%); }
+
+@property --book-card-rainbow-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes book-card-rainbow-turn { to { --book-card-rainbow-angle: 360deg; } }
+
+html.dark .book-card {
+  --book-card-surface: #1b2520;
+  box-shadow: 0 8px 20px rgb(0 0 0 / 24%);
+}
+
+html.dark .annual-home .book-card,
+html.dark .annual-home .annual-books .book-card {
+  border-color: transparent;
+  background: linear-gradient(var(--book-card-surface), var(--book-card-surface)) padding-box,
+    conic-gradient(from var(--book-card-rainbow-angle), #ff642e 0deg, #ffd044 65deg, #32d583 130deg, #36bafa 195deg, #a78bfa 260deg, #fb63a7 315deg, #ff642e 360deg) border-box;
+  color: #edf4ee;
+}
+
+html.dark .book-card__category { color: #9bd2aa; }
+html.dark .book-card__reason { background: #24362b; }
+html.dark .book-card__reason p { color: #d3e3d7; }
+html.dark .book-card__borrow-count { color: #9bd2aa; }
 
 .book-card__media {
   position: relative;
@@ -149,6 +184,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .book-card { animation: none; transition-duration: .01ms !important; }
   .book-card__cover,
   .book-card__action,
   .book-card__action svg { transition-duration: .01ms !important; }

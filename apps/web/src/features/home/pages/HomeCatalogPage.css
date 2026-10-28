@@ -42,21 +42,10 @@
 
 .catalog-book-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); align-items: stretch; gap: 22px 16px; }
 .catalog-book-grid .book-card {
-  --catalog-card-angle: 0deg;
   --book-card-ink: #17231d;
   --book-card-soft: #617067;
-  border: 1px solid transparent;
-  border-radius: 16px;
-  background: linear-gradient(var(--catalog-surface), var(--catalog-surface)) padding-box,
-    conic-gradient(from var(--catalog-card-angle), #f36f21, #f4c95d, #42b883, #49a6db, #a677d5, #f36f21) border-box;
-  box-shadow: 0 7px 18px rgb(23 35 29 / 5%);
-  animation: catalog-rainbow-turn 14s linear infinite;
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  --book-card-surface: var(--catalog-surface);
 }
-.catalog-book-grid .book-card:hover,
-.catalog-book-grid .book-card:focus-within { transform: translateY(-3px); box-shadow: 0 14px 30px rgb(23 35 29 / 12%); }
-@property --catalog-card-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
-@keyframes catalog-rainbow-turn { to { --catalog-card-angle: 360deg; } }
 
 html.dark .annual-catalog-page { --catalog-ground: #111a15; --catalog-surface: #1b2520; --catalog-ink: #edf4ee; --catalog-soft: #bdcbbf; }
 html.dark .annual-catalog-page .catalog-category-list button { color: #c4d0c8; }
@@ -65,7 +54,7 @@ html.dark .annual-catalog-page .catalog-mobile-categories__rail button { backgro
 html.dark .annual-catalog-page .catalog-category-list button:hover { background: #2a3b30; color: #fff; }
 html.dark .annual-catalog-page .catalog-category-list button.is-active,
 html.dark .annual-catalog-page .catalog-mobile-categories__rail button.is-active { background: #2b6545; color: #fff; }
-html.dark .annual-catalog-page .catalog-book-grid .book-card { --book-card-ink: #edf4ee; --book-card-soft: #bdcbbf; }
+html.dark .annual-catalog-page .catalog-book-grid .book-card { --book-card-ink: #edf4ee; --book-card-soft: #bdcbbf; --book-card-surface: #1b2520; }
 html.dark .annual-catalog-page .book-card__category { color: #9bd2aa; }
 html.dark .annual-catalog-page .book-card__reason { background: #24362b; }
 html.dark .annual-catalog-page .book-card__reason p { color: #d3e3d7; }
@@ -147,7 +136,6 @@ html.dark .annual-catalog-page .book-card__borrow-count { color: #9bd2aa; }
 
 @media (prefers-reduced-motion: reduce) {
   .catalog-category-list button { transition-duration: .01ms !important; }
-  .catalog-book-grid .book-card { animation: none; transition-duration: .01ms !important; }
   .catalog-book-skeleton,
   .catalog-category-skeletons span { animation-duration: .01ms; animation-iteration-count: 1; }
 }
