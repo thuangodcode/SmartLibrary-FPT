@@ -249,7 +249,7 @@ public class BookService
         {
             var nextCopyNumber = await _bookRepository.GetNextCopyNumberAsync(id, book.Code, ct);
             var locationForNewCopies = form.Location is null
-                ? activeCopies.Select(copy => copy.Location).FirstOrDefault()
+                ? activeCopies.Select(copy => copy.Location).FirstOrDefault(location => !string.IsNullOrWhiteSpace(location))
                 : string.IsNullOrWhiteSpace(form.Location) ? null : form.Location.Trim();
 
             for (var index = 0; index < copyCountDifference; index++)
@@ -392,6 +392,18 @@ public class BookService
         await _unitOfWork.SaveChangesAsync(ct);
         await SyncRagBookAsync(book.Id, deleted: true, ct);
 
+        return Result<bool>.Success(true);
+    }
+
+    public async Task<Result<bool>> RestoreAsync(Guid id, CancellationToken ct = default)
+    {
+        var book = await _bookRepository.GetDeletedWithDetailsAsync(id, ct);
+        if (book is null) return Result<bool>.Failure(Errors.NotFound);
+
+        book.IsDeleted = false;
+        await _bookRepository.UpdateAsync(book, ct);
+        await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagBookAsync(book.Id, deleted: false, ct);
         return Result<bool>.Success(true);
     }
 

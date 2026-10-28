@@ -174,6 +174,14 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
             .Include(b => b.Copies)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
+    public async Task<Book?> GetDeletedWithDetailsAsync(Guid id, CancellationToken ct = default)
+        => await _dbSet.IgnoreQueryFilters()
+            .Include(b => b.Authors)
+            .Include(b => b.Categories)
+            .Include(b => b.Publisher)
+            .Include(b => b.Copies)
+            .FirstOrDefaultAsync(b => b.Id == id && b.IsDeleted, ct);
+
     public async Task<int> GetNextCopyNumberAsync(Guid bookId, string bookCode, CancellationToken ct = default)
     {
         var prefix = $"{bookCode}-";

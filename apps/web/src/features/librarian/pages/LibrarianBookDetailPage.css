@@ -795,3 +795,7 @@
 @keyframes bookSpin {
   to { transform: rotate(360deg); }
 }
+.lib-book-capacity-warning,
+.lib-book-capacity-hint { display: block; margin-top: 7px; font-size: 12px; line-height: 1.45; }
+.lib-book-capacity-warning { color: #b42318 !important; font-weight: 700; }
+.lib-book-capacity-hint { color: #087443 !important; }

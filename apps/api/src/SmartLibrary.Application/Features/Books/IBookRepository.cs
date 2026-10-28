@@ -13,6 +13,7 @@ public interface IBookRepository : IRepository<Book>
     Task<Book?> GetByIsbnAsync(string isbn, CancellationToken ct = default);
     Task<bool> IsCodeTakenAsync(string code, CancellationToken ct = default);
     Task<Book?> GetWithDetailsAsync(Guid id, CancellationToken ct = default);
+    Task<Book?> GetDeletedWithDetailsAsync(Guid id, CancellationToken ct = default);
     Task<int> GetNextCopyNumberAsync(Guid bookId, string bookCode, CancellationToken ct = default);
     Task<(int TotalCopies, int AvailableCopies)> GetCopyAvailabilityAsync(Guid bookId, CancellationToken ct = default);
 }

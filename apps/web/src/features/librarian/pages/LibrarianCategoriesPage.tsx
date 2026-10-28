@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Archive,
+  RotateCcw,
 } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
@@ -52,6 +53,9 @@ const LibrarianCategoriesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deletedItems, setDeletedItems] = useState<{ books: Array<{ id: string; title: string; code: string; totalCopies: number }>; categories: Array<{ id: string; name: string }> }>({ books: [], categories: [] });
+  const [showDeletedItems, setShowDeletedItems] = useState(false);
+  const [loadingDeletedItems, setLoadingDeletedItems] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -111,6 +115,40 @@ const LibrarianCategoriesPage: React.FC = () => {
       .finally(() => setLoading(false));
   };
 
+  const loadDeletedItems = async () => {
+    setLoadingDeletedItems(true);
+    try {
+      const headers: Record<string, string> = {};
+      if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+      const [booksResponse, categoriesResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/books/deleted`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/categories/deleted`, { headers }),
+      ]);
+      const [booksResult, categoriesResult] = await Promise.all([
+        parseApiResponse<{ success?: boolean; data?: Array<{ id: string; title: string; code: string; totalCopies: number }> }>(booksResponse),
+        parseApiResponse<{ success?: boolean; data?: Array<{ id: string; name: string }> }>(categoriesResponse),
+      ]);
+      if (!booksResponse.ok || !categoriesResponse.ok) throw new Error('Không thể tải danh sách đã xóa.');
+      setDeletedItems({ books: booksResult.data ?? [], categories: categoriesResult.data ?? [] });
+    } catch (caught) {
+      showToast({ type: 'error', title: 'Không tải được mục đã xóa', message: caught instanceof Error ? caught.message : 'Vui lòng thử lại.' });
+    } finally { setLoadingDeletedItems(false); }
+  };
+
+  const restoreItem = async (kind: 'books' | 'categories', id: string) => {
+    try {
+      const headers: Record<string, string> = {};
+      if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+      const response = await fetch(`${API_BASE_URL}/api/v1/${kind}/${id}/restore`, { method: 'POST', headers });
+      const result = await parseApiResponse<{ success?: boolean; error?: string }>(response);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể khôi phục mục này.');
+      showToast({ type: 'success', title: 'Đã khôi phục', message: kind === 'books' ? 'Đầu sách đã được đưa lại vào danh mục.' : 'Danh mục đã được khôi phục.' });
+      await Promise.all([loadDeletedItems(), requestCategories().then(setCategories)]);
+    } catch (caught) {
+      showToast({ type: 'error', title: 'Khôi phục không thành công', message: caught instanceof Error ? caught.message : 'Vui lòng thử lại.' });
+    }
+  };
+
   // Filtered categories
   const filteredCategories = useMemo(() => {
     if (!searchTerm.trim()) return categories;
@@ -152,6 +190,9 @@ const LibrarianCategoriesPage: React.FC = () => {
         </div>
 
         {activeView === 'categories' && <div className="lib-cat-actions">
+          <button type="button" className="lib-cat-btn-add" onClick={() => { setShowDeletedItems((open) => !open); if (!showDeletedItems) void loadDeletedItems(); }}>
+            <Archive size={18} /><span>{showDeletedItems ? 'Ẩn mục đã xóa' : 'Đã xóa & khôi phục'}</span>
+          </button>
           <button
             type="button"
             className="lib-cat-btn-add"
@@ -186,6 +227,14 @@ const LibrarianCategoriesPage: React.FC = () => {
 
       {activeView === 'copies' ? <LibrarianCopiesPage embedded /> : (
         <>
+      {showDeletedItems && <section className="lib-cat-pnc-panel lib-cat-deleted-panel">
+        <div className="lib-cat-pnc-header"><div className="lib-cat-pnc-title-group"><div className="lib-cat-pnc-pill">THÙNG LƯU TRỮ</div><h2 className="lib-cat-pnc-title">Mục đã xóa mềm</h2><span className="lib-cat-pnc-count">Có thể khôi phục khi cần</span></div><button type="button" className="lib-cat-refresh-btn" onClick={() => void loadDeletedItems()} disabled={loadingDeletedItems}><RefreshCw size={16} className={loadingDeletedItems ? 'spinning' : ''} /></button></div>
+        {loadingDeletedItems ? <p>Đang tải...</p> : <div className="lib-cat-deleted-list">
+          {deletedItems.categories.map((item) => <article key={`category-${item.id}`}><div><strong>Danh mục · {item.name}</strong><small>Đã xóa mềm; sách liên kết vẫn được giữ.</small></div><button type="button" onClick={() => void restoreItem('categories', item.id)}><RotateCcw size={15} /> Khôi phục</button></article>)}
+          {deletedItems.books.map((item) => <article key={`book-${item.id}`}><div><strong>Đầu sách · {item.title}</strong><small>{item.code} · {item.totalCopies} bản sao</small></div><button type="button" onClick={() => void restoreItem('books', item.id)}><RotateCcw size={15} /> Khôi phục</button></article>)}
+          {!deletedItems.categories.length && !deletedItems.books.length && <p>Không có danh mục hoặc đầu sách đã xóa.</p>}
+        </div>}
+      </section>}
       {/* Quick Metrics Bar */}
       <section className="lib-cat-metrics-grid">
         <div className="lib-cat-metric-card">

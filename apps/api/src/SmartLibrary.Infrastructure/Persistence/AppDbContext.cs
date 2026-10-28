@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<Book> Books => Set<Book>();
     public DbSet<BookFieldConfiguration> BookFieldConfigurations => Set<BookFieldConfiguration>();
     public DbSet<BookCopy> BookCopies => Set<BookCopy>();
+    public DbSet<StorageShelf> StorageShelves => Set<StorageShelf>();
     public DbSet<Author> Authors => Set<Author>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Publisher> Publishers => Set<Publisher>();
@@ -187,6 +188,16 @@ public class AppDbContext : DbContext
                 v => v.ToString().ToLower(),
                 v => Enum.Parse<BookCondition>(v, true)
             );
+        });
+
+        modelBuilder.Entity<StorageShelf>(entity =>
+        {
+            entity.ToTable("storage_shelves");
+            entity.HasKey(shelf => shelf.Id);
+            entity.Property(shelf => shelf.Name).HasMaxLength(255).IsRequired();
+            entity.Property(shelf => shelf.Capacity).HasDefaultValue(100);
+            entity.Property(shelf => shelf.IsDeleted).HasDefaultValue(false);
+            entity.HasIndex(shelf => shelf.Name).IsUnique().HasFilter("is_deleted = FALSE");
         });
 
         modelBuilder.Entity<Review>(entity =>

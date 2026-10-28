@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Categories;
 using SmartLibrary.Application.Features.Categories.DTOs;
+using SmartLibrary.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -11,10 +13,12 @@ namespace SmartLibrary.Api.Controllers;
 public class CategoriesController : ControllerBase
 {
     private readonly CategoryService _categoryService;
+    private readonly AppDbContext _db;
 
-    public CategoriesController(CategoryService categoryService)
+    public CategoriesController(CategoryService categoryService, AppDbContext db)
     {
         _categoryService = categoryService;
+        _db = db;
     }
 
     /// <summary>
@@ -89,6 +93,34 @@ public class CategoriesController : ControllerBase
             return NotFound(ApiResponse<object>.Fail(result.Error!));
         }
 
+        return Ok(ApiResponse<bool>.Ok(true));
+    }
+
+    [HttpGet("deleted")]
+    [Authorize(Policy = "LibrarianOnly")]
+    public async Task<IActionResult> GetDeleted(CancellationToken ct = default)
+    {
+        var categories = await _db.Categories.IgnoreQueryFilters().AsNoTracking()
+            .Where(category => category.IsDeleted)
+            .OrderByDescending(category => category.UpdatedAt)
+            .Select(category => new { category.Id, category.Name, category.Description, category.ImageUrl, category.UpdatedAt })
+            .ToListAsync(ct);
+        return Ok(ApiResponse<object>.Ok(categories));
+    }
+
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Policy = "LibrarianOnly")]
+    public async Task<IActionResult> Restore(Guid id, CancellationToken ct = default)
+    {
+        var category = await _db.Categories.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(item => item.Id == id && item.IsDeleted, ct);
+        if (category is null) return NotFound(ApiResponse<object>.Fail("Không tìm thấy danh mục đã xóa."));
+
+        var nameInUse = await _db.Categories.AnyAsync(item => !item.IsDeleted && item.Name.ToLower() == category.Name.ToLower(), ct);
+        if (nameInUse) return Conflict(ApiResponse<object>.Fail("Không thể khôi phục vì một danh mục đang hoạt động đã dùng tên này. Đổi tên danh mục hiện tại trước."));
+
+        category.IsDeleted = false;
+        await _db.SaveChangesAsync(ct);
         return Ok(ApiResponse<bool>.Ok(true));
     }
 }

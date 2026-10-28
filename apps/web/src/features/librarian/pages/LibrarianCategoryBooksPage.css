@@ -1199,3 +1199,4 @@
     grid-column: span 1;
   }
 }
+.lib-cat-capacity-warning { display: block; margin-top: 6px; color: #b42318 !important; font-size: 12px; font-weight: 700; }

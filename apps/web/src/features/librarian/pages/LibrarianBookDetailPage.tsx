@@ -22,7 +22,6 @@ import {
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { parseApiResponse } from '../../../lib/api';
-import { STORAGE_LOCATIONS } from '../storageLocations';
 import type { CategoryItem } from './LibrarianCategoriesPage';
 import './LibrarianBookDetailPage.css';
 
@@ -66,6 +65,8 @@ interface BookCopiesResponse {
   };
 }
 
+interface StorageLocationOption { id: string; name: string; copyCount: number; capacity: number; availableCapacity: number }
+
 const COPY_PAGE_SIZE = 20;
 
 const getCopyStatus = (copy: BookCopyItem) => {
@@ -86,6 +87,9 @@ const LibrarianBookDetailPage: React.FC = () => {
 
   const [book, setBook] = useState<BookDetailData | null>(null);
   const [copies, setCopies] = useState<BookCopyItem[]>([]);
+  const [allBookCopies, setAllBookCopies] = useState<BookCopyItem[]>([]);
+  const [allBookCopiesLoaded, setAllBookCopiesLoaded] = useState(false);
+  const [storageLocations, setStorageLocations] = useState<StorageLocationOption[]>([]);
   const [copiesLoading, setCopiesLoading] = useState(true);
   const [copiesError, setCopiesError] = useState<string | null>(null);
   const [copiesPage, setCopiesPage] = useState(1);
@@ -94,6 +98,17 @@ const LibrarianBookDetailPage: React.FC = () => {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const headers: Record<string, string> = {};
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    void fetch(`${API_BASE_URL}/api/v1/copies/locations`, { headers })
+      .then((response) => parseApiResponse<{ success?: boolean; data?: StorageLocationOption[] }>(response))
+      .then((result) => { if (!cancelled && Array.isArray(result?.data)) setStorageLocations(result.data); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [accessToken]);
 
   // Confirmation before edit & before delete
   const [confirmEditOpen, setConfirmEditOpen] = useState(false);
@@ -206,6 +221,39 @@ const LibrarianBookDetailPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [accessToken, bookId, copiesPage, copiesRefreshKey]);
 
+  useEffect(() => {
+    if (!isEditModalOpen || !bookId) return;
+    let cancelled = false;
+    const loadAllBookCopies = async () => {
+      setAllBookCopiesLoaded(false);
+      try {
+        const headers: Record<string, string> = {};
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+        const collected: BookCopyItem[] = [];
+        let totalPages = 1;
+        for (let page = 1; page <= totalPages; page += 1) {
+          const params = new URLSearchParams({ bookId, page: String(page), pageSize: '500' });
+          const response = await fetch(`${API_BASE_URL}/api/v1/copies?${params}`, { headers });
+          const result = await parseApiResponse<BookCopiesResponse>(response);
+          if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể kiểm tra sức chứa kệ.');
+          collected.push(...(result.data ?? []));
+          totalPages = Math.max(1, result.meta?.totalPages ?? 1);
+        }
+        if (!cancelled) {
+          setAllBookCopies(collected);
+          setAllBookCopiesLoaded(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setAllBookCopies([]);
+          setAllBookCopiesLoaded(false);
+        }
+      }
+    };
+    void loadAllBookCopies();
+    return () => { cancelled = true; };
+  }, [accessToken, bookId, isEditModalOpen]);
+
   // Handle Opening Edit Modal (after confirmation)
   const handleOpenEditModal = () => {
     if (!book) return;
@@ -218,7 +266,7 @@ const LibrarianBookDetailPage: React.FC = () => {
     setEditLanguage(book.language && knownLanguages.includes(book.language) ? book.language : 'custom');
     setEditCustomLanguage(book.language && !knownLanguages.includes(book.language) ? book.language : '');
     setEditTotalCopies(book.totalCopies);
-    const currentLocation = copies.find((copy) => copy.location)?.location ?? '';
+    const currentLocation = (allBookCopies.length ? allBookCopies : copies).find((copy) => copy.location)?.location ?? '';
     setEditLocation(currentLocation);
     setEditLocationOriginal(currentLocation);
     setEditDescription(book.description || '');
@@ -405,6 +453,21 @@ const LibrarianBookDetailPage: React.FC = () => {
       </div>
     );
   }
+
+  const currentBookCopyCount = allBookCopiesLoaded ? allBookCopies.length : book.totalCopies;
+  const locationChanged = editLocation !== editLocationOriginal;
+  const implicitShelfName = !locationChanged && editTotalCopies > currentBookCopyCount
+    ? allBookCopies.find((copy) => copy.location)?.location ?? ''
+    : '';
+  const targetShelfName = locationChanged ? editLocation : implicitShelfName;
+  const targetShelf = storageLocations.find((location) => location.name === targetShelfName);
+  const currentCopiesOnTargetShelf = allBookCopies.filter((copy) => copy.location === targetShelfName).length;
+  const expectedTargetShelfCount = targetShelf
+    ? locationChanged
+      ? targetShelf.copyCount - currentCopiesOnTargetShelf + editTotalCopies
+      : targetShelf.copyCount + Math.max(0, editTotalCopies - currentBookCopyCount)
+    : 0;
+  const editShelfCapacityExceeded = Boolean(targetShelf && expectedTargetShelfCount > targetShelf.capacity);
 
   return (
     <div className="lib-book-detail-page">
@@ -831,14 +894,20 @@ const LibrarianBookDetailPage: React.FC = () => {
                   onChange={(e) => setEditLocation(e.target.value)}
                 >
                   <option value="">Chưa xếp kệ</option>
-                  {editLocation && !STORAGE_LOCATIONS.includes(editLocation) && (
+                  {editLocation && !storageLocations.some((location) => location.name === editLocation) && (
                     <option value={editLocation}>{editLocation} (vị trí hiện tại)</option>
                   )}
-                  {STORAGE_LOCATIONS.map((location) => (
-                    <option key={location} value={location}>{location}</option>
+                  {storageLocations.filter((location) => location.availableCapacity > 0 || location.name === editLocation).map((location) => (
+                    <option key={location.id} value={location.name}>{location.name} · {location.copyCount}/{location.capacity} cuốn · còn {location.availableCapacity}</option>
                   ))}
                 </select>
                 <small>Thay đổi vị trí tại đây sẽ áp dụng cho tất cả bản sao của đầu sách.</small>
+                {targetShelf && <small className={editShelfCapacityExceeded ? 'lib-book-capacity-warning' : 'lib-book-capacity-hint'}>
+                  {editShelfCapacityExceeded
+                    ? `Kệ ${targetShelf.name} sẽ có ${expectedTargetShelfCount}/${targetShelf.capacity} cuốn sau khi lưu. Hãy chọn kệ khác hoặc giảm số bản sao.`
+                    : `Kệ ${targetShelf.name}: dự kiến ${expectedTargetShelfCount}/${targetShelf.capacity} cuốn sau khi lưu.`}
+                </small>}
+                {!allBookCopiesLoaded && <small>Đang kiểm tra số lượng bản sao để xác nhận sức chứa…</small>}
               </div>
 
               <div className="lib-cat-form-group">
@@ -910,7 +979,7 @@ const LibrarianBookDetailPage: React.FC = () => {
                   type="button"
                   className="lib-cat-modal-btn-cancel"
                   onClick={() => setIsEditModalOpen(false)}
-                  disabled={savingEdit}
+                  disabled={savingEdit || !allBookCopiesLoaded || editShelfCapacityExceeded}
                 >
                   Hủy bỏ
                 </button>

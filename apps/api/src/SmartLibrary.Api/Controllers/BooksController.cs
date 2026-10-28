@@ -133,6 +133,18 @@ public class BooksController : ControllerBase
         return Ok(ApiResponse<object>.Ok(new { topRated, mostBorrowed }));
     }
 
+    [HttpGet("deleted")]
+    [Authorize(Policy = "LibrarianOnly")]
+    public async Task<IActionResult> GetDeleted(CancellationToken ct = default)
+    {
+        var books = await _db.Books.IgnoreQueryFilters().AsNoTracking()
+            .Where(book => book.IsDeleted)
+            .OrderByDescending(book => book.UpdatedAt)
+            .Select(book => new { book.Id, book.Code, book.Title, book.CoverImageUrl, book.TotalCopies, book.UpdatedAt })
+            .ToListAsync(ct);
+        return Ok(ApiResponse<object>.Ok(books));
+    }
+
     [HttpGet("code-availability")]
     [Authorize(Policy = "LibrarianOnly")]
     public async Task<IActionResult> CheckCodeAvailability([FromQuery] string? code, CancellationToken ct = default)
@@ -198,10 +210,20 @@ public class BooksController : ControllerBase
     /// Create a new book from form with cover image upload to Cloudinary.
     /// </summary>
     [HttpPost("form")]
-    [Authorize]
+    [Authorize(Policy = "LibrarianOnly")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> CreateFromForm([FromForm] CreateBookForm form, CancellationToken ct = default)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        if (!string.IsNullOrWhiteSpace(form.Location))
+        {
+            var location = form.Location.Trim();
+            var shelf = await _db.StorageShelves.FromSqlInterpolated($"SELECT * FROM storage_shelves WHERE name = {location} AND is_deleted = FALSE FOR UPDATE").FirstOrDefaultAsync(ct);
+            if (shelf is null) return BadRequest(ApiResponse<object>.Fail("Kệ đã chọn không tồn tại hoặc đã ngừng sử dụng."));
+            var occupied = await _db.BookCopies.CountAsync(copy => !copy.IsDeleted && copy.Location == location, ct);
+            if (form.TotalCopies < 1 || occupied + form.TotalCopies > shelf.Capacity)
+                return Conflict(ApiResponse<object>.Fail($"Kệ {shelf.Name} còn {Math.Max(0, shelf.Capacity - occupied)} chỗ, không đủ nhận {form.TotalCopies} bản sao."));
+        }
         Result<BookDto> result;
         try
         {
@@ -213,6 +235,8 @@ public class BooksController : ControllerBase
         }
         if (!result.IsSuccess)
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
+
+        await transaction.CommitAsync(ct);
 
         return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id },
             ApiResponse<BookDto>.Ok(result.Data));
@@ -240,10 +264,39 @@ public class BooksController : ControllerBase
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UpdateFromForm(Guid id, [FromForm] UpdateBookForm form, CancellationToken ct = default)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        var currentBook = await _db.Books.FromSqlInterpolated($"SELECT * FROM books WHERE id = {id} AND is_deleted = FALSE FOR UPDATE").FirstOrDefaultAsync(ct);
+        if (currentBook is null) return NotFound(ApiResponse<object>.Fail("Không tìm thấy đầu sách."));
+
+        var currentCopies = await _db.BookCopies
+            .FromSqlInterpolated($"SELECT * FROM book_copies WHERE book_id = {id} AND is_deleted = FALSE FOR UPDATE")
+            .ToListAsync(ct);
+        var currentTotal = currentCopies.Count;
+        var newTotal = form.TotalCopies ?? currentTotal;
+        var targetLocation = form.Location is null
+            ? (newTotal > currentTotal ? currentCopies.Select(copy => copy.Location).FirstOrDefault(location => !string.IsNullOrWhiteSpace(location)) : null)
+            : string.IsNullOrWhiteSpace(form.Location) ? null : form.Location.Trim();
+        var shelf = string.IsNullOrWhiteSpace(targetLocation)
+            ? null
+            : await _db.StorageShelves.FromSqlInterpolated($"SELECT * FROM storage_shelves WHERE name = {targetLocation} AND is_deleted = FALSE FOR UPDATE").FirstOrDefaultAsync(ct);
+        if (!string.IsNullOrWhiteSpace(targetLocation) && shelf is null)
+            return BadRequest(ApiResponse<object>.Fail("Kệ đã chọn không tồn tại hoặc đã ngừng sử dụng."));
+
+        if (shelf is not null)
+        {
+            var occupied = await _db.BookCopies.CountAsync(copy => !copy.IsDeleted && copy.Location == targetLocation, ct);
+            var targetCopiesAfterSave = form.Location is null
+                ? occupied + Math.Max(0, newTotal - currentTotal)
+                : occupied - currentCopies.Count(copy => copy.Location == targetLocation) + newTotal;
+            if (targetCopiesAfterSave > shelf.Capacity)
+                return Conflict(ApiResponse<object>.Fail($"Kệ {shelf.Name} sẽ có {targetCopiesAfterSave}/{shelf.Capacity} bản sao sau khi lưu."));
+        }
+
         var result = await _bookService.UpdateFromFormAsync(id, form, ct);
         if (!result.IsSuccess)
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
 
+        await transaction.CommitAsync(ct);
         return Ok(ApiResponse<BookDto>.Ok(result.Data!));
     }
 
@@ -258,6 +311,15 @@ public class BooksController : ControllerBase
         if (!result.IsSuccess)
             return NotFound(ApiResponse<object>.Fail(result.Error!));
 
+        return Ok(ApiResponse<bool>.Ok(true));
+    }
+
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Policy = "LibrarianOnly")]
+    public async Task<IActionResult> Restore(Guid id, CancellationToken ct = default)
+    {
+        var result = await _bookService.RestoreAsync(id, ct);
+        if (!result.IsSuccess) return NotFound(ApiResponse<object>.Fail(result.Error!));
         return Ok(ApiResponse<bool>.Ok(true));
     }
 

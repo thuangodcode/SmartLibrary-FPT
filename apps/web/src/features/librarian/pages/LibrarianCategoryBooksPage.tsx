@@ -26,7 +26,6 @@ import {
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { parseApiResponse } from '../../../lib/api';
-import { STORAGE_LOCATIONS } from '../storageLocations';
 import type { CategoryItem } from './LibrarianCategoriesPage';
 import './LibrarianCategoryBooksPage.css';
 
@@ -60,6 +59,8 @@ interface BookFieldDefinition {
   required?: boolean;
   placeholder?: string;
 }
+
+interface StorageLocationOption { id: string; name: string; copyCount: number; capacity: number; availableCapacity: number }
 
 const DEFAULT_BOOK_FIELDS: BookFieldDefinition[] = [
   { key: 'title', label: 'Tiêu đề sách', type: 'text', visible: true, required: true },
@@ -232,6 +233,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
   const [customBookLanguage, setCustomBookLanguage] = useState('');
   const [bookTotalCopies, setBookTotalCopies] = useState(1);
   const [bookLocation, setBookLocation] = useState('');
+  const [storageLocations, setStorageLocations] = useState<StorageLocationOption[]>([]);
   const [bookDescription, setBookDescription] = useState('');
   const [bookCoverFile, setBookCoverFile] = useState<File | null>(null);
   const [bookCoverPreview, setBookCoverPreview] = useState<string | null>(null);
@@ -240,6 +242,17 @@ const LibrarianCategoryBooksPage: React.FC = () => {
   const [bookFieldsLoaded, setBookFieldsLoaded] = useState(false);
   const [customBookValues, setCustomBookValues] = useState<Record<string, string>>({});
   const [newBookFieldLabel, setNewBookFieldLabel] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const headers: Record<string, string> = {};
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    void fetch(`${API_BASE_URL}/api/v1/copies/locations`, { headers })
+      .then((response) => parseApiResponse<{ success?: boolean; data?: StorageLocationOption[] }>(response))
+      .then((result) => { if (!cancelled && Array.isArray(result?.data)) setStorageLocations(result.data); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [accessToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -649,6 +662,20 @@ const LibrarianCategoryBooksPage: React.FC = () => {
         message: 'Vui lòng chọn hoặc nhập ngôn ngữ của sách.',
       });
       return;
+    }
+
+    if (bookLocation) {
+      const selectedShelf = storageLocations.find((location) => location.name === bookLocation);
+      if (!selectedShelf || selectedShelf.availableCapacity < bookTotalCopies) {
+        showToast({
+          type: 'warning',
+          title: 'Kệ không đủ sức chứa',
+          message: selectedShelf
+            ? `Kệ ${selectedShelf.name} còn ${selectedShelf.availableCapacity} chỗ, cần ${bookTotalCopies}. Hãy chọn kệ khác hoặc giảm số bản sao.`
+            : 'Kệ đã chọn không còn hoạt động. Hãy tải lại danh sách và chọn kệ khác.',
+        });
+        return;
+      }
     }
 
     setSavingBook(true);
@@ -1332,8 +1359,9 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                   <label htmlFor="book-location"><MapPin size={14} /><span>Vị trí kệ sách</span></label>
                   <select id="book-location" value={bookLocation} onChange={(e) => setBookLocation(e.target.value)}>
                     <option value="">Chưa xếp kệ</option>
-                    {STORAGE_LOCATIONS.map((location) => <option value={location} key={location}>{location}</option>)}
+                    {storageLocations.filter((location) => location.availableCapacity >= bookTotalCopies || location.name === bookLocation).map((location) => <option value={location.name} key={location.id}>{location.name} · {location.copyCount}/{location.capacity} cuốn · còn {location.availableCapacity}</option>)}
                   </select>
+                  {bookLocation && (() => { const shelf = storageLocations.find((location) => location.name === bookLocation); return shelf ? <small className={shelf.availableCapacity < bookTotalCopies ? 'lib-cat-capacity-warning' : ''}>{shelf.availableCapacity < bookTotalCopies ? `Kệ không đủ chỗ: còn ${shelf.availableCapacity}, cần ${bookTotalCopies}.` : `Sau khi thêm còn ${shelf.availableCapacity - bookTotalCopies} chỗ.`}</small> : null; })()}
                 </div>}
 
                 {bookFields.find((field) => field.key === 'description')?.visible && <div className="lib-cat-form-group col-span-2">
@@ -1418,7 +1446,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                   type="button"
                   className="lib-cat-modal-btn-cancel"
                   onClick={() => navigate(`/librarian/books/categories/${categoryId}`)}
-                  disabled={savingBook}
+                  disabled={savingBook || (!!bookLocation && (storageLocations.find((location) => location.name === bookLocation)?.availableCapacity ?? 0) < bookTotalCopies)}
                 >
                   Hủy bỏ
                 </button>
