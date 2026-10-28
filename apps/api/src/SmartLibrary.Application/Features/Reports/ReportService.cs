@@ -278,17 +278,26 @@ public sealed class ReportService(IReportRepository repository)
                         && x.PaidAt >= previousStart && x.PaidAt < start
                         && !repository.FinePayments.Any(payment => payment.FineId == x.Id));
         var finePreviousCount = await finePreviousPayments.CountAsync(ct) + await finePreviousLegacy.CountAsync(ct);
-        var cashFineRevenue = await currentPayments.Where(x => x.Method == "Cash")
-            .SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
-        var payOSFineRevenue = await currentPayments.Where(x => x.Method == "PayOS")
-            .SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
-        var legacyFineRevenue = (await legacyCurrentFines.SumAsync(x => (decimal?)x.Amount, ct) ?? 0)
-            + (await currentPayments.Where(x => x.Method != "Cash" && x.Method != "PayOS")
+        // Older cash settlements predate fine_payments and only stored the method on fines.
+        // Count those legacy records in the right payment bucket without double-counting
+        // fines that already have a payment row.
+        // This library supports only cash and PayOS. Before FinePayment was introduced,
+        // settled fines were paid at the desk and only stored PaidAt, not PaymentMethod.
+        // Treat historical/unknown non-PayOS methods as cash so revenue reconciles to the
+        // two actual collection channels instead of creating a third bucket.
+        var cashFineRevenue = (await currentPayments.Where(x => x.Method.ToLower() != "payos")
+                .SumAsync(x => (decimal?)x.Amount, ct) ?? 0)
+            + (await legacyCurrentFines.Where(x => x.PaymentMethod == null || x.PaymentMethod.ToLower() != "payos")
                 .SumAsync(x => (decimal?)x.Amount, ct) ?? 0);
+        var payOSFineRevenue = (await currentPayments.Where(x => x.Method.ToLower() == "payos")
+                .SumAsync(x => (decimal?)x.Amount, ct) ?? 0)
+            + (await legacyCurrentFines.Where(x => x.PaymentMethod != null && x.PaymentMethod.ToLower() == "payos")
+                .SumAsync(x => (decimal?)x.Amount, ct) ?? 0);
+        const decimal unclassifiedFineRevenue = 0;
         static decimal Change(decimal currentValue, decimal previousValue) => previousValue == 0 ? (currentValue == 0 ? 0 : 100) : Math.Round((currentValue - previousValue) / previousValue * 100, 1);
         return new ReportSummaryDto(start, end.AddDays(-1), borrowed, returned, returned == 0 ? 0 : Math.Round((decimal)onTime / returned * 100, 1),
             Change(borrowed, borrowedPrevious), Change(returned, returnedPrevious), fineRevenue, fineCount,
-            Change(fineCount, finePreviousCount), null, false, cashFineRevenue, payOSFineRevenue, legacyFineRevenue);
+            Change(fineCount, finePreviousCount), null, false, cashFineRevenue, payOSFineRevenue, unclassifiedFineRevenue);
     }
 
     public async Task<IReadOnlyList<CategoryBorrowDto>> BorrowByCategoryAsync(DateTime? from, DateTime? to, CancellationToken ct)

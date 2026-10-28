@@ -37,7 +37,7 @@ public interface ICirculationRepository
     Task<BorrowRecord?> GetTrackedLoanAsync(Guid id, CancellationToken ct);
     Task<BorrowRecord?> FindActiveLoanByBarcodeAsync(string barcode, CancellationToken ct);
     Task<IReadOnlyList<CirculationLoanDto>> GetOverdueAsync(int finePerDay, CancellationToken ct);
-    Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct);
+    Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct, DateTime? from = null, DateTime? to = null);
     Task<IReadOnlyList<CirculationFineDto>> GetFinesForReaderAsync(Guid readerId, CancellationToken ct);
     Task<(IReadOnlyList<CirculationLoanDto> Items, int Total)> GetLoansForReaderAsync(
         Guid readerId, int page, int pageSize, CirculationSettings settings, CancellationToken ct);

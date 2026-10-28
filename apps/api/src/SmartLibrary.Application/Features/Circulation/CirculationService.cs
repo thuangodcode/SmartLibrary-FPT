@@ -555,8 +555,8 @@ public class CirculationService
         return newlyOverdue;
     }
 
-    public Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct = default)
-        => _repository.GetFinesAsync(search, status, ct);
+    public Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct = default, DateTime? from = null, DateTime? to = null)
+        => _repository.GetFinesAsync(search, status, ct, from, to);
 
     public async Task<Result<CirculationFineDto>> RecordFineAsync(RecordFineRequest request, CancellationToken ct = default)
     {

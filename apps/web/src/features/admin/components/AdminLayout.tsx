@@ -3,7 +3,6 @@ import {
   Bell,
   BookOpen,
   Bot,
-  CalendarDays,
   ChartNoAxesCombined,
   ChevronDown,
   ChevronRight,
@@ -42,7 +41,6 @@ const reportNavigation = [
   { label: 'Hoạt động thư viện', to: '/admin/reports/activity', icon: BookOpenCheck },
   { label: 'Tài chính', to: '/admin/reports/finance', icon: CircleDollarSign },
   { label: 'Kho sách', to: '/admin/collection', icon: Boxes },
-  { label: 'Báo cáo định kỳ', to: '/admin/reports/periodic', icon: CalendarDays },
   { label: 'Thư viện báo cáo', to: '/admin/reports/library', icon: FileText },
   { label: 'Quản lý mẫu báo cáo', to: '/admin/reports/templates', icon: FileText },
 ];
@@ -55,7 +53,7 @@ export const AdminLayout: React.FC = () => {
     'Tổng quan': 'shell.adminOverview', 'Quản lý người dùng': 'shell.users', 'Quản lý chính sách': 'shell.policies',
     'Quản lý quy định': 'shell.regulations', 'Thống kê & báo cáo': 'shell.reports', 'Cấu hình AI': 'shell.aiSettings',
     'Theo dõi giao việc': 'shell.reportAssignments', 'Hoạt động thư viện': 'shell.reportActivity', 'Tài chính': 'shell.reportFinance',
-    'Kho sách': 'shell.reportCollection', 'Báo cáo định kỳ': 'shell.reportPeriodic', 'Thư viện báo cáo': 'shell.reportLibrary',
+    'Kho sách': 'shell.reportCollection', 'Thư viện báo cáo': 'shell.reportLibrary',
     'Quản lý mẫu báo cáo': 'shell.reportTemplates',
   };
   const translateLabel = (label: string) => translatedLabels[label] ? t(translatedLabels[label]) : label;

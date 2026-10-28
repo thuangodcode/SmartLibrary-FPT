@@ -29,8 +29,8 @@ public sealed class AdminReportsController(ReportService reports, CirculationSer
         => Ok(ApiResponse<IReadOnlyList<CategoryBorrowDto>>.Ok(await reports.BorrowByCategoryAsync(from, to, ct)));
 
     [HttpGet("finance/fines")]
-    public async Task<ActionResult<ApiResponse<IReadOnlyList<CirculationFineDto>>>> FinanceFines(CancellationToken ct)
-        => Ok(ApiResponse<IReadOnlyList<CirculationFineDto>>.Ok(await circulation.GetFinesAsync(null, null, ct)));
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<CirculationFineDto>>>> FinanceFines([FromQuery] DateTime? from, [FromQuery] DateTime? to, CancellationToken ct)
+        => Ok(ApiResponse<IReadOnlyList<CirculationFineDto>>.Ok(await circulation.GetFinesAsync(null, null, ct, from, to)));
 
     [HttpGet("templates")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<TemplateDto>>>> Templates(CancellationToken ct)

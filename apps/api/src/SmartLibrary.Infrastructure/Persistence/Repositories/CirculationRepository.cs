@@ -337,7 +337,7 @@ public class CirculationRepository : ICirculationRepository
         return await MapLoansAsync(rows, finePerDay, ct);
     }
 
-    public async Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct)
+    public async Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct, DateTime? from = null, DateTime? to = null)
     {
         var query = _db.Fines.AsNoTracking()
             .Include(x => x.Reader)
@@ -363,6 +363,17 @@ public class CirculationRepository : ICirculationRepository
                 FineStatus.Waived => query.Where(x => x.Status == FineStatus.Waived),
                 _ => query
             };
+        }
+
+        if (from.HasValue)
+        {
+            var start = from.Value.Date;
+            query = query.Where(x => (x.PaidAt ?? x.CreatedAt) >= start);
+        }
+        if (to.HasValue)
+        {
+            var endExclusive = to.Value.Date.AddDays(1);
+            query = query.Where(x => (x.PaidAt ?? x.CreatedAt) < endExclusive);
         }
 
         var rows = await query.OrderByDescending(x => x.CreatedAt).Take(100).ToListAsync(ct);
@@ -1052,6 +1063,10 @@ public class CirculationRepository : ICirculationRepository
             .Where(payment => payment.Status == FinePaymentStatus.Pending)
             .OrderByDescending(payment => payment.CreatedAt)
             .FirstOrDefault();
+        var settledPayment = fine.Payments
+            .Where(payment => payment.Status is FinePaymentStatus.Paid or FinePaymentStatus.PaidAfterSettlement)
+            .OrderByDescending(payment => payment.PaidAt ?? payment.CreatedAt)
+            .FirstOrDefault();
         return new CirculationFineDto
         {
             Id = fine.Id,
@@ -1067,8 +1082,11 @@ public class CirculationRepository : ICirculationRepository
             Status = fine.Status.ToString(),
             CreatedAt = fine.CreatedAt,
             PaidAt = fine.PaidAt,
-            PaymentMethod = fine.PaymentMethod,
-            PaymentReference = fine.PaymentReference,
+            PaymentMethod = fine.PaymentMethod
+                ?? settledPayment?.Method
+                // The pre-payment-ledger flow only supported in-person settlement.
+                ?? (fine.Status == FineStatus.Paid && fine.PaidAt.HasValue ? "Cash" : null),
+            PaymentReference = fine.PaymentReference ?? settledPayment?.ProviderReference,
             PendingPaymentStatus = pendingPayment?.Status.ToString(),
             CheckoutUrl = pendingPayment?.CheckoutUrl,
             QrCode = pendingPayment?.QrCode,

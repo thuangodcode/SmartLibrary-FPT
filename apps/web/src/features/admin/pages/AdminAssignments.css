@@ -1,5 +1,5 @@
 .reports-page-assignments {
-  gap: 22px;
+  gap: 24px;
 }
 
 .admin-assignments-hero {
@@ -70,9 +70,15 @@
 
 .admin-assignments-hero-aside .reports-button {
   min-height: 42px;
-  border-color: #f47a3c;
-  background: #f47a3c;
+  border-color: #f36b21;
+  background: #f36b21;
   color: #fff;
+}
+
+.admin-assignments-hero-aside .reports-button:hover:not(:disabled) {
+  border-color: #d9510f;
+  background: #d9510f;
+  box-shadow: 0 7px 18px rgb(8 19 35 / 24%);
 }
 
 .admin-assignment-overview {
@@ -82,11 +88,77 @@
 }
 
 .reports-self-submissions {
-  border-top: 3px solid #ef8754;
+  border-top: 4px solid #ed681f;
+  border-left: 1px solid #f6c6a9;
+  background: linear-gradient(180deg, #fffaf6 0, #fff 130px);
+  box-shadow: 0 9px 24px rgb(178 83 27 / 7%);
 }
 
-.reports-self-submissions .reports-panel-title > div > span {
-  color: #df6d34;
+.reports-page-assignments .reports-assignment-panel {
+  border-left: 4px solid #315d92;
+  box-shadow: 0 9px 24px rgb(35 70 112 / 7%);
+}
+
+.reports-page-assignments .admin-assignments-hero h1 {
+  font-size: clamp(34px, 3.2vw, 44px);
+  letter-spacing: -.035em;
+}
+
+.reports-page-assignments .admin-assignments-hero-copy > p:last-child {
+  max-width: 620px;
+  font-size: 15px;
+}
+
+.reports-page-assignments .admin-report-section-kicker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 27px;
+  margin-bottom: 4px;
+  padding: 0 10px;
+  border: 1px solid #c9d9ec;
+  border-radius: 999px;
+  background: #edf4fc;
+  color: #214f80;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .07em;
+}
+
+.reports-self-submissions .admin-report-section-kicker {
+  border-color: #f4c6a8;
+  background: #fff0e5;
+  color: #a8400d;
+}
+
+.reports-page-assignments .reports-panel-title h2 {
+  margin-top: 6px;
+  color: #17263c;
+  font-size: 21px;
+  font-weight: 780;
+  letter-spacing: -.025em;
+}
+
+.reports-page-assignments .admin-assignment-panel-heading > div > p {
+  margin-top: 8px;
+  color: #4e5e73;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.reports-page-assignments .reports-assignment-count {
+  min-height: 38px;
+  padding: 0 13px;
+  border-color: #ced9e8;
+  background: #eff4fa;
+  color: #294c74;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.reports-self-submissions .reports-assignment-count {
+  border-color: #f2c4a3;
+  background: #fff0e5;
+  color: #a8400d;
 }
 
 .admin-assignment-metric {
@@ -139,15 +211,15 @@
 }
 
 .admin-assignment-metric > div span {
-  color: #394860;
-  font-size: 12px;
-  font-weight: 700;
+  color: #253750;
+  font-size: 13px;
+  font-weight: 750;
 }
 
 .admin-assignment-metric > small {
   grid-column: 2;
-  color: #8792a3;
-  font-size: 11px;
+  color: #58677c;
+  font-size: 12px;
 }
 
 .reports-page-assignments .reports-panel {
@@ -188,22 +260,23 @@
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid #e5e9f0;
-  border-radius: 9px;
+  min-height: 40px;
+  padding: 0 15px;
+  border: 1px solid #cbd5e2;
+  border-radius: 10px;
   background: #fff;
-  color: #657187;
+  color: #34445c;
   font: inherit;
-  font-size: 12px;
-  font-weight: 650;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .admin-assignment-filters button.active {
-  border-color: #cbd7e6;
-  background: #eef3f9;
-  color: #29486d;
+  border-color: #244e7d;
+  background: #244e7d;
+  color: #fff;
+  box-shadow: 0 4px 10px rgb(36 78 125 / 18%);
 }
 
 .admin-assignment-filters button span {
@@ -213,8 +286,8 @@
   place-items: center;
   padding-inline: 5px;
   border-radius: 99px;
-  background: #f0f2f6;
-  color: #59677c;
+  background: #edf1f6;
+  color: #33445b;
   font-size: 11px;
 }
 
@@ -259,9 +332,14 @@
 }
 
 .reports-page-assignments .reports-assignment-list article span {
-  color: #7b8799;
-  font-size: 11px;
+  color: #58677c;
+  font-size: 12px;
   line-height: 1.5;
+}
+
+.reports-page-assignments .reports-assignment-list article strong {
+  color: #1d2d45;
+  font-size: 14px;
 }
 
 .reports-page-assignments .reports-assignment-period strong {
@@ -342,19 +420,42 @@
 }
 
 .reports-page-assignments .reports-assignment-link {
-  min-height: 34px;
-  padding: 0 10px;
-  border: 1px solid #dfe5ed;
-  border-radius: 8px;
-  color: #3e587c;
-  font-size: 11px;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid #b9c9dc;
+  border-radius: 9px;
+  background: #fff;
+  color: #244e7d;
+  font-size: 13px;
+  font-weight: 750;
 }
 
 .reports-page-assignments .reports-assignment-link:hover {
-  border-color: #bfcede;
-  background: #f6f8fb;
+  border-color: #244e7d;
+  background: #edf4fc;
   text-decoration: none;
 }
+
+html.dark .reports-page-assignments .reports-assignment-panel,
+html.dark .reports-page-assignments .reports-self-submissions {
+  background: #17231c;
+  border-color: #354a3c;
+}
+
+html.dark .reports-page-assignments .reports-self-submissions {
+  border-top-color: #f17937;
+  border-left-color: #69452f;
+}
+
+html.dark .reports-page-assignments .reports-assignment-panel { border-left-color: #6494c8; }
+html.dark .reports-page-assignments .reports-panel-title h2,
+html.dark .reports-page-assignments .reports-assignment-list article strong { color: #eef4f0; }
+html.dark .reports-page-assignments .admin-assignment-panel-heading > div > p,
+html.dark .reports-page-assignments .reports-assignment-list article span { color: #bdcbbf; }
+html.dark .reports-page-assignments .admin-assignment-filters button { border-color: #415446; background: #202e25; color: #d7e2da; }
+html.dark .reports-page-assignments .admin-assignment-filters button.active { border-color: #8bb798; background: #2c6340; color: #fff; }
+html.dark .reports-page-assignments .reports-assignment-link { border-color: #526a59; background: #202e25; color: #cce8d3; }
+html.dark .reports-page-assignments .reports-assignment-count { border-color: #415446; background: #202e25; color: #d7e2da; }
 
 .admin-assignment-feedback {
   grid-column: 1 / -1;
