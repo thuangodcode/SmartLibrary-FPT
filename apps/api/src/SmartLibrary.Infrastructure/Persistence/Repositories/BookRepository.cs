@@ -47,7 +47,7 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
             if (sortByReviewCount)
             {
                 var matchingIds = ranked.Select(item => item.Book.Id).ToArray();
-                var reviewCounts = await _context.Reviews.AsNoTracking()
+                var reviewCounts = await _context.Reviews.IgnoreQueryFilters().AsNoTracking()
                     .Where(review => !review.IsDeleted && matchingIds.Contains(review.BookId))
                     .GroupBy(review => review.BookId)
                     .Select(group => new { BookId = group.Key, Count = group.Count() })
@@ -73,7 +73,7 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
             if (pageBooks.Count > 0)
             {
                 var pageIds = pageBooks.Select(book => book.Id).ToArray();
-                var reviewCounts = await _context.Reviews.AsNoTracking()
+                var reviewCounts = await _context.Reviews.IgnoreQueryFilters().AsNoTracking()
                     .Where(review => !review.IsDeleted && pageIds.Contains(review.BookId))
                     .GroupBy(review => review.BookId)
                     .Select(group => new { BookId = group.Key, Count = group.Count() })
@@ -83,15 +83,21 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
             return new PagedResult<Book>(pageBooks, ranked.Count, page, pageSize);
         }
 
-        var query = _dbSet.AsNoTracking().Where(book => !book.IsDeleted);
+        // Apply soft-delete predicates explicitly here. The catalog is a high-traffic
+        // query with split collection includes; avoiding composed global filters keeps
+        // EF from evaluating captured filter parameters while compiling this query.
+        var query = _dbSet.IgnoreQueryFilters().AsNoTracking().Where(book => !book.IsDeleted);
         if (categoryId.HasValue)
-            query = query.Where(book => book.Categories.Any(category => category.Id == categoryId.Value && !category.IsDeleted));
+        {
+            var selectedCategoryId = categoryId.Value;
+            query = query.Where(book => book.Categories.Any(category => category.Id == selectedCategoryId && !category.IsDeleted));
+        }
 
         var totalCount = await query.CountAsync(ct);
         IQueryable<Book> orderedQuery;
         if (sortByReviewCount)
         {
-            var reviewCounts = _context.Reviews.AsNoTracking()
+            var reviewCounts = _context.Reviews.IgnoreQueryFilters().AsNoTracking()
                 .Where(review => !review.IsDeleted)
                 .GroupBy(review => review.BookId)
                 .Select(group => new { BookId = group.Key, Count = group.Count() });
@@ -115,8 +121,8 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
 
         var items = await orderedQuery
             .AsSplitQuery()
-            .Include(book => book.Authors)
-            .Include(book => book.Categories)
+            .Include(book => book.Authors.Where(author => !author.IsDeleted))
+            .Include(book => book.Categories.Where(category => !category.IsDeleted))
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
@@ -124,7 +130,7 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
         if (items.Count > 0)
         {
             var pageIds = items.Select(book => book.Id).ToArray();
-            var reviewCounts = await _context.Reviews.AsNoTracking()
+            var reviewCounts = await _context.Reviews.IgnoreQueryFilters().AsNoTracking()
                 .Where(review => !review.IsDeleted && pageIds.Contains(review.BookId))
                 .GroupBy(review => review.BookId)
                 .Select(group => new { BookId = group.Key, Count = group.Count() })

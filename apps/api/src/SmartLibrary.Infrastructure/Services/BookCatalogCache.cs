@@ -23,7 +23,7 @@ public sealed class BookCatalogCache : IBookCatalogCache
         if (_cache.TryGetValue(CacheKey, out IReadOnlyList<BookCatalogItem>? cached) && cached is not null)
             return cached;
 
-        var rows = await _db.Books.AsNoTracking()
+        var rows = await _db.Books.IgnoreQueryFilters().AsNoTracking()
             .Where(book => !book.IsDeleted)
             .Select(book => new
             {
@@ -37,9 +37,9 @@ public sealed class BookCatalogCache : IBookCatalogCache
                 book.PublishedYear,
                 book.AvailableCopies,
                 book.TotalCopies,
-                Authors = book.Authors.Select(author => author.Name).ToList(),
-                Categories = book.Categories.Select(category => category.Name).ToList(),
-                CategoryIds = book.Categories.Select(category => category.Id).ToList()
+                Authors = book.Authors.Where(author => !author.IsDeleted).Select(author => author.Name).ToList(),
+                Categories = book.Categories.Where(category => !category.IsDeleted).Select(category => category.Name).ToList(),
+                CategoryIds = book.Categories.Where(category => !category.IsDeleted).Select(category => category.Id).ToList()
             })
             .OrderBy(book => book.Title)
             .Take(400)
