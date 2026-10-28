@@ -129,7 +129,7 @@ const LibrarianCategoriesPage: React.FC = () => {
         parseApiResponse<{ success?: boolean; data?: Array<{ id: string; name: string }> }>(categoriesResponse),
       ]);
       if (!booksResponse.ok || !categoriesResponse.ok) throw new Error('Không thể tải danh sách đã xóa.');
-      setDeletedItems({ books: booksResult.data ?? [], categories: categoriesResult.data ?? [] });
+      setDeletedItems({ books: booksResult?.data ?? [], categories: categoriesResult?.data ?? [] });
     } catch (caught) {
       showToast({ type: 'error', title: 'Không tải được mục đã xóa', message: caught instanceof Error ? caught.message : 'Vui lòng thử lại.' });
     } finally { setLoadingDeletedItems(false); }

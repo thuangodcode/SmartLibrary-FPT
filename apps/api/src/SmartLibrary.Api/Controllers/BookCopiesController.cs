@@ -236,8 +236,8 @@ public class BookCopiesController : ControllerBase
         if (shelves.Count != targetNames.Length) return BadRequest(ApiResponse<object>.Fail("Một hoặc nhiều kệ đích không còn hoạt động."));
         var copies = await _db.BookCopies.Where(copy => !copy.IsDeleted && copyIds.Contains(copy.Id)).ToListAsync(ct);
         if (copies.Count != copyIds.Length) return NotFound(ApiResponse<object>.Fail("Một hoặc nhiều bản sao không còn tồn tại."));
-        var affectedNames = copies.Select(copy => copy.Location).Concat(assignments.Values).Where(name => !string.IsNullOrWhiteSpace(name)).Distinct().ToArray();
-        var counts = await _db.BookCopies.Where(copy => !copy.IsDeleted && copy.Location != null && affectedNames.Contains(copy.Location))
+        var affectedShelfNames = copies.Select(copy => copy.Location).Concat(assignments.Values).Where(name => !string.IsNullOrWhiteSpace(name)).Distinct().ToArray();
+        var counts = await _db.BookCopies.Where(copy => !copy.IsDeleted && copy.Location != null && affectedShelfNames.Contains(copy.Location))
             .GroupBy(copy => copy.Location!).Select(group => new { Name = group.Key, Count = group.Count() })
             .ToDictionaryAsync(item => item.Name, item => item.Count, ct);
         foreach (var copy in copies)
