@@ -688,3 +688,62 @@ html.dark .support-main .support-ticket-top > span { color: #edf4ee; }
   .support-ticket { animation: none; transition-duration: .01ms !important; }
   .support-detail-backdrop, .support-detail-modal { animation-duration: .01ms !important; }
 }
+
+/* Reader support: stronger type and a clear visual boundary between tickets and the form. */
+.support-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 30px; margin-bottom: 22px; }
+.support-tabs button { justify-content: center; min-height: 56px; padding-inline: 18px; border: 1px solid #d9e2da; border-radius: 12px 12px 0 0; background: #fff; color: #46534a; font-size: 15px; font-weight: 750; }
+.support-tabs button.is-active { border: 2px solid #2e6847; border-bottom: 4px solid #2e6847; background: #f4faf5; color: #214e32; }
+.support-complaint-layout { grid-template-columns: minmax(0, 1.08fr) minmax(390px, .92fr); gap: 26px; }
+.support-complaint-list,
+.support-complaint-form { min-width: 0; border-radius: 20px; box-shadow: 0 12px 30px rgb(25 46 32 / 8%); }
+.support-complaint-list { gap: 16px; border: 1px solid #cfded1; border-top: 4px solid #2e6847; background: #f7fbf7; padding: 22px; }
+.support-complaint-form { gap: 18px; border: 1px solid #ead8ca; border-top: 4px solid #e87532; background: #fffaf6; padding: 24px; }
+.support-complaint-list h2,
+.support-complaint-form h2 { color: #1e3024; font-size: 20px; font-weight: 800; }
+.support-section-eyebrow { margin-bottom: 7px; color: #b84b18; font-size: 12px; font-weight: 850; letter-spacing: .09em; }
+.support-complaint-list > header > span { min-width: 30px; height: 30px; font-size: 13px; }
+.support-ticket { border-radius: 14px; padding: 16px; }
+.support-ticket-top > strong { color: #24392b; font-size: 14px; font-weight: 800; }
+.support-ticket-status { padding: 6px 10px; font-size: 12px; font-weight: 800; }
+.support-ticket > p { margin: 11px 0 14px; color: #35443a; font-size: 14px; font-weight: 550; line-height: 1.65; }
+.support-ticket > footer { gap: 14px; padding-top: 12px; }
+.support-ticket > footer time,
+.support-ticket > footer > span { color: #4d5d51; font-size: 12px; font-weight: 600; }
+.support-ticket > footer button { min-height: 38px; padding-inline: 13px; font-size: 13px; font-weight: 800; }
+.support-complaint-form > header { gap: 13px; margin-bottom: 2px; }
+.support-form-icon { width: 46px; height: 46px; flex-basis: 46px; border-radius: 12px; }
+.support-complaint-form > header p { color: #59665c; font-size: 13px; font-weight: 550; line-height: 1.5; }
+.support-complaint-form > label:not(.support-attachment-control) { gap: 9px; color: #26372b; font-size: 14px; font-weight: 800; }
+.support-complaint-form select,
+.support-complaint-form textarea { border-color: #cbd7cc; border-radius: 9px; padding: 13px 14px; color: #202e24; font-size: 15px; font-weight: 550; }
+.support-complaint-form select { min-height: 48px; }
+.support-complaint-form textarea { min-height: 180px; line-height: 1.6; }
+.support-complaint-form :is(select, textarea)::placeholder { color: #657269; opacity: 1; }
+.support-complaint-form label small,
+.support-form-hint { color: #58665b; font-size: 12px; font-weight: 600; }
+.support-attachment-control { min-height: 54px; border-color: #b9cbbc; border-radius: 9px; background: #fff; color: #354d3c; font-size: 13px; font-weight: 700; }
+.support-submit { min-height: 48px; border-radius: 10px; padding-inline: 20px; font-size: 15px; font-weight: 800; }
+.support-inline-error { font-size: 13px; font-weight: 650; }
+.support-alert { border-radius: 10px; font-size: 14px; font-weight: 650; }
+.support-main :is(button, input, select, textarea):focus-visible { outline: 3px solid rgb(232 117 50 / 45%); outline-offset: 2px; }
+
+html.dark .support-main .support-complaint-list { border-color: #45604c; border-top-color: #79b389; background: #17231b; }
+html.dark .support-main .support-complaint-form { border-color: #5a4739; border-top-color: #e8783e; background: #211d19; }
+html.dark .support-main :is(.support-complaint-list h2, .support-complaint-form h2, .support-ticket-top > strong, .support-complaint-form > label:not(.support-attachment-control)) { color: #f0f5f1; }
+html.dark .support-main :is(.support-ticket > p, .support-ticket > footer time, .support-ticket > footer > span, .support-complaint-form > header p, .support-complaint-form label small, .support-form-hint) { color: #d0dbd2; }
+html.dark .support-main .support-complaint-form :is(select, textarea) { border-color: #536454; background: #111916; color: #f0f5f1; }
+html.dark .support-main .support-attachment-control { border-color: #536454; background: #18221b; color: #dce9df; }
+
+@media (max-width: 900px) {
+  .support-complaint-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .support-complaint-form { grid-row: 1; }
+}
+
+@media (max-width: 760px) {
+  .support-complaint-layout { grid-template-columns: minmax(0, 1fr); }
+  .support-complaint-list,
+  .support-complaint-form { padding: 18px; }
+  .support-tabs { grid-template-columns: minmax(0, 1fr); gap: 8px; border-bottom: 0; }
+  .support-tabs button { justify-content: flex-start; min-height: 50px; padding-inline: 14px; border-radius: 11px; font-size: 15px; }
+  .support-tabs button.is-active { border-bottom-width: 2px; }
+}

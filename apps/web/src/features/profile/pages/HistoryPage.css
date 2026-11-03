@@ -719,3 +719,72 @@
     padding: 24px 18px;
   }
 }
+
+/* Improve readability across the full loan and fines history page. */
+.history-page { --history-muted: #536157; }
+.history-page.theme-dark { --history-muted: #c0cec3; }
+.history-main { font-family: 'Be Vietnam Pro', 'Segoe UI', sans-serif; }
+.history-heading h1 { font-size: clamp(36px, 4.2vw, 48px); font-weight: 800; line-height: 1.16; letter-spacing: -.025em; }
+.history-heading-copy > p { font-size: 13px; font-weight: 850; letter-spacing: .13em; }
+.history-heading-copy > span { color: var(--history-muted); font-size: 16px; font-weight: 550; line-height: 1.6; }
+.history-summary { gap: 16px; }
+.history-summary article { gap: 12px; padding: 20px 22px; }
+.history-summary article > span { color: var(--history-muted); font-size: 14px; font-weight: 650; line-height: 1.45; }
+.history-summary article > strong { font-size: 27px; font-weight: 800; letter-spacing: 0; }
+.history-tabs { gap: 12px; }
+.history-tabs button { min-height: 50px; padding-inline: 20px; font-size: 15px; font-weight: 800; }
+.history-tabs button span { min-width: 24px; height: 24px; font-size: 12px; font-weight: 800; }
+.history-toolbar { padding-block: 20px 14px; }
+.history-toolbar strong { font-size: 19px; font-weight: 800; }
+.history-toolbar > div > span { color: var(--history-muted); font-size: 14px; font-weight: 550; line-height: 1.55; }
+.history-toolbar select { min-height: 44px; padding-inline: 13px 34px; color: var(--history-ink); font-size: 14px; font-weight: 650; }
+.history-filter-bar { gap: 10px; margin-bottom: 20px; }
+.history-filter-bar button { min-height: 44px; gap: 10px; padding-inline: 15px; font-size: 14px; font-weight: 750; }
+.history-filter-bar button span { min-width: 24px; height: 24px; font-size: 12px; font-weight: 800; }
+.history-list { gap: 18px; }
+.history-record { border: 1px solid var(--history-line); border-radius: 16px; background: var(--history-surface); padding: 18px; animation: history-card-in 320ms cubic-bezier(.2, .8, .2, 1) both; }
+.history-record:hover { border-color: var(--history-green); }
+.history-record-main { gap: 9px; }
+.history-record-title { gap: 9px; }
+.history-record-title > strong,
+.history-record-main > strong { color: var(--history-ink); font-size: 16px; font-weight: 800; line-height: 1.5; letter-spacing: .005em; }
+.history-record-title > span { padding: 4px 8px; font-size: 12px; font-weight: 750; }
+.history-record-main > span,
+.history-record-dates { color: var(--history-muted); font-size: 13px; font-weight: 600; line-height: 1.65; letter-spacing: .005em; }
+.history-record-dates { gap: 7px 15px; margin-top: 3px; }
+.history-record-main > .history-record-warning { font-weight: 750; }
+.history-record-actions { gap: 9px; }
+.history-status { padding: 7px 12px; font-size: 12px; font-weight: 800; }
+.history-renew-button,
+.history-pay-button { min-height: 42px; padding-inline: 14px; font-size: 13px; font-weight: 800; }
+.history-renew-note,
+.history-record-payment-method { color: var(--history-muted); font-size: 13px; font-weight: 600; line-height: 1.5; }
+.history-fine-total { gap: 10px; }
+.history-fine-total > strong { font-size: 20px; font-weight: 850; }
+.history-empty,
+.history-alert { padding: 18px; font-size: 15px; font-weight: 650; line-height: 1.6; }
+.history-pagination { gap: 12px; color: var(--history-muted); font-size: 14px; font-weight: 650; }
+.history-pagination button { min-height: 42px; padding-inline: 14px; font-size: 14px; font-weight: 750; }
+.history-payment-dialog { gap: 16px; }
+.history-payment-dialog h2 { font-size: 25px; font-weight: 850; }
+.history-payment-dialog > p,
+.history-payment-dialog > span,
+.history-payment-dialog > small { color: var(--history-muted); font-size: 14px; font-weight: 550; line-height: 1.65; }
+.history-payment-amount { font-size: 25px; font-weight: 850; }
+.history-page :is(button, select, a):focus-visible { outline: 3px solid color-mix(in srgb, var(--history-green), transparent 55%); outline-offset: 3px; }
+
+@media (max-width: 760px) {
+  .history-heading h1 { font-size: clamp(34px, 8vw, 42px); }
+  .history-heading-copy > span { font-size: 15px; }
+  .history-summary article > span { font-size: 13px; }
+  .history-tabs { gap: 8px; }
+  .history-tabs button { min-height: 46px; padding-inline: 13px; font-size: 14px; }
+  .history-filter-bar { gap: 8px; }
+  .history-filter-bar button { min-height: 42px; padding-inline: 13px; font-size: 13px; }
+  .history-list { gap: 14px; }
+  .history-record { padding: 15px; }
+  .history-record-title > strong,
+  .history-record-main > strong { font-size: 15px; }
+  .history-record-main > span,
+  .history-record-dates { font-size: 13px; }
+}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
-import { AlertCircle, Camera, Check, CircleHelp, LoaderCircle, MessageCircle, Send, UserRound, X } from 'lucide-react';
+import { AlertCircle, Camera, Check, CircleHelp, ClipboardList, LoaderCircle, MessageCircle, Send, UserRound, X } from 'lucide-react';
 import HomeNavbar from '../../home/components/HomeNavbar';
 import HomeFooter from '../../home/components/HomeFooter';
 import { API_BASE_URL } from '../../../config';
@@ -58,7 +58,7 @@ interface Complaint {
   replies: ComplaintReply[];
 }
 
-type SupportTab = 'chat' | 'complaint';
+type SupportTab = 'chat' | 'list' | 'create';
 type RealtimeStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
 const mergeMessages = (current: ChatMessage[], incoming: ChatMessage[]) => {
@@ -300,10 +300,13 @@ const SupportPage = () => {
         </header>
 
         <div className="support-tabs" role="tablist" aria-label="Kênh hỗ trợ">
-          <button className={tab === 'chat' ? 'is-active' : ''} onClick={() => setTab('chat')} role="tab" aria-selected={tab === 'chat'}>
+          <button id="support-tab-chat" className={tab === 'chat' ? 'is-active' : ''} onClick={() => setTab('chat')} role="tab" aria-controls="support-panel" aria-selected={tab === 'chat'}>
             <MessageCircle size={17} /> Nhắn tin với thủ thư
           </button>
-          <button className={tab === 'complaint' ? 'is-active' : ''} onClick={() => setTab('complaint')} role="tab" aria-selected={tab === 'complaint'}>
+          <button id="support-tab-list" className={tab === 'list' ? 'is-active' : ''} onClick={() => setTab('list')} role="tab" aria-controls="support-panel" aria-selected={tab === 'list'}>
+            <ClipboardList size={17} /> Xem đơn hỗ trợ
+          </button>
+          <button id="support-tab-create" className={tab === 'create' ? 'is-active' : ''} onClick={() => setTab('create')} role="tab" aria-controls="support-panel" aria-selected={tab === 'create'}>
             <CircleHelp size={17} /> Gửi đơn hỗ trợ
           </button>
         </div>
@@ -312,7 +315,7 @@ const SupportPage = () => {
         {notice && <div className="support-alert support-alert--success" role="status"><Check size={17} />{notice}</div>}
 
         {tab === 'chat' ? (
-          <section className="support-chat-card">
+          <section className="support-chat-card" id="support-panel" role="tabpanel" aria-labelledby="support-tab-chat" tabIndex={0}>
             <header className="support-chat-header">
               <div className="support-chat-mark"><MessageCircle size={19} /></div>
               <div><strong>Trao đổi trực tiếp</strong><span>{
@@ -361,9 +364,8 @@ const SupportPage = () => {
               </button>
             </form>
           </section>
-        ) : (
-          <div className="support-complaint-layout">
-            <section className="support-complaint-list">
+        ) : tab === 'list' ? (
+            <section className="support-complaint-list" id="support-panel" role="tabpanel" aria-labelledby="support-tab-list" tabIndex={0}>
               <header><div><span className="support-section-eyebrow">THEO DÕI YÊU CẦU</span><h2>Đơn của tôi</h2></div><span>{complaints.length}</span></header>
               {loading ? <div className="support-chat-empty"><LoaderCircle className="support-spinner" size={21} />Đang tải đơn...</div> :
                 complaints.length ? complaints.map((complaint) => (
@@ -374,8 +376,8 @@ const SupportPage = () => {
                   </article>
                 )) : <div className="support-chat-empty"><CircleHelp size={22} />Bạn chưa gửi đơn hỗ trợ nào.</div>}
             </section>
-
-            <form className="support-complaint-form" onSubmit={(event) => void sendComplaint(event)}>
+        ) : (
+            <form className="support-complaint-form" id="support-panel" role="tabpanel" aria-labelledby="support-tab-create" tabIndex={0} onSubmit={(event) => void sendComplaint(event)}>
               <header><span className="support-form-icon"><CircleHelp size={19} /></span><div><h2>Gửi đơn hỗ trợ</h2><p>Đơn sẽ được chuyển đến bộ phận thư viện.</p></div></header>
               <label>
                 Loại đơn
@@ -408,7 +410,6 @@ const SupportPage = () => {
                 Gửi đơn
               </button>
             </form>
-          </div>
         )}
       </main>
       {selectedComplaint && <div className="support-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedComplaint(null); }}>
