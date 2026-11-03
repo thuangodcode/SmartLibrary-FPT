@@ -97,22 +97,16 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
         IQueryable<Book> orderedQuery;
         if (sortByReviewCount)
         {
-            var reviewCounts = _context.Reviews.IgnoreQueryFilters().AsNoTracking()
-                .Where(review => !review.IsDeleted)
-                .GroupBy(review => review.BookId)
-                .Select(group => new { BookId = group.Key, Count = group.Count() });
+            var visibleReviews = _context.Reviews.IgnoreQueryFilters().AsNoTracking()
+                .Where(review => !review.IsDeleted);
 
             orderedQuery = reviewCountAscending
-                ? from book in query
-                  join reviewCount in reviewCounts on book.Id equals reviewCount.BookId into counts
-                  from reviewCount in counts.DefaultIfEmpty()
-                  orderby reviewCount == null ? 0 : reviewCount.Count, book.Title
-                  select book
-                : from book in query
-                  join reviewCount in reviewCounts on book.Id equals reviewCount.BookId into counts
-                  from reviewCount in counts.DefaultIfEmpty()
-                  orderby reviewCount == null ? 0 : reviewCount.Count descending, book.Title
-                  select book;
+                ? query
+                    .OrderBy(book => visibleReviews.Count(review => review.BookId == book.Id))
+                    .ThenBy(book => book.Title)
+                : query
+                    .OrderByDescending(book => visibleReviews.Count(review => review.BookId == book.Id))
+                    .ThenBy(book => book.Title);
         }
         else
         {
