@@ -93,6 +93,7 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
                     .Select(group => new { BookId = group.Key, Count = group.Count() })
                     .ToDictionaryAsync(item => item.BookId, item => item.Count, ct);
                 foreach (var book in pageBooks) book.ReviewCount = reviewCounts.GetValueOrDefault(book.Id);
+                await PopulateBorrowCountsAsync(pageBooks, pageIds, ct);
             }
             return new PagedResult<Book>(pageBooks, ranked.Count, page, pageSize);
         }
@@ -106,36 +107,7 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
         }
 
         var totalCount = await query.CountAsync(ct);
-        IQueryable<Book> orderedQuery;
-        if (sortByBorrowCount)
-        {
-            var borrowCounts = _context.BorrowRecords.AsNoTracking()
-                .Where(record => !record.IsDeleted && (record.Status == BorrowStatus.Borrowed || record.Status == BorrowStatus.Returned || record.Status == BorrowStatus.Overdue))
-                .GroupBy(record => record.BookCopy.BookId)
-                .Select(group => new { BookId = group.Key, Count = group.Count() });
-            orderedQuery = from book in query
-                           join borrowCount in borrowCounts on book.Id equals borrowCount.BookId into counts
-                           from borrowCount in counts.DefaultIfEmpty()
-                           orderby borrowCount == null ? 0 : borrowCount.Count descending, book.Title
-                           select book;
-        }
-        else if (sortByReviewCount)
-        {
-            var visibleReviews = _context.Reviews.IgnoreQueryFilters().AsNoTracking()
-                .Where(review => !review.IsDeleted);
-
-            orderedQuery = reviewCountAscending
-                ? query
-                    .OrderBy(book => visibleReviews.Count(review => review.BookId == book.Id))
-                    .ThenBy(book => book.Title)
-                : query
-                    .OrderByDescending(book => visibleReviews.Count(review => review.BookId == book.Id))
-                    .ThenBy(book => book.Title);
-        }
-        else
-        {
-            orderedQuery = query.OrderByDescending(book => book.CreatedAt);
-        }
+        var orderedQuery = OrderCatalog(query, _context, sortByReviewCount, reviewCountAscending, sortByBorrowCount);
 
         var items = await orderedQuery
             .AsSplitQuery()
@@ -154,9 +126,42 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
                 .Select(group => new { BookId = group.Key, Count = group.Count() })
                 .ToDictionaryAsync(item => item.BookId, item => item.Count, ct);
             foreach (var book in items) book.ReviewCount = reviewCounts.GetValueOrDefault(book.Id);
+            await PopulateBorrowCountsAsync(items, pageIds, ct);
         }
 
         return new PagedResult<Book>(items, totalCount, page, pageSize);
+    }
+
+    private async Task PopulateBorrowCountsAsync(List<Book> books, List<Guid> bookIds, CancellationToken ct)
+    {
+        var counts = await _context.BorrowRecords.AsNoTracking()
+            .Where(record => !record.IsDeleted && bookIds.Contains(record.BookCopy.BookId)
+                && (record.Status == BorrowStatus.Borrowed || record.Status == BorrowStatus.Returned || record.Status == BorrowStatus.Overdue))
+            .GroupBy(record => record.BookCopy.BookId)
+            .Select(group => new { BookId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(item => item.BookId, item => item.Count, ct);
+        foreach (var book in books) book.BorrowCount = counts.GetValueOrDefault(book.Id);
+    }
+
+    // Correlated counts translate to SQL without the problematic GroupJoin/DefaultIfEmpty.
+    public static IQueryable<Book> OrderCatalog(IQueryable<Book> query, AppDbContext context, bool sortByReviewCount, bool reviewCountAscending, bool sortByBorrowCount)
+    {
+        if (sortByBorrowCount)
+            return query.OrderByDescending(book => context.BorrowRecords.Count(record =>
+                    !record.IsDeleted && record.BookCopy.BookId == book.Id &&
+                    (record.Status == BorrowStatus.Borrowed || record.Status == BorrowStatus.Returned || record.Status == BorrowStatus.Overdue)))
+                .ThenBy(book => book.Title).ThenBy(book => book.Id);
+
+        if (sortByReviewCount)
+        {
+            var reviews = context.Reviews.IgnoreQueryFilters().Where(review => !review.IsDeleted);
+            return (reviewCountAscending
+                    ? query.OrderBy(book => reviews.Count(review => review.BookId == book.Id))
+                    : query.OrderByDescending(book => reviews.Count(review => review.BookId == book.Id)))
+                .ThenBy(book => book.Title).ThenBy(book => book.Id);
+        }
+
+        return query.OrderByDescending(book => book.CreatedAt).ThenBy(book => book.Id);
     }
 
     private static Book ToBook(BookCatalogItem item) => new()

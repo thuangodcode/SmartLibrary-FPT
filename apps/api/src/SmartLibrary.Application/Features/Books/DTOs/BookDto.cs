@@ -19,6 +19,7 @@ public class BookDto
     public int AvailableCopies { get; set; }
     public decimal AverageRating { get; set; }
     public int ReviewCount { get; set; }
+    public int? BorrowCount { get; set; }
     public List<string> AuthorNames { get; set; } = new();
     public List<string> CategoryNames { get; set; } = new();
     public List<string> CopyLocations { get; set; } = new();

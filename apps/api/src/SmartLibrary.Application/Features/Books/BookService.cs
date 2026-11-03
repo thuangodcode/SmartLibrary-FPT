@@ -342,6 +342,7 @@ public class BookService
         var dto = _mapper.Map<BookDto>(book);
         dto.CustomFields = ParseCustomFields(book.CustomFieldsJson);
         dto.ReviewCount = book.ReviewCount;
+        dto.BorrowCount = book.BorrowCount;
         return dto;
     }
 

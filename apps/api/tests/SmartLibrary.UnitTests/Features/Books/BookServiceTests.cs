@@ -38,16 +38,29 @@ public class BookServiceTests
     public async Task GetPagedAsync_WithBorrowSort_ForwardsFiltersAndPaging()
     {
         var categoryId = Guid.NewGuid();
-        var books = new List<Book> { new() { Id = Guid.NewGuid(), Title = "Algorithms" } };
+        var books = new List<Book> { new() { Id = Guid.NewGuid(), Title = "Algorithms", BorrowCount = 7 } };
         _bookRepositoryMock
             .Setup(repo => repo.GetPagedAsync(2, 18, "algorithm", categoryId, false, false, It.IsAny<CancellationToken>(), true))
             .ReturnsAsync(new PagedResult<Book>(books, 19, 2, 18));
 
         var result = await _sut.GetPagedAsync(2, 18, "algorithm", categoryId, sortByBorrowCount: true);
 
-        result.Items.Should().ContainSingle(book => book.Title == "Algorithms");
+        result.Items.Should().ContainSingle(book => book.Title == "Algorithms" && book.BorrowCount == 7);
         result.TotalCount.Should().Be(19);
         _bookRepositoryMock.Verify(repo => repo.GetPagedAsync(2, 18, "algorithm", categoryId, false, false, It.IsAny<CancellationToken>(), true), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_WithNoBorrows_ReturnsZeroBorrowCount()
+    {
+        var books = new List<Book> { new() { Id = Guid.NewGuid(), Title = "New book", BorrowCount = 0 } };
+        _bookRepositoryMock
+            .Setup(repo => repo.GetPagedAsync(1, 18, null, null, false, false, It.IsAny<CancellationToken>(), true))
+            .ReturnsAsync(new PagedResult<Book>(books, 1, 1, 18));
+
+        var result = await _sut.GetPagedAsync(1, 18, sortByBorrowCount: true);
+
+        result.Items.Should().ContainSingle(book => book.BorrowCount == 0);
     }
 
     [Fact]
