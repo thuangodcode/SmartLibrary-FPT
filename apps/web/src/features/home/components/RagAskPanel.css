@@ -248,6 +248,13 @@ html.dark .rag-ask .rag-ask-stats > div { border-color: #45564b; background: #20
 .rag-ask .rag-prompt-controls button[type='submit'] { display: grid; width: 38px; min-height: 38px; place-items: center; padding: 0; border-radius: 50%; background: #244d39; color: #fff; }
 .rag-ask .rag-prompt-controls button[type='submit']:not(:disabled):hover { background: #f36f21; color: #fff; }
 .rag-ask .rag-prompt-controls button[type='submit']:disabled { background: #edf1ee; color: #9aa49d; opacity: 1; }
+.rag-ask .rag-prompt-controls .rag-voice-button { display: grid; width: 38px; min-height: 38px; flex: 0 0 38px; place-items: center; padding: 0; border: 1px solid #dce5de; border-radius: 50%; background: #fff; color: #385443; cursor: pointer; }
+.rag-ask .rag-prompt-controls .rag-voice-button:hover { border-color: #f36f21; color: #d95f27; }
+.rag-ask .rag-prompt-controls .rag-voice-button.is-listening { border-color: #d95f27; background: #fff0e7; color: #c94b20; animation: rag-mic-pulse 1.2s ease-in-out infinite; }
+.rag-voice-error { margin: 7px 4px 0; color: #a74740; font-size: 11px; line-height: 1.45; }
+html.dark .rag-ask .rag-prompt-controls .rag-voice-button { border-color: #45564b; background: #26372b; color: #e1ece4; }
+html.dark .rag-ask .rag-prompt-controls .rag-voice-button.is-listening { border-color: #e8783e; background: #493126; color: #ffc5a3; }
+@keyframes rag-mic-pulse { 50% { box-shadow: 0 0 0 5px rgb(217 95 39 / 14%); } }
 .rag-ask-login { margin-top: 16px; }
 
 .rag-ask { display: flex; flex-direction: column; gap: 12px; }

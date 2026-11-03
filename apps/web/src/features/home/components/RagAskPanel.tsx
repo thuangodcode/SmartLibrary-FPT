@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowUp, BookOpen, CircleHelp, LibraryBig, LoaderCircle, RotateCcw, Sparkles, X } from 'lucide-react';
+import { ArrowUp, BookOpen, CircleHelp, LibraryBig, LoaderCircle, Mic, MicOff, RotateCcw, Sparkles, X } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import {
   askRag,
@@ -38,6 +38,22 @@ const TOPICS = [
 ];
 
 type ChatTopic = typeof TOPICS[number];
+
+type SpeechResult = { isFinal: boolean; 0: { transcript: string } };
+type SpeechRecognitionEventLike = { resultIndex: number; results: ArrayLike<SpeechResult> };
+type SpeechRecognitionErrorLike = { error: string };
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorLike) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
 function topicForQuestion(questionText: string): ChatTopic {
   const normalized = questionText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase();
@@ -133,11 +149,17 @@ const RagAskPanel = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<ChatTopic | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [speechError, setSpeechError] = useState('');
   const [prefilledQuestion, setPrefilledQuestion] = useState(searchParams.get('q') ?? '');
   const nextIdRef = useRef(0);
   const questionRef = useRef<HTMLTextAreaElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const dictationBaseRef = useRef('');
   const sending = turns.some((turn) => turn.loading);
+
+  useEffect(() => () => recognitionRef.current?.abort(), []);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -249,6 +271,56 @@ const RagAskPanel = () => {
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     submitQuestion(question);
+  };
+
+  const toggleVoiceInput = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const speechWindow = window as typeof window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      setSpeechError('Trình duyệt này chưa hỗ trợ nhập bằng giọng nói. Hãy dùng Chrome hoặc Edge phiên bản mới.');
+      return;
+    }
+    if (!window.isSecureContext) {
+      setSpeechError('Nhập bằng giọng nói cần kết nối HTTPS hoặc localhost để cấp quyền micro.');
+      return;
+    }
+
+    setSpeechError('');
+    dictationBaseRef.current = question.trim();
+    const recognition = new Recognition();
+    recognition.lang = 'vi-VN';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.onresult = (event) => {
+      const transcript = Array.from({ length: event.results.length }, (_, index) => event.results[index][0].transcript).join('').trim();
+      const base = dictationBaseRef.current;
+      setQuestion(`${base}${base && transcript ? ' ' : ''}${transcript}`.slice(0, 4000));
+    };
+    recognition.onerror = (event) => {
+      const message = event.error === 'not-allowed' || event.error === 'service-not-allowed'
+        ? 'Bạn chưa cấp quyền sử dụng micro. Hãy bật quyền micro trong cài đặt trình duyệt.'
+        : event.error === 'no-speech'
+          ? 'Chưa nhận được giọng nói. Hãy thử nói lại gần micro hơn.'
+          : 'Không thể nhận giọng nói lúc này. Vui lòng thử lại.';
+      setSpeechError(message);
+      setIsListening(false);
+    };
+    recognition.onend = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+      setIsListening(true);
+    } catch {
+      setIsListening(false);
+      setSpeechError('Không thể bật micro. Vui lòng thử lại.');
+    }
   };
 
   return (
@@ -377,11 +449,22 @@ const RagAskPanel = () => {
                   />
                   <div className="rag-prompt-controls">
                     <span className="rag-ask-count">{question.length}/4000 · Enter để gửi</span>
+                    <button
+                      type="button"
+                      className={`rag-voice-button${isListening ? ' is-listening' : ''}`}
+                      onClick={toggleVoiceInput}
+                      aria-label={isListening ? 'Dừng nhập bằng giọng nói' : 'Nhập câu hỏi bằng giọng nói'}
+                      aria-pressed={isListening}
+                      title={isListening ? 'Dừng ghi âm' : 'Nhập bằng giọng nói tiếng Việt'}
+                    >
+                      {isListening ? <MicOff size={17} /> : <Mic size={17} />}
+                    </button>
                     <button type="submit" aria-label="Gửi câu hỏi" disabled={sending || question.trim().length < 3}>
                       {sending ? <LoaderCircle size={17} className="ai-spin" /> : <ArrowUp size={17} />}
                     </button>
                   </div>
                 </div>
+                {speechError && <p className="rag-voice-error" role="status">{speechError}</p>}
               </form>
               </>
               )}
