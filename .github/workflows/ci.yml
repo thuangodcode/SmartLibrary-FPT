@@ -38,6 +38,19 @@ jobs:
   api-ci:
     name: Backend (.NET API) CI
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: report5
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U report5"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -56,4 +69,17 @@ jobs:
         run: dotnet build apps/api/SmartLibrary.slnx --no-restore -c Release
 
       - name: Run Unit Tests
-        run: dotnet test apps/api/tests/SmartLibrary.UnitTests/SmartLibrary.UnitTests.csproj --no-build -c Release --verbosity normal
+        run: dotnet test apps/api/tests/SmartLibrary.UnitTests/SmartLibrary.UnitTests.csproj --no-build -c Release --logger trx --collect:"XPlat Code Coverage" --results-directory TestResults/unit
+
+      - name: Run API Workflow Tests
+        env:
+          SMARTLIBRARY_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Username=report5;Database=postgres
+        run: dotnet test apps/api/tests/SmartLibrary.IntegrationTests/SmartLibrary.IntegrationTests.csproj --no-build -c Release --logger trx --results-directory TestResults/integration
+
+      - name: Upload Test Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-evidence
+          path: TestResults/
+          retention-days: 30

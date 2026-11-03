@@ -1,0 +1,701 @@
+﻿CAPSTONE PROJECT REPORT
+Report 2 – Project Management Plan
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+– Ho Chi Minh City, 2026 –
+Table of Contents
+   II. Project Management Plan
+1. Overview        4
+1.1 Scope & Estimation        4
+1.2 Project Objectives        4
+1.3 Project Risks        4
+2. Management Approach        4
+    2.1 Project Process        4
+    2.2 Quality Management        4
+2.3 Training Plan        4
+3. Project Deliverables        4
+4. Responsibility Assignments        4
+5. Project Communications        5
+6. Configuration Management        5
+6.1 Document Management        5
+6.2 Source Code Management        6
+6.2 Tools & Infrastructures        6
+
+
+II. Project Management Plan
+1. Overview
+1.1 Scope & Estimation
+The WBS below is structured directly from the SmartLibrary major features provided. The Complexity and Est. Effort fields are intentionally editable so project estimates can be entered or revised.
+  
+Table 2.1.1: Project Management Plan
+#
+	WBS Item
+	Complexity
+	Est. Effort (man-days)
+ 
+	1
+	System Implementation
+	
+
+	214
+	1.1
+	Authentication (Sign Up, Verify Email, Sign In/Out, Forgot/Reset/Change Password)
+	Simple
+	8
+	1.2
+	Role/Permission Management (Get Roles, User Permissions, Change Role)
+	Medium
+	6
+	1.3
+	User Management (Accounts, Profiles, Status & Reader Borrowing/Fine Status)
+	Medium
+	10
+	1.4
+	Author Management (CRUD)
+	Simple
+	6
+	1.5
+	Category Management (CRUD)
+	Simple
+	6
+	1.6
+	Publisher Management (CRUD)
+	Simple
+	6
+	1.7
+	Major Management (CRUD)
+	Simple
+	6
+	1.8
+	Book Management (CRUD, Book Status, Available Books, Soft Delete)
+	Medium
+	10
+	1.9
+	Book Copy Management (Copies, Barcodes, Locations, Status, Availability)
+	Medium
+	10
+	1.10
+	Book Search & Discovery (Structured Search, Popular/Viewed Books, Copy Locations)
+	Complex
+	10
+	1.11
+	Bookshelf Management (CRUD)
+	Simple
+	6
+	1.12
+	Library Facility & Equipment Management (CRUD Facilities & Equipment)
+	Medium
+	8
+	1.13
+	Book Import Ticket Management (Search, CRUD Import Tickets)
+	Medium
+	8
+	1.14
+	Borrow Request Management (Create/Cancel Request, History, Due Dates, Overdue Count)
+	Medium
+	8
+	1.15
+	Borrow Record Management (Check Conditions, Process Borrow/Return Transactions)
+	Complex
+	12
+	1.16
+	Renewal Management (Request, Cancel, Process Renewal Transactions)
+	Medium
+	8
+	1.17
+	Reservation Management (Create, Cancel, Process & Availability Notifications)
+	Complex
+	10
+	1.18
+	Overdue, Damaged & Lost Book Management (Track Overdue, Record Damaged/Lost)
+	Medium
+	8
+	1.19
+	Fine Management (Calculate, Create, Payment Status & Transactions)
+	Complex
+	10
+	1.20
+	Library Policy & Regulation Management (CRUD Policies & Regulations)
+	Simple
+	6
+	1.21
+	Review & Rating Management (Book Reviews, Ratings & Comments)
+	Medium
+	8
+	1.22
+	Complaint & Feedback Management (Submit, Process Complaints & Responses)
+	Medium
+	10
+	1.23
+	Notification Management (System Notifications, Borrow/Overdue/Update Alerts)
+	Medium
+	8
+	1.24
+	Work Coordination Management (Work Schedules, Assignments, Reports & Requests)
+	Complex
+	12
+	1.25
+	AI Book Recommendation (Reading Preferences, Goal-Based Recommendations)
+	Complex
+	12
+	1.26
+	AI Semantic Book Search (Natural-Language Search, Semantic Relevance Ranking)
+	Complex
+	12
+	1.27
+	AI System Configuration (AI Settings & Recommendation Criteria Management)
+	Complex
+	10
+	1.28
+	Statistics & Reports (Operation, Activity, Fine Statistics & Export Word/Excel)
+	Complex
+	12
+	2
+	Testing & Quality Assurance
+	
+
+	30
+	2.1
+	Perform Unit & Integration Testing
+	Medium
+	12
+	2.2
+	Perform System Testing & User Acceptance Testing (UAT)
+	Medium
+	10
+	2.3
+	Deliver Report 5 – Test Document
+	Simple
+	8
+	3
+	Deployment & Closure
+	
+
+	24
+	3.1
+	System Deployment (VPS / Server Setup)
+	Medium
+	6
+	3.2
+	Deliver Report 6 – Software User Guides
+	Simple
+	8
+	3.3
+	Deliver Report 7 – Final Project Report
+	Simple
+	10
+	Total Estimated Effort (man-days)
+	268
+	
+
+1.2 Project Objectives
+
+
+#
+	Objective / Stage
+	Description
+	Target
+	%
+	Notes
+	1
+	Requirements & System Design
+	Define the project scope, user roles, core workflows, system architecture, database schema, and UI/UX design for Administrator, Librarian, and Reader..
+	Approved requirements and design documents covering the implemented project scope.
+	15%
+	Scope should be confirmed with stakeholders before development.
+	2
+	Administrator Module Development
+	Develop administrator functions for user and account management, library collection overview, borrowing policies and regulations, AI service configuration, and reports.
+	Administrator workflows for account management, policy and regulation management, AI configuration, and reporting.
+	20%
+	The current scope does not include facility/equipment management, librarian scheduling, or full book catalog CRUD for administrators.
+	3
+	Librarian Module Development
+	Develop librarian workflows for reader registration and account management, books and categories, book copies and intake, borrowing, returns, reservations, renewals, overdue loans, fines, reader support, notices, and reports.
+	Core librarian workflows for catalog and copy management, circulation, reader support, and reporting
+	30%
+	AI-assisted insights support staff decisions; they do not automatically make acquisition decisions.
+	4
+	Reader Module & AI Features
+	Develop reader self-service functions for registration and account access, profile management, book discovery, favorites, borrowing and reservations, renewals, loan history, fines and payments, book reviews, and support requests.
+	Reader-facing workflows for discovering books and using the library’s circulation and support services.
+	25%
+	The current scope does not include a social community for posts, comments, reactions, or sharing.
+	5
+	Integration, Testing & Deployment
+	Integrate personalized book recommendations, natural-language semantic search over library books and policy documents, AI-assisted acquisition suggestions, and available operational insights.
+	AI services available through the application and configurable by administrators, subject to provider and service settings.
+	10%
+	Do not describe this as a fully validated predictive model. Overdue risk labels are based on loans that are already overdue.
+	 
+	Total
+	 
+	 
+	100%
+	 
+	
+
+
+
+1.3 Project Risks
+ 
+
+
+#
+	Risk Description
+	Impact
+	Possibility
+	Response Plans
+	1
+	Requirements change or scope creep as stakeholders' needs evolve during development.
+	High
+	Medium
+	Freeze requirements after formal sign-off; use a change-request process; maintain a requirements traceability matrix.
+	2
+	AI recommendation and semantic search accuracy is lower than expected, reducing usefulness for readers.
+	Medium
+	Medium
+	Prototype AI features early; benchmark against a sample dataset; fall back to keyword search when AI confidence is low.
+	3
+	Data migration errors when importing existing library data (books, members, borrowing history).
+	High
+	Medium
+	Run trial migrations on a copy of the data; validate data integrity; keep full backups of source data.
+	4
+	Key developer(s) become unavailable (resignation, illness) during the project.
+	High
+	Low
+	Maintain up-to-date documentation; cross-train team members; enforce code review and clear commenting standards.
+	5
+	Integration issues between Administrator, Librarian, and Reader modules and shared services (authentication, notifications).
+	Medium
+	Medium
+	Define clear API contracts; start integration testing early; use a CI/CD pipeline with automated tests.
+	6
+	Effort for AI-related features is underestimated, causing schedule delays.
+	Medium
+	Medium
+	Add schedule buffer for AI tasks; track progress weekly; scope down to an MVP AI feature set if needed.
+	7
+	Security vulnerabilities expose reader personal data or allow unauthorized access.
+	High
+	Low
+	Apply role-based access control; encrypt sensitive data; conduct a security review / penetration test before launch.
+	8
+	Low user adoption by librarians or readers due to an unfamiliar interface or resistance to change.
+	Medium
+	Medium
+	Provide training sessions and user guides; pilot with a small group and iterate on UI/UX based on feedback.
+	9
+	Server or infrastructure downtime and performance bottlenecks during peak load (e.g., start of semester).
+	High
+	Low
+	Perform load testing before go-live; use auto-scaling infrastructure; set up monitoring and alerting.
+	
+
+
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	
+
+	2. Management Approach
+2.1 Project Process
+  
+
+Figure 1 – Proposed project process for SmartLibrary
+This project was developed using the Scrum model, which is part of the Agile methodology, for the following reasons:
+●       The initial planning and documentation help keep both large and dynamic teams aligned, ensuring everyone works toward a shared objective.
+●       Scrum provides a structured and disciplined approach to project management.
+●       It is straightforward to understand, making task organization and tracking easy to manage.
+●       The model supports flexibility, allowing for the seamless integration of design or specification changes early in the process.
+●       Milestones and deadlines are clearly defined, ensuring timely delivery.
+●       The framework emphasizes both in-person and virtual meetings to maintain effective communication.
+●       Scrum fosters collaboration among team members, encouraging them to jointly define and refine solutions.
+2.2 Quality Management
+Approach
+	           Description
+	        When
+	Waiver Criteria
+	Defect Prevention
+	Define permissions, book-copy states, borrowing rules, and fine examples before coding.
+	Requirements and design
+	Mandatory
+	Reviewing
+	Review requirements, diagrams, API contracts, code, and report changes.
+	At the end of relevant phases and before merging
+	Mandatory
+	Unit Testing
+	Test eligibility, availability, renewal, reservation, and fine rules separately.
+	During coding
+	Mandatory for business rules
+	Integration Testing
+	Test API, database, notification, web/mobile, and AI connections.
+	After components are connected
+	Mandatory
+	System Testing
+	Test complete Administrator, Librarian, and Reader scenarios.
+	Before release and after major integration
+	Mandatory
+	Acceptance Testing
+	Demonstrate agreed scenarios and record supervisor feedback.
+	Before final submission
+	Mandatory
+	A defect record includes the steps to reproduce the problem, the expected and actual results, severity, owner, and resolution. A test waiver needs a documented reason and review; this plan does not assume that any waiver has been granted.
+2.3 Training Plan
+Training Area
+	Participants
+	When, Duration
+	Waiver Criteria
+	Git, branches, and code review
+	All members
+	Before implementation; one session
+	Mandatory
+	API and database model
+	Web, mobile, and backend owners
+	Before integration; one session
+	Mandatory
+	Unit and integration testing
+	Development members
+	Before test implementation; one session
+	Mandatory
+	AI configuration and Reader data handling
+	AI and backend owners
+	Before AI integration; one session
+	Mandatory
+	Administrator workflows and reporting
+	Demonstration and test members
+	Before acceptance testing; one walkthrough
+	Mandatory
+	Librarian and Reader workflows
+	Demonstration and test members
+	Before acceptance testing; one walkthrough
+	Mandatory
+	These are planned sessions. The team should record the actual dates and participants later.
+3. Project Deliverables
+#
+	Deliverable
+	     Due Date
+	     Notes
+	1
+	FA26SE226_GFA26SE187_Report1_SmartLibrary_Project_Introduction
+	To be confirmed
+	Background, vision, and latest Section 6
+	2
+	FA26SE226_GFA26SE187_Report2_SmartLibrary_Project_ManagementPlan
+	To be confirmed
+	WBS, risks, process, and team management
+	3
+	FA26SE226_GFA26SE187_Report3_SmartLibrary_Software_Requirement_Specification
+	To be confirmed
+	Requirements and use cases
+	4
+	FA26SE226_GFA26SE187_Report4_SmartLibrary_Software_Design_Document
+	To be confirmed
+	Architecture, data model, and interfaces
+	5
+	FA26SE226_GFA26SE187_Report5_SmartLibrary_Test_Document
+	To be confirmed
+	Test cases, actual results, and defects
+	6
+	FA26SE226_GFA26SE187_Report6_SmartLibrary_Software_UserGuides
+	To be confirmed
+	Guides for the three roles
+	7
+	FA26SE226_GFA26SE187_Report7_SmartLibrary_Final_Project_Report
+
+
+	To be confirmed
+	Final report and demonstration
+
+
+
+
+	The group must insert its official submission dates and filename requirements. The dates and project code from the example report belong to another group.
+4. Responsibility Assignments
+D~Do; R~Review; S~Support; I~Informed; <blank>- Omitted
+
+
+Responsibility
+	THONGNT
+	NhatTVSE172768
+	vinhhntse180198
+	thuanntse183670
+	longnhde180230
+	Project Planning & Tracking
+	I
+	R
+	D
+	D
+	S
+	Prepare Project Introduction Document
+	I
+	D
+	R
+	R
+	S
+	Prepare SRS Document
+	I
+	R
+	D
+	S
+	S
+	Prepare SDD Document
+	I
+	R
+	S
+	R
+	S
+	Testing & Quality Assurance
+	I
+	D
+	S
+	S
+	D
+	Prepare SUG Document
+	I
+	R
+	D
+	D
+	S
+	Prepare Final Project Report
+	I
+	R
+	S
+	S
+	D
+	
+
+5. Project Communications
+5.1 Communication Plan
+
+
+Communication Item
+	Who/ Target
+	Purpose
+	When, Frequency
+	Type, Tool, Method(s)
+	Working with advisor
+	  Team member & Supervisor
+	Review documentation, demonstrate features, evaluate progress and results.
+	2 time / week
+	Offline
+	Working in team
+	  Team member
+	* Report daily work status to the leader.
+
+
+* Provide input, solve problems, and request assistance from other team members.
+
+
+	2 days / week
+	Offline
+	Working in team
+	  Team member
+	* Plan for the next report, review completed work, and summarize.
+
+
+* Edit project documents.
+
+
+	2 days / week
+	Google Meet
+	
+
+5.2 External Interface
+Table 5.2.1: External Interface
+
+
+Function
+	Contact Person
+	Contact address (email, telephone)
+	Responsibility
+	Supervisor
+	Nguyễn Trí Thông (Lecturer)
+	ThongNT@fe.edu.vn, 0907973989
+	Provide guidance and document templates; review deliverables; supervise project status.
+	
+
+
+
+
+
+
+
+6. Configuration Management
+6.1 Document Management
+To manage and archive all project documents and related information, the team uses Google Drive 
+● Google Drive: All project documents are stored in the shared project drive. Any addition or modification must be updated and versioned properly within the documents.
+
+
+6.2 Source Code Management
+Version Control System: Git is used for version control, with GitHub as the platform to store and manage the source code.
+
+
+Branching Strategy:
+* Main: Contains stable, production-ready code.
+* Dev: Used for ongoing feature development and integration.
+* Member’s branch: Individual branches for each team member.
+* Hotfix Branches: Created for urgent fixes that need to be applied directly to production.
+
+
+Commit and Pull Request Practices:
+* Make frequent commits with clear and meaningful messages (e.g., [Add], [Doc], [Fix], [Update]).
+* All changes must go through Pull Requests (PRs) and code review before being merged into the main branch.
+* Code reviews are conducted to maintain code quality and detect issues early.
+
+
+Automated Testing and CI:
+* Continuous Integration (CI) tools are used to automate the build and testing process.
+* Automated tests are executed on every commit to ensure system stability.
+
+
+Code Documentation:
+*  Proper documentation is maintained for every function, class, and module.
+*  A Change Log is kept to track significant changes and version history.
+
+
+Backup and Recovery:
+*  Regular backups are performed to prevent data loss.
+*  A complete version history is maintained to allow rollback when necessary.
+
+
+6.3 Tools & Infrastructures
+Category
+	Tools / Infrastructure
+	Technology
+	HTML5, CSS, Typescript, Tailwind, ReactJS (FrontEnd), .Net (BackEnd), ReactNative(Mobile)
+	Database
+	Supabase
+	IDEs/Editors
+	Visual Studio Code, Visual Studio
+	Diagramming
+	Draw.IO, Lucid.app, Mermaid
+	Documentation
+	MS Office, Google Docs/Sheets/Slides
+	Version Control
+	GitHub (Source Codes), Google Drive (Documents)
+	Deployment server
+	VPS, Vercel
