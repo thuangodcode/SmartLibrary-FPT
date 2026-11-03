@@ -6,6 +6,8 @@ using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Circulation;
 using SmartLibrary.Application.Features.Circulation.DTOs;
 using SmartLibrary.Api.Hubs;
+using SmartLibrary.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -17,15 +19,18 @@ public class CirculationController : ControllerBase
     private readonly CirculationService _circulation;
     private readonly IHubContext<NotificationHub> _hub;
     private readonly ILogger<CirculationController> _logger;
+    private readonly AppDbContext _db;
 
     public CirculationController(
         CirculationService circulation,
         IHubContext<NotificationHub> hub,
-        ILogger<CirculationController> logger)
+        ILogger<CirculationController> logger,
+        AppDbContext db)
     {
         _circulation = circulation;
         _hub = hub;
         _logger = logger;
+        _db = db;
     }
 
     [HttpGet("stats")]
@@ -43,6 +48,72 @@ public class CirculationController : ControllerBase
         CancellationToken ct = default)
         => Ok(ApiResponse<CirculationLoanListDto>.Ok(
             await _circulation.GetLoansAsync(search, status, borrowedFrom, borrowedTo, page, pageSize, ct)));
+
+    [HttpGet("loans/due-soon")]
+    public async Task<IActionResult> DueSoonLoans(
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        CancellationToken ct)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var start = from ?? today;
+        var end = to ?? today.AddDays(30);
+        if (end < start)
+            return BadRequest(ApiResponse<object>.Fail("Ngày kết thúc phải sau hoặc bằng ngày bắt đầu."));
+
+        var firstPage = await _circulation.GetLoansAsync(null, "Borrowed", null, null, 1, 50, ct);
+        var items = firstPage.Items.ToList();
+        for (var page = 2; page <= firstPage.TotalPages; page++)
+        {
+            var next = await _circulation.GetLoansAsync(null, "Borrowed", null, null, page, 50, ct);
+            items.AddRange(next.Items);
+        }
+        return Ok(ApiResponse<IReadOnlyList<CirculationLoanDto>>.Ok(items
+            .Where(item => item.DueDate.HasValue
+                           && DateOnly.FromDateTime(item.DueDate.Value) >= start
+                           && DateOnly.FromDateTime(item.DueDate.Value) <= end)
+            .OrderBy(item => item.DueDate)
+            .ToList()));
+    }
+
+    [HttpGet("due-reminder-settings")]
+    public async Task<IActionResult> GetDueReminderSettings(CancellationToken ct)
+    {
+        var settings = await _db.CirculationReminderSettings.AsNoTracking()
+            .OrderBy(item => item.UpdatedAt)
+            .FirstOrDefaultAsync(ct);
+        return Ok(ApiResponse<CirculationDueReminderSettingsDto>.Ok(new(
+            settings?.IsEnabled ?? false,
+            settings?.ReminderDays ?? 7,
+            settings?.UpdatedAt ?? DateTime.UtcNow)));
+    }
+
+    [HttpPut("due-reminder-settings")]
+    public async Task<IActionResult> UpdateDueReminderSettings(
+        [FromBody] UpdateCirculationDueReminderSettingsRequest request,
+        CancellationToken ct)
+    {
+        if (request.ReminderDays is not (7 or 14))
+            return BadRequest(ApiResponse<object>.Fail("Chỉ hỗ trợ nhắc trước 7 hoặc 14 ngày."));
+
+        var settings = await _db.CirculationReminderSettings
+            .OrderBy(item => item.UpdatedAt)
+            .FirstOrDefaultAsync(ct);
+        if (settings is null)
+        {
+            settings = new SmartLibrary.Domain.Entities.CirculationReminderSetting();
+            _db.CirculationReminderSettings.Add(settings);
+        }
+        settings.IsEnabled = request.IsEnabled;
+        settings.ReminderDays = request.ReminderDays;
+        settings.UpdatedAt = DateTime.UtcNow;
+        settings.UpdatedBy = CirculationService.ReadUserId(User);
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(ApiResponse<CirculationDueReminderSettingsDto>.Ok(new(
+            settings.IsEnabled, settings.ReminderDays, settings.UpdatedAt),
+            new { message = "Đã lưu cấu hình nhắc hạn trả sách." }));
+    }
 
     [HttpGet("loans/{id:guid}")]
     public async Task<IActionResult> Loan(Guid id, CancellationToken ct)

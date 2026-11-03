@@ -1,4 +1,4 @@
-export type ReportMetric = 'Borrowed' | 'Returned';
+export type ReportMetric = 'Borrowed' | 'Returned' | 'Amount';
 
 export interface TemplateConfigShape {
   period?: string;
@@ -12,6 +12,7 @@ export interface ManualReportRow {
   category: string;
   borrowed: number;
   returned: number;
+  amount: number;
   notes: string;
 }
 
@@ -25,11 +26,13 @@ export interface ImportIssue {
 const metricLabels: Record<string, string> = {
   Borrowed: 'Lượt mượn',
   Returned: 'Lượt trả',
+  Amount: 'Số tiền (VND)',
 };
 
 const metricHeaderAliases: Record<ReportMetric, string[]> = {
   Borrowed: ['Lượt mượn', 'Mượn', 'Borrowed', 'borrowed'],
   Returned: ['Lượt trả', 'Trả', 'Tra', 'Returned', 'returned'],
+  Amount: ['Số tiền', 'So tien', 'Chi phí', 'Chi phi', 'Amount', 'Cost', 'Tổng phí', 'Tong phi'],
 };
 
 export const parseTemplateConfiguration = (raw?: string | null): TemplateConfigShape | null => {
@@ -45,29 +48,31 @@ export const parseTemplateConfiguration = (raw?: string | null): TemplateConfigS
 
 export const getTemplateMetrics = (config: TemplateConfigShape | null): ReportMetric[] => {
   const fromConfig = (config?.metrics ?? []).filter((m): m is ReportMetric =>
-    ['Borrowed', 'Returned'].includes(m),
+    ['Borrowed', 'Returned', 'Amount'].includes(m),
   );
   return fromConfig.length ? fromConfig : ['Borrowed', 'Returned'];
 };
 
 export const getExpectedColumnLabels = (config: TemplateConfigShape | null): string[] => {
   const metrics = getTemplateMetrics(config);
-  return ['Ngày', 'Nhóm sách', ...metrics.map((m) => metricLabels[m] ?? m)];
+  const categoryLabel = metrics.length === 1 && metrics[0] === 'Amount' ? 'Khoản phí' : 'Nhóm sách';
+  return ['Ngày', categoryLabel, ...metrics.map((m) => metricLabels[m] ?? m)];
 };
 
 export const getSampleCsvRows = (config: TemplateConfigShape | null): string[][] => {
   const metrics = getTemplateMetrics(config);
   const headers = [...getExpectedColumnLabels(config), 'Ghi chú'];
-  const firstValues: Record<ReportMetric, number> = { Borrowed: 12, Returned: 10 };
-  const secondValues: Record<ReportMetric, number> = { Borrowed: 8, Returned: 7 };
-  const first = ['01/10/2026', 'Khoa học', ...metrics.map((metric) => String(firstValues[metric])), 'Số liệu mẫu'];
-  const second = ['02/10/2026', 'Văn học', ...metrics.map((metric) => String(secondValues[metric])), 'Số liệu mẫu'];
+  const firstValues: Record<ReportMetric, number> = { Borrowed: 12, Returned: 10, Amount: 25000 };
+  const secondValues: Record<ReportMetric, number> = { Borrowed: 8, Returned: 7, Amount: 15000 };
+  const categoryLabel = metrics.length === 1 && metrics[0] === 'Amount';
+  const first = ['01/10/2026', categoryLabel ? 'Phí quá hạn' : 'Khoa học', ...metrics.map((metric) => String(firstValues[metric])), 'Số liệu mẫu'];
+  const second = ['02/10/2026', categoryLabel ? 'Phí làm mất sách' : 'Văn học', ...metrics.map((metric) => String(secondValues[metric])), 'Số liệu mẫu'];
   const totals = metrics.map((metric) => String(firstValues[metric] + secondValues[metric]));
   return [
     headers,
     first,
     second,
-    ['', 'Tổng', ...totals, ''],
+    ['', categoryLabel ? 'Tổng chi phí' : 'Tổng', ...totals, ''],
   ];
 };
 
@@ -78,6 +83,7 @@ export const emptyManualRow = (): ManualReportRow => ({
   category: '',
   borrowed: 0,
   returned: 0,
+  amount: 0,
   notes: '',
 });
 
@@ -86,6 +92,7 @@ export const manualRowToApi = (row: ManualReportRow, metrics: ReportMetric[]) =>
   category: row.category.trim(),
   borrowed: metrics.includes('Borrowed') ? row.borrowed : 0,
   returned: metrics.includes('Returned') ? row.returned : 0,
+  amount: metrics.includes('Amount') ? row.amount : 0,
   overdue: 0,
   returnedCount: 0,
   notes: row.notes.trim() || null,
@@ -141,10 +148,10 @@ const parseDateCell = (raw: string): string | null => {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().split('T')[0];
 };
 
-const parseIntCell = (raw: string): number => {
+const parseMetricCell = (raw: string): number => {
   const text = raw.trim().replace(/^"|"$/g, '');
   if (!text) return 0;
-  const n = Number.parseInt(text, 10);
+  const n = Number(text.replace(/\s/g, '').replace(/,(?=\d{1,2}$)/, '.'));
   return Number.isFinite(n) ? n : -1;
 };
 
@@ -165,7 +172,7 @@ export const parseReportCsv = (
 
   const headers = splitCsvLine(lines[0]);
   const dateIdx = findColumnIndex(headers, ['Ngày', 'Date', 'date']);
-  const categoryIdx = findColumnIndex(headers, ['Nhóm sách', 'Nhom sach', 'Category', 'category']);
+  const categoryIdx = findColumnIndex(headers, ['Khoản phí', 'Khoan phi', 'Nhóm sách', 'Nhom sach', 'Category', 'category']);
   if (dateIdx < 0) issues.push({ row: 0, field: 'Date', message: 'Thiếu cột bắt buộc «Ngày».', severity: 'error' });
   if (categoryIdx < 0) issues.push({ row: 0, field: 'Category', message: 'Thiếu cột bắt buộc «Nhóm sách».', severity: 'error' });
 
@@ -196,7 +203,7 @@ export const parseReportCsv = (
     if (cells.every((c) => !c.trim())) continue;
     const rowNumber = i;
     const category = categoryIdx >= 0 ? (cells[categoryIdx] ?? '').trim().replace(/^"|"$/g, '') : '';
-    if (['Tổng', 'Total'].some((label) => category.localeCompare(label, 'vi', { sensitivity: 'base' }) === 0)) {
+    if (['Tổng', 'Total', 'Tổng chi phí'].some((label) => category.localeCompare(label, 'vi', { sensitivity: 'base' }) === 0)) {
       continue;
     }
     const dateRaw = dateIdx >= 0 ? cells[dateIdx] ?? '' : '';
@@ -219,8 +226,8 @@ export const parseReportCsv = (
     row.category = category;
     for (const metric of metrics) {
       const idx = metricIdx[metric];
-      const val = idx !== undefined ? parseIntCell(cells[idx] ?? '') : 0;
-      if (val < 0) {
+      const val = idx !== undefined ? parseMetricCell(cells[idx] ?? '') : 0;
+      if (val < 0 || (metric !== 'Amount' && !Number.isInteger(val))) {
         issues.push({
           row: rowNumber,
           field: metric,
@@ -230,6 +237,7 @@ export const parseReportCsv = (
       }
       if (metric === 'Borrowed') row.borrowed = Math.max(0, val);
       if (metric === 'Returned') row.returned = Math.max(0, val);
+      if (metric === 'Amount') row.amount = Math.max(0, val);
     }
     if (notesIdx >= 0) row.notes = (cells[notesIdx] ?? '').trim().replace(/^"|"$/g, '');
     rows.push(row);
@@ -254,11 +262,12 @@ export const validateManualRows = (rows: ManualReportRow[], config: TemplateConf
     if (!row.date) issues.push({ row: rowNumber, field: 'Date', message: `Dòng ${rowNumber}: Thiếu ngày.`, severity: 'error' });
     if (!row.category.trim()) issues.push({ row: rowNumber, field: 'Category', message: `Dòng ${rowNumber}: Thiếu nhóm sách.`, severity: 'error' });
     for (const metric of metrics) {
-      const val =
-        metric === 'Borrowed'
-          ? row.borrowed
-          : row.returned;
-      if (val < 0 || !Number.isFinite(val)) {
+      const val = metric === 'Borrowed'
+        ? row.borrowed
+        : metric === 'Returned'
+          ? row.returned
+          : row.amount;
+      if (val < 0 || !Number.isFinite(val) || (metric !== 'Amount' && !Number.isInteger(val))) {
         issues.push({
           row: rowNumber,
           field: metric,

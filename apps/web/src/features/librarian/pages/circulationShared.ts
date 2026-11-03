@@ -39,6 +39,7 @@ export interface CirculationLoan {
   bookCopyId: string;
   barcode: string;
   bookTitle: string;
+  coverImageUrl?: string | null;
   copyCondition?: string | null;
   suggestedFine?: number | null;
   hasOpenFine?: boolean;

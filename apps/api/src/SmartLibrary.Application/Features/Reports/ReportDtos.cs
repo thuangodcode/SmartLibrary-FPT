@@ -3,7 +3,7 @@ namespace SmartLibrary.Application.Features.Reports;
 public sealed record ReportQuery(string? Search, string? Month, string? Status, string? Format, string? SortBy, string? SortDirection, int Page = 1, int PageSize = 10, Guid? SubmittedBy = null, bool? IsApproved = null);
 public sealed record ReportListItemDto(Guid Id, string Code, string Name, string Submitter, DateTime CreatedAt, string Format, string Status, bool IsViewed, bool IsApproved, DateTime PeriodStart, DateTime PeriodEnd, bool IsRejected = false);
 public sealed record ReportListDto(IReadOnlyList<ReportListItemDto> Items, int TotalCount, int Page, int PageSize, int TotalPages);
-public sealed record ReportRowDto(DateTime Date, string Category, int Borrowed, int Returned, int Overdue, int ReturnedCount, string? Notes);
+public sealed record ReportRowDto(DateTime Date, string Category, int Borrowed, int Returned, int Overdue, int ReturnedCount, string? Notes, decimal Amount = 0);
 public sealed record ReportDetailDto(Guid Id, string Code, string Name, string Submitter, string TemplateName, DateTime CreatedAt, DateTime PeriodStart, DateTime PeriodEnd, string Format, string Status, bool IsViewed, bool IsApproved, string? Snapshot, IReadOnlyList<ReportReviewDto> Reviews, IReadOnlyList<ReportRowDto> Rows, Guid? TemplateId = null, string? TemplateReportType = null, string? TemplateDescription = null, string? TemplateConfiguration = null, bool IsRejected = false);
 public sealed record ReportReviewDto(string Action, string? Comment, string Reviewer, DateTime CreatedAt);
 public sealed record ReportSummaryDto(

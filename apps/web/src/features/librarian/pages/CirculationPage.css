@@ -2299,6 +2299,152 @@
   color: #a83c05;
 }
 
+.circ-loan-detail-modal {
+  position: relative;
+  width: min(640px, 100%);
+  max-height: min(86vh, 760px);
+  overflow: auto;
+  padding: 28px;
+  border: 1px solid #e5e9e5;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 28px 90px rgb(22 38 30 / 24%);
+}
+
+.circ-loan-detail-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid #e2e8e5;
+  border-radius: 12px;
+  background: #fff;
+  color: #526173;
+  cursor: pointer;
+}
+
+.circ-loan-detail-close:hover { background: #fff2e9; color: #b9470a; }
+
+.circ-loan-detail-hero {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+  padding: 4px 42px 24px 0;
+  border-bottom: 1px solid #e8eeea;
+}
+
+.circ-loan-detail-cover {
+  display: grid;
+  width: 150px;
+  height: 210px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #e2e8e4;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f3f6f2, #e8f0e9);
+  color: #316247;
+  box-shadow: 0 10px 22px rgb(24 58 41 / 12%);
+}
+
+.circ-loan-detail-cover img { width: 100%; height: 100%; object-fit: cover; }
+.circ-loan-detail-title h2 { margin: 8px 0; color: #172c22; font-size: 25px; font-weight: 800; line-height: 1.25; }
+.circ-loan-detail-title p { margin: 0 0 15px; color: #65766c; font-size: 14px; font-weight: 600; }
+.circ-loan-detail-title p span { padding: 0 4px; color: #a2ada6; }
+
+.circ-loan-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 22px 0;
+}
+
+.circ-loan-detail-grid div {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid #e7ece8;
+  border-radius: 13px;
+  background: #f8faf8;
+}
+
+.circ-loan-detail-grid span { color: #718078; font-size: 12px; font-weight: 700; }
+.circ-loan-detail-grid strong { overflow-wrap: anywhere; color: #21372b; font-size: 14px; font-weight: 750; }
+.circ-loan-detail-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
+
+.circ-due-workspace { display: grid; gap: 18px; outline: none; }
+.circ-due-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
+.circ-due-heading h2 { margin: 6px 0; color: #192c22; font-size: 25px; font-weight: 800; }
+.circ-due-heading p { margin: 0; color: #64756b; font-size: 14px; }
+.circ-due-heading .animated-calendar { flex: 0 0 auto; }
+
+.circ-due-milestones { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.circ-due-milestones button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 10px;
+  align-items: center;
+  padding: 15px 18px;
+  border: 1px solid #e1e8e3;
+  border-radius: 15px;
+  background: #fff;
+  color: #506258;
+  text-align: left;
+  cursor: pointer;
+}
+.circ-due-milestones button.is-active { border-color: #f1b386; background: #fff5ed; color: #a9440c; box-shadow: 0 4px 14px rgb(171 82 24 / 8%); }
+.circ-due-milestones button span { font-size: 14px; font-weight: 750; }
+.circ-due-milestones button strong { grid-column: 2; grid-row: 1 / span 2; font-size: 26px; font-weight: 850; }
+.circ-due-milestones button small { color: #77857d; font-size: 12px; font-weight: 600; }
+
+.circ-reminder-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #e2e9e3;
+  border-radius: 17px;
+  background: linear-gradient(105deg, #f5faf5, #fffaf5);
+}
+.circ-reminder-settings__icon { display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border-radius: 13px; background: #e7f2e9; color: #286044; }
+.circ-reminder-settings__copy { min-width: 200px; flex: 1 1 240px; }
+.circ-reminder-settings__copy strong { color: #1d3527; font-size: 15px; font-weight: 800; }
+.circ-reminder-settings__copy p { margin: 4px 0 0; color: #67766d; font-size: 13px; line-height: 1.5; }
+.circ-reminder-days { display: grid; gap: 5px; color: #52645a; font-size: 12px; font-weight: 700; }
+.circ-reminder-days select { min-height: 40px; border: 1px solid #d7e0d9; border-radius: 10px; background: #fff; padding: 0 12px; color: #263a2e; font: inherit; }
+.circ-reminder-toggle { display: inline-flex; align-items: center; gap: 8px; color: #334b3c; font-size: 13px; font-weight: 750; cursor: pointer; }
+.circ-reminder-toggle input { width: 18px; height: 18px; accent-color: #23714c; }
+
+.circ-due-list-card { margin: 0; }
+.circ-due-list { display: grid; }
+.circ-due-row {
+  display: grid;
+  grid-template-columns: 56px minmax(160px, 1.25fr) minmax(140px, 1fr) 135px auto;
+  gap: 15px;
+  align-items: center;
+  padding: 14px 2px;
+  border-top: 1px solid #e9eeea;
+}
+.circ-due-row__cover { display: grid; width: 54px; height: 70px; place-items: center; overflow: hidden; border: 1px solid #e1e8e3; border-radius: 8px; background: #eff5f0; color: #2c6245; }
+.circ-due-row__cover img { width: 100%; height: 100%; object-fit: cover; }
+.circ-due-row__book, .circ-due-row__reader, .circ-due-row__date { display: grid; min-width: 0; gap: 5px; }
+.circ-due-row__book strong, .circ-due-row__reader strong { overflow: hidden; color: #23382c; font-size: 14px; font-weight: 780; text-overflow: ellipsis; white-space: nowrap; }
+.circ-due-row__book span, .circ-due-row__reader span { overflow: hidden; color: #77847c; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.circ-due-row__date span { color: #77847c; font-size: 12px; font-weight: 700; }
+.circ-due-row__date strong { color: #254a35; font-size: 14px; font-weight: 800; }
+.circ-due-row__date.is-soon strong, .circ-due-row__date.is-soon span { color: #c64d12; }
+
+@media (max-width: 900px) {
+  .circ-due-row { grid-template-columns: 52px minmax(140px, 1fr) minmax(125px, 1fr); }
+  .circ-due-row__date { grid-column: 2; }
+  .circ-due-row > .circ-btn { grid-column: 3; justify-self: end; }
+}
+
 @media (max-width: 768px) {
   .circ-workflow-tabs {
     width: 100%;
@@ -2306,6 +2452,23 @@
   .circ-workflow-tabs button {
     flex: 1 1 150px;
   }
+  .circ-loan-detail-modal { padding: 22px 18px; }
+  .circ-loan-detail-hero { grid-template-columns: 94px minmax(0, 1fr); gap: 15px; padding-right: 32px; }
+  .circ-loan-detail-cover { width: 94px; height: 136px; }
+  .circ-loan-detail-title h2 { font-size: 20px; }
+  .circ-loan-detail-grid { gap: 8px; }
+  .circ-loan-detail-grid div { padding: 11px; }
+  .circ-due-heading { align-items: stretch; flex-direction: column; }
+  .circ-due-heading .animated-calendar { width: 100%; }
+  .circ-due-milestones { gap: 7px; }
+  .circ-due-milestones button { padding: 12px; }
+  .circ-reminder-settings { align-items: flex-start; }
+  .circ-reminder-settings__copy { flex-basis: calc(100% - 60px); }
+  .circ-due-row { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 10px; }
+  .circ-due-row__cover { width: 46px; height: 62px; }
+  .circ-due-row__reader { grid-column: 2; }
+  .circ-due-row__date { grid-column: 2; }
+  .circ-due-row > .circ-btn { grid-column: 3; grid-row: 1 / span 3; }
   .circ-return-reader-grid {
     grid-template-columns: 1fr;
   }

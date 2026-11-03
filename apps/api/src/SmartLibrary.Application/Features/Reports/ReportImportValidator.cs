@@ -11,13 +11,14 @@ public static class ReportImportValidator
     {
         ["Borrowed"] = ["Lượt mượn", "Mượn", "Borrowed", "borrowed", "So muon"],
         ["Returned"] = ["Lượt trả", "Trả", "Tra", "Returned", "returned", "So tra"],
+        ["Amount"] = ["Số tiền", "So tien", "Chi phí", "Chi phi", "Amount", "Cost", "Tổng phí", "Tong phi"],
     };
 
     private static readonly string[][] DateHeaders = [["Ngày", "Ngay", "Date", "date"]];
-    private static readonly string[][] CategoryHeaders = [["Nhóm sách", "Nhom sach", "Category", "category", "Danh mục"]];
+    private static readonly string[][] CategoryHeaders = [["Nhóm sách", "Nhom sach", "Khoản phí", "Khoan phi", "Category", "category", "Danh mục"]];
     private static readonly string[][] NotesHeaders = [["Ghi chú", "Ghi chu", "Notes", "notes"]];
 
-    public static TemplateImportSchema ParseSchema(string? configurationJson)
+    public static TemplateImportSchema ParseSchema(string? configurationJson, string? reportType = null)
     {
         var metrics = new List<string> { "Borrowed", "Returned" };
         try
@@ -46,14 +47,16 @@ public static class ReportImportValidator
             // keep defaults
         }
 
-        metrics = metrics.Where(metric => metric is "Borrowed" or "Returned").Distinct().ToList();
+        if (string.Equals(reportType, "Finance", StringComparison.OrdinalIgnoreCase))
+            metrics = ["Amount"];
+        metrics = metrics.Where(metric => metric is "Borrowed" or "Returned" or "Amount").Distinct().ToList();
         if (metrics.Count == 0)
             metrics = ["Borrowed", "Returned"];
 
         var columns = new List<ExpectedColumnDto>
         {
             new("Date", "Ngày", true, DateHeaders.SelectMany(x => x).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()),
-            new("Category", "Nhóm sách", true, CategoryHeaders.SelectMany(x => x).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()),
+            new("Category", metrics.Count == 1 && metrics[0] == "Amount" ? "Khoản phí" : "Nhóm sách", true, CategoryHeaders.SelectMany(x => x).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()),
         };
 
         foreach (var metric in metrics)
@@ -66,9 +69,9 @@ public static class ReportImportValidator
         return new TemplateImportSchema(metrics, columns);
     }
 
-    public static ValidateReportRowsResult Validate(Guid templateId, string? configurationJson, IReadOnlyList<ReportRowDto>? rows)
+    public static ValidateReportRowsResult Validate(Guid templateId, string? configurationJson, IReadOnlyList<ReportRowDto>? rows, string? reportType = null)
     {
-        var schema = ParseSchema(configurationJson);
+        var schema = ParseSchema(configurationJson, reportType);
         var issues = new List<ReportImportIssueDto>();
         var rowList = rows ?? [];
 
@@ -114,9 +117,9 @@ public static class ReportImportValidator
         return new ValidateReportRowsResult(ready, issues, schema.ExpectedColumnLabels, validRows, templateId);
     }
 
-    public static ValidateReportRowsResult ValidateCsvHeaders(Guid templateId, string? configurationJson, IReadOnlyList<string> headers)
+    public static ValidateReportRowsResult ValidateCsvHeaders(Guid templateId, string? configurationJson, IReadOnlyList<string> headers, string? reportType = null)
     {
-        var schema = ParseSchema(configurationJson);
+        var schema = ParseSchema(configurationJson, reportType);
         var issues = new List<ReportImportIssueDto>();
         var normalized = headers.Select(NormalizeHeader).Where(x => x.Length > 0).ToList();
 
@@ -148,10 +151,11 @@ public static class ReportImportValidator
         return defaults;
     }
 
-    private static int MetricValue(ReportRowDto row, string metric) => metric switch
+    private static decimal MetricValue(ReportRowDto row, string metric) => metric switch
     {
         "Borrowed" => row.Borrowed,
         "Returned" => row.Returned,
+        "Amount" => row.Amount,
         _ => 0,
     };
 
@@ -159,6 +163,7 @@ public static class ReportImportValidator
     {
         "Borrowed" => "Lượt mượn",
         "Returned" => "Lượt trả",
+        "Amount" => "Số tiền",
         _ => metric,
     };
 

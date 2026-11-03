@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using SmartLibrary.Domain.Entities;
 
@@ -200,11 +201,22 @@ public sealed class ReportService(IReportRepository repository)
             .Select(x => new ReportReviewDto(x.Action, x.Comment, GetDisplayName(x.Reviewer?.FullName, "Không xác định"), x.CreatedAt))
             .ToList();
 
+        var rows = ReadRows(report.Snapshot);
+        if (string.Equals(report.Template?.ReportType, "Finance", StringComparison.OrdinalIgnoreCase) && !HasFinanceAmounts(report.Snapshot))
+        {
+            rows = await BuildFinanceRowsAsync(report.PeriodStart, report.PeriodEnd.AddDays(1), report.PeriodEnd, ct);
+            try
+            {
+                var snapshot = JsonNode.Parse(report.Snapshot) ?? new JsonObject();
+                snapshot["rows"] = JsonSerializer.SerializeToNode(rows, JsonOptions);
+                report.Snapshot = snapshot.ToJsonString(JsonOptions);
+                await repository.SaveChangesAsync(ct);
+            }
+            catch (JsonException) { }
+        }
         return new ReportDetailDto(report.Id, report.Code, report.Name, submitterName,
             templateName, report.CreatedAt, report.PeriodStart, report.PeriodEnd, report.Format, report.Status,
-            report.IsViewed, report.IsApproved, report.Snapshot,
-            reviews,
-            ReadRows(report.Snapshot),
+            report.IsViewed, report.IsApproved, report.Snapshot, reviews, rows,
             report.TemplateId, report.Template?.ReportType, report.Template?.Description, report.Template?.Configuration,
             string.Equals(report.Status, "Rejected", StringComparison.OrdinalIgnoreCase));
     }
@@ -242,6 +254,50 @@ public sealed class ReportService(IReportRepository repository)
         {
             return [];
         }
+    }
+
+    private static IReadOnlyList<ReportRowDto> AppendFinanceTotal(IEnumerable<ReportRowDto> source, DateTime periodEnd)
+    {
+        var rows = source.Where(row => !row.Category.StartsWith("Tổng", StringComparison.OrdinalIgnoreCase)).OrderBy(row => row.Date).ThenBy(row => row.Category, StringComparer.CurrentCulture).ToList();
+        rows.Add(new ReportRowDto(periodEnd.Date, "Tổng chi phí", 0, 0, 0, 0, $"Tổng {rows.Count} khoản phí trong kỳ", rows.Sum(row => row.Amount)));
+        return rows;
+    }
+    private static bool HasFinanceAmounts(string snapshot)
+    {
+        try { using var doc = ParseConfiguration(snapshot); return doc.RootElement.TryGetProperty("rows", out var rows) && rows.ValueKind == JsonValueKind.Array && rows.GetArrayLength() > 0 && rows.EnumerateArray().All(row => row.ValueKind == JsonValueKind.Object && row.TryGetProperty("amount", out _)); }
+        catch { return false; }
+    }
+    private async Task<IReadOnlyList<ReportRowDto>> BuildFinanceRowsAsync(DateTime start, DateTime endExclusive, DateTime totalDate, CancellationToken ct)
+    {
+        var fines = await repository.Fines.AsNoTracking().Where(f => !f.IsDeleted && f.CreatedAt >= start.Date && f.CreatedAt < endExclusive.Date).OrderBy(f => f.CreatedAt)
+            .Select(f => new { f.CreatedAt, f.Amount, f.Reason, f.Status, f.Notes, Reader = f.Reader.FullName, Book = f.BorrowRecord.BookCopy.Book.Title, Barcode = f.BorrowRecord.BookCopy.Barcode }).ToListAsync(ct);
+        return AppendFinanceTotal(fines.Select(f => new ReportRowDto(f.CreatedAt.Date, string.IsNullOrWhiteSpace(f.Reason) ? "Phí thư viện" : f.Reason, 0, 0, 0, 0, $"{f.Reader} · {f.Book} · {f.Barcode} · {f.Status}{(string.IsNullOrWhiteSpace(f.Notes) ? string.Empty : $" · {f.Notes}")}", f.Amount)), totalDate);
+    }
+    private static bool IsActivityReportType(string type) => type.Equals("Activity", StringComparison.OrdinalIgnoreCase) || type.Equals("Periodic", StringComparison.OrdinalIgnoreCase);
+    private static bool IsCollectionReportType(string type) => type.Equals("Collection", StringComparison.OrdinalIgnoreCase);
+    private async Task<IReadOnlyList<ReportRowDto>> BuildActivityRowsAsync(DateTime start, DateTime endExclusive, CancellationToken ct)
+    {
+        var borrowed = await repository.BorrowRecords.AsNoTracking().Where(x => !x.IsDeleted && x.BorrowDate >= start.Date && x.BorrowDate < endExclusive).GroupBy(x => x.BorrowDate!.Value.Date).Select(g => new { Date = g.Key, Count = g.Count() }).ToListAsync(ct);
+        var returned = await repository.BorrowRecords.AsNoTracking().Where(x => !x.IsDeleted && x.ReturnDate >= start.Date && x.ReturnDate < endExclusive).GroupBy(x => x.ReturnDate!.Value.Date).Select(g => new { Date = g.Key, Count = g.Count() }).ToListAsync(ct);
+        var dates = borrowed.Select(x => x.Date).Concat(returned.Select(x => x.Date)).Distinct().Order().ToList();
+        var b = borrowed.ToDictionary(x => x.Date, x => x.Count); var r = returned.ToDictionary(x => x.Date, x => x.Count);
+        return dates.Select(date => new ReportRowDto(date, "Toàn thư viện", b.GetValueOrDefault(date), r.GetValueOrDefault(date), 0, 0, "Lượt mượn theo ngày mượn; lượt trả theo ngày trả.")).ToList();
+    }
+    private async Task<IReadOnlyList<ReportRowDto>> BuildCollectionRowsAsync(CancellationToken ct)
+    {
+        var copies = await repository.BookCopies.AsNoTracking().Where(x => !x.IsDeleted && !x.Book.IsDeleted)
+            .GroupBy(x => new { x.BookId, x.Book.Title })
+            .Select(g => new { BookId = g.Key.BookId, Title = g.Key.Title, Total = g.Count(), Available = g.Count(x => x.IsAvailable) })
+            .OrderBy(x => x.Title).ToListAsync(ct);
+        var circulating = await repository.BorrowRecords.AsNoTracking()
+            .Where(x => !x.IsDeleted && (x.Status == SmartLibrary.Domain.Enums.BorrowStatus.Borrowed || x.Status == SmartLibrary.Domain.Enums.BorrowStatus.Overdue))
+            .GroupBy(x => x.BookCopy.BookId).Select(g => new { BookId = g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.BookId, x => x.Count, ct);
+        return copies.Select(x =>
+        {
+            var borrowed = circulating.GetValueOrDefault(x.BookId);
+            return new ReportRowDto(DateTime.UtcNow.Date, x.Title, x.Total, x.Available, borrowed, 0,
+                $"Tồn kho hiện tại; còn sẵn: {x.Available}, đang mượn/quá hạn: {borrowed}. Chưa có lịch sử nhập/xuất kho.");
+        }).ToList();
     }
 
     public async Task<ReportSummaryDto> SummaryAsync(DateTime? from, DateTime? to, CancellationToken ct)
@@ -351,7 +407,7 @@ public sealed class ReportService(IReportRepository repository)
         var reportPeriodEnd = periodEndExclusive.AddDays(-1);
         if (request.CustomRows is { Count: > 0 } submittedRows)
         {
-            var validation = ReportImportValidator.Validate(template.Id, template.Configuration, submittedRows);
+            var validation = ReportImportValidator.Validate(template.Id, template.Configuration, submittedRows, template.ReportType);
             if (!validation.IsReady)
             {
                 var preview = string.Join(" ", validation.Issues.Take(5).Select(x => x.Row > 0 ? $"Dòng {x.Row}: {x.Message}" : x.Message));
@@ -363,33 +419,25 @@ public sealed class ReportService(IReportRepository repository)
         IReadOnlyList<ReportRowDto> rows;
         if (request.CustomRows is { Count: > 0 } customRows)
         {
-            rows = customRows;
+            rows = template.ReportType.Equals("Finance", StringComparison.OrdinalIgnoreCase)
+                ? AppendFinanceTotal(customRows, reportPeriodEnd)
+                : customRows;
+        }
+        else if (template.ReportType.Equals("Finance", StringComparison.OrdinalIgnoreCase))
+        {
+            rows = await BuildFinanceRowsAsync(request.PeriodStart, periodEndExclusive, reportPeriodEnd, ct);
+        }
+        else if (IsActivityReportType(template.ReportType))
+        {
+            rows = await BuildActivityRowsAsync(request.PeriodStart, periodEndExclusive, ct);
+        }
+        else if (IsCollectionReportType(template.ReportType))
+        {
+            rows = await BuildCollectionRowsAsync(ct);
         }
         else
         {
-            var periodRecords = repository.BorrowRecords.AsNoTracking()
-                .Where(x => x.BorrowDate >= request.PeriodStart.Date && x.BorrowDate < periodEndExclusive);
-            var categorizedRows = await periodRecords
-                .Where(x => x.BookCopy.Book.Categories.Any())
-                .SelectMany(x => x.BookCopy.Book.Categories.Select(category => new { Record = x, Category = category.Name }))
-                .GroupBy(x => new { Day = x.Record.BorrowDate!.Value.Date, x.Category })
-                .Select(group => new ReportRowDto(group.Key.Day, group.Key.Category, group.Count(),
-                    group.Count(x => x.Record.ReturnDate != null),
-                    group.Count(x => x.Record.ReturnDate == null && x.Record.DueDate < DateTime.UtcNow),
-                    group.Count(x => x.Record.ReturnDate != null), null))
-                .ToListAsync(ct);
-            var unclassifiedRows = await periodRecords
-                .Where(x => !x.BookCopy.Book.Categories.Any())
-                .GroupBy(x => x.BorrowDate!.Value.Date)
-                .Select(group => new ReportRowDto(group.Key, "Chưa phân loại", group.Count(),
-                    group.Count(x => x.ReturnDate != null),
-                    group.Count(x => x.ReturnDate == null && x.DueDate < DateTime.UtcNow),
-                    group.Count(x => x.ReturnDate != null), null))
-                .ToListAsync(ct);
-            rows = categorizedRows.Concat(unclassifiedRows)
-                .OrderBy(x => x.Date)
-                .ThenBy(x => x.Category)
-                .ToList();
+            throw new ArgumentException($"Loại báo cáo '{template.ReportType}' chưa có bộ tổng hợp dữ liệu phù hợp.");
         }
         var report = new LibraryReport
         {

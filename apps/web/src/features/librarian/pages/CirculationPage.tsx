@@ -5,10 +5,12 @@ import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import {
   BookOpen,
   Bookmark,
+  BellRing,
   Check,
   Clock3,
   Eye,
   LoaderCircle,
+  Mail,
   RefreshCw,
   RotateCcw,
   Search,
@@ -59,6 +61,23 @@ interface LoanList {
   page: number;
   pageSize: number;
   totalPages: number;
+}
+
+interface DueReminderSettings {
+  isEnabled: boolean;
+  reminderDays: number;
+  updatedAt: string;
+}
+
+function dateOnly(value: Date): string {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+}
+
+function dayStart(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
 interface ReturnResult extends CirculationLoan {
@@ -480,7 +499,15 @@ function LoansView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<CirculationLoan | null>(null);
-  const [loansView, setLoansView] = useState<'pending' | 'list'>('pending');
+  const [loansView, setLoansView] = useState<'pending' | 'list' | 'due'>('pending');
+  const [dueLoans, setDueLoans] = useState<CirculationLoan[]>([]);
+  const [dueLoading, setDueLoading] = useState(false);
+  const [dueError, setDueError] = useState<string | null>(null);
+  const [dueRange, setDueRange] = useState<Date[]>([]);
+  const [dueHorizon, setDueHorizon] = useState<7 | 14 | 30>(30);
+  const [reminderSettings, setReminderSettings] = useState<DueReminderSettings>({ isEnabled: false, reminderDays: 7, updatedAt: '' });
+  const [reminderSaving, setReminderSaving] = useState(false);
+  const [reminderMessage, setReminderMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const search = params.get('q') ?? '';
@@ -537,6 +564,65 @@ function LoansView() {
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   useEffect(() => { void Promise.resolve().then(loadDashboard); }, [loadDashboard]);
+
+  useEffect(() => {
+    let active = true;
+    void fetch(`${API_BASE_URL}/api/v1/circulation/due-reminder-settings`, { headers })
+      .then((response) => parseApiResponse<ApiResult<DueReminderSettings>>(response))
+      .then((result) => {
+        if (active && result?.success && result.data) setReminderSettings(result.data);
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [headers]);
+
+  useEffect(() => {
+    if (loansView !== 'due') return undefined;
+    let active = true;
+    setDueLoading(true);
+    const query = new URLSearchParams();
+    if (dueRange.length === 1) {
+      query.set('from', dateOnly(dueRange[0]));
+      query.set('to', dateOnly(dueRange[0]));
+    } else if (dueRange.length > 1) {
+      query.set('from', dateOnly(dueRange[0]));
+      query.set('to', dateOnly(dueRange[1]));
+    }
+    void fetch(`${API_BASE_URL}/api/v1/circulation/loans/due-soon${query.size ? `?${query}` : ''}`, { headers })
+      .then(async (response) => {
+        const result = await parseApiResponse<ApiResult<CirculationLoan[]>>(response);
+        if (!response.ok || !result?.success) throw new Error(result?.error || 'Không tải được sách sắp đến hạn.');
+        if (active) {
+          setDueLoans(result.data ?? []);
+          setDueError(null);
+        }
+      })
+      .catch((reason: unknown) => {
+        if (active) setDueError(errorMessage(reason, 'Không tải được sách sắp đến hạn.'));
+      })
+      .finally(() => { if (active) setDueLoading(false); });
+    return () => { active = false; };
+  }, [dueRange, headers, loansView]);
+
+  const saveReminderSettings = async () => {
+    setReminderSaving(true);
+    setReminderMessage(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/circulation/due-reminder-settings`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(reminderSettings),
+      });
+      const result = await parseApiResponse<ApiResult<DueReminderSettings>>(response);
+      if (!response.ok || !result?.success || !result.data) throw new Error(result?.error || 'Không lưu được cấu hình nhắc hạn.');
+      setReminderSettings(result.data);
+      setReminderMessage(result.meta?.message || 'Đã lưu cấu hình nhắc hạn trả sách.');
+    } catch (reason) {
+      setDueError(errorMessage(reason, 'Không lưu được cấu hình nhắc hạn.'));
+    } finally {
+      setReminderSaving(false);
+    }
+  };
 
   const refreshRef = useRef(() => {
     void load();
@@ -611,6 +697,21 @@ function LoansView() {
     item.barcode,
     item.code,
   ].some((value) => value?.toLocaleLowerCase('vi').includes(pendingTerm)));
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const dueVisibleLoans = dueLoans.filter((loan) => {
+    const dueDay = dayStart(loan.dueDate);
+    if (dueDay === null) return false;
+    const daysRemaining = Math.ceil((dueDay - todayStart.getTime()) / 86_400_000);
+    return daysRemaining >= 0 && (dueRange.length > 0 || daysRemaining <= dueHorizon);
+  });
+  const dueMilestones = ([7, 14, 30] as const).map((days) => ({
+    days,
+    count: dueLoans.filter((loan) => {
+      const dueDay = dayStart(loan.dueDate);
+      return dueDay !== null && dueDay >= todayStart.getTime() && dueDay <= todayStart.getTime() + days * 86_400_000;
+    }).length,
+  }));
 
   return (
     <section className="circ-page circ-page--loans">
@@ -621,14 +722,127 @@ function LoansView() {
       <WorkflowTabs
         label="Nội dung mượn sách"
         value={loansView}
-        onChange={(value) => setLoansView(value as 'pending' | 'list')}
+        onChange={(value) => setLoansView(value as 'pending' | 'list' | 'due')}
         tabs={[
           { value: 'pending', label: 'Yêu cầu chờ xử lý', count: pending.length },
           { value: 'list', label: 'Danh sách mượn sách', count: list?.totalCount ?? 0 },
+          { value: 'due', label: 'Sắp đến hạn', count: dueLoans.length },
         ]}
       />
 
-      {loansView === 'pending' ? (
+      {loansView === 'due' ? (
+        <section className="circ-due-workspace" id="circ-panel-due" role="tabpanel" aria-labelledby="circ-tab-due" tabIndex={0}>
+          <div className="circ-due-heading">
+            <div>
+              <span className="circ-eyebrow">THEO DÕI HẠN TRẢ</span>
+              <h2>Sách gần đến hạn</h2>
+              <p>Chủ động theo dõi lịch trả và nhắc độc giả trước ngày đến hạn.</p>
+            </div>
+            <AnimatedCalendar
+              mode="range"
+              value={dueRange}
+              onChange={setDueRange}
+              placeholder="Chọn khoảng ngày đến hạn"
+              ariaLabel="Lọc sách theo khoảng ngày đến hạn"
+            />
+          </div>
+
+          <div className="circ-due-milestones" aria-label="Các mốc thời gian đến hạn">
+            {dueMilestones.map(({ days, count }) => (
+              <button
+                key={days}
+                type="button"
+                className={dueHorizon === days ? 'is-active' : ''}
+                onClick={() => setDueHorizon(days)}
+              >
+                <span>Trong {days} ngày</span>
+                <strong>{count}</strong>
+                <small>{count === 1 ? 'phiếu mượn' : 'phiếu mượn'}</small>
+              </button>
+            ))}
+          </div>
+
+          <div className="circ-reminder-settings">
+            <span className="circ-reminder-settings__icon"><Mail size={19} /></span>
+            <div className="circ-reminder-settings__copy">
+              <strong>Nhắc hạn trả qua email</strong>
+              <p>{reminderSettings.isEnabled
+                ? `Hệ thống sẽ tự gửi email trước hạn ${reminderSettings.reminderDays} ngày.`
+                : 'Đang tắt. Bật để hệ thống tự gửi email nhắc độc giả.'}</p>
+            </div>
+            <label className="circ-reminder-days">
+              <span>Nhắc trước</span>
+              <select
+                value={reminderSettings.reminderDays}
+                onChange={(event) => setReminderSettings((current) => ({ ...current, reminderDays: Number(event.target.value) }))}
+              >
+                <option value={7}>7 ngày</option>
+                <option value={14}>14 ngày</option>
+              </select>
+            </label>
+            <label className="circ-reminder-toggle">
+              <input
+                type="checkbox"
+                checked={reminderSettings.isEnabled}
+                onChange={(event) => setReminderSettings((current) => ({ ...current, isEnabled: event.target.checked }))}
+              />
+              <span>Bật tự động</span>
+            </label>
+            <button type="button" className="circ-btn circ-btn--primary" disabled={reminderSaving} onClick={() => void saveReminderSettings()}>
+              {reminderSaving ? <LoaderCircle className="spin" size={15} /> : <BellRing size={15} />}
+              {reminderSaving ? 'Đang lưu...' : 'Lưu cấu hình'}
+            </button>
+          </div>
+          {reminderMessage && <p className="circ-banner is-ok">{reminderMessage}</p>}
+          {dueError && <p className="circ-banner is-err">{dueError}</p>}
+
+          <div className="circ-card circ-due-list-card">
+            <div className="circ-card-head">
+              <div>
+                <h2>Danh sách cần theo dõi</h2>
+                <p>{dueRange.length ? 'Kết quả trong khoảng ngày đã chọn.' : `Các phiếu đến hạn trong ${dueHorizon} ngày tới.`}</p>
+              </div>
+              <span className="circ-count">{dueVisibleLoans.length} phiếu</span>
+            </div>
+            {dueLoading ? (
+              <p className="circ-empty"><LoaderCircle className="spin" size={17} /> Đang tải lịch đến hạn...</p>
+            ) : !dueVisibleLoans.length ? (
+              <p className="circ-empty">Không có sách đến hạn trong mốc thời gian này.</p>
+            ) : (
+              <div className="circ-due-list">
+                {dueVisibleLoans.map((loan) => {
+                  const dueDay = dayStart(loan.dueDate) ?? todayStart.getTime();
+                  const daysLeft = Math.max(0, Math.ceil((dueDay - todayStart.getTime()) / 86_400_000));
+                  return (
+                    <article className="circ-due-row" key={loan.id}>
+                      <div className="circ-due-row__cover">
+                        {loan.coverImageUrl
+                          ? <img src={loan.coverImageUrl} alt={`Bìa sách ${loan.bookTitle}`} loading="lazy" />
+                          : <BookOpen size={22} aria-hidden="true" />}
+                      </div>
+                      <div className="circ-due-row__book">
+                        <strong>{loan.bookTitle}</strong>
+                        <span>{loan.code} · Mã bản sao: {loan.barcode}</span>
+                      </div>
+                      <div className="circ-due-row__reader">
+                        <strong>{loan.readerName}</strong>
+                        <span>{loan.readerEmail || 'Chưa có email độc giả'}</span>
+                      </div>
+                      <div className={`circ-due-row__date${daysLeft <= 3 ? ' is-soon' : ''}`}>
+                        <span>{daysLeft === 0 ? 'Đến hạn hôm nay' : `Còn ${daysLeft} ngày`}</span>
+                        <strong>{formatDate(loan.dueDate)}</strong>
+                      </div>
+                      <button type="button" className="circ-btn" onClick={() => setDetail(loan)}>
+                        <Eye size={14} /> Xem phiếu
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+      ) : loansView === 'pending' ? (
       <section className="circ-card circ-pending-card" id="circ-panel-pending" role="tabpanel" aria-labelledby="circ-tab-pending" tabIndex={0}>
         <div className="circ-card-head">
           <div>
@@ -790,24 +1004,38 @@ function LoansView() {
       </div>}
 
       {detail && (
-        <div className="circ-modal" role="dialog" aria-labelledby="loan-detail-title">
-          <div className="circ-card">
-            <h2 id="loan-detail-title">Chi tiết {detail.code}</h2>
-            <p><b>Độc giả:</b> {detail.readerName}</p>
-            <p><b>Sách:</b> {detail.bookTitle}</p>
-            <p><b>Mã vạch:</b> {detail.barcode}</p>
-            <p><b>Mượn:</b> {formatDate(detail.borrowDate)} · <b>Hạn:</b> {formatDate(detail.dueDate)}</p>
-            <p>
-              <b>Trạng thái:</b> {STATUS_LABELS[detail.displayStatus] ?? detail.displayStatus}
-              {detail.overdueDays > 0 ? ` · Trễ ${detail.overdueDays} ngày` : ''}
-            </p>
-            <div className="circ-actions">
+        <div className="circ-modal" role="presentation" onClick={() => setDetail(null)}>
+          <section className="circ-card circ-loan-detail-modal" role="dialog" aria-modal="true" aria-labelledby="loan-detail-title" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="circ-loan-detail-close" aria-label="Đóng chi tiết" onClick={() => setDetail(null)}><X size={19} /></button>
+            <div className="circ-loan-detail-hero">
+              <div className="circ-loan-detail-cover">
+                {detail.coverImageUrl
+                  ? <img src={detail.coverImageUrl} alt={`Bìa sách ${detail.bookTitle}`} />
+                  : <BookOpen size={34} aria-hidden="true" />}
+              </div>
+              <div className="circ-loan-detail-title">
+                <span className="circ-eyebrow">CHI TIẾT PHIẾU MƯỢN</span>
+                <h2 id="loan-detail-title">{detail.bookTitle}</h2>
+                <p>{detail.code} <span>·</span> Bản sao {detail.barcode}</p>
+                <span className={`circ-badge is-${detail.displayStatus.toLowerCase()}`}>
+                  {STATUS_LABELS[detail.displayStatus] ?? detail.displayStatus}
+                  {detail.overdueDays > 0 ? ` · Trễ ${detail.overdueDays} ngày` : ''}
+                </span>
+              </div>
+            </div>
+            <div className="circ-loan-detail-grid">
+              <div><span>Độc giả</span><strong>{detail.readerName}</strong></div>
+              <div><span>Email</span><strong>{detail.readerEmail || 'Chưa có email'}</strong></div>
+              <div><span>Ngày mượn</span><strong>{formatDate(detail.borrowDate)}</strong></div>
+              <div><span>Hạn trả</span><strong>{formatDate(detail.dueDate)}</strong></div>
+            </div>
+            <div className="circ-loan-detail-actions">
               {detail.displayStatus !== 'Returned' && (
                 <Link className="circ-btn circ-btn--primary" to={`${tabPath('return')}?barcode=${encodeURIComponent(detail.barcode)}`}>Trả sách</Link>
               )}
               <button type="button" className="circ-btn" onClick={() => setDetail(null)}>Đóng</button>
             </div>
-          </div>
+          </section>
         </div>
       )}
     </section>

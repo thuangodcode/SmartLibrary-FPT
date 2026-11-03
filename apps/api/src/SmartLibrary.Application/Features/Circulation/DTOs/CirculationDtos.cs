@@ -17,6 +17,14 @@ public class CirculationStatsDto
     public int LostFee { get; set; }
 }
 
+public sealed record CirculationDueReminderSettingsDto(bool IsEnabled, int ReminderDays, DateTime UpdatedAt);
+
+public sealed class UpdateCirculationDueReminderSettingsRequest
+{
+    public bool IsEnabled { get; init; }
+    public int ReminderDays { get; init; } = 7;
+}
+
 public record CirculationLoanDto
 {
     public Guid Id { get; init; }

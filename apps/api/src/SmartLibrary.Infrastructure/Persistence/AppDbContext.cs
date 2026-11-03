@@ -45,6 +45,7 @@ public class AppDbContext : DbContext
     public DbSet<BookIncident> BookIncidents => Set<BookIncident>();
     public DbSet<AiSetting> AiSettings => Set<AiSetting>();
     public DbSet<UserAiSetting> UserAiSettings => Set<UserAiSetting>();
+    public DbSet<CirculationReminderSetting> CirculationReminderSettings => Set<CirculationReminderSetting>();
     public DbSet<RagDocument> RagDocuments => Set<RagDocument>();
     public DbSet<SupportRequestType> SupportRequestTypes => Set<SupportRequestType>();
     public DbSet<SupportComplaint> SupportComplaints => Set<SupportComplaint>();
@@ -330,6 +331,16 @@ public class AppDbContext : DbContext
             entity.Property(x => x.BaseUrl).HasMaxLength(500);
             entity.Property(x => x.ProviderKeysJson).HasColumnName("provider_keys_json");
             entity.Property(x => x.LastTestMessage).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<CirculationReminderSetting>(entity =>
+        {
+            entity.ToTable("circulation_reminder_settings");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.IsEnabled).HasColumnName("is_enabled").HasDefaultValue(false);
+            entity.Property(x => x.ReminderDays).HasColumnName("reminder_days").HasDefaultValue(7);
+            entity.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
         });
 
         modelBuilder.Entity<RagDocument>(entity =>

@@ -215,6 +215,16 @@ try
         }
 
         db.Database.Migrate();
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS circulation_reminder_settings (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                is_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                reminder_days INTEGER NOT NULL DEFAULT 7,
+                updated_by UUID NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT ck_circulation_reminder_days CHECK (reminder_days IN (7, 14))
+            );
+            """);
     }
 }
 catch (Exception ex)

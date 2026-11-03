@@ -154,6 +154,7 @@ export const LibrarianReportsPage: React.FC = () => {
   const [monthFilter, setMonthFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [reportContentTab, setReportContentTab] = useState<'requests' | 'archive'>('requests');
 
   const [createMode, setCreateMode] = useState<CreateMode>('auto');
   const [manualRows, setManualRows] = useState<ManualReportRow[]>([emptyManualRow()]);
@@ -166,11 +167,11 @@ export const LibrarianReportsPage: React.FC = () => {
   const [reportName, setReportName] = useState('');
   const [periodStart, setPeriodStart] = useState(() => {
     const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().split('T')[0];
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
   });
   const [periodEnd, setPeriodEnd] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   const [format, setFormat] = useState('CSV');
   const [submitting, setSubmitting] = useState(false);
@@ -272,6 +273,7 @@ export const LibrarianReportsPage: React.FC = () => {
     () => templates.find((t) => t.id === selectedTemplateId),
     [templates, selectedTemplateId],
   );
+  const isFinanceTemplate = activeTemplate?.reportType === 'Finance';
 
   const activeRequest = useMemo(
     () => requests.find((request) => request.id === requestId),
@@ -290,8 +292,11 @@ export const LibrarianReportsPage: React.FC = () => {
   }, [activeRequest]);
 
   const activeTemplateConfig = useMemo(
-    () => parseTemplateConfiguration(activeTemplate?.configuration),
-    [activeTemplate?.configuration],
+    () => {
+      const config = parseTemplateConfiguration(activeTemplate?.configuration);
+      return activeTemplate?.reportType === 'Finance' ? { ...config, metrics: ['Amount'] } : config;
+    },
+    [activeTemplate?.configuration, activeTemplate?.reportType],
   );
 
   const templateMetrics = useMemo(() => getTemplateMetrics(activeTemplateConfig), [activeTemplateConfig]);
@@ -586,7 +591,16 @@ export const LibrarianReportsPage: React.FC = () => {
         </article>
       </section>
 
-      <section className="lib-reports-panel lib-report-requests-panel">
+      <div className="lib-report-content-tabs" role="tablist" aria-label="Nội dung thống kê và báo cáo">
+        <button type="button" role="tab" id="lib-report-tab-requests" aria-selected={reportContentTab === 'requests'} aria-controls="lib-report-panel-requests" className={reportContentTab === 'requests' ? 'active' : ''} onClick={() => setReportContentTab('requests')}>
+          <ClipboardList size={16}/> Báo cáo được giao <span>{requests.filter((request) => request.status !== 'Submitted').length}</span>
+        </button>
+        <button type="button" role="tab" id="lib-report-tab-archive" aria-selected={reportContentTab === 'archive'} aria-controls="lib-report-panel-archive" className={reportContentTab === 'archive' ? 'active' : ''} onClick={() => setReportContentTab('archive')}>
+          <FileText size={16}/> Báo cáo đã gửi <span>{reports?.totalCount ?? 0}</span>
+        </button>
+      </div>
+
+      {reportContentTab === 'requests' && <section className="lib-reports-panel lib-report-requests-panel" id="lib-report-panel-requests" role="tabpanel" aria-labelledby="lib-report-tab-requests" tabIndex={0}>
         <div className="lib-panel-header">
           <div className="lib-panel-header-copy">
             <span>YÊU CẦU TỪ ADMIN</span>
@@ -637,10 +651,10 @@ export const LibrarianReportsPage: React.FC = () => {
         ) : (
           <div className="lib-request-empty"><ClipboardList size={22}/><strong>Chưa có yêu cầu mới từ Admin</strong><span>Các yêu cầu được giao cho bạn sẽ hiển thị tại đây.</span></div>
         )}
-      </section>
+      </section>}
 
       {/* ── Main Panel: List of Reports ── */}
-      <section className="lib-reports-panel">
+      {reportContentTab === 'archive' && <section className="lib-reports-panel" id="lib-report-panel-archive" role="tabpanel" aria-labelledby="lib-report-tab-archive" tabIndex={0}>
         <div className="lib-panel-header">
           <div className="lib-panel-header-copy">
             <span>DANH SÁCH LƯU TRỮ</span>
@@ -824,7 +838,7 @@ export const LibrarianReportsPage: React.FC = () => {
             </div>
           </div>
         )}
-      </section>
+      </section>}
 
       {/* ── Trang: Tạo & gửi báo cáo mới cho Admin ── */}
       {createModalOpen && (
@@ -947,9 +961,10 @@ export const LibrarianReportsPage: React.FC = () => {
                         <thead>
                           <tr>
                             <th>Ngày</th>
-                            <th>Nhóm sách</th>
+                            <th>{isFinanceTemplate ? 'Khoản phí' : 'Nhóm sách'}</th>
                             {templateMetrics.includes('Borrowed') && <th>Lượt mượn</th>}
                             {templateMetrics.includes('Returned') && <th>Lượt trả</th>}
+                            {templateMetrics.includes('Amount') && <th>Số tiền (VND)</th>}
                             <th>Ghi chú</th>
                             <th />
                           </tr>
@@ -972,7 +987,7 @@ export const LibrarianReportsPage: React.FC = () => {
                                 <input
                                   type="text"
                                   value={row.category}
-                                  placeholder="VD: Khoa học"
+                                  placeholder={isFinanceTemplate ? 'VD: Phí quá hạn' : 'VD: Khoa học'}
                                   onChange={(e) =>
                                     setManualRows((rows) =>
                                       rows.map((r, i) => (i === idx ? { ...r, category: e.target.value } : r)),
@@ -1012,6 +1027,17 @@ export const LibrarianReportsPage: React.FC = () => {
                                   />
                                 </td>
                               )}
+                              {templateMetrics.includes('Amount') && (
+                                <td>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={row.amount}
+                                    onChange={(e) => setManualRows((rows) => rows.map((r, i) => i === idx ? { ...r, amount: Number(e.target.value) || 0 } : r))}
+                                  />
+                                </td>
+                              )}
                               <td>
                                 <input
                                   type="text"
@@ -1037,6 +1063,7 @@ export const LibrarianReportsPage: React.FC = () => {
                             </tr>
                           ))}
                         </tbody>
+                        {isFinanceTemplate && <tfoot><tr><th colSpan={2}>Tổng chi phí</th><th>{manualRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0).toLocaleString('vi-VN')} ₫</th><th colSpan={2} /></tr></tfoot>}
                       </table>
                     </div>
                     {manualValidationIssues.length > 0 && (

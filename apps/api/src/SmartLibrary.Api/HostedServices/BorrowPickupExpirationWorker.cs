@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using SmartLibrary.Api.Hubs;
 using SmartLibrary.Application.Features.Circulation;
+using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Domain.Entities;
 using SmartLibrary.Domain.Enums;
 using SmartLibrary.Infrastructure.Persistence;
@@ -26,6 +27,10 @@ public sealed class BorrowPickupExpirationWorker(
                 await circulation.MarkOverdueAsync(stoppingToken);
                 await circulation.ProcessReservationExpirationsAsync(stoppingToken);
                 await CreateRemindersAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(), stoppingToken);
+                await SendDueDateEmailRemindersAsync(
+                    scope.ServiceProvider.GetRequiredService<AppDbContext>(),
+                    scope.ServiceProvider.GetRequiredService<IEmailService>(),
+                    stoppingToken);
                 var expired = await circulation.ExpireUncollectedPickupsAsync(stoppingToken);
                 foreach (var loan in expired)
                 {
@@ -44,6 +49,72 @@ public sealed class BorrowPickupExpirationWorker(
                 logger.LogError(exception, "Failed to expire uncollected borrow requests.");
             }
         }
+    }
+
+    private static async Task SendDueDateEmailRemindersAsync(AppDbContext db, IEmailService emailService, CancellationToken ct)
+    {
+        var settings = await db.CirculationReminderSettings.AsNoTracking()
+            .OrderBy(item => item.UpdatedAt)
+            .FirstOrDefaultAsync(ct);
+        if (settings is not { IsEnabled: true }) return;
+
+        var now = DateTime.UtcNow;
+        var targetDate = now.Date.AddDays(settings.ReminderDays);
+        var targetEnd = targetDate.AddDays(1);
+        var dueLoans = await db.BorrowRecords.AsNoTracking()
+            .Where(loan => loan.Status == BorrowStatus.Borrowed
+                           && loan.DueDate >= targetDate
+                           && loan.DueDate < targetEnd
+                           && !loan.IsDeleted
+                           && !loan.Reader.IsDeleted
+                           && loan.Reader.Email != "")
+            .Select(loan => new
+            {
+                loan.Id,
+                loan.ReaderId,
+                ReaderName = loan.Reader.FullName,
+                ReaderEmail = loan.Reader.Email,
+                loan.DueDate,
+                BookTitle = loan.BookCopy.Book.Title
+            })
+            .ToListAsync(ct);
+
+        if (dueLoans.Count == 0) return;
+        var readerIds = dueLoans.Select(item => item.ReaderId).Distinct().ToList();
+        var sentMetadata = await db.Notifications.AsNoTracking()
+            .Where(item => item.Type == "due_date_email_reminder" && readerIds.Contains(item.UserId))
+            .Select(item => item.Metadata)
+            .ToListAsync(ct);
+        var sentKeys = sentMetadata
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var loan in dueLoans)
+        {
+            var metadata = JsonSerializer.Serialize(new { loanId = loan.Id, reminderDays = settings.ReminderDays });
+            if (sentKeys.Contains(metadata)) continue;
+
+            var subject = $"Nhắc hạn trả sách sau {settings.ReminderDays} ngày";
+            var body = $"<p>Xin chào {System.Net.WebUtility.HtmlEncode(loan.ReaderName)},</p>" +
+                       $"<p>Thư viện xin nhắc bạn sách <strong>{System.Net.WebUtility.HtmlEncode(loan.BookTitle)}</strong> " +
+                       $"cần được trả vào ngày <strong>{loan.DueDate:dd/MM/yyyy}</strong>.</p>" +
+                       "<p>Vui lòng sắp xếp thời gian trả sách đúng hạn. Nếu bạn đã trả sách, xin bỏ qua email này.</p>";
+            if (!await emailService.SendEmailAsync(loan.ReaderEmail, subject, body, ct)) continue;
+
+            db.Notifications.Add(new Notification
+            {
+                UserId = loan.ReaderId,
+                Title = "Đã gửi email nhắc hạn trả sách",
+                Message = $"Email nhắc trả “{loan.BookTitle}” trước {settings.ReminderDays} ngày đã được gửi.",
+                Type = "due_date_email_reminder",
+                Metadata = metadata
+            });
+            sentKeys.Add(metadata);
+        }
+
+        if (db.ChangeTracker.Entries<Notification>().Any(entry => entry.State == EntityState.Added))
+            await db.SaveChangesAsync(ct);
     }
 
     private static async Task CreateRemindersAsync(AppDbContext db, CancellationToken ct)
