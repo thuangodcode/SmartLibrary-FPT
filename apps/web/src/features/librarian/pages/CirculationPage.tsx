@@ -395,6 +395,38 @@ function Chrome({ tab, stats, loading }: { tab: CirculationTab; stats: Circulati
   );
 }
 
+function WorkflowTabs({
+  label,
+  value,
+  tabs,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  tabs: Array<{ value: string; label: string; count?: number }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="circ-workflow-tabs" role="tablist" aria-label={label}>
+      {tabs.map((tab) => (
+        <button
+          key={tab.value}
+          id={`circ-tab-${tab.value}`}
+          type="button"
+          role="tab"
+          aria-selected={value === tab.value}
+          aria-controls={`circ-panel-${tab.value}`}
+          className={value === tab.value ? 'is-active' : ''}
+          onClick={() => onChange(tab.value)}
+        >
+          {tab.label}
+          {tab.count !== undefined && <span>{tab.count}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function CirculationConfirmDialog({
   eyebrow,
   title,
@@ -448,6 +480,7 @@ function LoansView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<CirculationLoan | null>(null);
+  const [loansView, setLoansView] = useState<'pending' | 'list'>('pending');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const search = params.get('q') ?? '';
@@ -585,7 +618,18 @@ function LoansView() {
       {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
 
-      <section className="circ-card circ-pending-card">
+      <WorkflowTabs
+        label="Nội dung mượn sách"
+        value={loansView}
+        onChange={(value) => setLoansView(value as 'pending' | 'list')}
+        tabs={[
+          { value: 'pending', label: 'Yêu cầu chờ xử lý', count: pending.length },
+          { value: 'list', label: 'Danh sách mượn sách', count: list?.totalCount ?? 0 },
+        ]}
+      />
+
+      {loansView === 'pending' ? (
+      <section className="circ-card circ-pending-card" id="circ-panel-pending" role="tabpanel" aria-labelledby="circ-tab-pending" tabIndex={0}>
         <div className="circ-card-head">
           <div>
             <h2>Yêu cầu chờ xử lý</h2>
@@ -667,7 +711,7 @@ function LoansView() {
         )}
       </section>
 
-      <div className="circ-layout circ-layout--loans">
+      ) : <div className="circ-layout circ-layout--loans" id="circ-panel-list" role="tabpanel" aria-labelledby="circ-tab-list" tabIndex={0}>
         <div className="circ-main">
           <div className="circ-card">
             <div className="circ-card-head">
@@ -743,7 +787,7 @@ function LoansView() {
           </div>
 
         </div>
-      </div>
+      </div>}
 
       {detail && (
         <div className="circ-modal" role="dialog" aria-labelledby="loan-detail-title">
@@ -936,7 +980,7 @@ function ReturnView() {
   const [loansError, setLoansError] = useState<string | null>(null);
   const [conditions, setConditions] = useState<Record<string, string>>({});
   const [returningBarcode, setReturningBarcode] = useState<string | null>(null);
-  const [returnMode, setReturnMode] = useState<'reader' | 'barcode'>(params.get('barcode') ? 'barcode' : 'reader');
+  const [returnMode, setReturnMode] = useState<'reader' | 'barcode' | 'activity'>(params.get('barcode') ? 'barcode' : 'reader');
   const [defaultCondition, setDefaultCondition] = useState('Good');
   const [manualBarcode, setManualBarcode] = useState(params.get('barcode') ?? '');
   const [manualCondition, setManualCondition] = useState('Good');
@@ -1047,33 +1091,45 @@ function ReturnView() {
       {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
 
-      <div className="circ-card circ-return-panel">
+      <WorkflowTabs
+        label="Nội dung trả sách"
+        value={returnMode}
+        onChange={(value) => setReturnMode(value as 'reader' | 'barcode' | 'activity')}
+        tabs={[
+          { value: 'reader', label: 'Trả theo độc giả' },
+          { value: 'barcode', label: 'Trả nhanh theo mã vạch' },
+          { value: 'activity', label: 'Giao dịch gần đây', count: activity.length },
+        ]}
+      />
+
+      {returnMode === 'activity' ? (
+      <section className="circ-card" id="circ-panel-activity" role="tabpanel" aria-labelledby="circ-tab-activity" tabIndex={0}>
+        <h2>Giao dịch gần đây</h2>
+        {loading ? (
+          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải giao dịch...</p>
+        ) : !activity.length ? <p className="circ-empty">Chưa có giao dịch gần đây.</p> : (
+          <div className="circ-table-wrap">
+            <table className="circ-table">
+              <thead><tr><th>Thời gian</th><th>Loại</th><th>Mã vạch</th><th>Độc giả</th></tr></thead>
+              <tbody>
+                {activity.map((item) => (
+                  <tr key={item.id}>
+                    <td>{formatDateTime(item.at)}</td>
+                    <td><span className={`circ-badge is-${item.kind.toLowerCase()}`}>{item.kind === 'Returned' ? 'Trả' : 'Mượn'}</span></td>
+                    <td>{item.barcode}</td>
+                    <td>{item.readerName}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      ) : <div className="circ-card circ-return-panel" id={`circ-panel-${returnMode}`} role="tabpanel" aria-labelledby={`circ-tab-${returnMode}`} tabIndex={0}>
         <div className="circ-return-section-header">
           <div>
             <h2>Trả sách</h2>
             <p>Ghi nhận trả sách và kiểm tra tình trạng bản sao, đối chiếu tính toán phí phạt quá hạn hoặc bồi thường.</p>
-          </div>
-          <div className="circ-return-mode-tabs" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={returnMode === 'reader'}
-              className={`circ-return-tab-btn ${returnMode === 'reader' ? 'is-active' : ''}`}
-              onClick={() => setReturnMode('reader')}
-            >
-              <UserRound size={15} />
-              <span>Trả theo độc giả</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={returnMode === 'barcode'}
-              className={`circ-return-tab-btn ${returnMode === 'barcode' ? 'is-active' : ''}`}
-              onClick={() => setReturnMode('barcode')}
-            >
-              <BookOpen size={15} />
-              <span>Trả nhanh theo mã vạch</span>
-            </button>
           </div>
         </div>
 
@@ -1267,33 +1323,7 @@ function ReturnView() {
             </div>
           </form>
         )}
-      </div>
-      <div className="circ-card">
-        <h2>Giao dịch gần đây</h2>
-        {loading ? (
-          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải giao dịch...</p>
-        ) : !activity.length ? <p className="circ-empty">Chưa có giao dịch gần đây.</p> : (
-          <div className="circ-table-wrap">
-            <table className="circ-table">
-              <thead><tr><th>Thời gian</th><th>Loại</th><th>Mã vạch</th><th>Độc giả</th></tr></thead>
-              <tbody>
-                {activity.map((item) => (
-                  <tr key={item.id}>
-                    <td>{formatDateTime(item.at)}</td>
-                    <td>
-                      <span className={`circ-badge is-${item.kind.toLowerCase()}`}>
-                        {item.kind === 'Returned' ? 'Trả' : 'Mượn'}
-                      </span>
-                    </td>
-                    <td>{item.barcode}</td>
-                    <td>{item.readerName}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      </div>}
     </section>
   );
 }
@@ -1312,6 +1342,7 @@ function ReservationsView() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [reservationView, setReservationView] = useState<'create' | 'queue'>('create');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1379,7 +1410,17 @@ function ReservationsView() {
       <Chrome tab="reservations" stats={stats} loading={loading} />
       {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
-      <section className="circ-card circ-reservation-create">
+      <WorkflowTabs
+        label="Nội dung đặt chỗ"
+        value={reservationView}
+        onChange={(value) => setReservationView(value as 'create' | 'queue')}
+        tabs={[
+          { value: 'create', label: 'Tạo đặt chỗ' },
+          { value: 'queue', label: 'Danh sách đặt chỗ', count: reservations.length },
+        ]}
+      />
+      {reservationView === 'create' ? (
+      <section className="circ-card circ-reservation-create" id="circ-panel-create" role="tabpanel" aria-labelledby="circ-tab-create" tabIndex={0}>
         <div className="circ-reservation-intro">
           <span className="circ-reservation-intro__icon"><Bookmark size={21} /></span>
           <div>
@@ -1457,7 +1498,8 @@ function ReservationsView() {
           </div>
         </form>
       </section>
-      <section className="circ-card circ-reservation-queue">
+      ) : (
+      <section className="circ-card circ-reservation-queue" id="circ-panel-queue" role="tabpanel" aria-labelledby="circ-tab-queue" tabIndex={0}>
         <div className="circ-card-head">
           <div>
             <h2>Danh sách đặt chỗ đang mở</h2>
@@ -1511,6 +1553,7 @@ function ReservationsView() {
           </div>
         )}
       </section>
+      )}
     </section>
   );
 }
@@ -1532,6 +1575,7 @@ function OverdueView() {
   const [incidentStatus, setIncidentStatus] = useState('All');
   const [overdueDates, setOverdueDates] = useState<Date[]>([]);
   const [incidentDates, setIncidentDates] = useState<Date[]>([]);
+  const [overdueView, setOverdueView] = useState<'overdue' | 'incidents'>('overdue');
 
   const inDateRange = (value: string | null | undefined, dates: Date[]) => {
     if (!dates.length) return true;
@@ -1641,7 +1685,17 @@ function OverdueView() {
       </div>
       {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
-      <div className="circ-card">
+      <WorkflowTabs
+        label="Nội dung quá hạn và sự cố"
+        value={overdueView}
+        onChange={(value) => setOverdueView(value as 'overdue' | 'incidents')}
+        tabs={[
+          { value: 'overdue', label: 'Sách quá hạn', count: items.length },
+          { value: 'incidents', label: 'Hư hỏng và thất lạc', count: incidents.length },
+        ]}
+      />
+      {overdueView === 'overdue' ? (
+      <section className="circ-card" id="circ-panel-overdue" role="tabpanel" aria-labelledby="circ-tab-overdue" tabIndex={0}>
         <div className="circ-card-head"><div><h2>Sách quá hạn</h2><p>Theo dõi hạn trả và trạng thái ghi nhận phí.</p></div></div>
         <div className="circ-toolbar circ-overdue-filters">
           <select aria-label="Lọc trạng thái sách quá hạn" value={overdueStatus} onChange={(event) => setOverdueStatus(event.target.value)}>
@@ -1702,8 +1756,9 @@ function OverdueView() {
             </table>
           </div>
         )}
-      </div>
-      <div className="circ-card">
+      </section>
+      ) : (
+      <section className="circ-card" id="circ-panel-incidents" role="tabpanel" aria-labelledby="circ-tab-incidents" tabIndex={0}>
         <div className="circ-card-head"><div><h2>Hư hỏng & thất lạc</h2><p>Đối chiếu hồ sơ và xử lý bồi thường theo chính sách thư viện.</p></div></div>
         <div className="circ-toolbar circ-overdue-filters">
           <select aria-label="Lọc trạng thái hồ sơ sự cố" value={incidentStatus} onChange={(event) => setIncidentStatus(event.target.value)}>
@@ -1723,7 +1778,8 @@ function OverdueView() {
           ))}
           </tbody></table></div>
         )}
-      </div>
+      </section>
+      )}
       {fineToRecord && (
         <CirculationConfirmDialog
           eyebrow="GHI NHẬN PHÍ QUÁ HẠN"
@@ -1981,16 +2037,21 @@ function FinesView() {
       <Chrome tab="fines" stats={stats} loading={loading} />
       {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
-      <div className="circ-card">
+      <WorkflowTabs
+        label="Lọc danh sách phí phạt"
+        value={status}
+        onChange={setStatus}
+        tabs={[
+          { value: 'All', label: 'Tất cả' },
+          { value: 'Pending', label: 'Chưa thanh toán' },
+          { value: 'Paid', label: 'Đã thanh toán' },
+        ]}
+      />
+      <div className="circ-card" id={`circ-panel-${status}`} role="tabpanel" aria-labelledby={`circ-tab-${status}`} tabIndex={0}>
         <div className="circ-card-head">
           <h2>Danh sách phí phạt</h2>
           <div className="circ-toolbar">
             <input value={searchInput} placeholder="Tìm độc giả, mã vạch, sách..." onChange={(e) => setSearchInput(e.target.value)} />
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="All">Tất cả</option>
-              <option value="Pending">Chưa thanh toán</option>
-              <option value="Paid">Đã thanh toán</option>
-            </select>
             <button
               type="button"
               className="circ-btn"

@@ -21,6 +21,7 @@ const HomeCatalogPage = () => {
     Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const categoriesQuery = useHomeCategories();
   const booksQuery = useHomeBooks(activeCategory, search, page, !isRecommendations, sortByReviewCount, reviewCountAscending);
+  const allBooksQuery = useHomeBooks("", "", 1, !isRecommendations);
   const highlightsQuery = useHomeBookHighlights(isRecommendations);
   const categories = categoriesQuery.data ?? [];
   const categoryName = categories.find(
@@ -97,6 +98,7 @@ const HomeCatalogPage = () => {
               onClick={() => selectCategory("")}
             >
               Tất cả
+              <small>{allBooksQuery.data?.totalCount ?? "…"}</small>
             </button>
             {categories.map((category) => (
               <button
@@ -140,12 +142,7 @@ const HomeCatalogPage = () => {
                   aria-pressed={!activeCategory}
                 >
                   <span>Tất cả đầu sách</span>
-                  <small>
-                    {categories.reduce(
-                      (count, category) => count + category.bookCount,
-                      0,
-                    )}
-                  </small>
+                  <small>{allBooksQuery.data?.totalCount ?? "..."}</small>
                 </button>
                 {categories.map((category) => (
                   <button
