@@ -102,12 +102,20 @@ npm run dev
 ### 3. Mobile App
 
 ```bash
-cd apps/mobile
+# Từ thư mục gốc repository
 npm install
-cp .env.example .env.local
-npx expo start
-# Scan QR code bằng Expo Go
+npm --prefix apps/mobile install
+npm run dev:lan
+# Quét QR Expo bằng Expo Go trên điện thoại cùng mạng với máy tính
 ```
+
+Trước lần chạy đầu, tạo `.env` từ `.env.example` ở thư mục gốc và điền thông tin Supabase/PostgreSQL của môi trường bạn được phép sử dụng. `.env` không được đưa lên Git; clone code không tự mang theo database, khóa dịch vụ hay tài khoản đăng nhập. Mobile tự lấy host LAN từ Expo, không cần đặt `EXPO_PUBLIC_API_URL` khi chạy cùng API local bằng `npm run dev:lan`.
+
+Mobile hiện hỗ trợ hai vai trò **Reader** và **Librarian (Thủ thư)**. Đăng nhập bằng tài khoản đã được kích hoạt trong hệ thống; vai trò Admin không được phép truy cập ứng dụng mobile.
+
+Để nhiều điện thoại thật dùng cùng API khi quét QR, kết nối chúng và máy tính vào cùng Wi-Fi. Có thể chạy `npm run dev:lan` để bật các dịch vụ cùng lúc. Nếu QR không hiện trong terminal được `concurrently` chia sẻ, chạy API bằng `npm run dev:api:lan` ở terminal thứ nhất, rồi mở terminal thứ hai và chạy `npm run dev:mobile`; Expo Go sẽ hiện QR riêng. Expo tự lấy IP máy chạy Metro làm host API cho app mobile. Nếu Windows Firewall chặn kết nối, cho phép Node/Expo và .NET trên mạng Private (Metro thường dùng cổng 8081; API dùng 5278). Quét QR bằng Expo Go trên từng điện thoại và đăng nhập bằng tài khoản Reader/Thủ thư riêng của người đó. Không dùng `localhost` cho điện thoại thật vì nó trỏ về chính điện thoại.
+
+`EXPO_PUBLIC_API_URL` là tùy chọn: để trống khi dùng `npm run dev:lan`, app sẽ tự dùng host LAN của Expo; chỉ cấu hình biến này khi dùng API ở máy chủ riêng. Không đặt `localhost` hoặc `10.0.2.2` cho điện thoại thật (`10.0.2.2` chỉ dành cho Android Emulator). Chế độ LAN chỉ mở API trong mạng nội bộ; để dùng ngoài mạng đó, cần triển khai API tại địa chỉ HTTPS công khai. QR Expo chỉ cấp mã chạy app qua Expo Go, không tự đưa API hay cơ sở dữ liệu lên Internet.
 
 ### 4. Supabase (Local)
 

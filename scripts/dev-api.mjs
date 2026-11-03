@@ -11,6 +11,7 @@ const apiUrl = 'http://127.0.0.1:5278/api/health-check';
 const lockName = createHash('sha256').update(repositoryRoot).digest('hex').slice(0, 20);
 const lockPath = join(tmpdir(), `smartlibrary-api-${lockName}.lock`);
 const startupTimeoutMs = 60_000;
+const staleLockTimeoutMs = startupTimeoutMs + 5_000;
 
 const sleep = (milliseconds) => new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
 
@@ -49,10 +50,10 @@ async function readLock() {
   }
 }
 
-async function removeStaleLock() {
+async function removeStaleLock(staleAfterMs = 5_000) {
   try {
     const lockStat = await stat(lockPath);
-    if (Date.now() - lockStat.mtimeMs < 5_000) return false;
+    if (Date.now() - lockStat.mtimeMs < staleAfterMs) return false;
     await unlink(lockPath);
     return true;
   } catch (error) {
@@ -88,9 +89,19 @@ async function acquireStartupLock() {
         continue;
       }
 
+      if (await removeStaleLock(staleLockTimeoutMs)) {
+        console.warn('Đã bỏ qua file khóa API quá hạn; tiến trình ghi trong khóa không còn đáng tin cậy.');
+        continue;
+      }
+
       if (await waitForExistingApi(existingLock.pid)) {
         console.log('SmartLibrary API đã chạy; kết nối terminal này với tiến trình hiện có.');
         return null;
+      }
+
+      if (await removeStaleLock(staleLockTimeoutMs)) {
+        console.warn('Đã bỏ qua file khóa API quá hạn sau khi health check hết thời gian chờ.');
+        continue;
       }
 
       if (isProcessRunning(existingLock.pid)) {
@@ -136,6 +147,12 @@ async function releaseStartupLock(lock, token) {
 async function stopExistingApi() {
   if (process.platform !== 'win32') {
     throw new Error('Chưa hỗ trợ dừng một API được khởi chạy từ terminal khác trên hệ điều hành này.');
+  }
+
+  if (!(await isPortOccupied())) {
+    await removeStaleLock();
+    console.log('SmartLibrary API chưa chạy trên cổng 5278; không cần dừng.');
+    return;
   }
 
   const projectPath = resolve(repositoryRoot, 'apps', 'api', 'src', 'SmartLibrary.Api')
@@ -258,6 +275,11 @@ async function runApi() {
     return;
   }
 
+  const lanMode = process.argv.includes('--lan');
+  if (lanMode && await isApiHealthy()) {
+    throw new Error('API đã chạy. Hãy dừng tiến trình API hiện tại bằng Ctrl+C hoặc npm run dev:api:stop, rồi chạy lại npm run dev:api:lan để mở API cho điện thoại trong mạng LAN.');
+  }
+
   const startupLock = await acquireStartupLock();
   if (!startupLock) {
     if (await isApiHealthy()) await attachToExistingApi();
@@ -275,7 +297,13 @@ async function runApi() {
       throw new Error('Cổng 5278 đang được một dịch vụ khác sử dụng nhưng không phản hồi health check SmartLibrary API. Hãy dừng đúng dịch vụ đó hoặc đổi cổng API trước khi chạy lại.');
     }
 
-    const child = spawn('dotnet', ['run', '--project', 'apps/api/src/SmartLibrary.Api'], {
+    const apiArgs = ['run', '--project', 'apps/api/src/SmartLibrary.Api'];
+    if (lanMode) {
+      apiArgs.push('--', '--urls', 'http://0.0.0.0:5278');
+      console.log('SmartLibrary API đang lắng nghe trên mạng LAN tại cổng 5278.');
+    }
+
+    const child = spawn('dotnet', apiArgs, {
       cwd: repositoryRoot,
       stdio: 'inherit',
       windowsHide: false,
