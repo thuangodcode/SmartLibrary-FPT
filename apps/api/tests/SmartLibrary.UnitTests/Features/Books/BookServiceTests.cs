@@ -35,6 +35,22 @@ public class BookServiceTests
     }
 
     [Fact]
+    public async Task GetPagedAsync_WithBorrowSort_ForwardsFiltersAndPaging()
+    {
+        var categoryId = Guid.NewGuid();
+        var books = new List<Book> { new() { Id = Guid.NewGuid(), Title = "Algorithms" } };
+        _bookRepositoryMock
+            .Setup(repo => repo.GetPagedAsync(2, 18, "algorithm", categoryId, false, false, It.IsAny<CancellationToken>(), true))
+            .ReturnsAsync(new PagedResult<Book>(books, 19, 2, 18));
+
+        var result = await _sut.GetPagedAsync(2, 18, "algorithm", categoryId, sortByBorrowCount: true);
+
+        result.Items.Should().ContainSingle(book => book.Title == "Algorithms");
+        result.TotalCount.Should().Be(19);
+        _bookRepositoryMock.Verify(repo => repo.GetPagedAsync(2, 18, "algorithm", categoryId, false, false, It.IsAny<CancellationToken>(), true), Times.Once);
+    }
+
+    [Fact]
     public async Task GetByIdAsync_WhenBookExists_ReturnsSuccess()
     {
         // Arrange

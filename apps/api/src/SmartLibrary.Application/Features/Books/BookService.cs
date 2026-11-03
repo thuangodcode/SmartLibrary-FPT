@@ -37,9 +37,9 @@ public class BookService
         _catalogCache = catalogCache;
     }
 
-    public async Task<PagedResult<BookDto>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, bool sortByReviewCount = false, bool reviewCountAscending = false, CancellationToken ct = default)
+    public async Task<PagedResult<BookDto>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, bool sortByReviewCount = false, bool reviewCountAscending = false, CancellationToken ct = default, bool sortByBorrowCount = false)
     {
-        var pagedBooks = await _bookRepository.GetPagedAsync(page, pageSize, search, categoryId, sortByReviewCount, reviewCountAscending, ct);
+        var pagedBooks = await _bookRepository.GetPagedAsync(page, pageSize, search, categoryId, sortByReviewCount, reviewCountAscending, ct, sortByBorrowCount);
         var dtos = pagedBooks.Items.Select(ToBookDto).ToList();
         return new PagedResult<BookDto>(dtos, pagedBooks.TotalCount, pagedBooks.Page, pagedBooks.PageSize);
     }

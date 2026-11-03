@@ -19,7 +19,7 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
         _catalog = catalog;
     }
 
-    public async Task<PagedResult<Book>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, bool sortByReviewCount = false, bool reviewCountAscending = false, CancellationToken ct = default)
+    public async Task<PagedResult<Book>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, bool sortByReviewCount = false, bool reviewCountAscending = false, CancellationToken ct = default, bool sortByBorrowCount = false)
     {
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -44,7 +44,19 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
                 .ThenBy(item => item.Book.Title)
                 .ToList();
 
-            if (sortByReviewCount)
+            if (sortByBorrowCount)
+            {
+                var matchingIds = ranked.Select(item => item.Book.Id).ToList();
+                var borrowCounts = await _context.BorrowRecords.AsNoTracking()
+                    .Where(record => !record.IsDeleted && matchingIds.Contains(record.BookCopy.BookId)
+                        && (record.Status == BorrowStatus.Borrowed || record.Status == BorrowStatus.Returned || record.Status == BorrowStatus.Overdue))
+                    .GroupBy(record => record.BookCopy.BookId)
+                    .Select(group => new { BookId = group.Key, Count = group.Count() })
+                    .ToDictionaryAsync(item => item.BookId, item => item.Count, ct);
+                ranked = ranked.OrderByDescending(item => borrowCounts.GetValueOrDefault(item.Book.Id))
+                    .ThenByDescending(item => item.Score).ThenBy(item => item.Book.Title).ToList();
+            }
+            else if (sortByReviewCount)
             {
                 // EF Core 9 may evaluate captured arrays through Span.Contains,
                 // which fails during query parameter extraction on this target.
@@ -95,7 +107,19 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
 
         var totalCount = await query.CountAsync(ct);
         IQueryable<Book> orderedQuery;
-        if (sortByReviewCount)
+        if (sortByBorrowCount)
+        {
+            var borrowCounts = _context.BorrowRecords.AsNoTracking()
+                .Where(record => !record.IsDeleted && (record.Status == BorrowStatus.Borrowed || record.Status == BorrowStatus.Returned || record.Status == BorrowStatus.Overdue))
+                .GroupBy(record => record.BookCopy.BookId)
+                .Select(group => new { BookId = group.Key, Count = group.Count() });
+            orderedQuery = from book in query
+                           join borrowCount in borrowCounts on book.Id equals borrowCount.BookId into counts
+                           from borrowCount in counts.DefaultIfEmpty()
+                           orderby borrowCount == null ? 0 : borrowCount.Count descending, book.Title
+                           select book;
+        }
+        else if (sortByReviewCount)
         {
             var visibleReviews = _context.Reviews.IgnoreQueryFilters().AsNoTracking()
                 .Where(review => !review.IsDeleted);
