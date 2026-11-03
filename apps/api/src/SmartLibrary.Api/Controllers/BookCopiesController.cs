@@ -185,6 +185,30 @@ public class BookCopiesController : ControllerBase
         return Ok(ApiResponse<object>.Ok(rows));
     }
 
+    [HttpGet("book-groups")]
+    public async Task<IActionResult> GetBookCopyGroups([FromQuery] string? search = null, CancellationToken ct = default)
+    {
+        var query = _db.Books.AsNoTracking().Where(book => !book.IsDeleted)
+            .Select(book => new
+            {
+                book.Id,
+                book.Title,
+                book.Code,
+                TotalCopies = book.Copies.Count(copy => !copy.IsDeleted),
+                OnShelfCopies = book.Copies.Count(copy => !copy.IsDeleted && copy.Location != null),
+                InWarehouseCopies = book.Copies.Count(copy => !copy.IsDeleted && copy.IsAvailable && copy.Location == null
+                    && copy.Condition != BookCondition.Damaged && copy.Condition != BookCondition.Lost),
+                UnavailableCopies = book.Copies.Count(copy => !copy.IsDeleted && (!copy.IsAvailable || copy.Condition == BookCondition.Damaged || copy.Condition == BookCondition.Lost))
+            });
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(book => book.Title.ToLower().Contains(term) || book.Code.ToLower().Contains(term));
+        }
+        var rows = await query.Where(book => book.TotalCopies > 0).OrderBy(book => book.Title).ToListAsync(ct);
+        return Ok(ApiResponse<object>.Ok(rows));
+    }
+
     [HttpGet("sorting/books")]
     public async Task<IActionResult> GetBooksForSorting([FromQuery] string? search = null, CancellationToken ct = default)
     {
