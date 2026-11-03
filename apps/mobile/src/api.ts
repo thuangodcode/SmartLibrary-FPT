@@ -16,10 +16,10 @@ export function setTokenRefreshHandler(handler: TokenRefreshHandler | null) {
   tokenRefreshHandler = handler;
 }
 
-async function send(path: string, options: RequestInit, token?: string) {
+async function send(path: string, options: RequestInit, token?: string, timeoutMs = 15_000) {
   const isMultipart = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(`${API_BASE_URL}${path}`, {
       ...options,
@@ -36,10 +36,10 @@ async function send(path: string, options: RequestInit, token?: string) {
   }
 }
 
-export async function apiRequest<T>(path: string, options: RequestInit = {}, token?: string): Promise<ApiResponse<T>> {
+export async function apiRequest<T>(path: string, options: RequestInit = {}, token?: string, timeoutMs = 15_000): Promise<ApiResponse<T>> {
   const fetchResponse = async (requestToken?: string) => {
     try {
-      return await send(path, options, requestToken);
+      return await send(path, options, requestToken, timeoutMs);
     } catch {
       throw new ApiError(`Điện thoại không kết nối được máy chủ (${API_BASE_URL}). Hãy mở địa chỉ này trên trình duyệt điện thoại để kiểm tra; nếu không truy cập được, chạy API ở chế độ LAN và kiểm tra Wi-Fi cùng Tường lửa Windows.`, 0);
     }
