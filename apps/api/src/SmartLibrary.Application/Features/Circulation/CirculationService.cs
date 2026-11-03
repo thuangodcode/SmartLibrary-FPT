@@ -212,6 +212,8 @@ public class CirculationService
             await NotifyAsync(reader.Id, "Đã mượn sách",
                 $"Bạn đã mượn “{copy.Book?.Title}”. Bắt đầu: {FormatPickup(loan.BorrowDate)}. Hạn trả: {FormatPickup(loan.DueDate)}.", "borrow", ct);
             await _unitOfWork.SaveChangesAsync(ct);
+            await _repository.NotifyShelfRestockIfNeededAsync(copy.BookId, copy.Book?.Title, ct);
+            await _unitOfWork.SaveChangesAsync(ct);
             return Result<CirculationLoanDto>.Success((await _repository.GetLoanAsync(loan.Id, currentSettings.FinePerDay, ct))!);
         }, ct);
     }
@@ -289,7 +291,7 @@ public class CirculationService
                 && settings.FinePerDay > 0
                 && await _repository.HasOverdueFineAsync(loan.Id, ct);
 
-            if (loan.BookCopy is { IsAvailable: true })
+            if (loan.BookCopy is { IsAvailable: true, Location: not null })
             {
                 await _unitOfWork.SaveChangesAsync(ct);
                 readyReservation = await ReadyNextReservationAsync(loan.BookCopy.BookId, settings, ct);
@@ -307,6 +309,11 @@ public class CirculationService
                 createdFine is > 0 || incidentOpened ? "fine" : "return", ct);
 
             await _unitOfWork.SaveChangesAsync(ct);
+            if (loan.BookCopy is not null)
+            {
+                await _repository.NotifyShelfRestockIfNeededAsync(loan.BookCopy.BookId, loan.BookCopy.Book?.Title, ct);
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
             if (isLostOrDamaged)
                 incidentId = await _repository.GetOpenIncidentIdAsync(loan.Id, ct);
             var saved = await _repository.GetLoanAsync(loan.Id, settings.FinePerDay, ct);
@@ -383,6 +390,11 @@ public class CirculationService
                 $"{librarianName} đã tiếp nhận yêu cầu “{loan.BookCopy?.Book?.Title}” lúc {FormatPickup(acceptedAt)}. Lịch nhận: {FormatPickup(loan.PickupAt)}.",
                 "borrow", ct);
             await _unitOfWork.SaveChangesAsync(ct);
+            if (loan.BookCopy is not null)
+            {
+                await _repository.NotifyShelfRestockIfNeededAsync(loan.BookCopy.BookId, loan.BookCopy.Book?.Title, ct);
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
             return Result<CirculationLoanDto>.Success((await _repository.GetLoanAsync(loan.Id, currentSettings.FinePerDay, ct))!);
         }, ct);
     }
@@ -429,6 +441,8 @@ public class CirculationService
                 $"Độc giả: {reader.FullName} ({student}). Sách: “{loan.BookCopy.Book.Title}”. Bản sao: {loan.BookCopyId} · {loan.BookCopy.Barcode}. Bắt đầu mượn: {FormatPickup(loan.BorrowDate)}. Hạn trả: {FormatPickup(loan.DueDate)}.",
                 "borrow", ct);
             await _unitOfWork.SaveChangesAsync(ct);
+            await _repository.NotifyShelfRestockIfNeededAsync(loan.BookCopy.BookId, loan.BookCopy.Book.Title, ct);
+            await _unitOfWork.SaveChangesAsync(ct);
             return Result<CirculationLoanDto>.Success((await _repository.GetLoanAsync(loan.Id, settings.FinePerDay, ct))!);
         }, ct);
     }
@@ -451,6 +465,11 @@ public class CirculationService
             await NotifyAsync(loan.ReaderId, "Yêu cầu mượn bị từ chối",
                 $"Thủ thư đã từ chối yêu cầu mượn “{loan.BookCopy?.Book?.Title}”. Bản sao đã được trả về kho.", "borrow", ct);
             await _unitOfWork.SaveChangesAsync(ct);
+            if (loan.BookCopy is not null)
+            {
+                await _repository.NotifyShelfRestockIfNeededAsync(loan.BookCopy.BookId, loan.BookCopy.Book?.Title, ct);
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
             return Result<bool>.Success(true);
         }, ct);
     }
@@ -883,6 +902,11 @@ public class CirculationService
             "return", ct, entityId: incident.BorrowRecordId);
 
         await _unitOfWork.SaveChangesAsync(ct);
+        if (request.RestoreCopy && incident.BookCopy is not null)
+        {
+            await _repository.NotifyShelfRestockIfNeededAsync(incident.BookCopy.BookId, incident.BookCopy.Book?.Title, ct);
+            await _unitOfWork.SaveChangesAsync(ct);
+        }
         var settings = await _repository.GetSettingsAsync(ct);
         var saved = await _repository.GetIncidentDtoAsync(id, settings.FinePerDay, ct);
         return saved is null
@@ -927,6 +951,11 @@ public class CirculationService
                     $"Yêu cầu nhận “{loan.BookCopy?.Book?.Title}” đã tự hủy vì bạn không đến trong vòng 30 phút sau lịch hẹn. Bản sao đã được trả về kho.",
                     "borrow", ct);
                 await _unitOfWork.SaveChangesAsync(ct);
+                if (loan.BookCopy is not null)
+                {
+                    await _repository.NotifyShelfRestockIfNeededAsync(loan.BookCopy.BookId, loan.BookCopy.Book?.Title, ct);
+                    await _unitOfWork.SaveChangesAsync(ct);
+                }
                 return await _repository.GetLoanAsync(id, settings.FinePerDay, ct);
             }, ct);
             if (result is not null)
@@ -1235,6 +1264,8 @@ public class CirculationService
                 $"Yêu cầu mượn “{copy.Book.Title}” đã được gửi. Lịch nhận: {FormatPickup(loan.PickupAt)}. Bản sao {copy.Barcode} đang được giữ cho bạn.",
                 "borrow", ct);
             await _unitOfWork.SaveChangesAsync(ct);
+            await _repository.NotifyShelfRestockIfNeededAsync(copy.BookId, copy.Book.Title, ct);
+            await _unitOfWork.SaveChangesAsync(ct);
             var result = await _repository.GetLoanAsync(loan.Id, currentSettings.FinePerDay, ct);
             return result is null
                 ? Result<CirculationLoanDto>.Failure("Không đọc được yêu cầu mượn vừa tạo.")
@@ -1280,6 +1311,8 @@ public class CirculationService
             return "Bản sao đang hư hỏng hoặc thất lạc, không cho mượn.";
         if (!copy.IsAvailable || await _repository.HasActiveLoanAsync(copy.Id, exceptLoanId, ct))
             return "Bản sao này hiện không sẵn sàng để mượn.";
+        if (string.IsNullOrWhiteSpace(copy.Location))
+            return "Bản sao đang ở kho. Thủ thư cần chuyển bản sao lên kệ trước khi cho độc giả mượn.";
         if (await _repository.HasOtherBorrowRequestAsync(copy.Id, exceptLoanId ?? Guid.Empty, ct))
             return "Bản sao đang được giữ cho một yêu cầu mượn khác.";
         var readyCount = await _repository.CountReadyReservationsAsync(copy.BookId, readerId, ct);
@@ -1429,16 +1462,15 @@ public class CirculationService
     private static void MarkBorrowed(BookCopy copy)
     {
         copy.IsAvailable = false;
-        if (copy.Book != null && copy.Book.AvailableCopies > 0)
-            copy.Book.AvailableCopies -= 1;
+        copy.Location = null;
     }
 
     private static void MarkReturned(BookCopy copy, BookCondition condition, bool keepUnavailable)
     {
         copy.Condition = condition;
         copy.IsAvailable = !keepUnavailable;
-        if (!keepUnavailable && copy.Book != null)
-            copy.Book.AvailableCopies += 1;
+        // Returned copies go to the warehouse first; shelf placement is a separate librarian workflow.
+        copy.Location = null;
     }
 
     private static void SetCopyAvailability(BookCopy copy, BookCondition condition, bool available)
@@ -1447,9 +1479,9 @@ public class CirculationService
         copy.Condition = condition;
         copy.IsAvailable = available;
         if (copy.Book is null) return;
-        if (!wasAvailable && available)
+        if (!wasAvailable && available && copy.Location is not null)
             copy.Book.AvailableCopies += 1;
-        if (wasAvailable && !available && copy.Book.AvailableCopies > 0)
+        if (wasAvailable && !available && copy.Location is not null && copy.Book.AvailableCopies > 0)
             copy.Book.AvailableCopies -= 1;
     }
 

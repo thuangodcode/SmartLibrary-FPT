@@ -311,8 +311,36 @@
 .lib-copies-shelf-delete { color: #b42318; }
 .lib-copies-shelf-delete:hover:not(:disabled) { border-color: #fda29b; background: #fff5f4; }
 .lib-copies-shelf-delete:disabled { color: #98a2b3; cursor: not-allowed; opacity: .7; }
+.lib-copies-sorting { display: grid; gap: 18px; padding: 20px; }
+.lib-copies-sorting-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.lib-copies-sorting-heading > div { display: grid; gap: 5px; }
+.lib-copies-sorting-heading strong { color: #263247; font-size: 17px; }
+.lib-copies-sorting-heading p { margin: 0; color: #667085; font-size: 13px; line-height: 1.5; }
+.lib-copies-sorting-heading .lib-copies-search { width: min(100%, 390px); }
+.lib-copies-sorting-book { max-width: 600px; margin-top: 0; }
+.lib-copies-sorting-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.lib-copies-sorting-stats article { display: grid; gap: 7px; border: 1px solid #e8ecf3; border-radius: 11px; background: #fbfcfd; padding: 14px 16px; }
+.lib-copies-sorting-stats span { color: #667085; font-size: 12px; font-weight: 600; }
+.lib-copies-sorting-stats strong { color: #263247; font-size: 22px; }
+.lib-copies-sorting-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #667085; font-size: 12px; }
+.lib-copies-sorting-toolbar button { min-height: 38px; border: 1px solid #e9621b; border-radius: 8px; background: #e9621b; padding: 0 14px; color: #fff; font-weight: 700; cursor: pointer; }
+.lib-copies-sorting-toolbar button:disabled { cursor: not-allowed; opacity: .55; }
+.lib-copies-sorting-list { display: grid; gap: 8px; }
+.lib-copies-sorting-list > article { display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid #e8ecf3; border-radius: 10px; background: #fff; padding: 10px 12px; }
+.lib-copies-sorting-list > article > label { display: flex; align-items: center; gap: 11px; min-width: 0; cursor: pointer; }
+.lib-copies-sorting-list > article > label > span { display: grid; gap: 4px; }
+.lib-copies-sorting-list strong { color: #344054; font-size: 13px; }
+.lib-copies-sorting-list small { color: #7a8495; font-size: 11px; }
+.lib-copies-sorting-list select { width: min(100%, 300px); min-height: 38px; border: 1px solid #dfe4ec; border-radius: 8px; background: #fff; padding: 0 10px; color: #344054; }
 .lib-copies-location-grid > .lib-copies-empty { grid-column: 1 / -1; }
 .lib-copies-capacity-warning { color: #b42318 !important; font-weight: 650 !important; }
+.lib-copies-restock-alerts { grid-column: 1 / -1; border: 1px solid #f6c797; border-radius: 12px; background: #fff8f0; padding: 14px 16px; }
+.lib-copies-restock-alerts > strong { color: #9a3412; font-size: 14px; }
+.lib-copies-restock-alerts > p { margin: 4px 0 10px; color: #7c5b45; font-size: 12px; }
+.lib-copies-restock-alerts > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #f3ddc8; padding: 9px 0; }
+.lib-copies-restock-alerts > div span { display: grid; gap: 3px; color: #344054; font-size: 12px; }
+.lib-copies-restock-alerts > div small { color: #667085; font-size: 11px; }
+.lib-copies-restock-alerts button { border: 1px solid #ef9a62; border-radius: 8px; background: #fff; padding: 7px 10px; color: #b54708; font-size: 11px; font-weight: 650; cursor: pointer; }
 
 .lib-copies-modal-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; overflow-y: auto; background: rgb(16 24 40 / 48%); padding: 20px; }
 .lib-copies-modal { width: min(100%, 560px); max-height: min(90vh, 820px); overflow-y: auto; border: 1px solid #e8ecf3; border-radius: 16px; background: #fff; padding: 22px; box-shadow: 0 24px 70px rgb(16 24 40 / 25%); }
@@ -357,4 +385,10 @@
   .lib-copies-form-row { grid-template-columns: 1fr; gap: 0; }
   .lib-copies-modal { padding: 18px; }
   .lib-copies-shelf-actions { align-items: stretch; flex-direction: column; }
+  .lib-copies-sorting { padding: 12px; }
+  .lib-copies-sorting-heading { align-items: stretch; flex-direction: column; }
+  .lib-copies-sorting-heading .lib-copies-search { width: 100%; }
+  .lib-copies-sorting-stats { grid-template-columns: 1fr; }
+  .lib-copies-sorting-list > article { align-items: stretch; flex-direction: column; }
+  .lib-copies-sorting-list select { width: 100%; }
 }

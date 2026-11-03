@@ -113,6 +113,9 @@ public class BookService
 
         var copies = form.TotalCopies;
         var location = string.IsNullOrWhiteSpace(form.Location) ? null : form.Location.Trim();
+        var shelfQuantity = form.ShelfQuantity ?? (location is null ? 0 : copies);
+        if (shelfQuantity < 0 || shelfQuantity > copies || (shelfQuantity > 0 && location is null))
+            return Result<BookDto>.Failure("Số bản đưa lên kệ phải từ 0 đến tổng số bản sao và cần chọn kệ nếu số lượng lớn hơn 0.");
         if (location?.Length > 255)
         {
             return Result<BookDto>.Failure("Vị trí lưu trữ không được vượt quá 255 ký tự.");
@@ -140,7 +143,7 @@ public class BookService
             Language = string.IsNullOrWhiteSpace(form.Language) ? "vi" : form.Language.Trim(),
             PageCount = form.PageCount,
             TotalCopies = copies,
-            AvailableCopies = copies,
+            AvailableCopies = shelfQuantity,
             AverageRating = 0m,
             IsDeleted = false
         };
@@ -180,7 +183,7 @@ public class BookService
                 BookId = book.Id,
                 Barcode = $"{code}-{i:D2}",
                 Condition = SmartLibrary.Domain.Enums.BookCondition.New,
-                Location = location,
+                Location = i <= shelfQuantity ? location : null,
                 IsAvailable = true,
                 IsDeleted = false
             };
@@ -248,9 +251,8 @@ public class BookService
         else if (copyCountDifference > 0)
         {
             var nextCopyNumber = await _bookRepository.GetNextCopyNumberAsync(id, book.Code, ct);
-            var locationForNewCopies = form.Location is null
-                ? activeCopies.Select(copy => copy.Location).FirstOrDefault(location => !string.IsNullOrWhiteSpace(location))
-                : string.IsNullOrWhiteSpace(form.Location) ? null : form.Location.Trim();
+            // Newly added copies enter the warehouse; shelf placement is managed per copy.
+            const string? locationForNewCopies = null;
 
             for (var index = 0; index < copyCountDifference; index++)
             {
@@ -270,7 +272,7 @@ public class BookService
         }
 
         book.TotalCopies = requestedTotalCopies;
-        book.AvailableCopies = activeCopies.Count(copy => !copy.IsDeleted && copy.IsAvailable);
+        book.AvailableCopies = activeCopies.Count(copy => !copy.IsDeleted && copy.IsAvailable && copy.Location is not null && copy.Condition is not (SmartLibrary.Domain.Enums.BookCondition.Damaged or SmartLibrary.Domain.Enums.BookCondition.Lost));
 
         book.Title = form.Title.Trim();
         book.Isbn = string.IsNullOrWhiteSpace(form.Isbn) ? null : form.Isbn.Trim();
@@ -280,15 +282,6 @@ public class BookService
         book.PublishedYear = form.PublishedYear;
         book.Language = string.IsNullOrWhiteSpace(form.Language) ? "vi" : form.Language.Trim();
         book.PageCount = form.PageCount;
-        if (form.Location is not null)
-        {
-            var location = string.IsNullOrWhiteSpace(form.Location) ? null : form.Location.Trim();
-            foreach (var copy in book.Copies.Where(copy => !copy.IsDeleted))
-            {
-                copy.Location = location;
-            }
-        }
-
         if (form.RemoveCoverImage)
         {
             book.CoverImageUrl = null;

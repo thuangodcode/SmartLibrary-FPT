@@ -205,6 +205,7 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
             copy.IsAvailable
             && copy.Condition != BookCondition.Damaged
             && copy.Condition != BookCondition.Lost
+            && copy.Location != null
             && !_context.BorrowRecords.Any(loan =>
                 loan.BookCopyId == copy.Id
                 && (loan.Status == BorrowStatus.Approved

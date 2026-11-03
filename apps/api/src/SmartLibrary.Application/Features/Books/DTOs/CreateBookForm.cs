@@ -15,6 +15,7 @@ public class CreateBookForm
     public int? PageCount { get; set; }
     public int TotalCopies { get; set; } = 1;
     public string? Location { get; set; }
+    public int? ShelfQuantity { get; set; }
     public Guid? CategoryId { get; set; }
     public IFormFile? CoverImage { get; set; }
 }

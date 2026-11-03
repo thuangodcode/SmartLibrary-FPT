@@ -215,14 +215,19 @@ public class BooksController : ControllerBase
     public async Task<IActionResult> CreateFromForm([FromForm] CreateBookForm form, CancellationToken ct = default)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        var shelfQuantity = form.ShelfQuantity ?? (string.IsNullOrWhiteSpace(form.Location) ? 0 : form.TotalCopies);
+        if (shelfQuantity < 0 || shelfQuantity > form.TotalCopies || (shelfQuantity > 0 && string.IsNullOrWhiteSpace(form.Location)))
+            return BadRequest(ApiResponse<object>.Fail("Số bản đưa lên kệ không hợp lệ."));
         if (!string.IsNullOrWhiteSpace(form.Location))
         {
             var location = form.Location.Trim();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(location, @"^Tầng [\p{L}\p{N}-]+ · Kệ [\p{L}\p{N}-]+$", System.Text.RegularExpressions.RegexOptions.CultureInvariant))
+                return BadRequest(ApiResponse<object>.Fail("Tên vị trí phải theo dạng Tầng X · Kệ Y, ví dụ Tầng 4 · Kệ A."));
             var shelf = await _db.StorageShelves.FromSqlInterpolated($"SELECT * FROM storage_shelves WHERE name = {location} AND is_deleted = FALSE FOR UPDATE").FirstOrDefaultAsync(ct);
             if (shelf is null) return BadRequest(ApiResponse<object>.Fail("Kệ đã chọn không tồn tại hoặc đã ngừng sử dụng."));
             var occupied = await _db.BookCopies.CountAsync(copy => !copy.IsDeleted && copy.Location == location, ct);
-            if (form.TotalCopies < 1 || occupied + form.TotalCopies > shelf.Capacity)
-                return Conflict(ApiResponse<object>.Fail($"Kệ {shelf.Name} còn {Math.Max(0, shelf.Capacity - occupied)} chỗ, không đủ nhận {form.TotalCopies} bản sao."));
+            if (shelfQuantity > 0 && occupied + shelfQuantity > shelf.Capacity)
+                return Conflict(ApiResponse<object>.Fail($"Kệ {shelf.Name} còn {Math.Max(0, shelf.Capacity - occupied)} chỗ, không đủ nhận {shelfQuantity} bản sao."));
         }
         Result<BookDto> result;
         try
@@ -267,30 +272,6 @@ public class BooksController : ControllerBase
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
         var currentBook = await _db.Books.FromSqlInterpolated($"SELECT * FROM books WHERE id = {id} AND is_deleted = FALSE FOR UPDATE").FirstOrDefaultAsync(ct);
         if (currentBook is null) return NotFound(ApiResponse<object>.Fail("Không tìm thấy đầu sách."));
-
-        var currentCopies = await _db.BookCopies
-            .FromSqlInterpolated($"SELECT * FROM book_copies WHERE book_id = {id} AND is_deleted = FALSE FOR UPDATE")
-            .ToListAsync(ct);
-        var currentTotal = currentCopies.Count;
-        var newTotal = form.TotalCopies ?? currentTotal;
-        var targetLocation = form.Location is null
-            ? (newTotal > currentTotal ? currentCopies.Select(copy => copy.Location).FirstOrDefault(location => !string.IsNullOrWhiteSpace(location)) : null)
-            : string.IsNullOrWhiteSpace(form.Location) ? null : form.Location.Trim();
-        var shelf = string.IsNullOrWhiteSpace(targetLocation)
-            ? null
-            : await _db.StorageShelves.FromSqlInterpolated($"SELECT * FROM storage_shelves WHERE name = {targetLocation} AND is_deleted = FALSE FOR UPDATE").FirstOrDefaultAsync(ct);
-        if (!string.IsNullOrWhiteSpace(targetLocation) && shelf is null)
-            return BadRequest(ApiResponse<object>.Fail("Kệ đã chọn không tồn tại hoặc đã ngừng sử dụng."));
-
-        if (shelf is not null)
-        {
-            var occupied = await _db.BookCopies.CountAsync(copy => !copy.IsDeleted && copy.Location == targetLocation, ct);
-            var targetCopiesAfterSave = form.Location is null
-                ? occupied + Math.Max(0, newTotal - currentTotal)
-                : occupied - currentCopies.Count(copy => copy.Location == targetLocation) + newTotal;
-            if (targetCopiesAfterSave > shelf.Capacity)
-                return Conflict(ApiResponse<object>.Fail($"Kệ {shelf.Name} sẽ có {targetCopiesAfterSave}/{shelf.Capacity} bản sao sau khi lưu."));
-        }
 
         var result = await _bookService.UpdateFromFormAsync(id, form, ct);
         if (!result.IsSuccess)

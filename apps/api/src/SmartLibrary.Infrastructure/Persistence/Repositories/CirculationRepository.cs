@@ -178,8 +178,8 @@ public class CirculationRepository : ICirculationRepository
                 x.Id,
                 x.Title,
                 x.Code,
-                x.Copies.Count(c => c.IsAvailable && c.Condition != BookCondition.Damaged && c.Condition != BookCondition.Lost),
-                x.Copies.Where(c => c.IsAvailable && c.Condition != BookCondition.Damaged && c.Condition != BookCondition.Lost)
+                x.Copies.Count(c => c.Location != null && c.IsAvailable && c.Condition != BookCondition.Damaged && c.Condition != BookCondition.Lost),
+                x.Copies.Where(c => c.Location != null && c.IsAvailable && c.Condition != BookCondition.Damaged && c.Condition != BookCondition.Lost)
                     .Select(c => c.Barcode)
                     .FirstOrDefault(),
                 x.CoverImageUrl))
@@ -198,6 +198,7 @@ public class CirculationRepository : ICirculationRepository
                 && copy.Book != null
                 && !copy.Book.IsDeleted
                 && copy.IsAvailable
+                && copy.Location != null
                 && copy.Condition != BookCondition.Damaged
                 && copy.Condition != BookCondition.Lost
                 && !_db.BorrowRecords.Any(loan =>
@@ -325,6 +326,32 @@ public class CirculationRepository : ICirculationRepository
                         (x.Status == BorrowStatus.Borrowed || x.Status == BorrowStatus.Overdue))
             .OrderByDescending(x => x.BorrowDate)
             .FirstOrDefaultAsync(ct);
+
+    public async Task NotifyShelfRestockIfNeededAsync(Guid bookId, string? title, CancellationToken ct)
+    {
+        await _db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({"shelf-restock:" + bookId})::bigint)", ct);
+        var onShelf = await _db.BookCopies.CountAsync(copy => copy.BookId == bookId && !copy.IsDeleted && copy.IsAvailable
+            && copy.Location != null && copy.Condition != BookCondition.Damaged && copy.Condition != BookCondition.Lost, ct);
+        if (onShelf > 0) return;
+        var inWarehouse = await _db.BookCopies.CountAsync(copy => copy.BookId == bookId && !copy.IsDeleted && copy.IsAvailable
+            && copy.Location == null && copy.Condition != BookCondition.Damaged && copy.Condition != BookCondition.Lost, ct);
+        if (inWarehouse == 0) return;
+        var now = DateTime.UtcNow;
+        var key = bookId.ToString();
+        if (await _db.Notifications.AnyAsync(notification => notification.Type == "shelf_restock"
+            && notification.CreatedAt >= now.AddHours(-24) && notification.Metadata != null && notification.Metadata.Contains(key), ct)) return;
+        var librarianIds = await _db.UserProfiles.Where(user => !user.IsDeleted && user.IsActive && user.Role.Name == "Librarian")
+            .Select(user => user.Id).ToListAsync(ct);
+        foreach (var librarianId in librarianIds)
+            _db.Notifications.Add(new Notification
+            {
+                UserId = librarianId,
+                Title = "Cần bổ sung sách lên kệ",
+                Message = $"Kệ hiện không còn bản sẵn sàng của “{title ?? "đầu sách"}”; kho còn {inWarehouse} bản sao. Hãy điều chuyển lên kệ.",
+                Type = "shelf_restock",
+                Metadata = System.Text.Json.JsonSerializer.Serialize(new { bookId, warehouseCopies = inWarehouse })
+            });
+    }
 
     public async Task<IReadOnlyList<CirculationLoanDto>> GetOverdueAsync(int finePerDay, CancellationToken ct)
     {
@@ -672,6 +699,7 @@ public class CirculationRepository : ICirculationRepository
     public Task<int> CountAvailableCopiesAsync(Guid bookId, CancellationToken ct)
         => _db.BookCopies.CountAsync(x =>
             x.BookId == bookId &&
+            x.Location != null &&
             x.IsAvailable &&
             x.Condition != BookCondition.Damaged &&
             x.Condition != BookCondition.Lost, ct);
@@ -787,14 +815,21 @@ public class CirculationRepository : ICirculationRepository
 
     public async Task<bool> TryClaimCopyAsync(Guid copyId, CancellationToken ct)
     {
+        var bookId = await _db.BookCopies.Where(copy => copy.Id == copyId).Select(copy => (Guid?)copy.BookId).FirstOrDefaultAsync(ct);
+        if (!bookId.HasValue) return false;
         var updated = await _db.BookCopies
             .Where(x => x.Id == copyId
                         && x.IsAvailable
+                        && x.Location != null
                         && x.Condition != BookCondition.Damaged
                         && x.Condition != BookCondition.Lost)
             .ExecuteUpdateAsync(set => set
                 .SetProperty(x => x.IsAvailable, false)
                 .SetProperty(x => x.UpdatedAt, DateTime.UtcNow), ct);
+        if (updated == 1)
+            await _db.Books.Where(book => book.Id == bookId.Value && book.AvailableCopies > 0)
+                .ExecuteUpdateAsync(set => set.SetProperty(book => book.AvailableCopies, book => book.AvailableCopies - 1)
+                    .SetProperty(book => book.UpdatedAt, DateTime.UtcNow), ct);
         return updated == 1;
     }
 

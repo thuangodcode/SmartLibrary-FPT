@@ -1479,8 +1479,7 @@ function ReturnView() {
                                 <option value="Damaged">Hư hỏng</option>
                                 <option value="Lost">Thất lạc</option>
                               </select>
-                            </label>
-                            <button
+                            </label>`n                            <button
                               type="button"
                               className="circ-btn circ-btn--primary"
                               disabled={busy}
@@ -1525,8 +1524,7 @@ function ReturnView() {
                   <option value="Damaged">Hư hỏng (Chờ xác minh bồi thường)</option>
                   <option value="Lost">Thất lạc (Chờ xác minh bồi thường)</option>
                 </select>
-              </label>
-            </div>
+              </label></div>
 
             <div className="circ-return-policy-box">
               <div className="circ-policy-item">

@@ -58,6 +58,7 @@ interface Envelope<T> {
 interface CopySummary {
   totalCopies: number;
   availableCopies: number;
+  warehouseCopies: number;
   unavailableCopies: number;
   locations: number;
 }
@@ -68,6 +69,33 @@ interface StorageLocation {
   copyCount: number;
   capacity: number;
   availableCapacity: number;
+}
+
+interface ShelfRestockAlert {
+  id: string;
+  title: string;
+  onShelf: number;
+  inWarehouse: number;
+}
+
+interface SortingBookOption {
+  id: string;
+  title: string;
+  code: string;
+  onShelfCopies: number;
+  inWarehouseCopies: number;
+}
+
+interface SortingCopy {
+  id: string;
+  barcode: string;
+  condition: CopyCondition;
+  hasBeenReturned: boolean;
+}
+
+interface SortingBookDetails extends SortingBookOption {
+  returnedInWarehouseCopies: number;
+  copies: SortingCopy[];
 }
 
 const PAGE_SIZE = 20;
@@ -87,10 +115,11 @@ interface LibrarianCopiesPageProps {
 const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = false }) => {
   const accessToken = useAuthStore((state) => state.accessToken);
   const { showToast } = useToast();
-  const [tab, setTab] = useState<'copies' | 'locations'>('copies');
+  const [tab, setTab] = useState<'copies' | 'sorting' | 'locations'>('copies');
   const [copies, setCopies] = useState<CopyItem[]>([]);
   const [summary, setSummary] = useState<CopySummary | null>(null);
   const [locations, setLocations] = useState<StorageLocation[]>([]);
+  const [restockAlerts, setRestockAlerts] = useState<ShelfRestockAlert[]>([]);
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(1);
   const [search, setSearch] = useState('');
@@ -106,6 +135,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
   const [debouncedBookSearch, setDebouncedBookSearch] = useState('');
   const [intakeBookId, setIntakeBookId] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [shelfQuantity, setShelfQuantity] = useState(0);
   const [intakeLocation, setIntakeLocation] = useState('');
   const [intakeCondition, setIntakeCondition] = useState<CopyCondition>('New');
   const [editLocation, setEditLocation] = useState('');
@@ -113,6 +143,13 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
   const [selectedCopyIds, setSelectedCopyIds] = useState<string[]>([]);
   const [transferLocations, setTransferLocations] = useState<Record<string, string>>({});
   const [transferOpen, setTransferOpen] = useState(false);
+  const [sortingSearch, setSortingSearch] = useState('');
+  const [sortingBooks, setSortingBooks] = useState<SortingBookOption[]>([]);
+  const [sortingBookId, setSortingBookId] = useState('');
+  const [sortingDetails, setSortingDetails] = useState<SortingBookDetails | null>(null);
+  const [sortingSelected, setSortingSelected] = useState<string[]>([]);
+  const [sortingDestinations, setSortingDestinations] = useState<Record<string, string>>({});
+  const [sortingLoading, setSortingLoading] = useState(false);
 
   const headers = useMemo(() => {
     const result: Record<string, string> = {};
@@ -135,13 +172,15 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
     setLoading(true);
     setError(null);
     try {
-      const [summaryResponse, locationsResponse] = await Promise.all([
+      const [summaryResponse, locationsResponse, restockResponse] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/copies/summary`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/copies/locations`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/copies/restock-alerts`, { headers }),
       ]);
-      const [summaryResult, locationsResult] = await Promise.all([
+      const [summaryResult, locationsResult, restockResult] = await Promise.all([
         parseApiResponse<Envelope<CopySummary>>(summaryResponse),
         parseApiResponse<Envelope<StorageLocation[]>>(locationsResponse),
+        parseApiResponse<Envelope<ShelfRestockAlert[]>>(restockResponse),
       ]);
       if (!summaryResponse.ok || !summaryResult?.success) {
         throw new Error(summaryResult?.error || 'Không thể tải thống kê kho.');
@@ -149,8 +188,12 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
       if (!locationsResponse.ok || !locationsResult?.success) {
         throw new Error(locationsResult?.error || 'Không thể tải danh sách vị trí lưu trữ.');
       }
+      if (!restockResponse.ok || !restockResult?.success) {
+        throw new Error(restockResult?.error || 'Không thể tải cảnh báo bổ sung sách.');
+      }
       setSummary(summaryResult.data ?? null);
       setLocations(locationsResult.data ?? []);
+      setRestockAlerts(restockResult.data ?? []);
       await fetchInventory();
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Không thể tải dữ liệu kho.';
@@ -201,6 +244,39 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
     return () => window.clearTimeout(timer);
   }, [bookSearch]);
 
+  useEffect(() => {
+    if (tab !== 'sorting') return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams();
+        if (sortingSearch.trim()) params.set('search', sortingSearch.trim());
+        const response = await fetch(`${API_BASE_URL}/api/v1/copies/sorting/books?${params}`, { headers });
+        const result = await parseApiResponse<Envelope<SortingBookOption[]>>(response);
+        if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể tải danh sách sách trong kho.');
+        if (!cancelled) setSortingBooks(result.data ?? []);
+      } catch (caught) {
+        if (!cancelled) showToast({ type: 'error', title: 'Không thể tải danh sách xếp sách', message: caught instanceof Error ? caught.message : 'Vui lòng thử lại.' });
+      }
+    }, 200);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [headers, showToast, sortingSearch, tab]);
+
+  useEffect(() => {
+    if (tab !== 'sorting' || !sortingBookId) { setSortingDetails(null); return; }
+    let cancelled = false;
+    setSortingLoading(true);
+    void fetch(`${API_BASE_URL}/api/v1/copies/sorting/books/${sortingBookId}`, { headers })
+      .then(async response => {
+        const result = await parseApiResponse<Envelope<SortingBookDetails>>(response);
+        if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể tải bản sao trong kho.');
+        if (!cancelled) { setSortingDetails(result.data ?? null); setSortingSelected([]); setSortingDestinations({}); }
+      })
+      .catch(caught => { if (!cancelled) showToast({ type: 'error', title: 'Không thể tải đầu sách', message: caught instanceof Error ? caught.message : 'Vui lòng thử lại.' }); })
+      .finally(() => { if (!cancelled) setSortingLoading(false); });
+    return () => { cancelled = true; };
+  }, [headers, showToast, sortingBookId, tab]);
+
   const handleIntake = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!intakeBookId || quantity < 1 || quantity > 500) return;
@@ -213,6 +289,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
           bookId: intakeBookId,
           quantity,
           location: intakeLocation,
+          shelfQuantity,
           condition: intakeCondition,
         }),
       });
@@ -227,6 +304,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
       setIntakeBookId('');
       setBookSearch('');
       setQuantity(1);
+      setShelfQuantity(0);
       setIntakeLocation('');
       await refreshData();
     } catch (caught) {
@@ -272,32 +350,8 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
     }
   };
 
-  const handleCreateShelf = async () => {
-    const name = window.prompt('Tên kệ sách mới (ví dụ: Tầng 2 · Kệ M)')?.trim();
-    if (!name) return;
-    const capacityText = window.prompt('Sức chứa tối đa (mặc định 100)', '100');
-    if (capacityText === null) return;
-    const capacity = Number(capacityText);
-    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 10000) {
-      showToast({ type: 'error', title: 'Sức chứa không hợp lệ', message: 'Nhập số nguyên từ 1 đến 10.000.' });
-      return;
-    }
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/copies/locations`, {
-        method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, capacity }),
-      });
-      const result = await parseApiResponse<Envelope<StorageLocation>>(response);
-      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể tạo kệ.');
-      await refreshData();
-      showToast({ type: 'success', title: 'Đã tạo kệ', message: `Kệ ${name} đã sẵn sàng.` });
-    } catch (caught) {
-      showToast({ type: 'error', title: 'Tạo kệ thất bại', message: caught instanceof Error ? caught.message : 'Không thể tạo kệ.' });
-    }
-  };
-
   const handleEditShelf = async (location: StorageLocation) => {
-    const name = window.prompt('Tên kệ sách', location.name)?.trim();
+    const name = window.prompt('Tên kệ (dạng: Tầng X · Kệ Y)', location.name)?.trim();
     if (!name) return;
     const capacityText = window.prompt('Sức chứa tối đa', String(location.capacity));
     if (capacityText === null) return;
@@ -314,19 +368,74 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
       const result = await parseApiResponse<Envelope<StorageLocation>>(response);
       if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể cập nhật kệ.');
       await refreshData();
-      showToast({ type: 'success', title: 'Đã cập nhật kệ', message: 'Tên kệ và sức chứa mới đã được áp dụng cho các bản sao đang lưu.' });
+      showToast({ type: 'success', title: 'Đã cập nhật kệ', message: `${name}: tối đa ${capacity} bản sao.` });
     } catch (caught) {
       showToast({ type: 'error', title: 'Cập nhật kệ thất bại', message: caught instanceof Error ? caught.message : 'Không thể cập nhật kệ.' });
     }
   };
 
+  const handleCreateShelf = async () => {
+    const name = window.prompt('Tên kệ mới (dạng: Tầng X · Kệ Y, ví dụ Tầng 4 · Kệ A)')?.trim();
+    if (!name) return;
+    const capacityText = window.prompt('Sức chứa tối đa của kệ', '100');
+    if (capacityText === null) return;
+    const capacity = Number(capacityText);
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 10000) {
+      showToast({ type: 'error', title: 'Sức chứa không hợp lệ', message: 'Sức chứa phải từ 1 đến 10.000 cuốn.' });
+      return;
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/copies/locations`, {
+        method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ name, capacity }),
+      });
+      const result = await parseApiResponse<Envelope<StorageLocation>>(response);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể tạo kệ mới.');
+      await refreshData();
+      showToast({ type: 'success', title: 'Đã thêm kệ', message: `${name} đã sẵn sàng để sắp xếp sách.` });
+    } catch (caught) {
+      showToast({ type: 'error', title: 'Thêm kệ thất bại', message: caught instanceof Error ? caught.message : 'Không thể tạo kệ mới.' });
+    }
+  };
+
+  const handleDeleteShelf = async (location: StorageLocation) => {
+    if (location.copyCount > 0) return;
+    if (!window.confirm(`Xóa kệ ${location.name}? Kệ chỉ xóa được khi đang trống.`)) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/copies/locations/${location.id}`, { method: 'DELETE', headers });
+      const result = await parseApiResponse<Envelope<boolean>>(response);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể xóa kệ.');
+      await refreshData();
+      showToast({ type: 'success', title: 'Đã xóa kệ', message: `${location.name} đã được gỡ khỏi danh sách.` });
+    } catch (caught) {
+      showToast({ type: 'error', title: 'Xóa kệ thất bại', message: caught instanceof Error ? caught.message : 'Không thể xóa kệ.' });
+    }
+  };
+
+  const handleSaveSorting = async () => {
+    if (!sortingSelected.length) return;
+    const assignments = sortingSelected.map(copyId => ({ copyId, location: sortingDestinations[copyId] ?? '' }));
+    setSaving(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/copies/locations/transfer`, {
+        method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ assignments }),
+      });
+      const result = await parseApiResponse<Envelope<{ movedCopies: number }>>(response);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể lưu sắp xếp sách.');
+      setSortingSelected([]);
+      setSortingDestinations({});
+      await refreshData();
+      const detailResponse = await fetch(`${API_BASE_URL}/api/v1/copies/sorting/books/${sortingBookId}`, { headers });
+      const detailResult = await parseApiResponse<Envelope<SortingBookDetails>>(detailResponse);
+      if (detailResponse.ok && detailResult?.success) setSortingDetails(detailResult.data ?? null);
+      showToast({ type: 'success', title: 'Đã cập nhật vị trí sách', message: `Đã xử lý ${result.data?.movedCopies ?? assignments.length} bản sao.` });
+    } catch (caught) {
+      showToast({ type: 'error', title: 'Không thể sắp xếp sách', message: caught instanceof Error ? caught.message : 'Vui lòng kiểm tra sức chứa kệ.' });
+    } finally { setSaving(false); }
+  };
+
   const handleSaveTransfer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const assignments = selectedCopyIds.map(copyId => ({ copyId, location: transferLocations[copyId] ?? '' }));
-    if (assignments.some(item => !item.location)) {
-      showToast({ type: 'error', title: 'Chưa chọn kệ đích', message: 'Chọn kệ cho từng bản sao trước khi xác nhận.' });
-      return;
-    }
     setSaving(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/copies/locations/transfer`, {
@@ -362,14 +471,17 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
 
       <section className="lib-copies-metrics" aria-label="Thống kê kho sách">
         <article><span className="lib-copies-metric-icon"><BookCopy size={19} /></span><span>Tổng bản sao</span><strong>{summary?.totalCopies ?? '—'}</strong></article>
-        <article><span className="lib-copies-metric-icon is-green"><Check size={19} /></span><span>Sẵn sàng phục vụ</span><strong>{summary?.availableCopies ?? '—'}</strong></article>
-        <article><span className="lib-copies-metric-icon is-blue"><Boxes size={19} /></span><span>Đang lưu tại vị trí</span><strong>{summary?.locations ?? '—'}</strong></article>
+        <article><span className="lib-copies-metric-icon is-green"><Check size={19} /></span><span>Sẵn sàng trên kệ</span><strong>{summary?.availableCopies ?? '—'}</strong></article>
+        <article><span className="lib-copies-metric-icon is-blue"><Boxes size={19} /></span><span>Đang ở trong kho</span><strong>{summary?.warehouseCopies ?? '—'}</strong></article>
         <article><span className="lib-copies-metric-icon is-slate"><Archive size={19} /></span><span>Chưa sẵn sàng</span><strong>{summary?.unavailableCopies ?? '—'}</strong></article>
       </section>
 
       <div className="lib-copies-tabs" role="tablist" aria-label="Chế độ xem kho">
         <button type="button" role="tab" aria-selected={tab === 'copies'} className={tab === 'copies' ? 'is-active' : ''} onClick={() => setTab('copies')}>
           <BookCopy size={16} /> Danh sách bản sao
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'sorting'} className={tab === 'sorting' ? 'is-active' : ''} onClick={() => setTab('sorting')}>
+          <Boxes size={16} /> Sắp xếp sách
         </button>
         <button type="button" role="tab" aria-selected={tab === 'locations'} className={tab === 'locations' ? 'is-active' : ''} onClick={() => setTab('locations')}>
           <MapPin size={16} /> Kệ & vị trí lưu trữ
@@ -388,6 +500,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
                 <MapPin size={16} />
                 <select value={selectedLocation} onChange={(event) => { setSelectedLocation(event.target.value); setPage(1); setLoading(true); }}>
                   <option value="">Tất cả vị trí</option>
+                  <option value="__warehouse__">Trong kho, chờ xếp kệ</option>
                   {locations.map((location) => <option key={location.name} value={location.name}>{location.name}</option>)}
                 </select>
               </label>
@@ -409,7 +522,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
                       <td><code>{copy.barcode}</code></td>
                       <td><Link className="lib-copy-book-link" to={`/librarian/books/${copy.bookId}`}><strong>{copy.bookTitle}</strong></Link><small>{copy.authors.join(', ') || 'Chưa rõ tác giả'}</small></td>
                       <td>{copy.categories.join(', ') || 'Chưa phân loại'}</td>
-                      <td>{copy.location || <span className="lib-copies-unassigned">Chưa xếp kệ</span>}</td>
+                      <td>{copy.location || <span className="lib-copies-unassigned">{copy.isAvailable ? 'Trong kho' : 'Ngoài kệ / không khả dụng'}</span>}</td>
                       <td><span className={`lib-copy-condition is-${copy.condition.toLowerCase()}`}>{conditionLabels[copy.condition]}</span></td>
                       <td><span className={`lib-copy-availability ${copy.isAvailable ? 'is-available' : 'is-unavailable'}`}>{copy.isAvailable ? 'Sẵn sàng' : copy.condition === 'Lost' ? 'Thất lạc' : copy.condition === 'Damaged' ? 'Hư hỏng' : 'Đang mượn / khóa'}</span></td>
                       <td><button type="button" className="lib-copy-edit" onClick={() => openEdit(copy)}>Sửa vị trí</button></td>
@@ -426,9 +539,39 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
               </div>
             </footer>
           </>
+        ) : tab === 'sorting' ? (
+          <div className="lib-copies-sorting">
+            <header className="lib-copies-sorting-heading">
+              <div><strong>Sắp xếp bản sao trong kho</strong><p>Sách trả về được đưa vào kho trước. Chọn một đầu sách để xem số bản trên kệ và các bản đang chờ sắp xếp.</p></div>
+              <label className="lib-copies-search"><Search size={17} /><input value={sortingSearch} onChange={event => setSortingSearch(event.target.value)} placeholder="Lọc theo tên hoặc mã đầu sách..." /></label>
+            </header>
+            <label className="lib-copies-field lib-copies-sorting-book">Đầu sách
+              <select value={sortingBookId} onChange={event => setSortingBookId(event.target.value)}>
+                <option value="">Chọn đầu sách có bản trong kho</option>
+                {sortingBooks.map(book => <option key={book.id} value={book.id}>{book.title} · {book.code} · {book.inWarehouseCopies} bản trong kho</option>)}
+              </select>
+            </label>
+            {!sortingBookId ? <div className="lib-copies-empty"><Boxes size={30} /><strong>Chọn đầu sách để bắt đầu</strong><p>Danh sách chỉ gồm đầu sách đang có bản sao khả dụng trong kho.</p></div> : sortingLoading ? (
+              <div className="lib-copies-loading" role="status"><span /><p>Đang tải bản sao...</p></div>
+            ) : sortingDetails ? <>
+              <div className="lib-copies-sorting-stats"><article><span>Đã xếp trên kệ</span><strong>{sortingDetails.onShelfCopies}</strong></article><article><span>Đang trong kho, chờ xếp</span><strong>{sortingDetails.inWarehouseCopies}</strong></article><article><span>Bản trả về đang chờ xếp</span><strong>{sortingDetails.returnedInWarehouseCopies}</strong></article></div>
+              <div className="lib-copies-sorting-toolbar"><span>Chọn từng bản sao rồi chỉ định kệ hoặc giữ trong kho.</span><button type="button" disabled={!sortingSelected.length || saving} onClick={() => void handleSaveSorting()}>{saving ? 'Đang lưu...' : `Lưu sắp xếp (${sortingSelected.length})`}</button></div>
+              <div className="lib-copies-sorting-list">
+                {sortingDetails.copies.map(copy => <article key={copy.id}>
+                  <label><input type="checkbox" checked={sortingSelected.includes(copy.id)} onChange={event => setSortingSelected(current => event.target.checked ? [...new Set([...current, copy.id])] : current.filter(id => id !== copy.id))} /><span><strong>{copy.barcode}</strong><small>{conditionLabels[copy.condition]} · {copy.hasBeenReturned ? 'Đã trả về' : 'Chưa có lượt mượn'}</small></span></label>
+                  <select aria-label={`Vị trí của bản sao ${copy.barcode}`} value={sortingDestinations[copy.id] ?? ''} onChange={event => setSortingDestinations(current => ({ ...current, [copy.id]: event.target.value }))}>
+                    <option value="">Giữ trong kho</option>
+                    {locations.filter(location => location.availableCapacity > 0).map(location => <option key={location.id} value={location.name}>{location.name} · còn {location.availableCapacity} chỗ</option>)}
+                  </select>
+                </article>)}
+                {!sortingDetails.copies.length && <div className="lib-copies-empty"><Check size={30} /><strong>Không còn bản sao trong kho cần sắp xếp</strong></div>}
+              </div>
+            </> : null}
+          </div>
         ) : (
           <div className="lib-copies-location-grid">
-            <div className="lib-copies-shelf-actions"><div><strong>Quản lý kệ sách</strong><small>Sức chứa áp dụng theo từng kệ; kệ đang có sách không thể xóa.</small></div><button type="button" onClick={() => void handleCreateShelf()}>+ Thêm kệ mới</button></div>
+            <div className="lib-copies-shelf-actions"><div><strong>Quản lý kệ sách</strong><small>Thêm, đổi tên, điều chỉnh sức chứa hoặc xóa kệ trống. Bản sao trong kho không chiếm chỗ trên kệ.</small></div><button type="button" onClick={() => void handleCreateShelf()}>+ Thêm kệ</button></div>
+            {restockAlerts.length > 0 && <section className="lib-copies-restock-alerts" aria-label="Sách cần bổ sung lên kệ"><strong>Cần xếp sách từ kho lên kệ</strong><p>Các đầu sách này đã hết bản sẵn sàng trên kệ nhưng vẫn còn bản trong kho.</p>{restockAlerts.map((alert) => <div key={alert.id}><span><b>{alert.title}</b><small>Còn {alert.inWarehouse} bản trong kho</small></span><button type="button" onClick={() => { setSearch(alert.title); setDebouncedSearch(alert.title); setSelectedLocation('__warehouse__'); setPage(1); setTab('copies'); }}>Xem bản sao</button></div>)}</section>}
             {locations.length ? locations.map((location) => (
               <article className="lib-copies-shelf-card" key={location.id}>
                 <button type="button" className="lib-copies-shelf-open" onClick={() => { setSelectedLocation(location.name); setTab('copies'); setPage(1); setLoading(true); }}>
@@ -436,13 +579,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
                   <span className="lib-copies-capacity-track"><i style={{ width: `${Math.min(100, (location.copyCount / location.capacity) * 100)}%` }} /></span>
                 </button>
                 <button type="button" className="lib-copies-shelf-edit" onClick={() => void handleEditShelf(location)}>Sửa kệ</button>
-                <button type="button" className="lib-copies-shelf-delete" disabled={location.copyCount > 0} title={location.copyCount > 0 ? 'Chuyển sách ra khỏi kệ trước khi ngừng sử dụng' : 'Ngừng sử dụng kệ'} onClick={async () => {
-                  if (!window.confirm(`Ngừng sử dụng kệ ${location.name}?`)) return;
-                  const response = await fetch(`${API_BASE_URL}/api/v1/copies/locations/${location.id}`, { method: 'DELETE', headers });
-                  const result = await parseApiResponse<Envelope<boolean>>(response);
-                  if (!response.ok || !result?.success) { showToast({ type: 'error', title: 'Không thể ngừng sử dụng kệ', message: result?.error || 'Hãy thử lại.' }); return; }
-                  await refreshData(); showToast({ type: 'success', title: 'Đã ngừng sử dụng kệ', message: location.name });
-                }}>Ngừng sử dụng</button>
+                <button type="button" className="lib-copies-shelf-delete" disabled={location.copyCount > 0} title={location.copyCount > 0 ? 'Chuyển bản sao khỏi kệ trước khi xóa' : 'Xóa kệ trống'} onClick={() => void handleDeleteShelf(location)}>Xóa kệ</button>
               </article>
             )) : <div className="lib-copies-empty"><MapPin size={30} /><strong>Chưa có vị trí lưu trữ</strong><p>Khi nhập hoặc cập nhật bản sao, hãy điền vị trí theo dạng khu – kệ – tầng, ví dụ: A1-K02-T03.</p></div>}
           </div>
@@ -465,24 +602,27 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
             </label>
             <div className="lib-copies-form-row">
               <label className="lib-copies-field">Số lượng bản sao
-                <input type="number" min={1} max={500} value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} required />
+                <input type="number" min={1} max={500} value={quantity} onChange={(event) => { const next = Number(event.target.value); setQuantity(next); setShelfQuantity((current) => Math.min(current, next)); }} required />
               </label>
               <label className="lib-copies-field">Tình trạng ban đầu
-                <select value={intakeCondition} onChange={(event) => setIntakeCondition(event.target.value as CopyCondition)}>
+                <select value={intakeCondition} onChange={(event) => { const next = event.target.value as CopyCondition; setIntakeCondition(next); if (next === 'Damaged' || next === 'Lost') setShelfQuantity(0); }}>
                   {CONDITIONS.map((condition) => <option key={condition} value={condition}>{conditionLabels[condition]}</option>)}
                 </select>
               </label>
             </div>
             <label className="lib-copies-field">Kệ / Vị trí lưu trữ
-              <select value={intakeLocation} onChange={(event) => setIntakeLocation(event.target.value)}>
-                <option value="">Chưa xếp kệ</option>
-                {locations.filter(location => location.availableCapacity >= quantity || location.name === intakeLocation).map((location) => <option key={location.id} value={location.name}>{location.name} · {location.copyCount}/{location.capacity} cuốn · còn {location.availableCapacity}</option>)}
+              <select value={intakeLocation} onChange={(event) => { setIntakeLocation(event.target.value); if (!event.target.value) setShelfQuantity(0); else setShelfQuantity(Math.min(quantity, locations.find((location) => location.name === event.target.value)?.availableCapacity ?? 0)); }}>
+                <option value="">Để toàn bộ trong kho</option>
+                {locations.filter(location => location.availableCapacity > 0 || location.name === intakeLocation).map((location) => <option key={location.id} value={location.name}>{location.name} · {location.copyCount}/{location.capacity} chỗ · còn {location.availableCapacity}</option>)}
               </select>
-              {intakeLocation && (() => { const shelf = locations.find(item => item.name === intakeLocation); return shelf ? <small className={shelf.availableCapacity < quantity ? 'lib-copies-capacity-warning' : ''}>{shelf.availableCapacity < quantity ? `Kệ không đủ chỗ: còn ${shelf.availableCapacity}, bạn đang nhập ${quantity}.` : `Kệ hiện có ${shelf.copyCount}/${shelf.capacity} cuốn; sau khi nhập còn ${shelf.availableCapacity - quantity} chỗ.`}</small> : null; })()}
-              <small>Vị trí này được gắn vào từng bản sao vừa nhập.</small>
+              {intakeLocation && <label className="lib-copies-field">Số bản đưa lên kệ (còn lại vào kho)
+                <input type="number" min={0} max={quantity} value={shelfQuantity} onChange={(event) => setShelfQuantity(Number(event.target.value))} />
+                <small>Kệ còn {locations.find(item => item.name === intakeLocation)?.availableCapacity ?? 0} chỗ; đang chọn {shelfQuantity} bản lên kệ và {Math.max(0, quantity - shelfQuantity)} bản vào kho.</small>
+              </label>}
+              <small>Bản sao trong kho chưa thể cho mượn; thủ thư cần chuyển lên kệ để độc giả có thể mượn.</small>
             </label>
             <aside className="lib-copies-intake-note">Mỗi cuốn sẽ có ID và mã vạch riêng nhưng vẫn liên kết về cùng đầu sách gốc và danh mục hiện có. Chức năng này không tạo đầu sách trùng.</aside>
-            <footer><button type="button" onClick={() => setIntakeOpen(false)}>Hủy</button><button type="submit" disabled={saving || !intakeBookId || (!!intakeLocation && (locations.find(item => item.name === intakeLocation)?.availableCapacity ?? 0) < quantity)}><PackagePlus size={16} />{saving ? 'Đang nhập...' : 'Tạo các bản sao'}</button></footer>
+            <footer><button type="button" onClick={() => setIntakeOpen(false)}>Hủy</button><button type="submit" disabled={saving || !intakeBookId || shelfQuantity > quantity || (shelfQuantity > 0 && (intakeCondition === 'Damaged' || intakeCondition === 'Lost')) || shelfQuantity > (locations.find(item => item.name === intakeLocation)?.availableCapacity ?? 0)}><PackagePlus size={16} />{saving ? 'Đang nhập...' : 'Tạo các bản sao'}</button></footer>
           </form>
         </div>
       )}
@@ -493,7 +633,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
             <header><div><span><MapPin size={19} /></span><div><h2 id="lib-copy-edit-title">Cập nhật vị trí bản sao</h2><p>{editCopy.bookTitle} · {editCopy.barcode}</p></div></div><button type="button" onClick={() => setEditCopy(null)} aria-label="Đóng"><X size={19} /></button></header>
             <label className="lib-copies-field">Kệ / Vị trí lưu trữ
               <select value={editLocation} onChange={(event) => setEditLocation(event.target.value)}>
-                <option value="">Chưa xếp kệ</option>
+                <option value="">Trong kho</option>
                 {editLocation && !locations.some(location => location.name === editLocation) && (
                   <option value={editLocation}>{editLocation} (vị trí hiện tại)</option>
                 )}
@@ -515,7 +655,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
         <div className="lib-copies-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setTransferOpen(false); }}>
           <form className="lib-copies-modal" onSubmit={handleSaveTransfer} role="dialog" aria-modal="true" aria-labelledby="lib-copy-transfer-title">
             <header><div><span><MapPin size={19} /></span><div><h2 id="lib-copy-transfer-title">Điều chuyển bản sao</h2><p>Chọn kệ đích cho từng cuốn. Có thể hoán đổi hai kệ trong cùng một lần xác nhận.</p></div></div><button type="button" onClick={() => setTransferOpen(false)} aria-label="Đóng"><X size={19} /></button></header>
-            <div className="lib-copies-transfer-list">{selectedCopyIds.map(id => { const copy = copies.find(item => item.id === id); return copy ? <label key={id} className="lib-copies-field"><strong>{copy.barcode} · {copy.bookTitle}</strong><select required value={transferLocations[id] ?? ''} onChange={event => setTransferLocations(current => ({ ...current, [id]: event.target.value }))}><option value="">Chọn kệ đích</option>{locations.map(location => <option key={location.id} value={location.name}>{location.name} · {location.copyCount}/{location.capacity}</option>)}</select></label> : null; })}</div>
+            <div className="lib-copies-transfer-list">{selectedCopyIds.map(id => { const copy = copies.find(item => item.id === id); return copy ? <label key={id} className="lib-copies-field"><strong>{copy.barcode} · {copy.bookTitle}</strong><select value={transferLocations[id] ?? ''} onChange={event => setTransferLocations(current => ({ ...current, [id]: event.target.value }))}><option value="">Đưa vào kho</option>{locations.map(location => <option key={location.id} value={location.name}>{location.name} · {location.copyCount}/{location.capacity}</option>)}</select></label> : null; })}</div>
             <aside className="lib-copies-intake-note">Sức chứa được kiểm tra theo tổng vị trí sau khi chuyển toàn bộ danh sách. Nếu vượt sức chứa, hệ thống không lưu bất kỳ thay đổi nào.</aside>
             <footer><button type="button" onClick={() => setTransferOpen(false)}>Hủy</button><button type="submit" disabled={saving}>{saving ? 'Đang điều chuyển...' : 'Xác nhận điều chuyển'}</button></footer>
           </form>

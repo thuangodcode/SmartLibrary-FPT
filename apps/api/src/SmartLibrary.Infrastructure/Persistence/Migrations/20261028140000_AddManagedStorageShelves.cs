@@ -22,8 +22,8 @@ public sealed class AddManagedStorageShelves : Migration
 
             INSERT INTO storage_shelves (id, name, capacity, is_deleted, created_at, updated_at)
             SELECT gen_random_uuid(), floor_name || ' · Kệ ' || shelf_letter, 100, FALSE, now(), now()
-            FROM (VALUES ('Tầng trệt'), ('Tầng 1'), ('Tầng 2'), ('Tầng 3')) AS floors(floor_name)
-            CROSS JOIN (VALUES ('A'), ('B'), ('C'), ('D'), ('E'), ('F'), ('G'), ('H'), ('I'), ('J'), ('K'), ('L')) AS shelves(shelf_letter);
+            FROM (VALUES ('Tầng 1'), ('Tầng 2'), ('Tầng 3')) AS floors(floor_name)
+            CROSS JOIN (VALUES ('A'), ('B'), ('C'), ('D'), ('E'), ('F'), ('G'), ('H'), ('I'), ('J')) AS shelves(shelf_letter);
 
             INSERT INTO storage_shelves (id, name, capacity, is_deleted, created_at, updated_at)
             SELECT gen_random_uuid(), locations.location, 100, FALSE, now(), now()
