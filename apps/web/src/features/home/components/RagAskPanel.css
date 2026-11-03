@@ -252,9 +252,27 @@ html.dark .rag-ask .rag-ask-stats > div { border-color: #45564b; background: #20
 .rag-ask .rag-prompt-controls .rag-voice-button:hover { border-color: #f36f21; color: #d95f27; }
 .rag-ask .rag-prompt-controls .rag-voice-button.is-listening { border-color: #d95f27; background: #fff0e7; color: #c94b20; animation: rag-mic-pulse 1.2s ease-in-out infinite; }
 .rag-voice-error { margin: 7px 4px 0; color: #a74740; font-size: 11px; line-height: 1.45; }
+.rag-voice-status { display: flex; align-items: center; gap: 9px; min-height: 48px; margin: 9px 10px 0; padding: 5px 7px; border: 1px solid #e6eae6; border-radius: 999px; background: #fbfcfb; color: #526259; }
+.rag-voice-status.is-listening { border-color: #dce5de; box-shadow: 0 4px 15px rgb(29 55 39 / 7%); }
+.rag-voice-status.is-done { min-height: 40px; padding-left: 13px; border-color: #d7eadc; background: #f5fbf6; color: #315e40; }
+.rag-voice-status-dismiss,.rag-voice-status-stop { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border: 1px solid #e5e9e5; border-radius: 50%; background: #fff; color: #49554d; cursor: pointer; }
+.rag-voice-status-dismiss:hover { color: #c94b20; }
+.rag-voice-status-stop { border: 2px solid #4285f4; color: #1e293b; }
+.rag-voice-status-stop span { width: 10px; height: 10px; border-radius: 2px; background: currentColor; }
+.rag-voice-status-label { flex: 0 1 auto; color: #536157; font-size: 11px; line-height: 1.3; }
+.rag-voice-wave { display: flex; flex: 1 1 80px; align-items: center; justify-content: space-evenly; gap: 2px; min-width: 25px; height: 28px; overflow: hidden; }
+.rag-voice-wave i { display: block; width: 2px; height: 3px; flex: 0 1 2px; border-radius: 2px; background: #8d9b90; }
+.rag-voice-status.is-listening .rag-voice-wave i { animation: rag-voice-wave 700ms ease-in-out infinite alternate; animation-delay: var(--wave-delay); }
+.rag-voice-status-check { display: grid; width: 23px; height: 23px; flex: 0 0 23px; place-items: center; border-radius: 50%; background: #e0f1e4; color: #287044; font-size: 14px; font-weight: 800; }
 html.dark .rag-ask .rag-prompt-controls .rag-voice-button { border-color: #45564b; background: #26372b; color: #e1ece4; }
 html.dark .rag-ask .rag-prompt-controls .rag-voice-button.is-listening { border-color: #e8783e; background: #493126; color: #ffc5a3; }
+html.dark .rag-voice-status { border-color: #45564b; background: #202c26; color: #e1ece4; }
+html.dark .rag-voice-status-label { color: #e1ece4; }
+html.dark .rag-voice-status.is-done { border-color: #355744; background: #1b2d22; }
+html.dark .rag-voice-status-dismiss,html.dark .rag-voice-status-stop { border-color: #45564b; background: #26372b; color: #e1ece4; }
+html.dark .rag-voice-status-check { background: #294533; color: #aee0b7; }
 @keyframes rag-mic-pulse { 50% { box-shadow: 0 0 0 5px rgb(217 95 39 / 14%); } }
+@keyframes rag-voice-wave { 0% { height: 3px; opacity: .55; } 100% { height: var(--wave-height); opacity: 1; } }
 .rag-ask-login { margin-top: 16px; }
 
 .rag-ask { display: flex; flex-direction: column; gap: 12px; }

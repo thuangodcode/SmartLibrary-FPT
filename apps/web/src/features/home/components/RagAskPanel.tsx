@@ -150,6 +150,7 @@ const RagAskPanel = () => {
   const [selectedTopic, setSelectedTopic] = useState<ChatTopic | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<'idle' | 'listening' | 'done'>('idle');
   const [speechError, setSpeechError] = useState('');
   const [prefilledQuestion, setPrefilledQuestion] = useState(searchParams.get('q') ?? '');
   const nextIdRef = useRef(0);
@@ -157,6 +158,8 @@ const RagAskPanel = () => {
   const conversationRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const dictationBaseRef = useRef('');
+  const receivedSpeechRef = useRef(false);
+  const ignoreVoiceEndRef = useRef(false);
   const sending = turns.some((turn) => turn.loading);
 
   useEffect(() => () => recognitionRef.current?.abort(), []);
@@ -294,12 +297,15 @@ const RagAskPanel = () => {
 
     setSpeechError('');
     dictationBaseRef.current = question.trim();
+    receivedSpeechRef.current = false;
+    ignoreVoiceEndRef.current = false;
     const recognition = new Recognition();
     recognition.lang = 'vi-VN';
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.onresult = (event) => {
       const transcript = Array.from({ length: event.results.length }, (_, index) => event.results[index][0].transcript).join('').trim();
+      receivedSpeechRef.current = Boolean(transcript);
       const base = dictationBaseRef.current;
       setQuestion(`${base}${base && transcript ? ' ' : ''}${transcript}`.slice(0, 4000));
     };
@@ -311,17 +317,35 @@ const RagAskPanel = () => {
           : 'Không thể nhận giọng nói lúc này. Vui lòng thử lại.';
       setSpeechError(message);
       setIsListening(false);
+      setVoiceStatus('idle');
+      ignoreVoiceEndRef.current = true;
     };
-    recognition.onend = () => setIsListening(false);
+    recognition.onend = () => {
+      setIsListening(false);
+      if (!ignoreVoiceEndRef.current) setVoiceStatus('done');
+    };
     recognitionRef.current = recognition;
     try {
       recognition.start();
       setIsListening(true);
+      setVoiceStatus('listening');
     } catch {
       setIsListening(false);
+      setVoiceStatus('idle');
       setSpeechError('Không thể bật micro. Vui lòng thử lại.');
     }
   };
+
+  const cancelVoiceInput = () => {
+    ignoreVoiceEndRef.current = true;
+    recognitionRef.current?.abort();
+    setIsListening(false);
+    setVoiceStatus('idle');
+    setQuestion(dictationBaseRef.current);
+    setSpeechError('');
+  };
+
+  const dismissVoiceStatus = () => setVoiceStatus('idle');
 
   return (
     <>
@@ -433,6 +457,24 @@ const RagAskPanel = () => {
               )}
               <form onSubmit={submit}>
                 <div className="rag-prompt-composer">
+                  {voiceStatus !== 'idle' && (
+                    <div className={`rag-voice-status${isListening ? ' is-listening' : ' is-done'}`} role="status" aria-live="polite">
+                      {isListening ? (
+                        <>
+                          <button type="button" className="rag-voice-status-dismiss" onClick={cancelVoiceInput} aria-label="Hủy ghi âm"><X size={15} /></button>
+                          <span className="rag-voice-wave" aria-hidden="true">{Array.from({ length: 32 }, (_, index) => <i key={index} style={{ '--wave-delay': `${(index % 8) * -0.11}s`, '--wave-height': `${8 + ((index * 17) % 17)}px` } as React.CSSProperties} />)}</span>
+                          <span className="rag-voice-status-label">Đang nghe… Hãy nói câu hỏi</span>
+                          <button type="button" className="rag-voice-status-stop" onClick={() => recognitionRef.current?.stop()} aria-label="Kết thúc ghi âm"><span /></button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="rag-voice-status-check" aria-hidden="true">✓</span>
+                          <span className="rag-voice-status-label">{receivedSpeechRef.current ? 'Đã nhận giọng nói. Bạn có thể chỉnh sửa hoặc gửi.' : 'Chưa nhận được giọng nói. Hãy thử ghi âm lại.'}</span>
+                          <button type="button" className="rag-voice-status-dismiss" onClick={dismissVoiceStatus} aria-label="Ẩn trạng thái giọng nói"><X size={15} /></button>
+                        </>
+                      )}
+                    </div>
+                  )}
                   <textarea
                     ref={questionRef}
                     rows={2}
