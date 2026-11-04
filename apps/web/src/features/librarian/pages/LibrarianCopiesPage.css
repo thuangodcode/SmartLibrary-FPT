@@ -139,6 +139,12 @@
   background: #fff;
 }
 
+.lib-copies-page--shelf-copy-detail { gap: 0; }
+.lib-copies-page--shelf-copy-detail > .lib-copies-heading,
+.lib-copies-page--shelf-copy-detail > .lib-copies-metrics,
+.lib-copies-page--shelf-copy-detail > .lib-copies-tabs { display: none; }
+.lib-copies-page--shelf-copy-detail > .lib-copies-panel { overflow: visible; border: 0; border-radius: 0; background: transparent; }
+
 .lib-copies-toolbar {
   display: flex;
   align-items: center;
@@ -407,6 +413,16 @@
 .lib-copies-selection-bar button { min-height: 36px; border: 1px solid #e9621b; border-radius: 8px; background: #e9621b; padding: 0 12px; color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; }
 .lib-copies-selection-bar button.is-quiet { border-color: #ead6c9; background: #fff; color: #7c2d12; }
 .lib-copies-shelf-filters { grid-column: 1 / -1; display: grid; gap: 12px; border: 1px solid #e8ecf3; border-radius: 12px; background: #fbfcfd; padding: 12px; }
+.lib-copies-shelf-detail { display: grid; gap: 18px; padding: 0; }
+.lib-copies-shelf-detail-header { display: grid; grid-template-columns: 1fr; gap: 14px; border: 1px solid #f1d2bd; border-radius: 16px; background: linear-gradient(120deg, #fff8f3, #fff); padding: 22px 24px; }
+.lib-copies-shelf-detail-header > button { justify-self: start; display: inline-flex; align-items: center; gap: 5px; }
+.lib-copies-shelf-detail-header > div { display: grid; gap: 5px; }
+.lib-copies-shelf-detail-header > div > span { display: inline-flex; align-items: center; gap: 7px; color: #b54708; font-size: 12px; font-weight: 750; }
+.lib-copies-shelf-detail-header h2 { margin: 0; color: #263247; font-size: 20px; }
+.lib-copies-shelf-detail-header p { margin: 0; color: #667085; font-size: 12px; }
+.lib-copies-shelf-detail-eyebrow { color: #c94d12; font-size: 10px; font-weight: 800; letter-spacing: .1em; }
+.lib-copies-shelf-detail .lib-copies-book-groups { padding: 0; }
+.lib-copies-shelf-detail .lib-copies-table-wrap { margin: 0; }
 .lib-copies-shelf-filters .lib-copies-search { width: min(100%, 520px); }
 .lib-copies-floor-tabs { display: flex; flex-wrap: wrap; gap: 7px; }
 .lib-copies-floor-tabs button { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; border: 1px solid #dfe4ec; border-radius: 999px; background: #fff; padding: 0 11px; color: #596579; font-size: 11px; font-weight: 650; cursor: pointer; }
@@ -451,4 +467,7 @@
   .lib-copies-selection-bar > div:last-child { justify-content: flex-end; }
   .lib-copies-select-page { align-items: flex-start; flex-direction: column; }
   .lib-copies-shelf-filters .lib-copies-search { width: 100%; }
+  .lib-copies-shelf-detail { padding: 10px; }
+  .lib-copies-shelf-detail-header { padding: 12px; }
+  .lib-copies-shelf-detail-header h2 { font-size: 17px; }
 }
