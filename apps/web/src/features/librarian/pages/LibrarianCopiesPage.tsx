@@ -221,6 +221,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
     } finally { setBookGroupsLoading(false); }
   }, [copyBookCategory, copyBookSearch, headers, selectedLocation, showToast]);
 
+  const selectedCopyBookId = selectedCopyBook?.id;
   const refreshData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -247,7 +248,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
       setSummary(summaryResult.data ?? null);
       setLocations(locationsResult.data ?? []);
       setRestockAlerts(restockResult.data ?? []);
-      await fetchInventory(selectedCopyBook?.id);
+      await fetchInventory(selectedCopyBookId);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Không thể tải dữ liệu kho.';
       setError(message);
@@ -255,7 +256,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
     } finally {
       setLoading(false);
     }
-  }, [fetchInventory, headers, selectedCopyBook?.id, showToast]);
+  }, [fetchInventory, headers, selectedCopyBookId, showToast]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -266,7 +267,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
   }, [search]);
 
   useEffect(() => {
-    if (tab === 'copies' && !selectedCopyBook) void fetchBookGroups();
+    if (tab === 'copies' && !selectedCopyBook) void Promise.resolve().then(fetchBookGroups);
   }, [fetchBookGroups, selectedCopyBook, tab]);
 
   useEffect(() => {
@@ -332,9 +333,8 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
   }, [headers, showToast, sortingSearch, tab]);
 
   useEffect(() => {
-    if (tab !== 'sorting' || !sortingBookId) { setSortingDetails(null); return; }
+    if (tab !== 'sorting' || !sortingBookId) return;
     let cancelled = false;
-    setSortingLoading(true);
     void fetch(`${API_BASE_URL}/api/v1/copies/sorting/books/${sortingBookId}`, { headers })
       .then(async response => {
         const result = await parseApiResponse<Envelope<SortingBookDetails>>(response);
@@ -549,7 +549,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
         <button type="button" role="tab" aria-selected={tab === 'copies'} className={tab === 'copies' ? 'is-active' : ''} onClick={() => setTab('copies')}>
           <BookCopy size={16} /> Đầu sách & bản sao
         </button>
-        <button type="button" role="tab" aria-selected={tab === 'sorting'} className={tab === 'sorting' ? 'is-active' : ''} onClick={() => setTab('sorting')}>
+        <button type="button" role="tab" aria-selected={tab === 'sorting'} className={tab === 'sorting' ? 'is-active' : ''} onClick={() => { setSortingLoading(Boolean(sortingBookId)); setTab('sorting'); }}>
           <Boxes size={16} /> Sắp xếp sách
         </button>
         <button type="button" role="tab" aria-selected={tab === 'locations'} className={tab === 'locations' ? 'is-active' : ''} onClick={() => setTab('locations')}>
@@ -624,7 +624,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
               <label className="lib-copies-search"><Search size={17} /><input value={sortingSearch} onChange={event => setSortingSearch(event.target.value)} placeholder="Lọc theo tên hoặc mã đầu sách..." /></label>
             </header>
             <label className="lib-copies-field lib-copies-sorting-book">Đầu sách
-              <select value={sortingBookId} onChange={event => setSortingBookId(event.target.value)}>
+              <select value={sortingBookId} onChange={event => { const nextBookId = event.target.value; setSortingBookId(nextBookId); setSortingDetails(null); setSortingSelected([]); setSortingDestinations({}); setSortingLoading(Boolean(nextBookId)); }}>
                 <option value="">Chọn đầu sách có bản trong kho</option>
                 {sortingBooks.map(book => <option key={book.id} value={book.id}>{book.title} · {book.code} · {book.inWarehouseCopies} bản trong kho</option>)}
               </select>

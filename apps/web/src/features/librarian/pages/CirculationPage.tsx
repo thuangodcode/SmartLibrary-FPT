@@ -579,7 +579,6 @@ function LoansView() {
   useEffect(() => {
     if (loansView !== 'due') return undefined;
     let active = true;
-    setDueLoading(true);
     const query = new URLSearchParams();
     if (dueRange.length === 1) {
       query.set('from', dateOnly(dueRange[0]));
@@ -722,7 +721,11 @@ function LoansView() {
       <WorkflowTabs
         label="Nội dung mượn sách"
         value={loansView}
-        onChange={(value) => setLoansView(value as 'pending' | 'list' | 'due')}
+        onChange={(value) => {
+          const nextView = value as 'pending' | 'list' | 'due';
+          if (nextView === 'due') setDueLoading(true);
+          setLoansView(nextView);
+        }}
         tabs={[
           { value: 'pending', label: 'Yêu cầu chờ xử lý', count: pending.length },
           { value: 'list', label: 'Danh sách mượn sách', count: list?.totalCount ?? 0 },
@@ -741,7 +744,7 @@ function LoansView() {
             <AnimatedCalendar
               mode="range"
               value={dueRange}
-              onChange={setDueRange}
+              onChange={(range) => { setDueLoading(true); setDueRange(range); }}
               placeholder="Chọn khoảng ngày đến hạn"
               ariaLabel="Lọc sách theo khoảng ngày đến hạn"
             />

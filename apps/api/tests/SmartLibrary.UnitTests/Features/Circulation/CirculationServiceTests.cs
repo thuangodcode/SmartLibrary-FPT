@@ -120,6 +120,7 @@ public class CirculationServiceTests
         Id = Guid.NewGuid(),
         BookId = Guid.NewGuid(),
         Barcode = "SL-000101",
+        Location = "Tầng 1 - Kệ A",
         IsAvailable = true,
         Condition = BookCondition.Good,
         Book = new Book { Title = "Clean Code", Language = "en", AvailableCopies = 2, Categories = [] }
@@ -964,7 +965,7 @@ public class CirculationServiceTests
     }
 
     [Fact]
-    public async Task Return_PersistsAvailableCopyBeforeReadyReservationIsSelected()
+    public async Task Return_LeavesCopyInWarehouseForLibrarianSorting()
     {
         var order = new List<string>();
         var copy = ReadyCopy();
@@ -1004,12 +1005,13 @@ public class CirculationServiceTests
         var result = await _sut.ReturnAsync(new ReturnLoanRequest { Barcode = copy.Barcode }, Guid.NewGuid());
 
         result.IsSuccess.Should().BeTrue();
-        result.Data!.ReadyReservationReaderId.Should().Be(reservation.ReaderId);
-        order.IndexOf("availability").Should().BeGreaterThan(order.IndexOf("save"));
+        result.Data!.ReadyReservationReaderId.Should().BeNull();
+        copy.Location.Should().BeNull();
+        _repo.Verify(x => x.ReadyNextReservationAsync(copy.BookId, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         _repo.Verify(x => x.AddNotificationAsync(
             It.Is<Notification>(notification => notification.UserId == reservation.ReaderId
                 && notification.Title == "Sách sẵn sàng nhận"),
-            It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -1301,6 +1303,7 @@ public class CirculationServiceTests
         Id = source.Id,
         BookId = source.BookId,
         Barcode = source.Barcode,
+        Location = source.Location,
         IsAvailable = source.IsAvailable,
         Condition = source.Condition,
         Book = source.Book
