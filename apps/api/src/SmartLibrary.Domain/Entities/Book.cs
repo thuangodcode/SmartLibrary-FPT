@@ -27,6 +27,9 @@ public class Book : AuditableEntity, ISoftDeletable
     [NotMapped]
     public int ReviewCount { get; set; }
 
+    [NotMapped]
+    public int? BorrowCount { get; set; }
+
     // Navigation properties
     public Publisher? Publisher { get; set; }
     public ICollection<Author> Authors { get; set; } = new List<Author>();

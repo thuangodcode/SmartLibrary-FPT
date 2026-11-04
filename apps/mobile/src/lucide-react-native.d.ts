@@ -20,4 +20,16 @@ declare module 'lucide-react-native' {
   export const CircleAlert: ComponentType<IconProps>;
   export const X: ComponentType<IconProps>;
   export const LogOut: ComponentType<IconProps>;
+  export const Newspaper: ComponentType<IconProps>;
+  export const Settings: ComponentType<IconProps>;
+  export const Heart: ComponentType<IconProps>;
+  export const ChevronRight: ComponentType<IconProps>;
+  export const ChevronLeft: ComponentType<IconProps>;
+  export const SlidersHorizontal: ComponentType<IconProps>;
+  export const Moon: ComponentType<IconProps>;
+  export const Sun: ComponentType<IconProps>;
+  export const MapPin: ComponentType<IconProps>;
+  export const MessageCircle: ComponentType<IconProps>;
+  export const FileText: ComponentType<IconProps>;
+  export const Star: ComponentType<IconProps>;
 }

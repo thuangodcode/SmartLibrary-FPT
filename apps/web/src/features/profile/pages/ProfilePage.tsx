@@ -62,7 +62,7 @@ const ProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [showDocs, setShowDocs] = useState(true);
+  const [showDocs, setShowDocs] = useState(embeddedInShell);
   const [frontDocFile, setFrontDocFile] = useState<File | null>(null);
   const [backDocFile, setBackDocFile] = useState<File | null>(null);
   const [selfieDocFile, setSelfieDocFile] = useState<File | null>(null);

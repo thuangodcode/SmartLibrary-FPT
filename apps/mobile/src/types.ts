@@ -13,6 +13,7 @@ export interface User {
 export interface Book {
   id: string;
   code?: string;
+  isbn?: string | null;
   title: string;
   author?: string;
   authorNames?: string[];
@@ -23,6 +24,9 @@ export interface Book {
   categoryNames?: string[];
   availableCopies?: number;
   totalCopies?: number;
+  averageRating?: number;
+  reviewCount?: number;
+  borrowCount?: number;
 }
 
 export interface Loan {

@@ -64,9 +64,10 @@ public class BooksController : ControllerBase
         [FromQuery] Guid? categoryId = null,
         [FromQuery] bool sortByReviewCount = false,
         [FromQuery] bool reviewCountAscending = false,
+        [FromQuery] bool sortByBorrowCount = false,
         CancellationToken ct = default)
     {
-        var result = await _bookService.GetPagedAsync(page, pageSize, search, categoryId, sortByReviewCount, reviewCountAscending, ct);
+        var result = await _bookService.GetPagedAsync(page, pageSize, search, categoryId, sortByReviewCount, reviewCountAscending, ct, sortByBorrowCount);
         return Ok(ApiResponse<object>.Ok(result.Items, new
         {
             result.TotalCount,
@@ -74,7 +75,8 @@ public class BooksController : ControllerBase
             result.PageSize,
             result.TotalPages,
             result.HasPrevious,
-            result.HasNext
+            result.HasNext,
+            SortByBorrowCount = sortByBorrowCount
         }));
     }
 
