@@ -32,7 +32,7 @@ public class BookCopiesController : ControllerBase
             totalCopies = await copies.CountAsync(ct),
             availableCopies = await copies.CountAsync(copy => copy.IsAvailable && copy.Location != null && copy.Condition != BookCondition.Damaged && copy.Condition != BookCondition.Lost, ct),
             warehouseCopies = await copies.CountAsync(copy => copy.IsAvailable && copy.Location == null && copy.Condition != BookCondition.Damaged && copy.Condition != BookCondition.Lost, ct),
-            unavailableCopies = await copies.CountAsync(copy => !copy.IsAvailable, ct),
+            unavailableCopies = await copies.CountAsync(copy => !copy.IsAvailable || copy.Condition == BookCondition.Damaged || copy.Condition == BookCondition.Lost, ct),
             locations = await copies
                 .Where(copy => copy.Location != null && copy.Location != "")
                 .Select(copy => copy.Location!)
@@ -152,17 +152,18 @@ public class BookCopiesController : ControllerBase
             .AsNoTracking()
             .Where(copy => !copy.IsDeleted && copy.Location != null && copy.Location != "")
             .GroupBy(copy => copy.Location!)
-            .Select(group => new { name = group.Key, copyCount = group.Count() })
-            .ToDictionaryAsync(item => item.name, item => item.copyCount, ct);
+            .Select(group => new { name = group.Key, copyCount = group.Count(), bookCount = group.Where(copy => !copy.Book.IsDeleted).Select(copy => copy.BookId).Distinct().Count() })
+            .ToDictionaryAsync(item => item.name, item => new { item.copyCount, item.bookCount }, ct);
         var shelves = await _db.StorageShelves.AsNoTracking().Where(shelf => !shelf.IsDeleted)
             .OrderBy(shelf => shelf.Name).ToListAsync(ct);
         var locations = shelves.Select(shelf => new
         {
             id = shelf.Id,
             name = shelf.Name,
-            copyCount = occupancy.GetValueOrDefault(shelf.Name),
+            copyCount = occupancy.GetValueOrDefault(shelf.Name)?.copyCount ?? 0,
+            bookCount = occupancy.GetValueOrDefault(shelf.Name)?.bookCount ?? 0,
             capacity = shelf.Capacity,
-            availableCapacity = Math.Max(0, shelf.Capacity - occupancy.GetValueOrDefault(shelf.Name))
+            availableCapacity = Math.Max(0, shelf.Capacity - (occupancy.GetValueOrDefault(shelf.Name)?.copyCount ?? 0))
         }).ToList();
 
         return Ok(ApiResponse<object>.Ok(locations));
@@ -186,9 +187,19 @@ public class BookCopiesController : ControllerBase
     }
 
     [HttpGet("book-groups")]
-    public async Task<IActionResult> GetBookCopyGroups([FromQuery] string? search = null, CancellationToken ct = default)
+    public async Task<IActionResult> GetBookCopyGroups([FromQuery] string? search = null, [FromQuery] Guid? categoryId = null, [FromQuery] string? location = null, CancellationToken ct = default)
     {
-        var query = _db.Books.AsNoTracking().Where(book => !book.IsDeleted)
+        var selectedLocation = string.IsNullOrWhiteSpace(location) ? null : location.Trim();
+        var query = _db.Books.AsNoTracking().Where(book => !book.IsDeleted);
+        if (categoryId.HasValue)
+            query = query.Where(book => book.Categories.Any(category => !category.IsDeleted && category.Id == categoryId.Value));
+        if (selectedLocation is not null)
+        {
+            query = selectedLocation == "__warehouse__"
+                ? query.Where(book => book.Copies.Any(copy => !copy.IsDeleted && copy.Location == null && copy.IsAvailable && copy.Condition != BookCondition.Damaged && copy.Condition != BookCondition.Lost))
+                : query.Where(book => book.Copies.Any(copy => !copy.IsDeleted && copy.Location == selectedLocation));
+        }
+        var projected = query
             .Select(book => new
             {
                 book.Id,
@@ -196,6 +207,9 @@ public class BookCopiesController : ControllerBase
                 book.Code,
                 TotalCopies = book.Copies.Count(copy => !copy.IsDeleted),
                 OnShelfCopies = book.Copies.Count(copy => !copy.IsDeleted && copy.Location != null),
+                CopiesAtLocation = selectedLocation == null ? 0 : selectedLocation == "__warehouse__"
+                    ? book.Copies.Count(copy => !copy.IsDeleted && copy.Location == null && copy.IsAvailable && copy.Condition != BookCondition.Damaged && copy.Condition != BookCondition.Lost)
+                    : book.Copies.Count(copy => !copy.IsDeleted && copy.Location == selectedLocation),
                 InWarehouseCopies = book.Copies.Count(copy => !copy.IsDeleted && copy.IsAvailable && copy.Location == null
                     && copy.Condition != BookCondition.Damaged && copy.Condition != BookCondition.Lost),
                 UnavailableCopies = book.Copies.Count(copy => !copy.IsDeleted && (!copy.IsAvailable || copy.Condition == BookCondition.Damaged || copy.Condition == BookCondition.Lost))
@@ -203,9 +217,9 @@ public class BookCopiesController : ControllerBase
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim().ToLower();
-            query = query.Where(book => book.Title.ToLower().Contains(term) || book.Code.ToLower().Contains(term));
+            projected = projected.Where(book => book.Title.ToLower().Contains(term) || book.Code.ToLower().Contains(term));
         }
-        var rows = await query.Where(book => book.TotalCopies > 0).OrderBy(book => book.Title).ToListAsync(ct);
+        var rows = await projected.Where(book => book.TotalCopies > 0).OrderBy(book => book.Title).ToListAsync(ct);
         return Ok(ApiResponse<object>.Ok(rows));
     }
 
