@@ -343,8 +343,13 @@ public class BookCopiesController : ControllerBase
         var copyIds = request.Assignments.Select(item => item.CopyId).ToArray();
         var assignments = request.Assignments.ToDictionary(item => item.CopyId, item => item.Location?.Trim());
         var targetNames = assignments.Values.Where(name => !string.IsNullOrWhiteSpace(name)).Distinct().ToArray();
-        var sourceNames = await _db.BookCopies.Where(copy => !copy.IsDeleted && copyIds.Contains(copy.Id))
-            .Select(copy => copy.Location).ToListAsync(ct);
+        // Use a PostgreSQL array parameter here instead of a captured EF Contains
+        // expression. This avoids provider evaluation failures on large selections.
+        var copies = await _db.BookCopies
+            .FromSqlInterpolated($"SELECT * FROM book_copies WHERE id = ANY({copyIds}) AND is_deleted = FALSE FOR UPDATE")
+            .ToListAsync(ct);
+        if (copies.Count != copyIds.Length) return NotFound(ApiResponse<object>.Fail("Một hoặc nhiều bản sao không còn tồn tại."));
+        var sourceNames = copies.Select(copy => copy.Location).ToList();
         var affectedNames = sourceNames.Concat(targetNames).Where(name => !string.IsNullOrWhiteSpace(name))
             .Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToArray();
         var shelves = new List<StorageShelf>();
@@ -356,15 +361,12 @@ public class BookCopiesController : ControllerBase
         if (targetNames.Any(name => !shelves.Any(shelf => shelf.Name == name)) ||
             sourceNames.Where(name => !string.IsNullOrWhiteSpace(name)).Any(name => !shelves.Any(shelf => shelf.Name == name)))
             return BadRequest(ApiResponse<object>.Fail("Một hoặc nhiều kệ nguồn hoặc kệ đích không còn hoạt động."));
-        var copies = await _db.BookCopies.Where(copy => !copy.IsDeleted && copyIds.Contains(copy.Id)).ToListAsync(ct);
-        if (copies.Count != copyIds.Length) return NotFound(ApiResponse<object>.Fail("Một hoặc nhiều bản sao không còn tồn tại."));
         if (copies.Any(copy => !string.IsNullOrWhiteSpace(assignments[copy.Id]) &&
                                (!copy.IsAvailable || copy.Condition is BookCondition.Damaged or BookCondition.Lost)))
             return Conflict(ApiResponse<object>.Fail("Chỉ bản sao đang ở kho và còn tốt mới được chuyển lên kệ."));
-        var affectedShelfNames = copies.Select(copy => copy.Location).Concat(assignments.Values).Where(name => !string.IsNullOrWhiteSpace(name)).Distinct().ToArray();
-        var counts = await _db.BookCopies.Where(copy => !copy.IsDeleted && copy.Location != null && affectedShelfNames.Contains(copy.Location))
-            .GroupBy(copy => copy.Location!).Select(group => new { Name = group.Key, Count = group.Count() })
-            .ToDictionaryAsync(item => item.Name, item => item.Count, ct);
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var shelf in shelves)
+            counts[shelf.Name] = await _db.BookCopies.CountAsync(copy => !copy.IsDeleted && copy.Location == shelf.Name, ct);
         foreach (var copy in copies)
         {
             var oldName = copy.Location;
