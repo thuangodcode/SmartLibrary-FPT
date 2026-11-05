@@ -125,11 +125,7 @@ const conditionLabels: Record<CopyCondition, string> = {
   Lost: 'Thất lạc',
 };
 
-interface LibrarianCopiesPageProps {
-  embedded?: boolean;
-}
-
-const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = false }) => {
+const LibrarianCopiesPage: React.FC = () => {
   const accessToken = useAuthStore((state) => state.accessToken);
   const { showToast } = useToast();
   const [tab, setTab] = useState<'copies' | 'sorting' | 'locations'>('copies');
@@ -168,6 +164,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
   const [transferOpen, setTransferOpen] = useState(false);
   const [sortingSearch, setSortingSearch] = useState('');
   const [sortingBooks, setSortingBooks] = useState<SortingBookOption[]>([]);
+  const [sortingBooksLoading, setSortingBooksLoading] = useState(false);
   const [sortingBookId, setSortingBookId] = useState('');
   const [sortingDetails, setSortingDetails] = useState<SortingBookDetails | null>(null);
   const [sortingSelected, setSortingSelected] = useState<string[]>([]);
@@ -376,6 +373,8 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
         if (!cancelled) setSortingBooks(result.data ?? []);
       } catch (caught) {
         if (!cancelled) showToast({ type: 'error', title: 'Không thể tải danh sách xếp sách', message: caught instanceof Error ? caught.message : 'Vui lòng thử lại.' });
+      } finally {
+        if (!cancelled) setSortingBooksLoading(false);
       }
     }, 200);
     return () => { cancelled = true; window.clearTimeout(timer); };
@@ -577,34 +576,34 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
   const isShelfBookDetailPage = tab === 'locations' && selectedShelf !== null && selectedShelfBook !== null;
 
   return (
-    <section className={`lib-copies-page${embedded ? ' lib-copies-page--embedded' : ''}${isShelfBookDetailPage ? ' lib-copies-page--shelf-copy-detail' : ''}`}>
+    <section className={`lib-copies-page${isShelfBookDetailPage ? ' lib-copies-page--shelf-copy-detail' : ''}`}>
       <header className="lib-copies-heading">
         <div>
-          {!embedded && <p className="lib-copies-eyebrow"><Archive size={15} /> KHÔNG GIAN THỦ THƯ · QUẢN LÝ KHO</p>}
-          {!embedded && <h1>Quản lý sách và kệ</h1>}
-          {!embedded && <span>Tìm đầu sách, theo dõi từng cuốn và biết sách đang ở đâu.</span>}
+          <p className="lib-copies-eyebrow"><Archive size={15} /> KHÔNG GIAN THỦ THƯ · QUẢN LÝ SÁCH</p>
+          <h1>Quản lý bản sao, kho và kệ sách</h1>
+          <span>Theo dõi từng cuốn sách, xử lý sách trong kho và kiểm soát sức chứa từng kệ.</span>
         </div>
         <button type="button" className="lib-copies-primary" onClick={() => setIntakeOpen(true)}>
-          <PackagePlus size={17} /> Nhập bản sao
+          <PackagePlus size={17} /> Nhập sách vào kho
         </button>
       </header>
 
       <section className="lib-copies-metrics" aria-label="Thống kê kho sách">
-        <article><span className="lib-copies-metric-icon"><BookCopy size={19} /></span><span>Tổng số cuốn</span><strong>{summary?.totalCopies ?? '—'}</strong></article>
-        <article><span className="lib-copies-metric-icon is-green"><Check size={19} /></span><span>Có thể cho mượn</span><strong>{summary?.availableCopies ?? '—'}</strong></article>
-        <article><span className="lib-copies-metric-icon is-blue"><Boxes size={19} /></span><span>Trong kho, chờ xếp</span><strong>{summary?.warehouseCopies ?? '—'}</strong></article>
-        <article><span className="lib-copies-metric-icon is-slate"><Archive size={19} /></span><span>Chưa thể cho mượn</span><strong>{summary?.unavailableCopies ?? '—'}</strong></article>
+        <article><span className="lib-copies-metric-icon"><BookCopy size={19} /></span><span>Tổng số bản sao</span><strong>{summary?.totalCopies ?? '—'}</strong></article>
+        <article><span className="lib-copies-metric-icon is-green"><Check size={19} /></span><span>Sẵn sàng trên kệ</span><strong>{summary?.availableCopies ?? '—'}</strong></article>
+        <article><span className="lib-copies-metric-icon is-blue"><Boxes size={19} /></span><span>Trong kho chờ xếp</span><strong>{summary?.warehouseCopies ?? '—'}</strong></article>
+        <article><span className="lib-copies-metric-icon is-slate"><Archive size={19} /></span><span>Đang mượn hoặc cần xử lý</span><strong>{summary?.unavailableCopies ?? '—'}</strong></article>
       </section>
 
       <div className="lib-copies-tabs" role="tablist" aria-label="Chế độ xem kho">
         <button type="button" role="tab" aria-selected={tab === 'copies'} className={tab === 'copies' ? 'is-active' : ''} onClick={() => setTab('copies')}>
-          <BookCopy size={16} /> Đầu sách & bản sao
+          <BookCopy size={16} /> Danh sách bản sao
         </button>
-        <button type="button" role="tab" aria-selected={tab === 'sorting'} className={tab === 'sorting' ? 'is-active' : ''} onClick={() => { setSortingLoading(Boolean(sortingBookId)); setTab('sorting'); }}>
-          <Boxes size={16} /> Sắp xếp sách
+        <button type="button" role="tab" aria-selected={tab === 'sorting'} className={tab === 'sorting' ? 'is-active' : ''} onClick={() => { setSortingBooksLoading(true); setSortingLoading(Boolean(sortingBookId)); setTab('sorting'); }}>
+          <Boxes size={16} /> Quản lý kho
         </button>
         <button type="button" role="tab" aria-selected={tab === 'locations'} className={tab === 'locations' ? 'is-active' : ''} onClick={() => setTab('locations')}>
-          <MapPin size={16} /> Kệ sách
+          <MapPin size={16} /> Quản lý kệ sách
         </button>
       </div>
 
@@ -671,20 +670,31 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
         ) : tab === 'sorting' ? (
           <div className="lib-copies-sorting">
             <header className="lib-copies-sorting-heading">
-              <div><strong>Sắp xếp bản sao trong kho</strong><p>Sách trả về được đưa vào kho trước. Chọn một đầu sách để xem số bản trên kệ và các bản đang chờ sắp xếp.</p></div>
-              <label className="lib-copies-search"><Search size={17} /><input value={sortingSearch} onChange={event => setSortingSearch(event.target.value)} placeholder="Lọc theo tên hoặc mã đầu sách..." /></label>
+              <div><strong>Quản lý kho sách</strong><p>Theo dõi bản sao đang lưu trong kho. Chọn đầu sách để xếp từng cuốn lên kệ hoặc tiếp tục giữ trong kho.</p></div>
+              {!sortingBookId && <label className="lib-copies-search"><Search size={17} /><input value={sortingSearch} onChange={event => { setSortingBooksLoading(true); setSortingSearch(event.target.value); }} placeholder="Tìm đầu sách trong kho theo tên hoặc mã..." /></label>}
             </header>
-            <label className="lib-copies-field lib-copies-sorting-book">Đầu sách
-              <select value={sortingBookId} onChange={event => { const nextBookId = event.target.value; setSortingBookId(nextBookId); setSortingDetails(null); setSortingSelected([]); setSortingDestinations({}); setSortingLoading(Boolean(nextBookId)); }}>
-                <option value="">Chọn đầu sách có bản trong kho</option>
-                {sortingBooks.map(book => <option key={book.id} value={book.id}>{book.title} · {book.code} · {book.inWarehouseCopies} bản trong kho</option>)}
-              </select>
-            </label>
-            {!sortingBookId ? <div className="lib-copies-empty"><Boxes size={30} /><strong>Chọn đầu sách để bắt đầu</strong><p>Danh sách chỉ gồm đầu sách đang có bản sao khả dụng trong kho.</p></div> : sortingLoading ? (
+            {!sortingBookId ? sortingBooksLoading ? (
+              <div className="lib-copies-loading" role="status"><span /><p>Đang tải danh sách sách trong kho...</p></div>
+            ) : sortingBooks.length ? <>
+              <div className="lib-copies-warehouse-summary">
+                <article><span>Đầu sách có bản trong kho</span><strong>{sortingBooks.length}</strong></article>
+                <article><span>Bản sao sẵn sàng trong kho</span><strong>{summary?.warehouseCopies ?? 0}</strong></article>
+                <article><span>Kệ còn chỗ nhận sách</span><strong>{locations.filter(location => location.availableCapacity > 0).length}</strong></article>
+              </div>
+              {restockAlerts.length > 0 && <section className="lib-copies-restock-alerts" aria-label="Đầu sách cần bổ sung lên kệ"><strong>Cần bổ sung sách lên kệ</strong><p>Các đầu sách này đã hết bản sẵn sàng trên kệ nhưng vẫn còn sách trong kho.</p>{restockAlerts.map(alert => <div key={alert.id}><span><b>{alert.title}</b><small>Còn {alert.inWarehouse} bản trong kho · chưa có bản sẵn sàng trên kệ</small></span><button type="button" onClick={() => { setSortingBookId(alert.id); setSortingDetails(null); setSortingSelected([]); setSortingDestinations({}); setSortingLoading(true); }}>Xếp sách lên kệ</button></div>)}</section>}
+              <div className="lib-copies-warehouse-list">
+                {sortingBooks.map(book => <article key={book.id}>
+                  <div className="lib-copies-warehouse-book"><span className="lib-copies-book-group-icon"><BookCopy size={19} /></span><span><strong>{book.title}</strong><small>Mã đầu sách: {book.code}</small></span></div>
+                  <div className="lib-copies-warehouse-counts"><span><strong>{book.inWarehouseCopies}</strong><small>trong kho</small></span><span><strong>{book.onShelfCopies}</strong><small>trên kệ</small></span></div>
+                  <button type="button" onClick={() => { setSortingBookId(book.id); setSortingDetails(null); setSortingSelected([]); setSortingDestinations({}); setSortingLoading(true); }}>Xem bản sao và xếp kệ <ChevronRight size={16} /></button>
+                </article>)}
+              </div>
+            </> : <div className="lib-copies-empty"><Boxes size={30} /><strong>{sortingSearch.trim() ? 'Không tìm thấy đầu sách phù hợp' : 'Kho chưa có bản sao chờ xếp'}</strong><p>{sortingSearch.trim() ? 'Thử tìm theo tên khác hoặc mã đầu sách.' : 'Các bản sao mới nhập hoặc được trả về kho sẽ xuất hiện tại đây để thủ thư sắp xếp.'}</p></div> : sortingLoading ? (
               <div className="lib-copies-loading" role="status"><span /><p>Đang tải bản sao...</p></div>
             ) : sortingDetails ? <>
+              <div className="lib-copies-warehouse-detail-heading"><button type="button" className="lib-copies-back-books" onClick={() => { setSortingBookId(''); setSortingDetails(null); setSortingSelected([]); setSortingDestinations({}); }}>‹ Quay lại danh sách kho</button><div><small>ĐẦU SÁCH ĐANG QUẢN LÝ</small><h3>{sortingDetails.title}</h3><span>{sortingDetails.code} · {sortingDetails.inWarehouseCopies} bản trong kho</span></div></div>
               <div className="lib-copies-sorting-stats"><article><span>Đã xếp trên kệ</span><strong>{sortingDetails.onShelfCopies}</strong></article><article><span>Đang trong kho, chờ xếp</span><strong>{sortingDetails.inWarehouseCopies}</strong></article><article><span>Bản trả về đang chờ xếp</span><strong>{sortingDetails.returnedInWarehouseCopies}</strong></article></div>
-              <div className="lib-copies-sorting-toolbar"><span>Chọn từng bản sao rồi chỉ định kệ hoặc giữ trong kho.</span><button type="button" disabled={!sortingSelected.length || saving} onClick={() => void handleSaveSorting()}>{saving ? 'Đang lưu...' : `Lưu sắp xếp (${sortingSelected.length})`}</button></div>
+              <div className="lib-copies-sorting-toolbar"><span>Chọn các bản sao cần xử lý, sau đó chỉ định kệ hoặc giữ trong kho.</span><button type="button" disabled={!sortingSelected.length || saving} onClick={() => void handleSaveSorting()}>{saving ? 'Đang lưu...' : `Lưu thay đổi (${sortingSelected.length})`}</button></div>
               <div className="lib-copies-sorting-list">
                 {sortingDetails.copies.map(copy => <article key={copy.id}>
                   <label><input type="checkbox" checked={sortingSelected.includes(copy.id)} onChange={event => setSortingSelected(current => event.target.checked ? [...new Set([...current, copy.id])] : current.filter(id => id !== copy.id))} /><span><strong>{copy.barcode}</strong><small>{conditionLabels[copy.condition]} · {copy.hasBeenReturned ? 'Đã trả về' : 'Chưa có lượt mượn'}</small></span></label>
@@ -765,7 +775,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
           </div>
         ) : (
           <div className="lib-copies-location-grid">
-            <div className="lib-copies-shelf-actions"><div><strong>Quản lý kệ sách</strong><small>Thêm, đổi tên, điều chỉnh sức chứa hoặc xóa kệ trống. Bản sao trong kho không chiếm chỗ trên kệ.</small></div><button type="button" onClick={() => void handleCreateShelf()}>+ Thêm kệ</button></div>
+            <div className="lib-copies-shelf-actions"><div><strong>Quản lý kệ sách</strong><small>Tạo kệ, đổi tên và sức chứa. Chọn một kệ để xem đầu sách, kiểm tra số chỗ còn lại; chỉ xóa được kệ đang trống.</small></div><button type="button" onClick={() => void handleCreateShelf()}>+ Thêm kệ sách</button></div>
             <div className="lib-copies-shelf-filters">
               <label className="lib-copies-search"><Search size={17} /><input value={shelfSearch} onChange={event => setShelfSearch(event.target.value)} placeholder="Tìm nhanh theo tầng hoặc tên kệ..." /></label>
               <div className="lib-copies-floor-tabs" role="tablist" aria-label="Lọc kệ theo tầng">
@@ -773,7 +783,6 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
                 {shelfFloors.map(floor => <button type="button" key={floor} className={shelfFloor === floor ? 'is-active' : ''} onClick={() => setShelfFloor(floor)}>Tầng {floor} <span>{locations.filter(location => location.name.match(/^Tầng\s+(.+?)\s+·/i)?.[1] === floor).length}</span></button>)}
               </div>
             </div>
-            {restockAlerts.length > 0 && <section className="lib-copies-restock-alerts" aria-label="Sách cần đưa lên kệ"><strong>Cần đưa sách trong kho lên kệ</strong><p>Các đầu sách này chưa còn cuốn sẵn sàng trên kệ nhưng vẫn có cuốn trong kho.</p>{restockAlerts.map((alert) => <div key={alert.id}><span><b>{alert.title}</b><small>Còn {alert.inWarehouse} cuốn trong kho</small></span><button type="button" onClick={() => { setSelectedCopyBook(null); setSelectedCopyIds([]); setCopyBookSearch(alert.title); setCopyBookCategory(''); setSelectedLocation('__warehouse__'); setPage(1); setTab('copies'); }}>Xem sách trong kho</button></div>)}</section>}
             {visibleShelves.length ? visibleShelves.map((location) => (
               <article className="lib-copies-shelf-card" key={location.id}>
                 <button type="button" className="lib-copies-shelf-open" aria-label={`Xem ${location.bookCount} đầu sách trên ${location.name}`} onClick={() => { setSelectedShelf(location); setSelectedShelfBook(null); setShelfBookGroups([]); setShelfBooksLoading(true); }}>
@@ -791,7 +800,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
       {intakeOpen && (
         <div className="lib-copies-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setIntakeOpen(false); }}>
           <form className="lib-copies-modal" onSubmit={handleIntake} role="dialog" aria-modal="true" aria-labelledby="lib-copy-intake-title">
-            <header><div><span><PackagePlus size={19} /></span><div><h2 id="lib-copy-intake-title">Nhập bản sao sách</h2><p>Chọn đầu sách đã biên mục để tạo mã riêng cho từng cuốn.</p></div></div><button type="button" onClick={() => setIntakeOpen(false)} aria-label="Đóng"><X size={19} /></button></header>
+            <header><div><span><PackagePlus size={19} /></span><div><h2 id="lib-copy-intake-title">Nhập sách vào kho</h2><p>Tạo mã riêng cho từng cuốn, sau đó chọn số bản đặt lên kệ; các bản còn lại được lưu trong kho.</p></div></div><button type="button" onClick={() => setIntakeOpen(false)} aria-label="Đóng"><X size={19} /></button></header>
             <label className="lib-copies-field">Tìm đầu sách
               <input value={bookSearch} onChange={(event) => setBookSearch(event.target.value)} placeholder="Nhập tên sách hoặc ISBN..." />
             </label>
@@ -812,7 +821,7 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
                 </select>
               </label>
             </div>
-            <label className="lib-copies-field">Kệ / Vị trí lưu trữ
+            <div className="lib-copies-field"><span>Kệ nhận sách (có thể để toàn bộ trong kho)</span>
               <select value={intakeLocation} onChange={(event) => { setIntakeLocation(event.target.value); if (!event.target.value) setShelfQuantity(0); else setShelfQuantity(Math.min(quantity, locations.find((location) => location.name === event.target.value)?.availableCapacity ?? 0)); }}>
                 <option value="">Để toàn bộ trong kho</option>
                 {locations.filter(location => location.availableCapacity > 0 || location.name === intakeLocation).map((location) => <option key={location.id} value={location.name}>{location.name} · {location.copyCount}/{location.capacity} chỗ · còn {location.availableCapacity}</option>)}
@@ -821,8 +830,8 @@ const LibrarianCopiesPage: React.FC<LibrarianCopiesPageProps> = ({ embedded = fa
                 <input type="number" min={0} max={quantity} value={shelfQuantity} onChange={(event) => setShelfQuantity(Number(event.target.value))} />
                 <small>Kệ còn {locations.find(item => item.name === intakeLocation)?.availableCapacity ?? 0} chỗ; đang chọn {shelfQuantity} bản lên kệ và {Math.max(0, quantity - shelfQuantity)} bản vào kho.</small>
               </label>}
-              <small>Bản sao trong kho chưa thể cho mượn; thủ thư cần chuyển lên kệ để độc giả có thể mượn.</small>
-            </label>
+              <small>Bản sao để trong kho chưa thể cho mượn. Thủ thư có thể xếp lên kệ sau.</small>
+            </div>
             <aside className="lib-copies-intake-note">Mỗi cuốn sẽ có ID và mã vạch riêng nhưng vẫn liên kết về cùng đầu sách gốc và danh mục hiện có. Chức năng này không tạo đầu sách trùng.</aside>
             <footer><button type="button" onClick={() => setIntakeOpen(false)}>Hủy</button><button type="submit" disabled={saving || !intakeBookId || shelfQuantity > quantity || (shelfQuantity > 0 && (intakeCondition === 'Damaged' || intakeCondition === 'Lost')) || shelfQuantity > (locations.find(item => item.name === intakeLocation)?.availableCapacity ?? 0)}><PackagePlus size={16} />{saving ? 'Đang nhập...' : 'Tạo các bản sao'}</button></footer>
           </form>

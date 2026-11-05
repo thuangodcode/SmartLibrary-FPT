@@ -178,7 +178,7 @@ const LibrarianCreateCategoryPage: React.FC = () => {
         <div className="lib-create-cat-breadcrumb">
           <span>Thủ thư</span>
           <span>/</span>
-          <span>Sách & Biên mục</span>
+          <span>Quản lý sách</span>
           <span>/</span>
           <strong>Thêm danh mục mới</strong>
         </div>

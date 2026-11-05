@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import HomePage from './features/home/pages/HomePage';
 import HomeCatalogPage from './features/home/pages/HomeCatalogPage';
 import BookDetailPage from './features/home/pages/BookDetailPage';
@@ -23,6 +23,7 @@ import LibrarianModulePage from './features/librarian/pages/LibrarianModulePage'
 import LibrarianAiPage from './features/librarian/pages/LibrarianAiPage';
 import AdminAiSettingsPage from './features/admin/pages/AdminAiSettingsPage';
 import LibrarianCategoriesPage from './features/librarian/pages/LibrarianCategoriesPage';
+import LibrarianCopiesPage from './features/librarian/pages/LibrarianCopiesPage';
 import LibrarianCreateCategoryPage from './features/librarian/pages/LibrarianCreateCategoryPage';
 import LibrarianCategoryBooksPage from './features/librarian/pages/LibrarianCategoryBooksPage';
 import LibrarianBookDetailPage from './features/librarian/pages/LibrarianBookDetailPage';
@@ -54,6 +55,13 @@ function ProfileEntry() {
   if (role === 'Admin') return <Navigate to="/admin/profile" replace />;
   if (role === 'Librarian') return <Navigate to="/librarian/profile" replace />;
   return <ProfilePage />;
+}
+
+function LibrarianBooksEntry() {
+  const [searchParams] = useSearchParams();
+  return searchParams.get('view') === 'copies'
+    ? <Navigate to="/librarian/books/copies" replace />
+    : <LibrarianCategoriesPage />;
 }
 
 function App() {
@@ -113,12 +121,13 @@ function App() {
         <Route path="registrations" element={<RegistrationApprovalPage />} />
         <Route path="readers" element={<ReadersManagementPage />} />
         <Route path="readers/:userId" element={<AdminUserDetailPage audience="librarian" />} />
-        <Route path="books" element={<LibrarianCategoriesPage />} />
+        <Route path="books" element={<LibrarianBooksEntry />} />
+        <Route path="books/copies" element={<LibrarianCopiesPage />} />
         <Route path="books/categories/new" element={<LibrarianCreateCategoryPage />} />
         <Route path="books/categories/:categoryId" element={<LibrarianCategoryBooksPage />} />
         <Route path="books/categories/:categoryId/add" element={<LibrarianCategoryBooksPage />} />
         <Route path="books/:bookId" element={<LibrarianBookDetailPage />} />
-        <Route path="copies" element={<Navigate to="/librarian/books?view=copies" replace />} />
+        <Route path="copies" element={<Navigate to="/librarian/books/copies" replace />} />
         <Route path="loans" element={<LibrarianModulePage />} />
         <Route path="fines" element={<LibrarianModulePage />} />
         <Route path="ai-settings" element={<LibrarianAiPage />} />

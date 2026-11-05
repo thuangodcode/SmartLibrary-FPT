@@ -790,7 +790,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
         <div className="lib-cat-books-breadcrumb">
           <span>Thủ thư</span>
           <span>/</span>
-          <span>Sách & Biên mục</span>
+          <span>Quản lý sách</span>
           <span>/</span>
           <strong>{category?.name || 'Chi tiết danh mục'}</strong>
         </div>

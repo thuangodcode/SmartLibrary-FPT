@@ -15,13 +15,6 @@
   background: linear-gradient(115deg, #fff 55%, #fff5ed);
 }
 
-.lib-copies-page--embedded .lib-copies-heading {
-  justify-content: flex-end;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
 .lib-copies-heading h1 {
   margin: 9px 0 6px;
   color: #172033;
@@ -287,7 +280,7 @@
 .lib-copies-error { display: flex; align-items: center; gap: 12px; padding: 12px 16px; color: #b42318; font-size: 12px; }
 .lib-copies-error button { margin-left: auto; border: 0; background: transparent; color: #b42318; font-weight: 700; cursor: pointer; }
 
-.lib-copies-location-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; padding: 16px; }
+.lib-copies-location-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; padding: 20px; }
 .lib-copies-shelf-actions { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 4px 2px 10px; }
 .lib-copies-shelf-actions > div { display: grid; gap: 4px; }
 .lib-copies-shelf-actions strong { color: #263247; font-size: 15px; }
@@ -324,13 +317,35 @@
 .lib-copies-shelf-delete { color: #b42318; }
 .lib-copies-shelf-delete:hover:not(:disabled) { border-color: #fda29b; background: #fff5f4; }
 .lib-copies-shelf-delete:disabled { color: #98a2b3; cursor: not-allowed; opacity: .7; }
-.lib-copies-sorting { display: grid; gap: 18px; padding: 20px; }
+.lib-copies-sorting { display: grid; gap: 18px; padding: 22px; }
 .lib-copies-sorting-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .lib-copies-sorting-heading > div { display: grid; gap: 5px; }
 .lib-copies-sorting-heading strong { color: #263247; font-size: 17px; }
 .lib-copies-sorting-heading p { margin: 0; color: #667085; font-size: 13px; line-height: 1.5; }
 .lib-copies-sorting-heading .lib-copies-search { width: min(100%, 390px); }
 .lib-copies-sorting-book { max-width: 600px; margin-top: 0; }
+.lib-copies-warehouse-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.lib-copies-warehouse-summary article { display: grid; gap: 7px; border: 1px solid #e8ecf3; border-radius: 11px; background: #fbfcfd; padding: 14px 16px; }
+.lib-copies-warehouse-summary span { color: #667085; font-size: 12px; font-weight: 650; }
+.lib-copies-warehouse-summary strong { color: #263247; font-size: 22px; }
+.lib-copies-warehouse-list { display: grid; gap: 9px; }
+.lib-copies-warehouse-list > article { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(150px, auto) auto; align-items: center; gap: 16px; border: 1px solid #e4e9f0; border-radius: 12px; background: #fff; padding: 14px 16px; }
+.lib-copies-warehouse-book { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.lib-copies-warehouse-book > span:last-child { display: grid; gap: 4px; min-width: 0; }
+.lib-copies-warehouse-book strong { overflow: hidden; color: #263247; font-size: 14px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.lib-copies-warehouse-book small { color: #667085; font-size: 11px; }
+.lib-copies-warehouse-counts { display: flex; justify-content: center; gap: 18px; }
+.lib-copies-warehouse-counts span { display: grid; justify-items: center; gap: 2px; }
+.lib-copies-warehouse-counts strong { color: #263247; font-size: 17px; }
+.lib-copies-warehouse-counts small { color: #667085; font-size: 10px; }
+.lib-copies-warehouse-list > article > button { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 6px; border: 1px solid #f0a174; border-radius: 9px; background: #fff8f3; padding: 0 11px; color: #b54708; font-size: 11px; font-weight: 750; white-space: nowrap; cursor: pointer; }
+.lib-copies-warehouse-list > article > button:hover { background: #fff0e5; }
+.lib-copies-warehouse-detail-heading { display: grid; gap: 12px; border: 1px solid #f1d2bd; border-radius: 12px; background: linear-gradient(120deg, #fff8f3, #fff); padding: 16px; }
+.lib-copies-warehouse-detail-heading > button { justify-self: start; }
+.lib-copies-warehouse-detail-heading > div { display: grid; gap: 4px; }
+.lib-copies-warehouse-detail-heading small { color: #b54708; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.lib-copies-warehouse-detail-heading h3 { margin: 0; color: #263247; font-size: 18px; }
+.lib-copies-warehouse-detail-heading span { color: #667085; font-size: 12px; }
 .lib-copies-sorting-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .lib-copies-sorting-stats article { display: grid; gap: 7px; border: 1px solid #e8ecf3; border-radius: 11px; background: #fbfcfd; padding: 14px 16px; }
 .lib-copies-sorting-stats span { color: #667085; font-size: 12px; font-weight: 600; }
@@ -436,7 +451,6 @@
 
 @media (max-width: 600px) {
   .lib-copies-heading { align-items: flex-start; flex-direction: column; padding: 20px; }
-  .lib-copies-page--embedded .lib-copies-heading { align-items: stretch; padding: 0; }
   .lib-copies-primary { width: 100%; }
   .lib-copies-metrics { gap: 9px; }
   .lib-copies-metrics article { min-height: 92px; grid-template-columns: 34px 1fr; column-gap: 8px; padding: 11px; }
@@ -453,10 +467,14 @@
   .lib-copies-form-row { grid-template-columns: 1fr; gap: 0; }
   .lib-copies-modal { padding: 18px; }
   .lib-copies-shelf-actions { align-items: stretch; flex-direction: column; }
-  .lib-copies-sorting { padding: 12px; }
+  .lib-copies-sorting { padding: 14px; }
   .lib-copies-sorting-heading { align-items: stretch; flex-direction: column; }
   .lib-copies-sorting-heading .lib-copies-search { width: 100%; }
-  .lib-copies-sorting-stats { grid-template-columns: 1fr; }
+  .lib-copies-sorting-stats,
+  .lib-copies-warehouse-summary { grid-template-columns: 1fr; }
+  .lib-copies-warehouse-list > article { align-items: stretch; grid-template-columns: 1fr; }
+  .lib-copies-warehouse-counts { justify-content: flex-start; }
+  .lib-copies-warehouse-counts span { justify-items: start; }
   .lib-copies-sorting-list > article { align-items: stretch; flex-direction: column; }
   .lib-copies-sorting-list select { width: 100%; }
   .lib-copies-book-group { grid-template-columns: 38px minmax(0, 1fr) 45px 16px; gap: 8px; padding: 10px; }

@@ -24,7 +24,7 @@ const resources = {
       shell: {
         adminOverview: 'Tổng quan', users: 'Quản lý người dùng', policies: 'Quản lý chính sách', regulations: 'Quản lý quy định',
         reports: 'Thống kê & báo cáo', aiSettings: 'Cấu hình AI', librarianOverview: 'Tổng quan',
-        services: 'Quản lý dịch vụ', books: 'Sách & Biên mục', approvals: 'Duyệt người đọc', readers: 'Độc giả',
+        services: 'Quản lý dịch vụ', books: 'Quản lý sách', bookCatalog: 'Danh mục đầu sách', bookCopies: 'Bản sao & kệ sách', approvals: 'Duyệt người đọc', readers: 'Độc giả',
         readerSupport: 'Hỗ trợ độc giả', news: 'Tin tức & Thông báo', librarianReports: 'Thống kê & báo cáo',
         librarianAi: 'Thiết lập AI nghiệp vụ', profile: 'Hồ sơ cá nhân', libraryManagement: 'Quản lý thư viện',
         updateApiKey: 'Cập nhật API Key', reportApproved: 'Báo cáo đã được duyệt', reportRevision: 'Admin yêu cầu chỉnh sửa',
@@ -58,7 +58,7 @@ const resources = {
       shell: {
         adminOverview: 'Overview', users: 'User management', policies: 'Policy management', regulations: 'Regulations',
         reports: 'Analytics & reports', aiSettings: 'AI settings', librarianOverview: 'Overview',
-        services: 'Library services', books: 'Books & cataloging', approvals: 'Reader approvals', readers: 'Readers',
+        services: 'Library services', books: 'Book management', bookCatalog: 'Book catalog', bookCopies: 'Copies and shelves', approvals: 'Reader approvals', readers: 'Readers',
         readerSupport: 'Reader support', news: 'News & announcements', librarianReports: 'Analytics & reports',
         librarianAi: 'AI operations settings', profile: 'Profile', libraryManagement: 'Library management',
         updateApiKey: 'Update API key', reportApproved: 'Report approved', reportRevision: 'Admin requested changes',

@@ -242,7 +242,7 @@ public class BookCopiesController : ControllerBase
             query = query.Where(book => book.Title.ToLower().Contains(term) || book.Code.ToLower().Contains(term));
         }
         var rows = await query.Where(book => book.InWarehouseCopies > 0)
-            .OrderBy(book => book.Title).Take(100).ToListAsync(ct);
+            .OrderBy(book => book.Title).ToListAsync(ct);
         return Ok(ApiResponse<object>.Ok(rows));
     }
 

@@ -46,10 +46,15 @@ const supportChildren = [
   { label: 'Phản hồi đơn', to: '/librarian/support/replies', icon: MessagesSquare, end: true },
 ];
 
+const bookChildren = [
+  { label: 'Danh mục đầu sách', to: '/librarian/books', icon: BookOpen, end: true },
+  { label: 'Bản sao & kệ sách', to: '/librarian/books/copies', icon: Bookmark, end: true },
+];
+
 const navigation = [
   { label: 'Tổng quan', to: '/librarian', icon: LayoutDashboard, end: true },
   { label: 'Quản lý dịch vụ', to: '/librarian/circulation', icon: RotateCcw, end: false, children: circulationChildren },
-  { label: 'Sách & Biên mục', to: '/librarian/books', icon: BookOpen, end: false },
+  { label: 'Quản lý sách', to: '/librarian/books', icon: BookOpen, end: false, children: bookChildren },
   { label: 'Duyệt người đọc', to: '/librarian/registrations', icon: FileCheck, end: false },
   { label: 'Độc giả', to: '/librarian/readers', icon: Users, end: false },
   { label: 'Hỗ trợ độc giả', to: '/librarian/support', icon: CircleHelp, end: false, children: supportChildren },
@@ -78,12 +83,13 @@ interface ReportDecisionNotice {
 export const LibrarianLayout: React.FC = () => {
   const { t } = useTranslation();
   const translatedLabels: Record<string, string> = {
-    'Tổng quan': 'shell.librarianOverview', 'Quản lý dịch vụ': 'shell.services', 'Sách & Biên mục': 'shell.books',
+    'Tổng quan': 'shell.librarianOverview', 'Quản lý dịch vụ': 'shell.services', 'Quản lý sách': 'shell.books',
     'Duyệt người đọc': 'shell.approvals', 'Độc giả': 'shell.readers', 'Hỗ trợ độc giả': 'shell.readerSupport',
     'Tin tức & Thông báo': 'shell.news', 'Thống kê & báo cáo': 'shell.librarianReports', 'Thiết lập AI nghiệp vụ': 'shell.librarianAi',
     'Mượn sách': 'shell.circulationLoans', 'Trả sách': 'shell.circulationReturn', 'Đặt chỗ': 'shell.reservations',
     'Quá hạn & Sự cố': 'shell.overdue', 'Phí phạt': 'shell.fines', 'Đơn tiếp nhận': 'shell.supportRequests',
     'Phản hồi đơn': 'shell.supportReplies', 'Hồ sơ cá nhân': 'shell.profile',
+    'Danh mục đầu sách': 'shell.bookCatalog', 'Bản sao & kệ sách': 'shell.bookCopies',
   };
   const translateLabel = (label: string) => translatedLabels[label] ? t(translatedLabels[label]) : label;
   const location = useLocation();
@@ -91,6 +97,7 @@ export const LibrarianLayout: React.FC = () => {
   const [railExpanded, setRailExpanded] = useState(false);
   const [hoverCapable, setHoverCapable] = useState(true);
   const [circulationOpen, setCirculationOpen] = useState(true);
+  const [booksOpen, setBooksOpen] = useState(() => location.pathname.startsWith('/librarian/books'));
   const [supportOpen, setSupportOpen] = useState(() => location.pathname.startsWith('/librarian/support'));
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const [decisionNotices, setDecisionNotices] = useState<ReportDecisionNotice[]>([]);
@@ -313,8 +320,9 @@ export const LibrarianLayout: React.FC = () => {
             const { label, to, icon: Icon, end, children } = item;
             const displayLabel = translateLabel(label);
             const isSupportGroup = to === '/librarian/support';
-            const groupOpen = isSupportGroup ? supportOpen : circulationOpen;
-            const setGroupOpen = isSupportGroup ? setSupportOpen : setCirculationOpen;
+            const isBookGroup = to === '/librarian/books';
+            const groupOpen = isSupportGroup ? supportOpen : isBookGroup ? booksOpen : circulationOpen;
+            const setGroupOpen = isSupportGroup ? setSupportOpen : isBookGroup ? setBooksOpen : setCirculationOpen;
             const groupActive = location.pathname.startsWith(to);
             return children ? (
               <div className="lib-nav-group" key={to}>
@@ -339,7 +347,10 @@ export const LibrarianLayout: React.FC = () => {
                       title={showTooltips ? translateLabel(child.label) : undefined}
                       data-tooltip={translateLabel(child.label)}
                       onClick={() => setSidebarOpen(false)}
-                      className={({ isActive }) => `lib-nav-link lib-nav-child${isActive ? ' lib-nav-link-active' : ''}`}
+                      className={({ isActive }) => {
+                        const isBookCatalogRoute = child.to === '/librarian/books' && location.pathname.startsWith('/librarian/books/categories');
+                        return `lib-nav-link lib-nav-child${isActive || isBookCatalogRoute ? ' lib-nav-link-active' : ''}`;
+                      }}
                     >
                       <child.icon size={16} strokeWidth={1.9} className="lib-nav-icon" />
                       <span className="lib-nav-label">{translateLabel(child.label)}</span>

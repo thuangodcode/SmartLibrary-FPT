@@ -9,7 +9,7 @@ import {
 
 const modules: Record<string, { title: string; description: string; icon: typeof BookOpen }> = {
   books: {
-    title: 'Sách & Biên mục',
+    title: 'Quản lý sách',
     description: 'Quản lý danh mục sách và thông tin biên mục.',
     icon: BookOpen,
   },
