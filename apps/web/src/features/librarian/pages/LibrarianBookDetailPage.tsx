@@ -41,6 +41,7 @@ export interface BookDetailData {
   averageRating: number;
   authorNames: string[];
   categoryNames: string[];
+  categoryIds?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -109,7 +110,7 @@ const LibrarianBookDetailPage: React.FC = () => {
   const [editLanguage, setEditLanguage] = useState('vi');
   const [editCustomLanguage, setEditCustomLanguage] = useState('');
   const [editTotalCopies, setEditTotalCopies] = useState(1);
-  const [editCategoryId, setEditCategoryId] = useState('');
+  const [editCategoryIds, setEditCategoryIds] = useState<string[]>([]);
   const [editDescription, setEditDescription] = useState('');
   const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
   const [editCoverPreview, setEditCoverPreview] = useState<string | null>(null);
@@ -221,11 +222,7 @@ const LibrarianBookDetailPage: React.FC = () => {
     setEditCoverPreview(book.coverImageUrl || null);
     setEditRemoveCover(false);
 
-    // Find category ID matching name if possible
-    if (book.categoryNames && book.categoryNames.length > 0) {
-      const matchedCat = categories.find((c) => c.name === book.categoryNames[0]);
-      if (matchedCat) setEditCategoryId(matchedCat.id);
-    }
+    setEditCategoryIds(book.categoryIds ?? categories.filter(c => book.categoryNames?.includes(c.name)).map(c => c.id));
 
     setIsEditModalOpen(true);
   };
@@ -284,7 +281,8 @@ const LibrarianBookDetailPage: React.FC = () => {
       }
       formData.append('Language', language);
       formData.append('TotalCopies', String(editTotalCopies));
-      if (editCategoryId) formData.append('CategoryId', editCategoryId);
+      if (editCategoryIds.length === 0) throw new Error('Vui lòng chọn ít nhất một danh mục.');
+      editCategoryIds.forEach(categoryId => formData.append('CategoryIds', categoryId));
       if (editDescription.trim()) formData.append('Description', editDescription.trim());
       if (editCoverFile) formData.append('CoverImage', editCoverFile);
       if (editRemoveCover) formData.append('RemoveCoverImage', 'true');
@@ -795,17 +793,7 @@ const LibrarianBookDetailPage: React.FC = () => {
 
               <div className="lib-cat-form-group">
                 <label>Danh mục sách</label>
-                <select
-                  value={editCategoryId}
-                  onChange={(e) => setEditCategoryId(e.target.value)}
-                >
-                  <option value="">-- Giữ nguyên danh mục hiện tại --</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                <fieldset className="lib-book-edit-category-picker"><legend>Danh m&#7909;c s&#225;ch <span>*</span></legend><p>Ch&#7885;n t&#7845;t c&#7843; danh m&#7909;c ph&#249; h&#7907;p v&#7899;i &#273;&#7847;u s&#225;ch n&#224;y.</p><div>{categories.map(category => <label key={category.id}><input type="checkbox" checked={editCategoryIds.includes(category.id)} onChange={event => setEditCategoryIds(current => event.target.checked ? [...current, category.id] : current.filter(id => id !== category.id))} /><span>{category.name}</span></label>)}</div>{editCategoryIds.length === 0 && <small>H&#227;y ch&#7885;n &#237;t nh&#7845;t m&#7897;t danh m&#7909;c &#273;&#7875; l&#432;u thay &#273;&#7893;i.</small>}</fieldset>
               </div>
 
               <div className="lib-cat-form-group">

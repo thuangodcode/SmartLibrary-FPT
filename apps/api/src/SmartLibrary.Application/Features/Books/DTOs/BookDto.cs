@@ -22,6 +22,7 @@ public class BookDto
     public int? BorrowCount { get; set; }
     public List<string> AuthorNames { get; set; } = new();
     public List<string> CategoryNames { get; set; } = new();
+    public List<Guid> CategoryIds { get; set; } = new();
     public List<string> CopyLocations { get; set; } = new();
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

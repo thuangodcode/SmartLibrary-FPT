@@ -161,4 +161,75 @@ public class BookServiceTests
         book.IsDeleted.Should().BeTrue(); // Soft delete
         _bookRepositoryMock.Verify(r => r.UpdateAsync(book, It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task CreateFromFormAsync_WithMultipleCategories_PersistsEveryCategory()
+    {
+        var first = new Category { Id = Guid.NewGuid(), Name = "Ngôn ngữ" };
+        var second = new Category { Id = Guid.NewGuid(), Name = "Văn học" };
+        var categories = new Mock<IRepository<Category>>();
+        categories.Setup(repo => repo.GetByIdAsync(first.Id, It.IsAny<CancellationToken>())).ReturnsAsync(first);
+        categories.Setup(repo => repo.GetByIdAsync(second.Id, It.IsAny<CancellationToken>())).ReturnsAsync(second);
+        _unitOfWorkMock.Setup(unit => unit.Repository<Category>()).Returns(categories.Object);
+        _bookRepositoryMock.Setup(repo => repo.IsCodeTakenAsync("MULTICAT", It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _bookRepositoryMock.Setup(repo => repo.AddAsync(It.IsAny<Book>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Book book, CancellationToken _) => book);
+        _unitOfWorkMock.Setup(unit => unit.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _sut.CreateFromFormAsync(new CreateBookForm
+        {
+            Code = "MULTICAT",
+            Title = "Language and Literature",
+            TotalCopies = 2,
+            CategoryIds = [first.Id, second.Id, first.Id]
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.CategoryIds.Should().BeEquivalentTo(new[] { first.Id, second.Id });
+        result.Data.CategoryNames.Should().BeEquivalentTo(new[] { first.Name, second.Name });
+        _unitOfWorkMock.Verify(unit => unit.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateFromFormAsync_WithoutCategories_FailsBeforePersisting()
+    {
+        _bookRepositoryMock.Setup(repo => repo.IsCodeTakenAsync("NOCATEGORY", It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        var result = await _sut.CreateFromFormAsync(new CreateBookForm
+        {
+            Code = "NOCATEGORY",
+            Title = "Uncategorized book",
+            TotalCopies = 1
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        _bookRepositoryMock.Verify(repo => repo.AddAsync(It.IsAny<Book>(), It.IsAny<CancellationToken>()), Times.Never);
+        _unitOfWorkMock.Verify(unit => unit.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ReplacesCategoriesWithRequestedSet()
+    {
+        var first = new Category { Id = Guid.NewGuid(), Name = "Ngôn ngữ" };
+        var second = new Category { Id = Guid.NewGuid(), Name = "Văn học" };
+        var previous = new Category { Id = Guid.NewGuid(), Name = "Khoa học" };
+        var book = new Book { Id = Guid.NewGuid(), Code = "UPDATEME", Title = "Old title", Categories = [previous] };
+        var categories = new Mock<IRepository<Category>>();
+        categories.Setup(repo => repo.GetByIdAsync(first.Id, It.IsAny<CancellationToken>())).ReturnsAsync(first);
+        categories.Setup(repo => repo.GetByIdAsync(second.Id, It.IsAny<CancellationToken>())).ReturnsAsync(second);
+        _unitOfWorkMock.Setup(unit => unit.Repository<Category>()).Returns(categories.Object);
+        _bookRepositoryMock.Setup(repo => repo.GetWithDetailsAsync(book.Id, It.IsAny<CancellationToken>())).ReturnsAsync(book);
+        _bookRepositoryMock.Setup(repo => repo.UpdateAsync(book, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _unitOfWorkMock.Setup(unit => unit.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _sut.UpdateAsync(book.Id, new UpdateBookRequest
+        {
+            Title = "Updated title",
+            CategoryIds = [first.Id, second.Id]
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        book.Categories.Select(category => category.Id).Should().BeEquivalentTo(new[] { first.Id, second.Id });
+        result.Data!.CategoryNames.Should().BeEquivalentTo(new[] { first.Name, second.Name });
+    }
 }

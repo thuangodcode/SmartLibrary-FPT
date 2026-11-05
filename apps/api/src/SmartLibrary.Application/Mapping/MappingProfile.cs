@@ -15,6 +15,7 @@ public class MappingProfile : Profile
         CreateMap<Book, BookDto>()
             .ForMember(dest => dest.AuthorNames, opt => opt.MapFrom(src => src.Authors.Select(a => a.Name).ToList()))
             .ForMember(dest => dest.CategoryNames, opt => opt.MapFrom(src => src.Categories.Select(c => c.Name).ToList()))
+            .ForMember(dest => dest.CategoryIds, opt => opt.MapFrom(src => src.Categories.Select(c => c.Id).ToList()))
             .ForMember(dest => dest.CopyLocations, opt => opt.MapFrom(src => src.Copies
                 .Where(copy => !copy.IsDeleted && copy.Location != null && copy.Location != "")
                 .Select(copy => copy.Location!)

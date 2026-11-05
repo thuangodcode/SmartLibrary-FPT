@@ -156,7 +156,7 @@ const LibrarianCopiesPage: React.FC = () => {
   const [newBookIsbn, setNewBookIsbn] = useState('');
   const [newBookYear, setNewBookYear] = useState('');
   const [newBookLanguage, setNewBookLanguage] = useState('vi');
-  const [newBookCategoryId, setNewBookCategoryId] = useState('');
+  const [newBookCategoryIds, setNewBookCategoryIds] = useState<string[]>([]);
   const [newBookQuantity, setNewBookQuantity] = useState(1);
   const [newBookDescription, setNewBookDescription] = useState('');
   const [newBookCover, setNewBookCover] = useState<File | null>(null);
@@ -396,12 +396,11 @@ const LibrarianCopiesPage: React.FC = () => {
   useEffect(() => {
     const code = newBookCode.trim();
     if (!newBookOpen || !code || !/^[a-zA-Z0-9]{1,32}$/.test(code)) {
-      setNewBookCodeState(code ? 'idle' : 'idle');
       return;
     }
     let cancelled = false;
-    setNewBookCodeState('checking');
     const timer = window.setTimeout(async () => {
+      if (!cancelled) setNewBookCodeState('checking');
       try {
         const params = new URLSearchParams({ code });
         const response = await fetch(`${API_BASE_URL}/api/v1/books/code-availability?${params}`, { headers });
@@ -479,7 +478,7 @@ const LibrarianCopiesPage: React.FC = () => {
   const handleCreateAndIntakeBook = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const code = newBookCode.trim();
-    if (!newBookTitle.trim() || !newBookCategoryId || !/^[a-zA-Z0-9]{1,32}$/.test(code) || newBookCodeState !== 'available') return;
+    if (!newBookTitle.trim() || newBookCategoryIds.length === 0 || !/^[a-zA-Z0-9]{1,32}$/.test(code) || newBookCodeState !== 'available') return;
     if (newBookQuantity < 1 || newBookQuantity > 500) return;
     setSaving(true);
     try {
@@ -492,14 +491,14 @@ const LibrarianCopiesPage: React.FC = () => {
       body.append('Language', newBookLanguage);
       body.append('TotalCopies', String(newBookQuantity));
       body.append('ShelfQuantity', '0');
-      body.append('CategoryId', newBookCategoryId);
+      newBookCategoryIds.forEach(categoryId => body.append('CategoryIds', categoryId));
       if (newBookDescription.trim()) body.append('Description', newBookDescription.trim());
       if (newBookCover) body.append('CoverImage', newBookCover);
       const response = await fetch(`${API_BASE_URL}/api/v1/books/form`, { method: 'POST', headers, body });
       const result = await parseApiResponse<Envelope<{ id: string; title: string }>>(response);
       if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể tạo đầu sách và nhập vào kho.');
       showToast({ type: 'success', title: 'Đã nhập đầu sách mới', message: `Đã tạo “${newBookTitle.trim()}” cùng ${newBookQuantity} bản sao trong kho.` });
-      setNewBookTitle(''); setNewBookCode(''); setNewBookCodeState('idle'); setNewBookAuthor(''); setNewBookIsbn(''); setNewBookYear(''); setNewBookLanguage('vi'); setNewBookCategoryId(''); setNewBookQuantity(1); setNewBookDescription(''); setNewBookCover(null); setNewBookCoverPreview('');
+      setNewBookTitle(''); setNewBookCode(''); setNewBookCodeState('idle'); setNewBookAuthor(''); setNewBookIsbn(''); setNewBookYear(''); setNewBookLanguage('vi'); setNewBookCategoryIds([]); setNewBookQuantity(1); setNewBookDescription(''); setNewBookCover(null); setNewBookCoverPreview('');
       closeNewBookForm();
       setTab('sorting');
       await refreshData();
@@ -888,7 +887,7 @@ const LibrarianCopiesPage: React.FC = () => {
       {newBookOpen && (
         <div className="lib-copies-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeNewBookForm(); }}>
           <form className="lib-copies-modal lib-copies-new-book-modal" onSubmit={handleCreateAndIntakeBook} role="dialog" aria-modal="true" aria-labelledby="lib-copy-new-book-title">
-            <header><div><span><BookCopy size={19} /></span><div><h2 id="lib-copy-new-book-title">Tạo đầu sách mới và nhập kho</h2><p>Điền thông tin sách và số bản nhận về. Tất cả bản sao sẽ được lưu trong kho trước.</p></div></div><button type="button" onClick={closeNewBookForm} aria-label="Đóng"><X size={19} /></button></header>
+            <header><div><span><BookCopy size={19} /></span><div><h2 id="lib-copy-new-book-title">Tạo đầu sách mới và nhập kho</h2><p>Điền thông tin sách và số bản nhận về. Tất cả bản sao sẽ được lưu trong kho trước.</p></div></div><button type="button" className="lib-copies-modal-back" onClick={closeNewBookForm}><ChevronLeft size={16} /> Quay lại</button></header>
             <label className="lib-copies-field">Tên sách <b>*</b><input value={newBookTitle} onChange={event => setNewBookTitle(event.target.value)} placeholder="Ví dụ: Lập trình C# căn bản" required /></label>
             <div className="lib-copies-form-row">
               <label className="lib-copies-field">Mã sách <b>*</b><input value={newBookCode} onChange={event => { setNewBookCode(event.target.value); setNewBookCodeState('idle'); }} maxLength={32} pattern="[A-Za-z0-9]{1,32}" placeholder="Ví dụ: PY01" required /><small>{newBookCodeState === 'checking' ? 'Đang kiểm tra mã...' : newBookCodeState === 'available' ? 'Mã sách có thể sử dụng.' : newBookCodeState === 'taken' ? 'Mã đã được sử dụng, hãy chọn mã khác.' : newBookCodeState === 'error' ? 'Không kiểm tra được mã sách. Hãy thử lại.' : 'Dùng chữ cái và chữ số, tối đa 32 ký tự.'}</small></label>
@@ -902,11 +901,11 @@ const LibrarianCopiesPage: React.FC = () => {
               <label className="lib-copies-field">Số lượng bản sao <b>*</b><input type="number" min={1} max={500} value={newBookQuantity} onChange={event => setNewBookQuantity(Number(event.target.value))} required /><small>Hệ thống tự tạo mã vạch riêng cho từng bản.</small></label>
               <label className="lib-copies-field">Ngôn ngữ<select value={newBookLanguage} onChange={event => setNewBookLanguage(event.target.value)}><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option><option value="ja">Tiếng Nhật</option><option value="ko">Tiếng Hàn</option></select></label>
             </div>
-            <label className="lib-copies-field">Danh mục <b>*</b><select value={newBookCategoryId} onChange={event => setNewBookCategoryId(event.target.value)} required><option value="">Chọn danh mục</option>{categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+            <fieldset className="lib-copies-category-picker"><legend>Danh mục <b>*</b></legend><p>Chọn một hoặc nhiều danh mục phù hợp với cuốn sách.</p><div>{categories.map(category => <label key={category.id}><input type="checkbox" checked={newBookCategoryIds.includes(category.id)} onChange={event => setNewBookCategoryIds(current => event.target.checked ? [...current, category.id] : current.filter(id => id !== category.id))} /><span>{category.name}</span></label>)}</div></fieldset>
             <label className="lib-copies-field">Mô tả<textarea rows={3} value={newBookDescription} onChange={event => setNewBookDescription(event.target.value)} placeholder="Tóm tắt nội dung sách hoặc ghi chú..." /></label>
             <label className="lib-copies-field">Ảnh bìa sách<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={event => { const file = event.target.files?.[0]; if (!file) return; if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 10 * 1024 * 1024) { showToast({ type: 'error', title: 'Ảnh không hợp lệ', message: 'Chọn ảnh JPG, PNG, WEBP hoặc GIF có dung lượng tối đa 10 MB.' }); event.target.value = ''; return; } setNewBookCover(file); setNewBookCoverPreview(URL.createObjectURL(file)); }} /><small>JPG, PNG, WEBP hoặc GIF · tối đa 10 MB</small>{newBookCoverPreview && <img className="lib-copies-new-book-cover" src={newBookCoverPreview} alt="Ảnh bìa xem trước" />}</label>
             <aside className="lib-copies-intake-note">Nhập kho trước: sách chưa lên kệ sẽ chưa thể cho mượn. Sau khi nhận sách, vào danh sách kho để sắp xếp từng bản sao lên kệ.</aside>
-            <footer><button type="button" onClick={closeNewBookForm}>Hủy</button><button type="submit" disabled={saving || newBookCodeState !== 'available' || !newBookCategoryId || newBookQuantity < 1 || newBookQuantity > 500}>{saving ? 'Đang nhập...' : 'Tạo đầu sách và nhập kho'}</button></footer>
+            <footer><button type="button" onClick={closeNewBookForm}>Hủy</button><button type="submit" disabled={saving || newBookCodeState !== 'available' || newBookCategoryIds.length === 0 || newBookQuantity < 1 || newBookQuantity > 500}>{saving ? 'Đang nhập...' : 'Tạo đầu sách và nhập kho'}</button></footer>
           </form>
         </div>
       )}

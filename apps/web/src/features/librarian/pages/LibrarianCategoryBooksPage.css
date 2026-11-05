@@ -1024,10 +1024,17 @@
 .lib-cat-add-book-card { width: min(100%, 1180px); margin: 0 auto; border: 1px solid #e6ebf2; border-radius: 20px; background: #fff; padding: clamp(28px, 4vw, 48px); box-shadow: 0 22px 60px rgb(15 23 42 / 9%); }
 .lib-cat-add-book-card .lib-cat-modal-header { border-bottom: 1px solid #edf1f5; padding-bottom: 20px; }
 .lib-cat-add-book-card .lib-cat-modal-header h3 { font-size: clamp(20px, 3vw, 26px); }
+.lib-cat-add-book-context { display: grid; gap: 4px; margin: 18px 0 0; border: 1px solid #f4d5c3; border-radius: 12px; background: linear-gradient(110deg, #fff8f3, #fff); padding: 13px 16px; }
+.lib-cat-add-book-context > span { color: #b54708; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.lib-cat-add-book-context > strong { color: #263247; font-size: 15px; }
+.lib-cat-add-book-context > small { color: #667085; font-size: 12px; line-height: 1.45; }
 .lib-cat-add-book-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 20px 0 4px; }
 .lib-cat-add-book-toolbar p { margin: 0; color: #64748b; font-size: 13px; }
 .lib-cat-existing-search { display: flex; min-height: 44px; flex: 1; align-items: center; gap: 10px; border: 1px solid #d8e0eb; border-radius: 10px; background: #fff; padding: 0 12px; color: #718096; }
 .lib-cat-existing-search input { width: 100%; border: 0; outline: 0; background: transparent; color: #263247; font: inherit; }
+.lib-cat-existing-category-filter { width: min(240px, 25%); min-height: 44px; border: 1px solid #d8e0eb; border-radius: 10px; background: #fff; padding: 0 12px; color: #344054; font: inherit; font-weight: 600; }
+.lib-cat-add-back { display: inline-flex; min-height: 38px; align-items: center; gap: 7px; border: 1px solid #dfe4ec; border-radius: 9px; background: #fff; padding: 0 12px; color: #344054; font-size: 13px; font-weight: 700; cursor: pointer; }
+.lib-cat-add-back:hover { border-color: #f0a174; background: #fff8f3; color: #b54708; }
 .lib-cat-existing-books { display: grid; gap: 9px; margin-top: 16px; }
 .lib-cat-existing-books article { display: flex; align-items: center; gap: 13px; border: 1px solid #e3e9f1; border-radius: 12px; background: #fff; padding: 11px 13px; }
 .lib-cat-existing-cover { display: grid; width: 48px; height: 56px; flex: 0 0 auto; place-items: center; overflow: hidden; border-radius: 7px; background: #fff2e9; color: #e9621b; }
@@ -1041,6 +1048,9 @@
 .lib-cat-existing-empty { display: grid; justify-items: center; gap: 8px; padding: 52px 16px; color: #7a8495; text-align: center; }
 .lib-cat-existing-empty strong { color: #344054; font-size: 15px; }
 .lib-cat-existing-empty span { font-size: 12px; }
+.lib-cat-existing-empty button { min-height: 38px; border: 1px solid #f0a174; border-radius: 9px; background: #fff8f3; padding: 0 14px; color: #b54708; font-size: 12px; font-weight: 700; cursor: pointer; }
+.lib-cat-existing-spinner { width: 28px; height: 28px; border: 3px solid #fde5d5; border-top-color: #e9621b; border-radius: 50%; animation: lib-cat-existing-spin .8s linear infinite; }
+@keyframes lib-cat-existing-spin { to { transform: rotate(360deg); } }
 .lib-cat-manage-fields-button { display: inline-flex; min-height: 42px; flex: 0 0 auto; align-items: center; gap: 8px; border: 1px solid #fed7aa; border-radius: 10px; background: #fff7ed; padding: 0 14px; color: #c2410c; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
 .lib-cat-manage-fields-button:hover { border-color: #fdba74; background: #ffedd5; }
 .lib-cat-add-book-card .lib-cat-book-form { gap: 20px; }
@@ -1074,6 +1084,7 @@
   .lib-cat-add-book-card { padding: 20px 16px; }
   .lib-cat-add-book-card .lib-cat-modal-actions { bottom: -20px; margin: 8px -16px -20px; padding: 14px 16px; }
   .lib-cat-add-book-toolbar { align-items: stretch; flex-direction: column; }
+  .lib-cat-existing-category-filter { width: 100%; }
   .lib-cat-manage-fields-button { justify-content: center; }
   .lib-cat-field-config-modal { padding: 20px 16px; }
   .lib-cat-field-config-list { grid-template-columns: 1fr; }

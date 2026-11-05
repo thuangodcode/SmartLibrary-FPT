@@ -386,12 +386,22 @@
 .lib-copies-modal header p { margin: 5px 0 0; color: #7a8495; font-size: 11px; line-height: 1.5; }
 .lib-copies-modal > header > button { display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 8px; background: transparent; color: #778196; cursor: pointer; }
 .lib-copies-modal > header > button:hover { background: #f3f5f8; }
+.lib-copies-modal > header > .lib-copies-modal-back { display: inline-flex; width: auto; min-height: 36px; align-items: center; gap: 5px; border: 1px solid #dfe4ec; background: #fff; padding: 0 11px; color: #344054; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.lib-copies-modal > header > .lib-copies-modal-back:hover { border-color: #f0a174; background: #fff8f3; color: #b54708; }
 .lib-copies-field { display: grid; gap: 7px; margin-top: 14px; color: #475467; font-size: 12px; font-weight: 650; }
 .lib-copies-field input,
 .lib-copies-field select { width: 100%; min-height: 42px; border: 1px solid #dfe4ec; border-radius: 9px; outline: none; background: #fff; padding: 0 11px; color: #344054; font: inherit; font-size: 12px; }
 .lib-copies-field input:focus,
 .lib-copies-field select:focus { border-color: #e9621b; box-shadow: 0 0 0 3px rgb(233 98 27 / 11%); }
 .lib-copies-field > small { color: #8a94a5; font-size: 10px; font-weight: 400; }
+.lib-copies-category-picker { min-width: 0; margin: 16px 0 0; border: 1px solid #dfe4ec; border-radius: 10px; padding: 12px; }
+.lib-copies-category-picker legend { padding: 0 5px; color: #475467; font-size: 12px; font-weight: 700; }
+.lib-copies-category-picker legend b { color: #d92d20; }
+.lib-copies-category-picker > p { margin: 0 0 10px; color: #7a8495; font-size: 11px; }
+.lib-copies-category-picker > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; max-height: 170px; overflow-y: auto; }
+.lib-copies-category-picker label { display: flex; align-items: center; gap: 8px; min-height: 36px; border: 1px solid #e8ecf3; border-radius: 8px; padding: 0 9px; color: #344054; font-size: 12px; cursor: pointer; }
+.lib-copies-category-picker label:has(input:checked) { border-color: #f0a174; background: #fff8f3; color: #9a3412; }
+.lib-copies-category-picker input { accent-color: #e9621b; }
 .lib-copies-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .lib-copies-intake-note { margin-top: 16px; border: 1px solid #f4d6c5; border-radius: 10px; background: #fff9f5; padding: 12px; color: #875235; font-size: 11px; line-height: 1.55; }
 .lib-copies-modal > footer { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; }

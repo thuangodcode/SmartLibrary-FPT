@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Categories;
 using SmartLibrary.Application.Features.Categories.DTOs;
+using SmartLibrary.Application.Features.Books;
 using SmartLibrary.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,11 +14,13 @@ namespace SmartLibrary.Api.Controllers;
 public class CategoriesController : ControllerBase
 {
     private readonly CategoryService _categoryService;
+    private readonly BookService _bookService;
     private readonly AppDbContext _db;
 
-    public CategoriesController(CategoryService categoryService, AppDbContext db)
+    public CategoriesController(CategoryService categoryService, BookService bookService, AppDbContext db)
     {
         _categoryService = categoryService;
+        _bookService = bookService;
         _db = db;
     }
 
@@ -50,19 +53,11 @@ public class CategoriesController : ControllerBase
     [Authorize(Policy = "LibrarianOnly")]
     public async Task<IActionResult> AddExistingBook(Guid id, Guid bookId, CancellationToken ct = default)
     {
-        var category = await _db.Categories.FirstOrDefaultAsync(item => item.Id == id && !item.IsDeleted, ct);
-        if (category is null) return NotFound(ApiResponse<object>.Fail("Không tìm thấy danh mục."));
-
-        var book = await _db.Books.Include(item => item.Categories)
-            .FirstOrDefaultAsync(item => item.Id == bookId && !item.IsDeleted, ct);
-        if (book is null) return NotFound(ApiResponse<object>.Fail("Không tìm thấy đầu sách."));
-        if (book.Categories.Any(item => item.Id == category.Id))
-            return Conflict(ApiResponse<object>.Fail("Đầu sách đã có trong danh mục này."));
-
-        book.Categories.Add(category);
-        book.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
-        return Ok(ApiResponse<bool>.Ok(true));
+        var result = await _bookService.AddCategoryAsync(bookId, id, ct);
+        if (result.IsSuccess) return Ok(ApiResponse<bool>.Ok(true));
+        if (result.Error == Errors.NotFound)
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy đầu sách hoặc danh mục."));
+        return Conflict(ApiResponse<object>.Fail(result.Error!));
     }
 
     /// <summary>

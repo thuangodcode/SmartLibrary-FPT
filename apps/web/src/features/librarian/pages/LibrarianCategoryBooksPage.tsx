@@ -169,33 +169,68 @@ const LibrarianCategoryBooksPage: React.FC = () => {
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [existingBookSearch, setExistingBookSearch] = useState('');
+  const [existingBookCategoryFilter, setExistingBookCategoryFilter] = useState('');
   const [existingBooks, setExistingBooks] = useState<BookItem[]>([]);
+  const [existingBookCategories, setExistingBookCategories] = useState<CategoryItem[]>([]);
   const [existingBooksLoading, setExistingBooksLoading] = useState(false);
+  const [existingBooksError, setExistingBooksError] = useState<string | null>(null);
+  const [existingBooksRetry, setExistingBooksRetry] = useState(0);
   const [addingExistingBookId, setAddingExistingBookId] = useState<string | null>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredExistingBooks = existingBooks.filter(book =>
+    !existingBookCategoryFilter || book.categoryNames?.includes(existingBookCategories.find(item => item.id === existingBookCategoryFilter)?.name ?? '')
+  );
+
+  useEffect(() => {
+    if (!isAddBookRoute) return;
+    let cancelled = false;
+    const headers: Record<string, string> = {};
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    void fetch(`${API_BASE_URL}/api/v1/categories`, { headers })
+      .then(async response => {
+        const result = await parseApiResponse<{ success?: boolean; data?: CategoryItem[]; error?: string }>(response);
+        if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể tải danh mục sách.');
+        if (!cancelled) setExistingBookCategories(result.data ?? []);
+      })
+      .catch(caught => {
+        if (!cancelled) showToast({ type: 'error', title: 'Không thể tải danh mục', message: caught instanceof Error ? caught.message : 'Vui lòng thử lại.' });
+      });
+    return () => { cancelled = true; };
+  }, [accessToken, isAddBookRoute, showToast]);
 
   useEffect(() => {
     if (!isAddBookRoute) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setExistingBooksLoading(true);
+      setExistingBooksError(null);
       try {
-        const params = new URLSearchParams({ page: '1', pageSize: '100' });
-        if (existingBookSearch.trim()) params.set('search', existingBookSearch.trim());
         const headers: Record<string, string> = {};
         if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-        const response = await fetch(`${API_BASE_URL}/api/v1/books?${params}`, { headers });
-        const result = await parseApiResponse<{ success?: boolean; data?: BookItem[]; error?: string }>(response);
-        if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể tải danh sách đầu sách.');
-        if (!cancelled) setExistingBooks((result.data ?? []).filter(book => !book.categoryNames?.includes(category?.name ?? '')));
+        const allBooks: BookItem[] = [];
+        let page = 1;
+        let totalPages = 1;
+        do {
+          const params = new URLSearchParams({ page: String(page), pageSize: '100' });
+          if (existingBookSearch.trim()) params.set('search', existingBookSearch.trim());
+          const response = await fetch(`${API_BASE_URL}/api/v1/books?${params}`, { headers });
+          const result = await parseApiResponse<{ success?: boolean; data?: BookItem[]; error?: string; meta?: { totalPages?: number } }>(response);
+          if (!response.ok || !result?.success) throw new Error(result?.error || 'Unable to load the book list.');
+          allBooks.push(...(result.data ?? []));
+          totalPages = Math.max(1, result.meta?.totalPages ?? 1);
+          page += 1;
+        } while (page <= totalPages && page <= 100);
+        if (!cancelled) setExistingBooks(allBooks.filter(book => !book.categoryNames?.includes(category?.name ?? '')));
       } catch (caught) {
+        if (!cancelled) setExistingBooksError(caught instanceof Error ? caught.message : 'Vui lòng thử lại.');
         if (!cancelled) showToast({ type: 'error', title: 'Không thể tải đầu sách', message: caught instanceof Error ? caught.message : 'Vui lòng thử lại.' });
       } finally {
         if (!cancelled) setExistingBooksLoading(false);
       }
     }, 250);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [accessToken, category?.name, existingBookSearch, isAddBookRoute, showToast]);
+  }, [accessToken, category?.name, existingBookSearch, existingBooksRetry, isAddBookRoute, showToast]);
 
   const markInitialRequestComplete = (request: 'category' | 'books') => {
     initialRequestsRef.current[request] = true;
@@ -916,24 +951,29 @@ const LibrarianCategoryBooksPage: React.FC = () => {
             <div className="lib-cat-modal-header">
               <div className="lib-cat-modal-title-row">
                 <div className="lib-cat-modal-badge orange"><BookOpen size={14} /><span>CHỌN ĐẦU SÁCH CÓ SẴN</span></div>
-                <button type="button" className="lib-cat-modal-close" onClick={() => navigate(`/librarian/books/categories/${categoryId}`)} aria-label="Quay lại danh mục"><X size={18} /></button>
+                <button type="button" className="lib-cat-add-back" onClick={() => navigate(`/librarian/books/categories/${categoryId}`)}><ArrowLeft size={16} /> Quay lại</button>
               </div>
               <h3>Thêm đầu sách vào danh mục “{category?.name}”</h3>
               <p className="lib-cat-modal-subtitle">Chọn một đầu sách đã có trong thư viện. Muốn tạo đầu sách mới và nhập bản sao vào kho, hãy dùng chức năng Nhập sách tại Quản lý kho.</p>
             </div>
+            <div className="lib-cat-add-book-context"><span>Danh m&#7909;c &#273;ang m&#7903;</span><strong>{category?.name ?? '&#272;ang t&#7843;i danh m&#7909;c...'}</strong><small>Ch&#7885;n &#273;&#7847;u s&#225;ch c&#243; s&#7861;n &#273;&#7875; th&#234;m. C&#225;c danh m&#7909;c &#273;&#227; g&#225;n cho s&#225;ch s&#7869; &#273;&#432;&#7907;c gi&#7919; nguy&#234;n.</small></div>
             <div className="lib-cat-add-book-toolbar">
               <label className="lib-cat-existing-search"><Search size={17} /><input value={existingBookSearch} onChange={event => setExistingBookSearch(event.target.value)} placeholder="Tìm theo tên sách, mã sách hoặc ISBN..." /></label>
+              <select className="lib-cat-existing-category-filter" aria-label="Lọc theo danh mục" value={existingBookCategoryFilter} onChange={event => setExistingBookCategoryFilter(event.target.value)}>
+                <option value="">Tất cả danh mục</option>
+                {existingBookCategories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
               <button type="button" className="lib-cat-manage-fields-button" onClick={() => navigate('/librarian/books/copies?tab=sorting&newBook=1')}><Plus size={16} /> Tạo đầu sách mới</button>
             </div>
-            {existingBooksLoading ? <div className="lib-cat-existing-empty">Đang tải danh sách đầu sách...</div> : existingBooks.length ? (
+            {existingBooksError ? <div className="lib-cat-existing-empty"><AlertCircle size={28} /><strong>Ch&#432;a t&#7843;i &#273;&#432;&#7907;c danh s&#225;ch</strong><span>{existingBooksError}</span><button type="button" onClick={() => setExistingBooksRetry(value => value + 1)}>Th&#7917; l&#7841;i</button></div> : existingBooksLoading ? <div className="lib-cat-existing-empty">Đang tải danh sách đầu sách...</div> : filteredExistingBooks.length ? (
               <div className="lib-cat-existing-books">
-                {existingBooks.map(book => <article key={book.id}>
+                {filteredExistingBooks.map(book => <article key={book.id}>
                   <div className="lib-cat-existing-cover">{book.coverImageUrl ? <img src={book.coverImageUrl} alt="" /> : <BookOpen size={20} />}</div>
                   <div className="lib-cat-existing-info"><strong>{book.title}</strong><span>Mã {book.code}{book.authorNames?.length ? ` · ${book.authorNames.join(', ')}` : ''}</span><small>{book.totalCopies} bản sao · {book.categoryNames?.join(', ') || 'Chưa phân loại'}</small></div>
                   <button type="button" onClick={() => void handleAddExistingBook(book)} disabled={Boolean(addingExistingBookId)}>{addingExistingBookId === book.id ? 'Đang thêm...' : 'Thêm vào danh mục'}</button>
                 </article>)}
               </div>
-            ) : <div className="lib-cat-existing-empty"><BookOpen size={28} /><strong>{existingBookSearch.trim() ? 'Không tìm thấy đầu sách phù hợp' : 'Không còn đầu sách để thêm'}</strong><span>{existingBookSearch.trim() ? 'Thử tìm bằng từ khóa khác.' : 'Các đầu sách trong thư viện đã thuộc danh mục này hoặc chưa được tạo.'}</span></div>}
+            ) : <div className="lib-cat-existing-empty"><BookOpen size={28} /><strong>{existingBookSearch.trim() || existingBookCategoryFilter ? 'Không tìm thấy đầu sách phù hợp' : 'Không còn đầu sách để thêm'}</strong><span>{existingBookSearch.trim() || existingBookCategoryFilter ? 'Thử thay đổi từ khóa hoặc danh mục lọc.' : 'Các đầu sách trong thư viện đã thuộc danh mục này hoặc chưa được tạo.'}</span></div>}
           </section>
         </div>
       )}
