@@ -562,6 +562,20 @@ const LibrarianCopiesPage: React.FC = () => {
       if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể điều chuyển bản sao.');
       setTransferOpen(false); setSelectedCopyIds([]); setTransferLocations({});
       await refreshData();
+      if (selectedCopyBook) {
+        // The copy table is refreshed by refreshData, but its selected group is a
+        // separate snapshot. Reload the aggregate so on-shelf/warehouse counts
+        // immediately match the copies just moved.
+        const params = new URLSearchParams({ search: selectedCopyBook.code });
+        const groupsResponse = await fetch(`${API_BASE_URL}/api/v1/copies/book-groups?${params}`, { headers });
+        const groupsResult = await parseApiResponse<Envelope<BookCopyGroup[]>>(groupsResponse);
+        if (groupsResponse.ok && groupsResult?.success) {
+          const groups = groupsResult.data ?? [];
+          setBookGroups(groups);
+          const updatedBook = groups.find(book => book.id === selectedCopyBook.id);
+          if (updatedBook) setSelectedCopyBook(updatedBook);
+        }
+      }
       showToast({ type: 'success', title: 'Điều chuyển thành công', message: `Đã cập nhật ${result.data?.movedCopies ?? assignments.length} bản sao.` });
     } catch (caught) {
       showToast({ type: 'error', title: 'Điều chuyển thất bại', message: caught instanceof Error ? caught.message : 'Không thể điều chuyển bản sao.' });

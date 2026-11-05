@@ -341,7 +341,11 @@ public class BookCopiesController : ControllerBase
             return BadRequest(ApiResponse<object>.Fail("Một bản sao chỉ được khai báo một lần trong đợt điều chuyển."));
         await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         var copyIds = request.Assignments.Select(item => item.CopyId).ToArray();
-        var assignments = request.Assignments.ToDictionary(item => item.CopyId, item => item.Location?.Trim());
+        // The UI represents “Trong kho” with an empty select value. Persist that
+        // as SQL NULL so warehouse queries (Location == null) include the copy.
+        var assignments = request.Assignments.ToDictionary(
+            item => item.CopyId,
+            item => string.IsNullOrWhiteSpace(item.Location) ? null : item.Location.Trim());
         var targetNames = assignments.Values.Where(name => !string.IsNullOrWhiteSpace(name)).Distinct().ToArray();
         // Use a PostgreSQL array parameter here instead of a captured EF Contains
         // expression. This avoids provider evaluation failures on large selections.
