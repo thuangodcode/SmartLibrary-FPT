@@ -320,6 +320,7 @@
 .lib-copies-sorting { display: grid; gap: 18px; padding: 22px; }
 .lib-copies-sorting-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .lib-copies-sorting-heading > div { display: grid; gap: 5px; }
+.lib-copies-sorting-heading > div > .lib-copies-primary { justify-self: start; margin-top: 8px; }
 .lib-copies-sorting-heading strong { color: #263247; font-size: 17px; }
 .lib-copies-sorting-heading p { margin: 0; color: #667085; font-size: 13px; line-height: 1.5; }
 .lib-copies-sorting-heading .lib-copies-search { width: min(100%, 390px); }
@@ -351,7 +352,10 @@
 .lib-copies-sorting-stats span { color: #667085; font-size: 12px; font-weight: 600; }
 .lib-copies-sorting-stats strong { color: #263247; font-size: 22px; }
 .lib-copies-sorting-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #667085; font-size: 12px; }
+.lib-copies-sorting-actions { display: flex; align-items: center; gap: 8px; }
 .lib-copies-sorting-toolbar button { min-height: 38px; border: 1px solid #e9621b; border-radius: 8px; background: #e9621b; padding: 0 14px; color: #fff; font-weight: 700; cursor: pointer; }
+.lib-copies-sorting-toolbar button.is-secondary { border-color: #dfe4ec; background: #fff; color: #344054; }
+.lib-copies-sorting-toolbar button.is-secondary:hover:not(:disabled) { border-color: #f0a174; background: #fff8f3; color: #b54708; }
 .lib-copies-sorting-toolbar button:disabled { cursor: not-allowed; opacity: .55; }
 .lib-copies-sorting-list { display: grid; gap: 8px; }
 .lib-copies-sorting-list > article { display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid #e8ecf3; border-radius: 10px; background: #fff; padding: 10px 12px; }
@@ -372,6 +376,9 @@
 
 .lib-copies-modal-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; overflow-y: auto; background: rgb(16 24 40 / 48%); padding: 20px; }
 .lib-copies-modal { width: min(100%, 560px); max-height: min(90vh, 820px); overflow-y: auto; border: 1px solid #e8ecf3; border-radius: 16px; background: #fff; padding: 22px; box-shadow: 0 24px 70px rgb(16 24 40 / 25%); }
+.lib-copies-new-book-modal { width: min(100%, 760px); }
+.lib-copies-new-book-modal .lib-copies-field b { color: #d92d20; }
+.lib-copies-new-book-cover { width: 96px; max-height: 132px; object-fit: cover; border: 1px solid #e8ecf3; border-radius: 8px; }
 .lib-copies-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 20px; }
 .lib-copies-modal > header > div { display: flex; align-items: flex-start; gap: 12px; }
 .lib-copies-modal > header > div > span { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border-radius: 12px; background: #fff0e7; color: #d94712; }
@@ -406,7 +413,9 @@
 .lib-copies-book-group-breakdown { display: flex; flex-wrap: wrap; gap: 6px; }
 .lib-copies-book-group-breakdown span { border-radius: 99px; background: #f3f6f8; padding: 5px 8px; white-space: nowrap; }
 .lib-copies-book-group > svg { color: #98a2b3; }
-.lib-copies-back-books { min-height: 40px; border: 1px solid #dfe4ec; border-radius: 9px; background: #fff; padding: 0 12px; color: #344054; font-size: 12px; font-weight: 700; cursor: pointer; }
+.lib-copies-back-books { display: inline-flex; min-height: 38px; align-items: center; gap: 7px; border: 1px solid #dfe4ec; border-radius: 9px; background: #fff; padding: 0 12px; color: #344054; font-size: 12px; font-weight: 700; cursor: pointer; transition: border-color .15s ease, background .15s ease, color .15s ease, transform .15s ease; }
+.lib-copies-back-books:hover { border-color: #f0a174; background: #fff8f3; color: #b54708; }
+.lib-copies-back-books:active { transform: translateX(-1px); }
 .lib-copies-selected-book { border: 1px solid #f3c19f; border-radius: 11px; background: #fff8f3; padding: 12px 15px; }
 .lib-copies-selected-book > div { display: grid; gap: 4px; }
 .lib-copies-selected-book span { color: #b54708; font-size: 9px; font-weight: 800; letter-spacing: .09em; }

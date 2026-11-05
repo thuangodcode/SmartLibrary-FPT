@@ -46,6 +46,25 @@ public class CategoriesController : ControllerBase
         return Ok(ApiResponse<CategoryDto>.Ok(result.Data!));
     }
 
+    [HttpPost("{id:guid}/books/{bookId:guid}")]
+    [Authorize(Policy = "LibrarianOnly")]
+    public async Task<IActionResult> AddExistingBook(Guid id, Guid bookId, CancellationToken ct = default)
+    {
+        var category = await _db.Categories.FirstOrDefaultAsync(item => item.Id == id && !item.IsDeleted, ct);
+        if (category is null) return NotFound(ApiResponse<object>.Fail("Không tìm thấy danh mục."));
+
+        var book = await _db.Books.Include(item => item.Categories)
+            .FirstOrDefaultAsync(item => item.Id == bookId && !item.IsDeleted, ct);
+        if (book is null) return NotFound(ApiResponse<object>.Fail("Không tìm thấy đầu sách."));
+        if (book.Categories.Any(item => item.Id == category.Id))
+            return Conflict(ApiResponse<object>.Fail("Đầu sách đã có trong danh mục này."));
+
+        book.Categories.Add(category);
+        book.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return Ok(ApiResponse<bool>.Ok(true));
+    }
+
     /// <summary>
     /// Tạo mới một danh mục sách (có hỗ trợ upload hình ảnh lên Cloudinary từ máy tính).
     /// </summary>

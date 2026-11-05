@@ -1026,6 +1026,21 @@
 .lib-cat-add-book-card .lib-cat-modal-header h3 { font-size: clamp(20px, 3vw, 26px); }
 .lib-cat-add-book-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 20px 0 4px; }
 .lib-cat-add-book-toolbar p { margin: 0; color: #64748b; font-size: 13px; }
+.lib-cat-existing-search { display: flex; min-height: 44px; flex: 1; align-items: center; gap: 10px; border: 1px solid #d8e0eb; border-radius: 10px; background: #fff; padding: 0 12px; color: #718096; }
+.lib-cat-existing-search input { width: 100%; border: 0; outline: 0; background: transparent; color: #263247; font: inherit; }
+.lib-cat-existing-books { display: grid; gap: 9px; margin-top: 16px; }
+.lib-cat-existing-books article { display: flex; align-items: center; gap: 13px; border: 1px solid #e3e9f1; border-radius: 12px; background: #fff; padding: 11px 13px; }
+.lib-cat-existing-cover { display: grid; width: 48px; height: 56px; flex: 0 0 auto; place-items: center; overflow: hidden; border-radius: 7px; background: #fff2e9; color: #e9621b; }
+.lib-cat-existing-cover img { width: 100%; height: 100%; object-fit: cover; }
+.lib-cat-existing-info { display: grid; flex: 1; gap: 3px; min-width: 0; }
+.lib-cat-existing-info strong { overflow: hidden; color: #263247; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.lib-cat-existing-info span,.lib-cat-existing-info small { overflow: hidden; color: #667085; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.lib-cat-existing-books article > button,.lib-cat-add-book-toolbar > button { min-height: 38px; flex: 0 0 auto; border: 1px solid #f0a174; border-radius: 9px; background: #fff8f3; padding: 0 12px; color: #b54708; font-size: 12px; font-weight: 700; cursor: pointer; }
+.lib-cat-existing-books article > button:hover,.lib-cat-add-book-toolbar > button:hover { background: #fff0e5; }
+.lib-cat-existing-books article > button:disabled { cursor: wait; opacity: .6; }
+.lib-cat-existing-empty { display: grid; justify-items: center; gap: 8px; padding: 52px 16px; color: #7a8495; text-align: center; }
+.lib-cat-existing-empty strong { color: #344054; font-size: 15px; }
+.lib-cat-existing-empty span { font-size: 12px; }
 .lib-cat-manage-fields-button { display: inline-flex; min-height: 42px; flex: 0 0 auto; align-items: center; gap: 8px; border: 1px solid #fed7aa; border-radius: 10px; background: #fff7ed; padding: 0 14px; color: #c2410c; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
 .lib-cat-manage-fields-button:hover { border-color: #fdba74; background: #ffedd5; }
 .lib-cat-add-book-card .lib-cat-book-form { gap: 20px; }
