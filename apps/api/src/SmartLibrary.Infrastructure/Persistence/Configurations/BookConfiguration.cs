@@ -79,6 +79,9 @@ public class BookConfiguration : IEntityTypeConfiguration<Book>
             .HasForeignKey(c => c.BookId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne(book => book.CodeCategory).WithMany()
+            .HasForeignKey(book => book.CodeCategoryId).OnDelete(DeleteBehavior.Restrict);
+
         // Indexes
         builder.HasIndex(b => b.Isbn).IsUnique();
         builder.HasIndex(b => b.Code).IsUnique();
