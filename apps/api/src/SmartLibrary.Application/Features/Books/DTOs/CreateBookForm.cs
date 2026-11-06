@@ -5,6 +5,7 @@ namespace SmartLibrary.Application.Features.Books.DTOs;
 public class CreateBookForm
 {
     public string Code { get; set; } = string.Empty;
+    public Guid? CodeCategoryId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? AuthorName { get; set; }
     public string? Isbn { get; set; }

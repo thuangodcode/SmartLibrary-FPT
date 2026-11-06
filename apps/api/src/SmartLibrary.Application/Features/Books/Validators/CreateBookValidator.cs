@@ -7,10 +7,7 @@ public class CreateBookValidator : AbstractValidator<CreateBookRequest>
 {
     public CreateBookValidator()
     {
-        RuleFor(x => x.Code)
-            .NotEmpty().WithMessage("Book code is required.")
-            .MaximumLength(32).WithMessage("Book code must not exceed 32 characters.")
-            .Matches("^[A-Za-z0-9]+$").WithMessage("Book code may contain only letters and numbers.");
+        RuleFor(x => x.CategoryIds).NotEmpty().WithMessage("Chọn ít nhất một danh mục sách.");
 
         RuleFor(x => x.Title)
             .NotEmpty().WithMessage("Title is required.")

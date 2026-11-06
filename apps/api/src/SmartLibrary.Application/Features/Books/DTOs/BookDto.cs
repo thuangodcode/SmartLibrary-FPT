@@ -7,6 +7,7 @@ public class BookDto
 {
     public Guid Id { get; set; }
     public string Code { get; set; } = string.Empty;
+    public Guid? CodeCategoryId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Isbn { get; set; }
     public string? Description { get; set; }
