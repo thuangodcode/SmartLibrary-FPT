@@ -23,6 +23,7 @@ public class CategoryRepository : ICategoryRepository
             .Select(c => new CategoryDto
             {
                 Id = c.Id,
+                Code = c.Code,
                 Name = c.Name,
                 Description = c.Description,
                 ImageUrl = c.ImageUrl,
@@ -40,6 +41,7 @@ public class CategoryRepository : ICategoryRepository
             .Select(c => new CategoryDto
             {
                 Id = c.Id,
+                Code = c.Code,
                 Name = c.Name,
                 Description = c.Description,
                 ImageUrl = c.ImageUrl,
@@ -66,6 +68,10 @@ public class CategoryRepository : ICategoryRepository
     {
         await _context.Categories.AddAsync(category, ct);
     }
+
+    public Task<bool> ExistsByCodeAsync(string code, Guid? excludeId = null, CancellationToken ct = default)
+        => _context.Categories.IgnoreQueryFilters().AnyAsync(category => category.Code == code
+            && (!excludeId.HasValue || category.Id != excludeId.Value), ct);
 
     public Task UpdateAsync(Category category, CancellationToken ct = default)
     {
