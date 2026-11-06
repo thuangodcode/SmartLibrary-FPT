@@ -5,6 +5,9 @@ using Npgsql;
 using NpgsqlTypes;
 using System.Text.RegularExpressions;
 using SmartLibrary.Application.Common;
+using SmartLibrary.Application.Features.Books;
+using SmartLibrary.Application.Features.Circulation;
+using SmartLibrary.Application.Features.Circulation.DTOs;
 using SmartLibrary.Domain.Entities;
 using SmartLibrary.Domain.Enums;
 using SmartLibrary.Infrastructure.Persistence;
@@ -22,6 +25,58 @@ public class BookCopiesController : ControllerBase
         && Regex.IsMatch(name.Trim(), @"^Tầng [\p{L}\p{N}-]+ · Kệ [\p{L}\p{N}-]+$", RegexOptions.CultureInvariant);
 
     public BookCopiesController(AppDbContext db) => _db = db;
+
+    // A scan identifies one physical copy, never a partial search result or an ISBN.
+    [HttpGet("lookup")]
+    public async Task<IActionResult> Lookup(
+        [FromQuery] string? barcode,
+        [FromServices] CirculationService circulation,
+        CancellationToken ct = default)
+    {
+        var code = barcode?.Trim();
+        if (string.IsNullOrWhiteSpace(code) || code.Length > 100)
+            return BadRequest(ApiResponse<object>.Fail("Nhập mã bản sao hợp lệ, tối đa 100 ký tự."));
+        var normalizedCode = code.ToUpperInvariant();
+        var copy = await _db.BookCopies.AsNoTracking()
+            .Where(item => !item.IsDeleted && !item.Book.IsDeleted && item.Barcode.ToUpper() == normalizedCode)
+            .Select(item => new
+            {
+                item.Id, item.BookId, item.Barcode, item.Condition, item.Location, item.IsAvailable,
+                BookTitle = item.Book.Title, item.Book.CoverImageUrl
+            }).SingleOrDefaultAsync(ct);
+        if (copy is null)
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy mã bản sao. Hãy quét QR của thư viện hoặc nhập mã bên dưới QR."));
+
+        var openLoanId = await _db.BorrowRecords.AsNoTracking()
+            .Where(loan => !loan.IsDeleted && loan.BookCopyId == copy.Id &&
+                (loan.Status == BorrowStatus.Pending || loan.Status == BorrowStatus.Approved ||
+                 loan.Status == BorrowStatus.Borrowed || loan.Status == BorrowStatus.Overdue))
+            .OrderByDescending(loan => loan.CreatedAt)
+            .Select(loan => (Guid?)loan.Id).FirstOrDefaultAsync(ct);
+        CirculationLoanDto? openLoan = null;
+        if (openLoanId.HasValue)
+        {
+            var result = await circulation.GetLoanAsync(openLoanId.Value, ct);
+            if (!result.IsSuccess)
+                return Conflict(ApiResponse<object>.Fail("Phiếu mượn vừa thay đổi. Hãy tra cứu lại bản sao."));
+            openLoan = result.Data;
+        }
+        return Ok(ApiResponse<object>.Ok(new
+        {
+            copy.Id, copy.BookId, copy.Barcode, copy.BookTitle, copy.CoverImageUrl,
+            Condition = copy.Condition.ToString(), copy.Location, copy.IsAvailable, OpenLoan = openLoan,
+            CanReturn = CopyScanRules.CanReturn(openLoan?.Status),
+            CanShelve = CopyScanRules.CanShelve(copy.IsAvailable, copy.Location, copy.Condition, openLoan is not null)
+        }));
+    }
+
+    [HttpGet("{id:guid}/history")]
+    public async Task<IActionResult> History(Guid id, [FromServices] CirculationService circulation, CancellationToken ct)
+    {
+        if (!await _db.BookCopies.AnyAsync(copy => copy.Id == id && !copy.IsDeleted, ct))
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy bản sao."));
+        return Ok(ApiResponse<CopyCirculationHistoryDto>.Ok(await circulation.GetCopyHistoryAsync(id, ct)));
+    }
 
     [HttpGet("summary")]
     public async Task<IActionResult> GetSummary(CancellationToken ct = default)
@@ -333,7 +388,7 @@ public class BookCopiesController : ControllerBase
     }
 
     [HttpPost("locations/transfer")]
-    public async Task<IActionResult> TransferLocations([FromBody] TransferCopiesRequest request, CancellationToken ct = default)
+    public async Task<IActionResult> TransferLocations([FromBody] TransferCopiesRequest request, [FromServices] CirculationService circulation, CancellationToken ct = default)
     {
         if (request.Assignments is null || request.Assignments.Count == 0 || request.Assignments.Count > 500)
             return BadRequest(ApiResponse<object>.Fail("Cần chọn từ 1 đến 500 bản sao để điều chuyển."));
@@ -368,6 +423,10 @@ public class BookCopiesController : ControllerBase
         if (copies.Any(copy => !string.IsNullOrWhiteSpace(assignments[copy.Id]) &&
                                (!copy.IsAvailable || copy.Condition is BookCondition.Damaged or BookCondition.Lost)))
             return Conflict(ApiResponse<object>.Fail("Chỉ bản sao đang ở kho và còn tốt mới được chuyển lên kệ."));
+        var shelfCopyIds = request.Assignments.Where(item => !string.IsNullOrWhiteSpace(item.Location)).Select(item => item.CopyId).ToList();
+        if (await _db.BorrowRecords.AnyAsync(loan => shelfCopyIds.Contains(loan.BookCopyId) && !loan.IsDeleted &&
+            (loan.Status == BorrowStatus.Pending || loan.Status == BorrowStatus.Approved || loan.Status == BorrowStatus.Borrowed || loan.Status == BorrowStatus.Overdue), ct))
+            return Conflict(ApiResponse<object>.Fail("Có bản sao đang gắn với phiếu mở. Không thể xếp kệ."));
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var shelf in shelves)
             counts[shelf.Name] = await _db.BookCopies.CountAsync(copy => !copy.IsDeleted && copy.Location == shelf.Name, ct);
@@ -388,7 +447,7 @@ public class BookCopiesController : ControllerBase
             var nextName = assignments[copy.Id];
             if (copy.Location != nextName && copy.IsAvailable && copy.Condition is not (BookCondition.Damaged or BookCondition.Lost))
                 availableShelfDeltaByBook[copy.BookId] = availableShelfDeltaByBook.GetValueOrDefault(copy.BookId)
-                    + (string.IsNullOrWhiteSpace(nextName) ? -1 : 1);
+                    + CopyScanRules.ShelfAvailabilityDelta(copy.Location, nextName);
             copy.Location = nextName;
         }
         foreach (var (bookId, delta) in availableShelfDeltaByBook)
@@ -398,12 +457,13 @@ public class BookCopiesController : ControllerBase
             book.UpdatedAt = DateTime.UtcNow;
         }
         await _db.SaveChangesAsync(ct);
+        await circulation.ReadyReservationsAfterShelvingAsync(copies.Where(copy => copy.Location != null).Select(copy => copy.BookId), ct);
         await transaction.CommitAsync(ct);
         return Ok(ApiResponse<object>.Ok(new { movedCopies = copies.Count }));
     }
 
     [HttpPost("intake")]
-    public async Task<IActionResult> Intake([FromBody] IntakeBookCopiesRequest request, CancellationToken ct = default)
+    public async Task<IActionResult> Intake([FromBody] IntakeBookCopiesRequest request, [FromServices] CirculationService circulation, CancellationToken ct = default)
     {
         if (request.Quantity is < 1 or > 500)
             return BadRequest(ApiResponse<object>.Fail("Số lượng bản sao phải từ 1 đến 500."));
@@ -468,6 +528,7 @@ public class BookCopiesController : ControllerBase
         book.AvailableCopies += copies.Count(copy => copy.IsAvailable && copy.Location is not null);
         book.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
+        if (shelfQuantity > 0) await circulation.ReadyReservationsAfterShelvingAsync([request.BookId], ct);
         await transaction.CommitAsync(ct);
 
         return Ok(ApiResponse<object>.Ok(new
@@ -481,7 +542,7 @@ public class BookCopiesController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateBookCopyRequest request, CancellationToken ct = default)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateBookCopyRequest request, [FromServices] CirculationService circulation, CancellationToken ct = default)
     {
         if (request.Location?.Trim().Length > 255)
             return BadRequest(ApiResponse<object>.Fail("Vị trí lưu trữ không được vượt quá 255 ký tự."));
@@ -494,6 +555,10 @@ public class BookCopiesController : ControllerBase
             .FirstOrDefaultAsync(item => item.Id == id && !item.IsDeleted && !item.Book.IsDeleted, ct);
         if (copy is null)
             return NotFound(ApiResponse<object>.Fail("Không tìm thấy bản sao sách."));
+
+        if (copy.Condition != request.Condition && await _db.BookIncidents.AnyAsync(item => item.BookCopyId == id && !item.IsDeleted &&
+            (item.Status == BookIncidentStatus.PendingReview || copy.Condition == BookCondition.Damaged || copy.Condition == BookCondition.Lost), ct))
+            return Conflict(ApiResponse<object>.Fail("Bản sao có hồ sơ sự cố. Hãy cập nhật tình trạng qua hồ sơ để lưu kết quả kiểm tra."));
 
         var nextLocation = request.Condition is BookCondition.Damaged or BookCondition.Lost
             ? null
@@ -528,6 +593,7 @@ public class BookCopiesController : ControllerBase
         }
 
         await _db.SaveChangesAsync(ct);
+        if (isAvailableOnShelf) await circulation.ReadyReservationsAfterShelvingAsync([copy.BookId], ct);
         await transaction.CommitAsync(ct);
         return Ok(ApiResponse<object>.Ok(new
         {
