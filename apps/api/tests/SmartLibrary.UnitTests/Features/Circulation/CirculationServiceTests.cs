@@ -296,7 +296,7 @@ public class CirculationServiceTests
     {
         var loanId = Guid.NewGuid();
         _repo.Setup(x => x.GetTrackedLoanAsync(loanId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BorrowRecord { Id = loanId, ReaderId = Guid.NewGuid(), DueDate = DateTime.UtcNow.AddDays(-3) });
+            .ReturnsAsync(new BorrowRecord { Id = loanId, ReaderId = Guid.NewGuid(), Status = BorrowStatus.Returned, DueDate = DateTime.UtcNow.AddDays(-3), ReturnDate = DateTime.UtcNow });
         _repo.Setup(x => x.HasOverdueFineAsync(loanId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         var result = await _sut.RecordFineAsync(new RecordFineRequest { BorrowRecordId = loanId, Amount = 15000 });
@@ -311,7 +311,7 @@ public class CirculationServiceTests
         var loanId = Guid.NewGuid();
         var due = DateTime.UtcNow.AddDays(-3);
         _repo.Setup(x => x.GetTrackedLoanAsync(loanId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BorrowRecord { Id = loanId, ReaderId = Guid.NewGuid(), DueDate = due });
+            .ReturnsAsync(new BorrowRecord { Id = loanId, ReaderId = Guid.NewGuid(), Status = BorrowStatus.Returned, DueDate = due, ReturnDate = DateTime.UtcNow });
         _repo.Setup(x => x.HasOverdueFineAsync(loanId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _repo.Setup(x => x.GetFineDtoAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CirculationFineDto { Amount = 15000, Status = "Pending" });
@@ -345,7 +345,7 @@ public class CirculationServiceTests
         _repo.Setup(x => x.GetLoanAsync(loan.Id, _settings.FinePerDay, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CirculationLoanDto { Id = loan.Id, Barcode = copy.Barcode, Status = "Returned" });
 
-        var result = await _sut.ReturnAsync(new ReturnLoanRequest { Barcode = copy.Barcode, Condition = "Lost" }, Guid.NewGuid());
+        var result = await _sut.ReturnAsync(new ReturnLoanRequest { Barcode = copy.Barcode, Condition = "Lost", Notes = "Độc giả không tìm thấy sách." }, Guid.NewGuid());
 
         result.IsSuccess.Should().BeTrue();
         result.Data!.IncidentOpened.Should().BeTrue();
@@ -466,7 +466,7 @@ public class CirculationServiceTests
 
         result.IsSuccess.Should().BeTrue();
         incident.BookCopy.IsAvailable.Should().BeTrue();
-        incident.BookCopy.Condition.Should().Be(BookCondition.Damaged);
+        incident.BookCopy.Condition.Should().Be(BookCondition.LightDamaged);
         _repo.Verify(x => x.AddFineAsync(It.Is<Fine>(f => f.Amount == 10000 && f.Reason.StartsWith("Bồi thường hư hỏng")), It.IsAny<CancellationToken>()), Times.Once);
         _repo.Verify(x => x.AddFineAsync(It.Is<Fine>(f => f.Reason.StartsWith("Phạt quá hạn")), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -830,6 +830,58 @@ public class CirculationServiceTests
         loan.Status.Should().Be(BorrowStatus.Borrowed);
     }
 
+    [Fact]
+    public async Task Return_DamageWithoutNotes_DoesNotChangeLoan()
+    {
+        var result = await _sut.ReturnAsync(new ReturnLoanRequest { Barcode = "BOOK-01", Condition = "damaged" }, Guid.NewGuid());
+        result.IsSuccess.Should().BeFalse();
+        _repo.Verify(x => x.FindActiveLoanByBarcodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Confirm_ReaderReportBeforeReturn_CannotReleaseCopyOrCharge()
+    {
+        var incident = PendingLostIncident();
+        incident.BorrowRecord.Status = BorrowStatus.Borrowed;
+        _repo.Setup(x => x.GetTrackedIncidentAsync(incident.Id, It.IsAny<CancellationToken>())).ReturnsAsync(incident);
+        var result = await _sut.ConfirmIncidentAsync(incident.Id, new ConfirmIncidentRequest { Severity = "Lost" }, Guid.NewGuid());
+        result.IsSuccess.Should().BeFalse();
+        incident.BookCopy.IsAvailable.Should().BeFalse();
+        _repo.Verify(x => x.AddFineAsync(It.IsAny<Fine>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Reject_ResponsibilityOnly_PreservesDamagedCopy()
+    {
+        var incident = PendingLostIncident();
+        incident.BookCopy.Condition = BookCondition.Damaged;
+        _repo.Setup(x => x.GetTrackedIncidentAsync(incident.Id, It.IsAny<CancellationToken>())).ReturnsAsync(incident);
+        _repo.Setup(x => x.GetIncidentDtoAsync(incident.Id, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(new CirculationIncidentDto { Id = incident.Id });
+        var result = await _sut.RejectIncidentAsync(incident.Id, new RejectIncidentRequest { Notes = "Sách hỏng đã có trước khi mượn." }, Guid.NewGuid());
+        result.IsSuccess.Should().BeTrue();
+        incident.BookCopy.Condition.Should().Be(BookCondition.Damaged);
+        incident.BookCopy.IsAvailable.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Reject_RestoreWithoutPhysicalCondition_FailsBeforeChangingState()
+    {
+        var result = await _sut.RejectIncidentAsync(Guid.NewGuid(), new RejectIncidentRequest { Notes = "Đã tìm thấy sách.", RestoreCopy = true }, Guid.NewGuid());
+        result.IsSuccess.Should().BeFalse();
+        _repo.Verify(x => x.TryClaimIncidentAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Return_StaleLoanId_DoesNotReturnNewBorrowersLoan()
+    {
+        var copy = ReadyCopy();
+        var loan = new BorrowRecord { Id = Guid.NewGuid(), Status = BorrowStatus.Borrowed, BookCopy = copy };
+        _repo.Setup(x => x.FindActiveLoanByBarcodeAsync(copy.Barcode, It.IsAny<CancellationToken>())).ReturnsAsync(loan);
+        var result = await _sut.ReturnAsync(new ReturnLoanRequest { Barcode = copy.Barcode, LoanId = Guid.NewGuid() }, Guid.NewGuid());
+        result.IsSuccess.Should().BeFalse();
+        loan.Status.Should().Be(BorrowStatus.Borrowed);
+    }
+
     private static BookIncident PendingLostIncident()
     {
         var copy = ReadyCopy();
@@ -844,7 +896,7 @@ public class CirculationServiceTests
             Severity = BookIncidentSeverity.Lost,
             Status = BookIncidentStatus.PendingReview,
             BookCopy = copy,
-            BorrowRecord = new BorrowRecord { DueDate = DateTime.UtcNow.AddDays(2) }
+            BorrowRecord = new BorrowRecord { Status = BorrowStatus.Returned, ReturnDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(2) }
         };
     }
 

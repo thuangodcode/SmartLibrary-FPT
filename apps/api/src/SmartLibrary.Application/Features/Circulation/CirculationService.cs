@@ -250,6 +250,13 @@ public class CirculationService
         var barcode = request.Barcode?.Trim() ?? string.Empty;
         if (barcode.Length == 0)
             return Result<CirculationLoanDto>.Failure("Nhập mã vạch sách cần trả.");
+        if (request.Notes?.Length > 2000)
+            return Result<CirculationLoanDto>.Failure("Ghi chú tối đa 2000 ký tự.");
+        if (!string.IsNullOrWhiteSpace(request.Condition) &&
+            (!Enum.TryParse<BookCondition>(request.Condition, true, out var validCondition) || !Enum.IsDefined(validCondition)))
+            return Result<CirculationLoanDto>.Failure("Tình trạng sách không hợp lệ.");
+        if (ParseCondition(request.Condition) is BookCondition.Damaged or BookCondition.Lost && string.IsNullOrWhiteSpace(request.Notes))
+            return Result<CirculationLoanDto>.Failure("Mô tả tình trạng hư hỏng hoặc lý do thất lạc trước khi xác nhận.");
 
         var settings = await _repository.GetSettingsAsync(ct);
         return await _repository.InTransactionAsync(async () =>
@@ -257,6 +264,10 @@ public class CirculationService
             var loan = await _repository.FindActiveLoanByBarcodeAsync(barcode, ct);
             if (loan is null)
                 return Result<CirculationLoanDto>.Failure("Không có phiếu mượn đang mở cho mã vạch này.");
+            await _repository.LockBorrowRequestAsync(loan.Id, ct);
+            await _repository.ReloadTrackedLoanAsync(loan.Id, ct);
+            if (request.LoanId.HasValue && request.LoanId != loan.Id)
+                return Result<CirculationLoanDto>.Failure("Bản sao đã gắn với phiếu khác. Hãy tải lại phiếu trước khi trả.");
             if (loan.Status is not (BorrowStatus.Borrowed or BorrowStatus.Overdue))
                 return Result<CirculationLoanDto>.Failure(loan.Status == BorrowStatus.Returned
                     ? "Phiếu này đã được trả. Không xử lý lần thứ hai."
@@ -269,9 +280,17 @@ public class CirculationService
             var overdueDays = CirculationRules.CalendarOverdueDays(loan.DueDate, now);
             var isLostOrDamaged = condition is BookCondition.Damaged or BookCondition.Lost;
 
+            if (loan.BookCopy?.Condition == BookCondition.LightDamaged && condition is BookCondition.New or BookCondition.Good or BookCondition.Fair)
+                return Result<CirculationLoanDto>.Failure("Bản sao đã hư nhẹ. Chọn hư nhẹ đã xác minh nếu không có hư hỏng mới; việc phục hồi cần kiểm tra riêng.");
+            if (condition == BookCondition.LightDamaged && loan.BookCopy?.Condition != BookCondition.LightDamaged)
+                return Result<CirculationLoanDto>.Failure("Hư nhẹ mới cần ghi nhận Hư hỏng rồi xác minh mức độ.");
+            if (!isLostOrDamaged && await _repository.HasOpenIncidentAsync(loan.Id, ct))
+                return Result<CirculationLoanDto>.Failure("Phiếu đang có hồ sơ sự cố. Hãy ghi nhận Hư hỏng/Thất lạc để xác minh, hoặc từ chối hồ sơ không đúng trước khi trả bình thường.");
             loan.Status = BorrowStatus.Returned;
             loan.ReturnDate = now;
             loan.ReturnCondition = condition;
+            if (!string.IsNullOrWhiteSpace(request.Notes))
+                loan.Notes = AppendNote(loan.Notes, $"Nhận trả {FormatPickup(now)}: {request.Notes.Trim()}");
             if (librarianId != Guid.Empty)
                 loan.LibrarianId = librarianId;
             if (loan.BookCopy != null)
@@ -282,7 +301,21 @@ public class CirculationService
             decimal? createdFine = null;
             Reservation? readyReservation = null;
             if (isLostOrDamaged)
-                incidentOpened = await OpenIncidentIfNeededAsync(loan, condition, librarianId, ct);
+            {
+                incidentOpened = await OpenIncidentIfNeededAsync(loan, condition, librarianId, ct, request.Notes);
+                var openId = await _repository.GetOpenIncidentIdAsync(loan.Id, ct);
+                if (openId.HasValue)
+                {
+                    incidentOpened = true;
+                    var existingIncident = await _repository.GetTrackedIncidentAsync(openId.Value, ct);
+                    if (existingIncident is not null)
+                    {
+                        existingIncident.Kind = condition == BookCondition.Lost ? BookIncidentKind.Lost : BookIncidentKind.Damage;
+                        existingIncident.Description = AppendNote(existingIncident.Description, $"Nhận trả {FormatPickup(now)}: {request.Notes!.Trim()}");
+                    }
+                }
+                // New incidents are not queryable until SaveChanges; their initial description is set below.
+            }
             else
                 createdFine = await AddOverdueFineIfNeededAsync(loan, overdueDays, settings.FinePerDay, ct);
             var overdueFineAlreadyExists = !isLostOrDamaged
@@ -315,13 +348,17 @@ public class CirculationService
                 await _unitOfWork.SaveChangesAsync(ct);
             }
             if (isLostOrDamaged)
+            {
                 incidentId = await _repository.GetOpenIncidentIdAsync(loan.Id, ct);
+                incidentOpened = incidentOpened || incidentId.HasValue;
+            }
             var saved = await _repository.GetLoanAsync(loan.Id, settings.FinePerDay, ct);
             if (saved is null)
                 return Result<CirculationLoanDto>.Failure("Không đọc được phiếu sau khi trả.");
             return Result<CirculationLoanDto>.Success(saved with
             {
                 CreatedFineAmount = createdFine,
+                OverdueFineAlreadyExists = overdueFineAlreadyExists,
                 OverdueDays = overdueDays,
                 IncidentOpened = incidentOpened,
                 IncidentId = incidentId,
@@ -400,7 +437,7 @@ public class CirculationService
     }
 
     public async Task<Result<CirculationLoanDto>> CompleteCheckoutAsync(
-        Guid id, Guid librarianId, CancellationToken ct = default)
+        Guid id, Guid librarianId, CancellationToken ct = default, string? barcode = null)
     {
         await ExpireUncollectedPickupsAsync(ct);
         return await _repository.InTransactionAsync(async () =>
@@ -412,6 +449,10 @@ public class CirculationService
             await _repository.ReloadTrackedLoanAsync(id, ct);
             if (loan.Status != BorrowStatus.Approved)
                 return Result<CirculationLoanDto>.Failure("Chỉ xác nhận nhận sách cho yêu cầu đã được tiếp nhận.");
+            if (barcode is not null && !string.Equals(barcode.Trim(), loan.BookCopy.Barcode, StringComparison.OrdinalIgnoreCase))
+                return Result<CirculationLoanDto>.Failure("Mã quét không khớp bản sao trên phiếu. Chưa giao sách.");
+            if (loan.BookCopy.Condition is BookCondition.Damaged or BookCondition.Lost)
+                return Result<CirculationLoanDto>.Failure("Bản sao không đủ điều kiện sử dụng. Chưa giao sách.");
 
             await _repository.LockBorrowReaderAsync(loan.ReaderId, ct);
             var settings = await _repository.GetSettingsAsync(ct);
@@ -447,8 +488,9 @@ public class CirculationService
         }, ct);
     }
 
-    public async Task<Result<bool>> RejectAsync(Guid id, CancellationToken ct = default)
+    public async Task<Result<bool>> RejectAsync(Guid id, CancellationToken ct = default, string? notes = null)
     {
+        if (notes?.Length > 2000) return Result<bool>.Failure("Lý do tối đa 2000 ký tự.");
         return await _repository.InTransactionAsync(async () =>
         {
             await _repository.LockBorrowRequestAsync(id, ct);
@@ -459,9 +501,9 @@ public class CirculationService
             if (loan.Status is not (BorrowStatus.Pending or BorrowStatus.Approved))
                 return Result<bool>.Failure("Yêu cầu này không còn chờ xử lý.");
             loan.Status = BorrowStatus.Rejected;
-            loan.Notes = AppendNote(loan.Notes, "Yêu cầu bị từ chối/hủy bởi thủ thư.");
+            loan.Notes = AppendNote(loan.Notes, "Yêu cầu bị từ chối/hủy bởi thủ thư. " + notes?.Trim());
             if (loan.BookCopy is not null)
-                SetCopyAvailability(loan.BookCopy, loan.BookCopy.Condition, true);
+                SetCopyAvailability(loan.BookCopy, loan.BookCopy.Condition, loan.BookCopy.Condition is not (BookCondition.Damaged or BookCondition.Lost));
             await NotifyAsync(loan.ReaderId, "Yêu cầu mượn bị từ chối",
                 $"Thủ thư đã từ chối yêu cầu mượn “{loan.BookCopy?.Book?.Title}”. Bản sao đã được trả về kho.", "borrow", ct);
             await _unitOfWork.SaveChangesAsync(ct);
@@ -583,29 +625,36 @@ public class CirculationService
 
     public async Task<Result<CirculationFineDto>> RecordFineAsync(RecordFineRequest request, CancellationToken ct = default)
     {
-        var loan = await _repository.GetTrackedLoanAsync(request.BorrowRecordId, ct);
-        if (loan is null)
-            return Result<CirculationFineDto>.Failure("Không tìm thấy phiếu mượn.");
+        return await _repository.InTransactionAsync(async () =>
+        {
+            await _repository.LockBorrowRequestAsync(request.BorrowRecordId, ct);
+            var loan = await _repository.GetTrackedLoanAsync(request.BorrowRecordId, ct);
+            if (loan is null)
+                return Result<CirculationFineDto>.Failure("Không tìm thấy phiếu mượn.");
+            await _repository.ReloadTrackedLoanAsync(loan.Id, ct);
+            if (loan.Status != BorrowStatus.Returned || !loan.ReturnDate.HasValue)
+                return Result<CirculationFineDto>.Failure("Phí quá hạn chỉ được chốt khi ghi nhận trả sách. Trước đó chỉ hiển thị tạm tính.");
 
-        var settings = await _repository.GetSettingsAsync(ct);
-        if (settings.FinePerDay <= 0)
-            return Result<CirculationFineDto>.Failure("Chưa cấu hình phí quá hạn. Admin hãy vào Chính sách > Phí phạt và đặt overdue_fee_per_day.");
+            var settings = await _repository.GetSettingsAsync(ct);
+            if (settings.FinePerDay <= 0)
+                return Result<CirculationFineDto>.Failure("Chưa cấu hình phí quá hạn. Admin hãy vào Chính sách > Phí phạt và đặt overdue_fee_per_day.");
 
-        var overdueDays = CirculationRules.CalendarOverdueDays(loan.DueDate, DateTime.UtcNow);
-        if (overdueDays <= 0)
-            return Result<CirculationFineDto>.Failure("Phiếu này chưa quá hạn nên không ghi nhận phí quá hạn.");
+            var overdueDays = CirculationRules.CalendarOverdueDays(loan.DueDate, loan.ReturnDate.Value);
+            if (overdueDays <= 0)
+                return Result<CirculationFineDto>.Failure("Phiếu này chưa quá hạn nên không ghi nhận phí quá hạn.");
 
-        var reason = $"{CirculationRules.OverdueReasonPrefix} {overdueDays} ngày";
-        var duplicate = await FineDuplicateErrorAsync(loan.Id, reason, ct);
-        if (duplicate is not null)
-            return Result<CirculationFineDto>.Failure(duplicate);
+            var reason = $"{CirculationRules.OverdueReasonPrefix} {overdueDays} ngày";
+            var duplicate = await FineDuplicateErrorAsync(loan.Id, reason, ct);
+            if (duplicate is not null)
+                return Result<CirculationFineDto>.Failure(duplicate);
 
-        var amount = CirculationRules.OverdueFineAmount(overdueDays, settings.FinePerDay);
-        var fine = NewFine(loan.Id, loan.ReaderId, amount, reason);
-        await _repository.AddFineAsync(fine, ct);
-        await NotifyAsync(loan.ReaderId, "Khoản phí mới", $"Thư viện đã ghi nhận khoản phí {fine.Amount:0}đ. {fine.Reason}", "fine", ct);
-        await _unitOfWork.SaveChangesAsync(ct);
-        return Result<CirculationFineDto>.Success((await _repository.GetFineDtoAsync(fine.Id, ct))!);
+            var amount = CirculationRules.OverdueFineAmount(overdueDays, settings.FinePerDay);
+            var fine = NewFine(loan.Id, loan.ReaderId, amount, reason);
+            await _repository.AddFineAsync(fine, ct);
+            await NotifyAsync(loan.ReaderId, "Khoản phí mới", $"Thư viện đã ghi nhận khoản phí {fine.Amount:0}đ. {fine.Reason}", "fine", ct);
+            await _unitOfWork.SaveChangesAsync(ct);
+            return Result<CirculationFineDto>.Success((await _repository.GetFineDtoAsync(fine.Id, ct))!);
+        }, ct);
     }
 
     public Task<Result<CirculationFineDto>> PayFineAsync(Guid id, CancellationToken ct = default)
@@ -808,14 +857,19 @@ public class CirculationService
     {
         if (!CirculationRules.TryParseSeverity(request.Severity, out var severity))
             return Result<CirculationIncidentDto>.Failure("Chọn mức độ: Light, Severe hoặc Lost.");
+        if (request.Notes?.Length > 2000) return Result<CirculationIncidentDto>.Failure("Ghi chú tối đa 2000 ký tự.");
 
         var settings = await _repository.GetSettingsAsync(ct);
         return await _repository.InTransactionAsync(async () =>
         {
-            var incident = await _repository.GetTrackedIncidentAsync(id, ct);
+            var incident = await LockIncidentWithLoanAsync(id, ct);
             if (incident is null)
                 return Result<CirculationIncidentDto>.Failure("Không tìm thấy hồ sơ mất/hỏng sách.");
+            if (incident.BorrowRecord is not null && incident.BorrowRecord.Status != BorrowStatus.Returned)
+                return Result<CirculationIncidentDto>.Failure("Cần ghi nhận trả hoặc thất lạc trên phiếu trước khi xác nhận hồ sơ.");
 
+            if (await _repository.HasActiveLoanAsync(incident.BookCopyId, null, ct))
+                return Result<CirculationIncidentDto>.Failure("Bản sao đang có phiếu mở khác. Hãy kiểm tra lại trước khi xác nhận.");
             var error = CirculationRules.ValidateIncidentConfirmation(
                 incident.Kind, incident.Status, severity, settings.DamageFee, settings.LostFee);
             if (error is not null)
@@ -835,10 +889,12 @@ public class CirculationService
                 CirculationRules.CompensationReason(severity), $"incident:{incident.Id}");
             await _repository.AddFineAsync(compensationFine, ct);
 
-            Fine? overdueFine = null;
+            // Older records may already have an overdue fine. Keep that liability linked
+            // without charging it again, even when no additional overdue fee is requested.
+            Fine? overdueFine = await _repository.GetOverdueFineAsync(incident.BorrowRecordId, ct);
             var overdueDays = CirculationRules.CalendarOverdueDays(
                 incident.BorrowRecord?.DueDate, incident.BorrowRecord?.ReturnDate ?? now);
-            if (request.ApplyOverdue && overdueDays > 0 && settings.FinePerDay > 0
+            if (overdueFine is null && request.ApplyOverdue && overdueDays > 0 && settings.FinePerDay > 0
                 && !await _repository.HasOverdueFineAsync(incident.BorrowRecordId, ct))
             {
                 overdueFine = NewFine(
@@ -882,36 +938,108 @@ public class CirculationService
     public async Task<Result<CirculationIncidentDto>> RejectIncidentAsync(
         Guid id, RejectIncidentRequest request, Guid librarianId, CancellationToken ct = default)
     {
-        var incident = await _repository.GetTrackedIncidentAsync(id, ct);
-        if (incident is null)
-            return Result<CirculationIncidentDto>.Failure("Không tìm thấy hồ sơ mất/hỏng sách.");
-        if (incident.Status != BookIncidentStatus.PendingReview)
-            return Result<CirculationIncidentDto>.Failure("Chỉ từ chối hồ sơ đang chờ xác nhận.");
-
-        incident.Status = BookIncidentStatus.Rejected;
-        incident.ConfirmedBy = librarianId == Guid.Empty ? null : librarianId;
-        incident.ConfirmedAt = DateTime.UtcNow;
-        incident.Description = AppendNote(incident.Description, string.IsNullOrWhiteSpace(request.Notes)
-            ? "Từ chối trách nhiệm sau khi đối chiếu hồ sơ."
-            : request.Notes.Trim());
-        if (request.RestoreCopy && incident.BookCopy != null)
-            SetCopyAvailability(incident.BookCopy, BookCondition.Good, true);
-
-        await NotifyAsync(incident.ReaderId, "Hồ sơ sự cố đã được từ chối",
-            $"Thư viện đã đối chiếu và từ chối trách nhiệm mất/hỏng đối với “{incident.BookCopy?.Book?.Title}”.",
-            "return", ct, entityId: incident.BorrowRecordId);
-
-        await _unitOfWork.SaveChangesAsync(ct);
-        if (request.RestoreCopy && incident.BookCopy is not null)
+        if (string.IsNullOrWhiteSpace(request.Notes) || request.Notes.Length > 2000)
+            return Result<CirculationIncidentDto>.Failure("Nhập kết luận xác minh, tối đa 2000 ký tự.");
+        if (request.RestoreCopy && !IsRestorableCondition(request.Condition))
+            return Result<CirculationIncidentDto>.Failure("Chọn rõ tình trạng thực tế trước khi cho sách sử dụng lại.");
+        return await _repository.InTransactionAsync(async () =>
         {
-            await _repository.NotifyShelfRestockIfNeededAsync(incident.BookCopy.BookId, incident.BookCopy.Book?.Title, ct);
+            var incident = await LockIncidentWithLoanAsync(id, ct);
+            if (incident is null) return Result<CirculationIncidentDto>.Failure("Không tìm thấy hồ sơ mất/hỏng sách.");
+            if (incident.Status != BookIncidentStatus.PendingReview)
+                return Result<CirculationIncidentDto>.Failure("Chỉ từ chối hồ sơ đang chờ xác nhận.");
+            if (request.RestoreCopy && incident.BorrowRecord.Status != BorrowStatus.Returned)
+                return Result<CirculationIncidentDto>.Failure("Sách chưa được ghi nhận trả. Không thể xác nhận đưa về kho.");
+            if (request.RestoreCopy && await _repository.HasActiveLoanAsync(incident.BookCopyId, null, ct))
+                return Result<CirculationIncidentDto>.Failure("Bản sao đang có phiếu mở. Hãy tải lại trạng thái.");
+            if (!await _repository.TryClaimIncidentAsync(id, librarianId == Guid.Empty ? null : librarianId, ct))
+                return Result<CirculationIncidentDto>.Failure("Hồ sơ vừa được người khác xử lý. Hãy tải lại.");
+            incident.Status = BookIncidentStatus.Rejected;
+            incident.ConfirmedBy = librarianId == Guid.Empty ? null : librarianId;
+            incident.ConfirmedAt = DateTime.UtcNow;
+            incident.Description = AppendNote(incident.Description, $"Từ chối hồ sơ {FormatPickup(DateTime.UtcNow)}: {request.Notes.Trim()}");
+            if (request.RestoreCopy && incident.BookCopy is not null)
+            {
+                SetCopyAvailability(incident.BookCopy, ParseCondition(request.Condition), true);
+                incident.BookCopy.Location = null;
+                incident.Description = AppendNote(incident.Description, $"Đã kiểm tra bản sao: {request.Condition}. Trong kho chờ xếp kệ.");
+            }
+            // Rejecting responsibility does not erase overdue time, even when no compensation applies.
+            var settings = await _repository.GetSettingsAsync(ct);
+            if (incident.BorrowRecord.Status == BorrowStatus.Returned)
+                await AddOverdueFineIfNeededAsync(incident.BorrowRecord,
+                    CirculationRules.CalendarOverdueDays(incident.BorrowRecord.DueDate, incident.BorrowRecord.ReturnDate ?? DateTime.UtcNow), settings.FinePerDay, ct);
+            await NotifyAsync(incident.ReaderId, "Hồ sơ sự cố đã được từ chối", request.Notes.Trim(), "return", ct, entityId: incident.BorrowRecordId);
             await _unitOfWork.SaveChangesAsync(ct);
-        }
+            var saved = await _repository.GetIncidentDtoAsync(id, settings.FinePerDay, ct);
+            return saved is null ? Result<CirculationIncidentDto>.Failure("Không đọc được hồ sơ sau xử lý.") : Result<CirculationIncidentDto>.Success(saved);
+        }, ct);
+    }
+
+    private async Task<BookIncident?> LockIncidentWithLoanAsync(Guid id, CancellationToken ct)
+    {
+        var incident = await _repository.GetTrackedIncidentAsync(id, ct);
+        if (incident is null) return null;
+        // Receiving a return locks the loan before updating its incident. Keep the same
+        // order for assessment/recovery to avoid a loan <-> incident deadlock.
+        await _repository.LockBorrowRequestAsync(incident.BorrowRecordId, ct);
+        await _repository.ReloadTrackedLoanAsync(incident.BorrowRecordId, ct);
+        await _repository.LockIncidentAsync(id, ct);
+        return await _repository.GetTrackedIncidentAsync(id, ct);
+    }
+
+    private static bool IsRestorableCondition(string? value)
+        => Enum.TryParse<BookCondition>(value, true, out var condition)
+           && condition is BookCondition.Good or BookCondition.Fair or BookCondition.LightDamaged;
+
+    public async Task<Result<CirculationIncidentDto>> RestoreIncidentCopyAsync(
+        Guid id, RestoreIncidentCopyRequest request, Guid librarianId, CancellationToken ct = default)
+    {
+        if (!IsRestorableCondition(request.Condition) || string.IsNullOrWhiteSpace(request.Notes) || request.Notes.Length > 2000)
+            return Result<CirculationIncidentDto>.Failure("Chọn tình trạng đủ điều kiện sử dụng và ghi kết quả kiểm tra, tối đa 2000 ký tự.");
+        return await _repository.InTransactionAsync(async () =>
+        {
+            var incident = await LockIncidentWithLoanAsync(id, ct);
+            if (incident is null) return Result<CirculationIncidentDto>.Failure("Không tìm thấy hồ sơ.");
+            if (incident.Status == BookIncidentStatus.PendingReview || incident.BorrowRecord.Status != BorrowStatus.Returned)
+                return Result<CirculationIncidentDto>.Failure("Cần xử lý hồ sơ và ghi nhận trả trước khi khôi phục bản sao.");
+            if (incident.BookCopy.Condition is not (BookCondition.Damaged or BookCondition.Lost))
+                return Result<CirculationIncidentDto>.Failure("Bản sao đã đủ điều kiện sử dụng; không xác nhận lần nữa.");
+            if (await _repository.HasActiveLoanAsync(incident.BookCopyId, null, ct))
+                return Result<CirculationIncidentDto>.Failure("Bản sao đang có phiếu mở; không thể khôi phục.");
+            var settings = await _repository.GetSettingsAsync(ct);
+            var history = await _repository.GetCopyHistoryAsync(incident.BookCopyId, settings.FinePerDay, ct);
+            if (history.Incidents.FirstOrDefault()?.Id != incident.Id)
+                return Result<CirculationIncidentDto>.Failure("Có hồ sơ mới hơn cho bản sao này. Hãy mở hồ sơ mới nhất.");
+            SetCopyAvailability(incident.BookCopy, ParseCondition(request.Condition), true);
+            incident.BookCopy.Location = null;
+            incident.Description = AppendNote(incident.Description,
+                $"Kiểm tra/khôi phục {FormatPickup(DateTime.UtcNow)} bởi {librarianId}: {request.Notes.Trim()} · Tình trạng {request.Condition}. Trong kho chờ xếp kệ.");
+            await _unitOfWork.SaveChangesAsync(ct);
+            var saved = await _repository.GetIncidentDtoAsync(id, settings.FinePerDay, ct);
+            return saved is null ? Result<CirculationIncidentDto>.Failure("Không đọc được hồ sơ.") : Result<CirculationIncidentDto>.Success(saved);
+        }, ct);
+    }
+
+    public async Task<CirculationIncidentDto?> GetIncidentAsync(Guid id, CancellationToken ct = default)
+        => await _repository.GetIncidentDtoAsync(id, (await _repository.GetSettingsAsync(ct)).FinePerDay, ct);
+
+    public async Task<CopyCirculationHistoryDto> GetCopyHistoryAsync(Guid id, CancellationToken ct = default)
+        => await _repository.GetCopyHistoryAsync(id, (await _repository.GetSettingsAsync(ct)).FinePerDay, ct);
+
+    public async Task<StaffLoanDetailDto?> GetLoanDetailAsync(Guid id, CancellationToken ct = default)
+        => await _repository.GetLoanDetailAsync(id, (await _repository.GetSettingsAsync(ct)).FinePerDay, ct);
+
+    // Called in the same transaction as shelving, after copies have been saved.
+    public async Task ReadyReservationsAfterShelvingAsync(IEnumerable<Guid> bookIds, CancellationToken ct = default)
+    {
         var settings = await _repository.GetSettingsAsync(ct);
-        var saved = await _repository.GetIncidentDtoAsync(id, settings.FinePerDay, ct);
-        return saved is null
-            ? Result<CirculationIncidentDto>.Failure("Không đọc được hồ sơ sau khi từ chối.")
-            : Result<CirculationIncidentDto>.Success(saved);
+        foreach (var bookId in bookIds.Distinct().OrderBy(id => id))
+        {
+            await _repository.LockReservationBookAsync(bookId, ct);
+            while (await ReadyNextReservationAsync(bookId, settings, ct) is not null)
+                await _unitOfWork.SaveChangesAsync(ct);
+        }
     }
 
     public async Task<IReadOnlyList<CirculationLoanDto>> GetPendingAsync(CancellationToken ct = default)
@@ -946,7 +1074,7 @@ public class CirculationService
                 loan.Status = BorrowStatus.Rejected;
                 loan.Notes = AppendNote(loan.Notes, "Tự hủy vì độc giả không đến trong vòng 30 phút sau lịch nhận.");
                 if (loan.BookCopy is not null)
-                    SetCopyAvailability(loan.BookCopy, loan.BookCopy.Condition, true);
+                    SetCopyAvailability(loan.BookCopy, loan.BookCopy.Condition, loan.BookCopy.Condition is not (BookCondition.Damaged or BookCondition.Lost));
                 await NotifyAsync(loan.ReaderId, "Yêu cầu mượn đã hết hạn",
                     $"Yêu cầu nhận “{loan.BookCopy?.Book?.Title}” đã tự hủy vì bạn không đến trong vòng 30 phút sau lịch hẹn. Bản sao đã được trả về kho.",
                     "borrow", ct);
@@ -1132,31 +1260,38 @@ public class CirculationService
     {
         if (readerId == Guid.Empty)
             return Result<CirculationIncidentDto>.Failure("Không xác định được tài khoản.");
-        var loan = await _repository.GetTrackedLoanAsync(loanId, ct);
-        if (loan is null || loan.ReaderId != readerId)
-            return Result<CirculationIncidentDto>.Failure("Không tìm thấy phiếu mượn của bạn.");
-        if (loan.Status is not (BorrowStatus.Borrowed or BorrowStatus.Overdue))
-            return Result<CirculationIncidentDto>.Failure("Chỉ báo mất/hỏng trên phiếu đang mượn.");
-        if (await _repository.HasOpenIncidentAsync(loan.Id, ct) || await _repository.HasCompensationFineAsync(loan.Id, ct))
-            return Result<CirculationIncidentDto>.Failure("Phiếu này đã có hồ sơ sự cố. Chờ thủ thư xác minh, chưa tính bồi thường.");
+        if (request.Notes?.Length > 2000)
+            return Result<CirculationIncidentDto>.Failure("Ghi chú tối đa 2000 ký tự.");
+        return await _repository.InTransactionAsync(async () =>
+        {
+            await _repository.LockBorrowRequestAsync(loanId, ct);
+            var loan = await _repository.GetTrackedLoanAsync(loanId, ct);
+            if (loan is null || loan.ReaderId != readerId)
+                return Result<CirculationIncidentDto>.Failure("Không tìm thấy phiếu mượn của bạn.");
+            await _repository.ReloadTrackedLoanAsync(loanId, ct);
+            if (loan.Status is not (BorrowStatus.Borrowed or BorrowStatus.Overdue))
+                return Result<CirculationIncidentDto>.Failure("Chỉ báo mất/hỏng trên phiếu đang mượn.");
+            if (await _repository.HasOpenIncidentAsync(loan.Id, ct) || await _repository.HasCompensationFineAsync(loan.Id, ct))
+                return Result<CirculationIncidentDto>.Failure("Phiếu này đã có hồ sơ sự cố. Chờ thủ thư xác minh, chưa tính bồi thường.");
 
-        var condition = request.Kind.Equals("Lost", StringComparison.OrdinalIgnoreCase)
-            ? BookCondition.Lost
-            : BookCondition.Damaged;
-        var incident = CirculationRules.CreatePendingIncident(loan.Id, loan.BookCopyId, loan.ReaderId, condition, readerId);
-        incident.Description = AppendNote(incident.Description,
-            string.IsNullOrWhiteSpace(request.Notes)
-                ? "Độc giả tự báo cáo. Chưa xác nhận mất/hỏng và chưa lập bồi thường."
-                : request.Notes.Trim());
-        loan.Notes = AppendNote(loan.Notes, "Độc giả báo cáo sự cố. Chờ thủ thư đối chiếu.");
-        await _repository.AddIncidentAsync(incident, ct);
-        await _unitOfWork.SaveChangesAsync(ct);
+            var condition = request.Kind.Equals("Lost", StringComparison.OrdinalIgnoreCase)
+                ? BookCondition.Lost
+                : BookCondition.Damaged;
+            var incident = CirculationRules.CreatePendingIncident(loan.Id, loan.BookCopyId, loan.ReaderId, condition, readerId);
+            incident.Description = AppendNote(incident.Description,
+                string.IsNullOrWhiteSpace(request.Notes)
+                    ? "Độc giả tự báo cáo. Chưa xác nhận mất/hỏng và chưa lập bồi thường."
+                    : request.Notes.Trim());
+            loan.Notes = AppendNote(loan.Notes, "Độc giả báo cáo sự cố. Chờ thủ thư đối chiếu.");
+            await _repository.AddIncidentAsync(incident, ct);
+            await _unitOfWork.SaveChangesAsync(ct);
 
-        var settings = await _repository.GetSettingsAsync(ct);
-        var saved = await _repository.GetIncidentDtoAsync(incident.Id, settings.FinePerDay, ct);
-        return saved is null
-            ? Result<CirculationIncidentDto>.Failure("Không đọc được hồ sơ vừa tạo.")
-            : Result<CirculationIncidentDto>.Success(saved);
+            var settings = await _repository.GetSettingsAsync(ct);
+            var saved = await _repository.GetIncidentDtoAsync(incident.Id, settings.FinePerDay, ct);
+            return saved is null
+                ? Result<CirculationIncidentDto>.Failure("Không đọc được hồ sơ vừa tạo.")
+                : Result<CirculationIncidentDto>.Success(saved);
+        }, ct);
     }
 
     public Task<IReadOnlyList<CirculationActivityDto>> GetRecentActivityAsync(CancellationToken ct = default)
@@ -1322,15 +1457,16 @@ public class CirculationService
     }
 
     private async Task<bool> OpenIncidentIfNeededAsync(
-        BorrowRecord loan, BookCondition condition, Guid librarianId, CancellationToken ct)
+        BorrowRecord loan, BookCondition condition, Guid librarianId, CancellationToken ct, string? returnNotes = null)
     {
         loan.Notes = AppendNote(loan.Notes, condition == BookCondition.Lost
             ? CirculationRules.LostNote
             : CirculationRules.DamagedNote);
         if (await _repository.HasOpenIncidentAsync(loan.Id, ct) || await _repository.HasCompensationFineAsync(loan.Id, ct))
             return false;
-        await _repository.AddIncidentAsync(
-            CirculationRules.CreatePendingIncident(loan.Id, loan.BookCopyId, loan.ReaderId, condition, librarianId), ct);
+        var incident = CirculationRules.CreatePendingIncident(loan.Id, loan.BookCopyId, loan.ReaderId, condition, librarianId);
+        incident.Description = AppendNote(incident.Description, $"Nhận trả {FormatPickup(DateTime.UtcNow)}: {returnNotes?.Trim()}");
+        await _repository.AddIncidentAsync(incident, ct);
         return true;
     }
 

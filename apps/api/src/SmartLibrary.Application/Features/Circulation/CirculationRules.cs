@@ -248,7 +248,7 @@ public static class CirculationRules
         => severity == BookIncidentSeverity.Lost ? CompensationLostPrefix : CompensationDamagePrefix;
 
     public static BookCondition CopyConditionAfterConfirm(BookIncidentSeverity severity)
-        => severity == BookIncidentSeverity.Lost ? BookCondition.Lost : BookCondition.Damaged;
+        => severity switch { BookIncidentSeverity.Lost => BookCondition.Lost, BookIncidentSeverity.Light => BookCondition.LightDamaged, _ => BookCondition.Damaged };
 
     public static bool CopyAvailableAfterConfirm(BookIncidentSeverity severity)
         => severity == BookIncidentSeverity.Light;
