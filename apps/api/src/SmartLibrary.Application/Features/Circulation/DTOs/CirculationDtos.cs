@@ -2,6 +2,9 @@ namespace SmartLibrary.Application.Features.Circulation.DTOs;
 
 public class CirculationStatsDto
 {
+    public int Pending { get; init; }
+    public int Approved { get; init; }
+    public int PendingIncidents { get; init; }
     public int Borrowed { get; init; }
     public int BorrowedDelta { get; init; }
     public int Returned { get; init; }
@@ -48,6 +51,8 @@ public record CirculationLoanDto
     public string BookTitle { get; init; } = string.Empty;
     public string? CoverImageUrl { get; init; }
     public string? CopyCondition { get; init; }
+    public string? ReturnCondition { get; init; }
+    public string? Notes { get; init; }
     public decimal? SuggestedFine { get; init; }
     public bool HasOpenFine { get; init; }
     public bool HasFine { get; init; }
@@ -57,6 +62,7 @@ public record CirculationLoanDto
     public bool RequiresApproval { get; init; }
     public string? Language { get; init; }
     public decimal? CreatedFineAmount { get; init; }
+    public bool OverdueFineAlreadyExists { get; init; }
     public bool IncidentOpened { get; init; }
     public Guid? IncidentId { get; init; }
     public Guid? ReadyReservationReaderId { get; init; }
@@ -125,6 +131,7 @@ public record CirculationIncidentDto
     public string ReaderName { get; init; } = string.Empty;
     public int OverdueDays { get; init; }
     public decimal? SuggestedOverdueFine { get; init; }
+    public bool HasRecordedOverdueFine { get; init; }
     public decimal? ReplacementValue { get; init; }
     public decimal? AssessedFee { get; init; }
     public decimal CompensationAmount { get; init; }
@@ -135,7 +142,20 @@ public record CirculationIncidentDto
     public string? Description { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? ConfirmedAt { get; init; }
+    public string CopyCondition { get; init; } = string.Empty;
+    public string LoanStatus { get; init; } = string.Empty;
+    public bool CanRestoreCopy { get; init; }
 }
+
+public sealed record CopyCirculationHistoryDto(IReadOnlyList<CirculationLoanDto> Loans, IReadOnlyList<CirculationIncidentDto> Incidents);
+public sealed record StaffLoanDetailDto(CirculationLoanDto Loan, IReadOnlyList<CirculationIncidentDto> Incidents, IReadOnlyList<CirculationFineDto> Fines);
+public sealed class RestoreIncidentCopyRequest
+{
+    public string Condition { get; set; } = "Good";
+    public string Notes { get; set; } = string.Empty;
+}
+public sealed class RejectLoanRequest { public string? Notes { get; set; } }
+public sealed class CompleteCheckoutRequest { public string? Barcode { get; set; } }
 
 public class ConfirmIncidentRequest
 {
@@ -149,7 +169,8 @@ public class ConfirmIncidentRequest
 public class RejectIncidentRequest
 {
     public string? Notes { get; set; }
-    public bool RestoreCopy { get; set; } = true;
+    public bool RestoreCopy { get; set; }
+    public string? Condition { get; set; }
 }
 
 public class CirculationLoanListDto
@@ -238,6 +259,8 @@ public class ReturnLoanRequest
 {
     public string Barcode { get; set; } = string.Empty;
     public string? Condition { get; set; }
+    public string? Notes { get; set; }
+    public Guid? LoanId { get; set; }
 }
 
 public class RecordFineRequest
