@@ -27,6 +27,16 @@ public class BooksController : ControllerBase
         _db = db;
     }
 
+    [HttpGet("next-code")]
+    [Authorize(Policy = "LibrarianOnly")]
+    public async Task<IActionResult> NextCode([FromQuery] Guid categoryId, [FromServices] IBookCodeGenerator generator, CancellationToken ct)
+    {
+        var result = await generator.GetNextAsync(categoryId, ct: ct);
+        return result.IsSuccess
+            ? Ok(ApiResponse<object>.Ok(new { code = result.Data, categoryId }))
+            : BadRequest(ApiResponse<object>.Fail(result.Error!));
+    }
+
     [HttpGet("field-config")]
     public async Task<IActionResult> GetFieldConfig(CancellationToken ct)
     {
@@ -192,6 +202,7 @@ public class BooksController : ControllerBase
     [Authorize(Policy = "LibrarianOnly")]
     public async Task<IActionResult> Create([FromBody] CreateBookRequest request, CancellationToken ct = default)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
         Result<BookDto> result;
         try
         {
@@ -199,11 +210,12 @@ public class BooksController : ControllerBase
         }
         catch (DbUpdateException exception) when (IsBookCodeConflict(exception))
         {
-            return Conflict(ApiResponse<object>.Fail("Mã sách đã được sử dụng. Vui lòng nhập mã khác."));
+            return Conflict(ApiResponse<object>.Fail("Mã sách vừa được sử dụng. Vui lòng tải lại mã tự động và thử lại."));
         }
         if (!result.IsSuccess)
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
 
+        await transaction.CommitAsync(ct);
         return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id },
             ApiResponse<BookDto>.Ok(result.Data));
     }
@@ -238,7 +250,7 @@ public class BooksController : ControllerBase
         }
         catch (DbUpdateException exception) when (IsBookCodeConflict(exception))
         {
-            return Conflict(ApiResponse<object>.Fail("Mã sách đã được sử dụng. Vui lòng nhập mã khác."));
+            return Conflict(ApiResponse<object>.Fail("Mã sách vừa được sử dụng. Vui lòng tải lại mã tự động và thử lại."));
         }
         if (!result.IsSuccess)
             return BadRequest(ApiResponse<object>.Fail(result.Error!));

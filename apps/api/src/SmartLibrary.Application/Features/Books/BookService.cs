@@ -17,6 +17,7 @@ public class BookService
     private readonly IBookRepository _bookRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly IBookCodeGenerator _codeGenerator;
     private readonly IStorageService? _storageService;
     private readonly IRagIndexer? _ragIndexer;
     private readonly IBookCatalogCache? _catalogCache;
@@ -25,6 +26,7 @@ public class BookService
         IBookRepository bookRepository,
         IUnitOfWork unitOfWork,
         IMapper mapper,
+        IBookCodeGenerator codeGenerator,
         IStorageService? storageService = null,
         IRagIndexer? ragIndexer = null,
         IBookCatalogCache? catalogCache = null)
@@ -32,6 +34,7 @@ public class BookService
         _bookRepository = bookRepository;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _codeGenerator = codeGenerator;
         _storageService = storageService;
         _ragIndexer = ragIndexer;
         _catalogCache = catalogCache;
@@ -64,18 +67,24 @@ public class BookService
 
     public async Task<Result<BookDto>> CreateAsync(CreateBookRequest request, CancellationToken ct = default)
     {
-        var code = NormalizeBookCode(request.Code);
-        if (code is null)
+        var categoryIds = request.CategoryIds.Where(id => id != Guid.Empty).Distinct().ToList();
+        var primaryId = request.CodeCategoryId ?? (categoryIds.Count == 1 ? categoryIds[0] : (Guid?)null);
+        if (!primaryId.HasValue || !categoryIds.Contains(primaryId.Value))
+            return Result<BookDto>.Failure("Chọn một danh mục cấp mã trong các danh mục của đầu sách.");
+        var categories = new List<Category>();
+        foreach (var id in categoryIds)
         {
-            return Result<BookDto>.Failure("Mã sách chỉ được gồm 1–32 chữ cái hoặc chữ số.");
+            var category = await _unitOfWork.Repository<Category>().GetByIdAsync(id, ct);
+            if (category is null || category.IsDeleted)
+                return Result<BookDto>.Failure("Một hoặc nhiều danh mục không còn tồn tại.");
+            categories.Add(category);
         }
-        if (await _bookRepository.IsCodeTakenAsync(code, ct))
-        {
-            return Result<BookDto>.Failure("Mã sách đã được sử dụng. Vui lòng nhập mã khác.");
-        }
-
+        var generated = await _codeGenerator.GetNextAsync(primaryId.Value, true, ct);
+        if (!generated.IsSuccess) return Result<BookDto>.Failure(generated.Error!);
         var book = _mapper.Map<Book>(request);
-        book.Code = code;
+        book.Code = generated.Data!;
+        book.CodeCategoryId = primaryId;
+        book.Categories = categories;
         await _bookRepository.AddAsync(book, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
@@ -114,16 +123,6 @@ public class BookService
             return Result<BookDto>.Failure("Tiêu đề sách không được để trống.");
         }
 
-        var code = NormalizeBookCode(form.Code);
-        if (code is null)
-        {
-            return Result<BookDto>.Failure("Mã sách chỉ được gồm 1–32 chữ cái hoặc chữ số.");
-        }
-        if (await _bookRepository.IsCodeTakenAsync(code, ct))
-        {
-            return Result<BookDto>.Failure("Mã sách đã được sử dụng. Vui lòng nhập mã khác.");
-        }
-
         if (form.TotalCopies is < 1 or > 500)
         {
             return Result<BookDto>.Failure("Số lượng bản sao phải từ 1 đến 500.");
@@ -146,6 +145,9 @@ public class BookService
             .ToList();
         if (categoryIds.Count == 0)
             return Result<BookDto>.Failure("Vui lòng chọn ít nhất một danh mục cho đầu sách.");
+        var primaryId = form.CodeCategoryId ?? (categoryIds.Count == 1 ? categoryIds[0] : (Guid?)null);
+        if (!primaryId.HasValue || !categoryIds.Contains(primaryId.Value))
+            return Result<BookDto>.Failure("Chọn một danh mục cấp mã trong các danh mục của đầu sách.");
 
         var bookCategories = new List<Category>(categoryIds.Count);
         foreach (var categoryId in categoryIds)
@@ -166,10 +168,14 @@ public class BookService
             coverUrl = await _storageService.UploadFileAsync(stream, safeName, "books", ct);
         }
 
+        var generated = await _codeGenerator.GetNextAsync(primaryId.Value, true, ct);
+        if (!generated.IsSuccess) return Result<BookDto>.Failure(generated.Error!);
+        var code = generated.Data!;
         var book = new Book
         {
             Id = Guid.NewGuid(),
             Code = code,
+            CodeCategoryId = primaryId,
             Title = trimmedTitle,
             Isbn = string.IsNullOrWhiteSpace(form.Isbn) ? null : form.Isbn.Trim(),
             Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
@@ -234,6 +240,8 @@ public class BookService
             return Result<BookDto>.Failure(Errors.NotFound);
 
         var requestedCategoryIds = request.CategoryIds.Where(categoryId => categoryId != Guid.Empty).Distinct().ToList();
+        if (requestedCategoryIds.Count > 0 && book.CodeCategoryId.HasValue && !requestedCategoryIds.Contains(book.CodeCategoryId.Value))
+            return Result<BookDto>.Failure("Cần giữ danh mục cấp mã của đầu sách để bảo toàn mã bản sao và QR. Có thể thêm các danh mục khác.");
         var requestedCategories = new List<Category>(requestedCategoryIds.Count);
         foreach (var categoryId in requestedCategoryIds)
         {
@@ -370,6 +378,8 @@ public class BookService
             .ToList();
         if (requestedCategoryIds.Count > 0)
         {
+            if (book.CodeCategoryId.HasValue && !requestedCategoryIds.Contains(book.CodeCategoryId.Value))
+                return Result<BookDto>.Failure("Cần giữ danh mục cấp mã của đầu sách. Có thể thêm các danh mục khác.");
             book.Categories.Clear();
             foreach (var categoryId in requestedCategoryIds)
             {

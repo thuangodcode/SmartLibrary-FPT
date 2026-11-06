@@ -19,6 +19,7 @@ public class BookServiceTests
     private readonly Mock<IBookRepository> _bookRepositoryMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly IMapper _mapper;
+    private readonly Mock<IBookCodeGenerator> _codeGeneratorMock = new();
     private readonly BookService _sut; // System Under Test
 
     public BookServiceTests()
@@ -31,7 +32,9 @@ public class BookServiceTests
             NullLoggerFactory.Instance);
         _mapper = mapperConfig.CreateMapper();
 
-        _sut = new BookService(_bookRepositoryMock.Object, _unitOfWorkMock.Object, _mapper);
+        _codeGeneratorMock.Setup(generator => generator.GetNextAsync(It.IsAny<Guid>(), true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<string>.Success("AUTO001"));
+        _sut = new BookService(_bookRepositoryMock.Object, _unitOfWorkMock.Object, _mapper, _codeGeneratorMock.Object);
     }
 
     [Fact]
@@ -120,6 +123,11 @@ public class BookServiceTests
             Isbn = "1234567890123",
             Language = "vi"
         };
+        var category = new Category { Id = Guid.NewGuid(), Code = "AUTO", Name = "Category" };
+        var categories = new Mock<IRepository<Category>>();
+        categories.Setup(repo => repo.GetByIdAsync(category.Id, It.IsAny<CancellationToken>())).ReturnsAsync(category);
+        _unitOfWorkMock.Setup(unit => unit.Repository<Category>()).Returns(categories.Object);
+        request.CategoryIds = [category.Id];
 
         _bookRepositoryMock
             .Setup(r => r.AddAsync(It.IsAny<Book>(), It.IsAny<CancellationToken>()))
@@ -135,6 +143,8 @@ public class BookServiceTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Data!.Title.Should().Be("New Book");
+        result.Data.Code.Should().Be("AUTO001");
+        result.Data.CodeCategoryId.Should().Be(category.Id);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -165,7 +175,7 @@ public class BookServiceTests
     [Fact]
     public async Task CreateFromFormAsync_WithMultipleCategories_PersistsEveryCategory()
     {
-        var first = new Category { Id = Guid.NewGuid(), Name = "Ngôn ngữ" };
+        var first = new Category { Id = Guid.NewGuid(), Code = "NN", Name = "Ngôn ngữ" };
         var second = new Category { Id = Guid.NewGuid(), Name = "Văn học" };
         var categories = new Mock<IRepository<Category>>();
         categories.Setup(repo => repo.GetByIdAsync(first.Id, It.IsAny<CancellationToken>())).ReturnsAsync(first);
@@ -181,12 +191,17 @@ public class BookServiceTests
             Code = "MULTICAT",
             Title = "Language and Literature",
             TotalCopies = 2,
+            CodeCategoryId = first.Id,
             CategoryIds = [first.Id, second.Id, first.Id]
         });
 
         result.IsSuccess.Should().BeTrue();
         result.Data!.CategoryIds.Should().BeEquivalentTo(new[] { first.Id, second.Id });
         result.Data.CategoryNames.Should().BeEquivalentTo(new[] { first.Name, second.Name });
+        result.Data.Code.Should().Be("AUTO001");
+        _codeGeneratorMock.Verify(generator => generator.GetNextAsync(first.Id, true, It.IsAny<CancellationToken>()), Times.Once);
+        _bookRepositoryMock.Verify(repo => repo.AddAsync(It.Is<Book>(book =>
+            book.CodeCategoryId == first.Id && book.Copies.All(copy => copy.Barcode.StartsWith("AUTO001-"))), It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWorkMock.Verify(unit => unit.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
