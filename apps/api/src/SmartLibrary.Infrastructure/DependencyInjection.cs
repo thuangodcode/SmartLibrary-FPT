@@ -78,6 +78,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminUserManagementService, AdminUserManagementService>();
         services.AddScoped<IUserProfileService, UserProfileService>();
         services.AddScoped<IStorageService, StorageService>();
+        services.AddScoped<SmartLibrary.Application.Features.Books.IBookCodeGenerator, BookCodeGenerator>();
         services.AddScoped<IReportExportService, ReportExportService>();
 
         // Supabase
