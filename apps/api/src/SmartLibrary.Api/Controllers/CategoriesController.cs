@@ -6,6 +6,7 @@ using SmartLibrary.Application.Features.Categories.DTOs;
 using SmartLibrary.Application.Features.Books;
 using SmartLibrary.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -64,11 +65,14 @@ public class CategoriesController : ControllerBase
     /// Tạo mới một danh mục sách (có hỗ trợ upload hình ảnh lên Cloudinary từ máy tính).
     /// </summary>
     [HttpPost]
-    [Authorize]
+    [Authorize(Policy = "LibrarianOnly")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> Create([FromForm] CreateCategoryForm form, CancellationToken ct = default)
     {
-        var result = await _categoryService.CreateAsync(form, ct);
+        Result<CategoryDto> result;
+        try { result = await _categoryService.CreateAsync(form, ct); }
+        catch (DbUpdateException exception) when (IsCodeConflict(exception))
+        { return Conflict(ApiResponse<object>.Fail("Mã danh mục đã được sử dụng.")); }
         if (!result.IsSuccess)
         {
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
@@ -81,11 +85,14 @@ public class CategoriesController : ControllerBase
     /// Cập nhật thông tin danh mục sách (có hỗ trợ thay đổi hình ảnh Cloudinary).
     /// </summary>
     [HttpPut("{id:guid}")]
-    [Authorize]
+    [Authorize(Policy = "LibrarianOnly")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> Update(Guid id, [FromForm] UpdateCategoryForm form, CancellationToken ct = default)
     {
-        var result = await _categoryService.UpdateAsync(id, form, ct);
+        Result<CategoryDto> result;
+        try { result = await _categoryService.UpdateAsync(id, form, ct); }
+        catch (DbUpdateException exception) when (IsCodeConflict(exception))
+        { return Conflict(ApiResponse<object>.Fail("Mã danh mục đã được sử dụng.")); }
         if (!result.IsSuccess)
         {
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
@@ -98,7 +105,7 @@ public class CategoriesController : ControllerBase
     /// Xóa một danh mục sách (soft-delete).
     /// </summary>
     [HttpDelete("{id:guid}")]
-    [Authorize]
+    [Authorize(Policy = "LibrarianOnly")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
     {
         var result = await _categoryService.DeleteAsync(id, ct);
@@ -117,7 +124,7 @@ public class CategoriesController : ControllerBase
         var categories = await _db.Categories.IgnoreQueryFilters().AsNoTracking()
             .Where(category => category.IsDeleted)
             .OrderByDescending(category => category.UpdatedAt)
-            .Select(category => new { category.Id, category.Name, category.Description, category.ImageUrl, category.UpdatedAt })
+            .Select(category => new { category.Id, category.Code, category.Name, category.Description, category.ImageUrl, category.UpdatedAt })
             .ToListAsync(ct);
         return Ok(ApiResponse<object>.Ok(categories));
     }
@@ -137,4 +144,7 @@ public class CategoriesController : ControllerBase
         await _db.SaveChangesAsync(ct);
         return Ok(ApiResponse<bool>.Ok(true));
     }
+
+    private static bool IsCodeConflict(DbUpdateException exception)
+        => exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ix_categories_code" };
 }
