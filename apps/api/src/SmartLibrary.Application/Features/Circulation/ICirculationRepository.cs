@@ -44,6 +44,7 @@ public interface ICirculationRepository
         Guid readerId, int page, int pageSize, CirculationSettings settings, CancellationToken ct);
     Task<bool> HasOpenFineAsync(Guid borrowRecordId, CancellationToken ct);
     Task<bool> HasOverdueFineAsync(Guid borrowRecordId, CancellationToken ct);
+    Task<Fine?> GetOverdueFineAsync(Guid borrowRecordId, CancellationToken ct);
     Task<bool> HasCompensationFineAsync(Guid borrowRecordId, CancellationToken ct);
     Task<bool> HasOpenIncidentAsync(Guid borrowRecordId, CancellationToken ct);
     Task<Guid?> GetOpenIncidentIdAsync(Guid borrowRecordId, CancellationToken ct);
@@ -53,6 +54,9 @@ public interface ICirculationRepository
     Task<BookIncident?> FindIncidentByFineIdAsync(Guid fineId, CancellationToken ct);
     Task<IReadOnlyList<CirculationIncidentDto>> GetIncidentsAsync(int finePerDay, CancellationToken ct);
     Task<CirculationIncidentDto?> GetIncidentDtoAsync(Guid id, int finePerDay, CancellationToken ct);
+    Task LockIncidentAsync(Guid id, CancellationToken ct);
+    Task<CopyCirculationHistoryDto> GetCopyHistoryAsync(Guid copyId, int finePerDay, CancellationToken ct);
+    Task<StaffLoanDetailDto?> GetLoanDetailAsync(Guid id, int finePerDay, CancellationToken ct);
     Task<Fine?> GetTrackedFineAsync(Guid id, CancellationToken ct);
     Task LockFineAsync(Guid id, CancellationToken ct);
     Task<CirculationFineDto?> GetFineDtoAsync(Guid id, CancellationToken ct);
