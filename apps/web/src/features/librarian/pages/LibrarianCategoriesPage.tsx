@@ -23,6 +23,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5278';
 
 export interface CategoryItem {
   id: string;
+  code: string;
   name: string;
   description?: string | null;
   imageUrl?: string | null;
@@ -340,6 +341,7 @@ const LibrarianCategoriesPage: React.FC = () => {
 
                     {/* Bottom: Only Category Name (Sample 1 Style) */}
                     <span className="lib-cat-pnc-name">{cat.name}</span>
+                    <span className="lib-cat-prefix">Mã danh mục: {cat.code}</span>
                   </div>
                 );
               })}
