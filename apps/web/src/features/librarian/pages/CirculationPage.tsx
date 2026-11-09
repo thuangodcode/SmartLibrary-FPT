@@ -86,7 +86,7 @@ interface ReturnResult extends CirculationLoan {
 }
 
 function policyIncidentFee(stats: CirculationStats | null, severity: string): number {
-  if (!stats) return 0;
+  if (!stats || !['Light', 'Severe', 'Lost'].includes(severity)) return 0;
   return severity === 'Light' ? stats.damageFee || 0 : stats.lostFee || 0;
 }
 
@@ -1215,6 +1215,8 @@ function ReturnView() {
   const [defaultCondition, setDefaultCondition] = useState('Good');
   const [manualBarcode, setManualBarcode] = useState(params.get('barcode') ?? '');
   const [manualCondition, setManualCondition] = useState('Good');
+  const [returnNotes, setReturnNotes] = useState<Record<string, string>>({});
+  const [manualNotes, setManualNotes] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1273,7 +1275,11 @@ function ReturnView() {
     setLoansError(null);
   };
 
-  const returnBook = async (barcode: string, condition: string) => {
+  const returnBook = async (barcode: string, condition: string, notes: string, loanId?: string) => {
+    if (['Damaged', 'Lost'].includes(condition) && !notes.trim()) {
+      showToast({ type: 'error', title: 'Thiếu mô tả tình trạng', message: 'Ghi rõ hư hỏng hoặc lý do thất lạc trước khi nhận trả.' });
+      return;
+    }
     setBusy(true);
     setReturningBarcode(barcode);
     setError(null);
@@ -1282,7 +1288,7 @@ function ReturnView() {
       const res = await fetch(`${API_BASE_URL}/api/v1/circulation/return`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ barcode, condition }),
+        body: JSON.stringify({ barcode, condition, notes: notes.trim(), loanId }),
       });
       const json = await parseApiResponse<ApiResult<ReturnResult>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Thao tác trả sách thất bại.');
@@ -1298,7 +1304,7 @@ function ReturnView() {
       if (selectedReader) {
         await fetchReaderLoans(selectedReader.id);
       }
-      setManualBarcode('');
+      setManualBarcode(''); setManualNotes('');
     } catch (err) {
       const msg = errorMessage(err, 'Thao tác trả sách thất bại.');
       setError(msg);
@@ -1404,6 +1410,7 @@ function ReturnView() {
                 >
                   <option value="Good">Bình thường (Đạt tiêu chuẩn)</option>
                   <option value="Fair">Hơi cũ (Còn nguyên vẹn)</option>
+                  <option value="LightDamaged">Hư nhẹ đã xác minh, không có hư hỏng mới</option>
                   <option value="Damaged">Hư hỏng (Chờ xác minh bồi thường)</option>
                   <option value="Lost">Thất lạc (Chờ xác minh bồi thường)</option>
                 </select>
@@ -1448,7 +1455,7 @@ function ReturnView() {
                 ) : (
                   <div className="circ-active-loans-grid">
                     {activeLoans.map((loan) => {
-                      const cond = conditions[loan.id] || defaultCondition;
+                      const cond = conditions[loan.id] || (loan.copyCondition === 'LightDamaged' ? 'LightDamaged' : defaultCondition);
                       const isProcessing = busy && returningBarcode === loan.barcode;
                       return (
                         <article className="circ-active-loan-card" key={loan.id}>
@@ -1478,15 +1485,18 @@ function ReturnView() {
                                 onChange={(e) => setConditions((prev) => ({ ...prev, [loan.id]: e.target.value }))}
                               >
                                 <option value="Good">Bình thường</option>
+                                {loan.copyCondition === 'LightDamaged' && <option value="LightDamaged">Hư nhẹ đã xác minh, không có hư hỏng mới</option>}
                                 <option value="Fair">Hơi cũ</option>
                                 <option value="Damaged">Hư hỏng</option>
                                 <option value="Lost">Thất lạc</option>
                               </select>
-                            </label>`n                            <button
+                            </label>
+                            <label className="circ-field">Mô tả tình trạng / ghi chú<textarea rows={2} maxLength={2000} disabled={busy} value={returnNotes[loan.id] || ''} onChange={event => setReturnNotes(previous => ({ ...previous, [loan.id]: event.target.value }))} placeholder={['Damaged', 'Lost'].includes(cond) ? 'Bắt buộc: mô tả hư hỏng hoặc lý do thất lạc' : 'Ghi chú nhận trả (nếu có)'} /></label>
+                            <button
                               type="button"
                               className="circ-btn circ-btn--primary"
                               disabled={busy}
-                              onClick={() => void returnBook(loan.barcode, cond)}
+                              onClick={() => void returnBook(loan.barcode, cond, returnNotes[loan.id] || '', loan.id)}
                             >
                               {isProcessing ? <LoaderCircle className="spin" size={14} /> : <RotateCcw size={14} />}
                               {isProcessing ? 'Đang ghi nhận...' : 'Ghi nhận trả sách'}
@@ -1506,7 +1516,7 @@ function ReturnView() {
             className="circ-barcode-return-form"
             onSubmit={(e) => {
               e.preventDefault();
-              if (manualBarcode.trim()) void returnBook(manualBarcode.trim(), manualCondition);
+              if (manualBarcode.trim()) void returnBook(manualBarcode.trim(), manualCondition, manualNotes);
             }}
           >
             <div className="circ-return-reader-grid">
@@ -1524,6 +1534,7 @@ function ReturnView() {
                 <select value={manualCondition} onChange={(e) => setManualCondition(e.target.value)}>
                   <option value="Good">Bình thường (Đạt tiêu chuẩn)</option>
                   <option value="Fair">Hơi cũ (Còn nguyên vẹn)</option>
+                  <option value="LightDamaged">Hư nhẹ đã xác minh, không có hư hỏng mới</option>
                   <option value="Damaged">Hư hỏng (Chờ xác minh bồi thường)</option>
                   <option value="Lost">Thất lạc (Chờ xác minh bồi thường)</option>
                 </select>
@@ -1540,6 +1551,7 @@ function ReturnView() {
               </div>
             </div>
 
+            <label className="circ-field">Mô tả tình trạng / ghi chú<textarea rows={3} maxLength={2000} value={manualNotes} onChange={event => setManualNotes(event.target.value)} placeholder="Bắt buộc khi báo hỏng hoặc thất lạc" /></label>
             <div className="circ-return-actions-row">
               <button
                 type="submit"
@@ -1796,10 +1808,7 @@ function OverdueView() {
   const [error, setError] = useState<string | null>(null);
   const [overdueLoadFailed, setOverdueLoadFailed] = useState(false);
   const [incidentLoadFailed, setIncidentLoadFailed] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [fineToRecord, setFineToRecord] = useState<CirculationLoan | null>(null);
   const [overdueStatus, setOverdueStatus] = useState('All');
   const [incidentStatus, setIncidentStatus] = useState('All');
   const [overdueDates, setOverdueDates] = useState<Date[]>([]);
@@ -1877,42 +1886,16 @@ function OverdueView() {
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
-  const recordFine = async (loan: CirculationLoan) => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/circulation/fines`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ borrowRecordId: loan.id }),
-      });
-      const json = await parseApiResponse<ApiResult<unknown>>(res);
-      if (!res.ok || !json?.success) throw new Error(json?.error || 'Không ghi nhận được phạt.');
-      const message = json.meta?.message || 'Đã ghi nhận phạt.';
-      setMessage(message);
-      showToast({ type: 'success', title: 'Đã ghi nhận phí phạt', message });
-      setFineToRecord(null);
-      await load();
-    } catch (err) {
-      const message = errorMessage(err, 'Không ghi nhận được phạt.');
-      setError(message);
-      showToast({ type: 'error', title: 'Không ghi nhận được phí phạt', message });
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <section className="circ-page circ-page--overdue">
       <Chrome tab="overdue" stats={stats} loading={loading} />
       <div className="circ-toolbar-end">
         <span />
-        <button type="button" className="circ-btn" disabled={loading || busy} onClick={() => void load()}>
+        <button type="button" className="circ-btn" disabled={loading} onClick={() => void load()}>
           {loading ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />}
           {loading ? 'Đang tải...' : 'Làm mới'}
         </button>
       </div>
-      {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
       <WorkflowTabs
         label="Nội dung quá hạn và sự cố"
@@ -1925,7 +1908,7 @@ function OverdueView() {
       />
       {overdueView === 'overdue' ? (
       <section className="circ-card" id="circ-panel-overdue" role="tabpanel" aria-labelledby="circ-tab-overdue" tabIndex={0}>
-        <div className="circ-card-head"><div><h2>Sách quá hạn</h2><p>Theo dõi hạn trả và trạng thái ghi nhận phí.</p></div></div>
+        <div className="circ-card-head"><div><h2>Sách quá hạn</h2><p>Phí đang hiển thị là tạm tính. Khi nhận trả mới chốt phí theo ngày trả thực tế.</p></div></div>
         <div className="circ-toolbar circ-overdue-filters">
           <select aria-label="Lọc trạng thái sách quá hạn" value={overdueStatus} onChange={(event) => setOverdueStatus(event.target.value)}>
             <option value="All">Tất cả trạng thái</option><option value="Unrecorded">Chưa ghi nhận phí</option><option value="Unpaid">Chưa thanh toán</option><option value="Paid">Đã thanh toán</option>
@@ -1959,25 +1942,12 @@ function OverdueView() {
                       ) : loan.hasFine ? (
                         <span className="circ-badge is-paid">Đã thanh toán</span>
                       ) : (
-                        <span className="circ-badge is-borrowed">Chưa ghi nhận</span>
+                        <span className="circ-badge is-borrowed">Chưa chốt · đang mượn</span>
                       )}
                     </td>
                     <td className="circ-actions">
-                      {loan.hasOpenFine || loan.hasFine ? (
-                        <Link className="circ-btn" to={tabPath('fines')}>Xem</Link>
-                      ) : (
-                        <button
-                          type="button"
-                          className="circ-btn circ-btn--primary"
-                          disabled={busy || !loan.suggestedFine || loan.suggestedFine <= 0}
-                          title={loan.suggestedFine && loan.suggestedFine > 0
-                            ? 'Tạo khoản phí quá hạn theo chính sách hiện hành'
-                            : 'Admin cần cấu hình overdue_fee_per_day trong Chính sách > Phí phạt'}
-                          onClick={() => setFineToRecord(loan)}
-                        >
-                          Ghi nhận phạt
-                        </button>
-                      )}
+                      <Link className="circ-btn circ-btn--primary" to={tabPath('return') + '?barcode=' + encodeURIComponent(loan.barcode)}>Xử lý trả sách</Link>
+                      {(loan.hasOpenFine || loan.hasFine) && <Link className="circ-btn" to={tabPath('fines')}>Xem phí đã lập</Link>}
                     </td>
                   </tr>
                 ))}
@@ -2009,17 +1979,7 @@ function OverdueView() {
         )}
       </section>
       )}
-      {fineToRecord && (
-        <CirculationConfirmDialog
-          eyebrow="GHI NHẬN PHÍ QUÁ HẠN"
-          title={`${fineToRecord.readerName} · ${fineToRecord.bookTitle}`}
-          message={`Phí dự kiến theo chính sách: ${formatMoney(fineToRecord.suggestedFine ?? 0)}. Hệ thống sẽ tự tính lại theo chính sách Admin khi ghi nhận.`}
-          confirmLabel="Ghi nhận phí"
-          busy={busy}
-          onConfirm={() => void recordFine(fineToRecord)}
-          onCancel={() => setFineToRecord(null)}
-        />
-      )}
+
     </section>
   );
 }
@@ -2031,9 +1991,11 @@ export function CirculationIncidentDetailPage() {
   const { showToast } = useToast();
   const [item, setItem] = useState<CirculationIncident | null>(null);
   const [stats, setStats] = useState<CirculationStats | null>(null);
-  const [severity, setSeverity] = useState('Light');
+  const [severity, setSeverity] = useState('');
   const [applyOverdue, setApplyOverdue] = useState(false);
   const [notes, setNotes] = useState('');
+  const [restoreCopy, setRestoreCopy] = useState(false);
+  const [restoreCondition, setRestoreCondition] = useState('Fair');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2041,16 +2003,16 @@ export function CirculationIncidentDetailPage() {
   useEffect(() => {
     let active = true;
     void Promise.all([
-      fetch(`${API_BASE_URL}/api/v1/circulation/incidents`, { headers }).then((response) => parseApiResponse<ApiResult<CirculationIncident[]>>(response)),
+      fetch(`${API_BASE_URL}/api/v1/circulation/incidents/${incidentId}`, { headers }).then((response) => parseApiResponse<ApiResult<CirculationIncident>>(response)),
       fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }).then((response) => parseApiResponse<ApiResult<CirculationStats>>(response)),
     ]).then(([incidentResult, statsResult]) => {
       if (!active) return;
-      const found = incidentResult?.data?.find((candidate) => candidate.id === incidentId) ?? null;
+      const found = incidentResult?.data ?? null;
       setItem(found);
       setStats(statsResult?.data ?? null);
       if (!found) setError(incidentResult?.success ? 'Không tìm thấy hồ sơ sự cố.' : incidentResult?.error ?? 'Không tải được hồ sơ sự cố.');
       else {
-        setSeverity(found.kind === 'Lost' ? 'Lost' : 'Light');
+        setSeverity(found.kind === 'Lost' ? 'Lost' : '');
         setApplyOverdue(found.overdueDays > 0 && (found.suggestedOverdueFine ?? 0) > 0);
       }
     }).catch((reason: unknown) => {
@@ -2061,6 +2023,7 @@ export function CirculationIncidentDetailPage() {
 
   const confirm = async () => {
     if (!item) return;
+    if (!notes.trim()) { showToast({ type: 'error', title: 'Thiếu kết luận', message: 'Nhập kết quả xác minh trước khi xác nhận.' }); return; }
     const fee = policyIncidentFee(stats, severity);
     if (fee <= 0) {
       showToast({ type: 'error', title: 'Chưa thể xác nhận', message: 'Chính sách bồi thường chưa có mức phí hợp lệ.' });
@@ -2082,10 +2045,11 @@ export function CirculationIncidentDetailPage() {
 
   const reject = async () => {
     if (!item) return;
+    if (!notes.trim()) { showToast({ type: 'error', title: 'Thiếu kết luận', message: 'Nhập lý do từ chối hồ sơ.' }); return; }
     setBusy(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/circulation/incidents/${item.id}/reject`, {
-        method: 'POST', headers, body: JSON.stringify({ notes, restoreCopy: true }),
+        method: 'POST', headers, body: JSON.stringify({ notes, restoreCopy, condition: restoreCopy ? restoreCondition : undefined }),
       });
       const result = await parseApiResponse<ApiResult<unknown>>(response);
       if (!response.ok || !result?.success) throw new Error(result?.error || 'Không xử lý được hồ sơ.');
@@ -2095,6 +2059,20 @@ export function CirculationIncidentDetailPage() {
       showToast({ type: 'error', title: 'Không xử lý được hồ sơ', message: errorMessage(reason, 'Vui lòng thử lại.') });
     } finally { setBusy(false); }
   };
+
+  const restore = async () => {
+    if (!item || !notes.trim()) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/circulation/incidents/${item.id}/restore-copy`, { method: 'POST', headers, body: JSON.stringify({ condition: restoreCondition, notes: notes.trim() }) });
+      const result = await parseApiResponse<ApiResult<CirculationIncident>>(response);
+      if (!response.ok || !result?.success || !result.data) throw new Error(result?.error || 'Không thể khôi phục bản sao.');
+      setItem(result.data); setNotes('');
+      showToast({ type: 'success', title: 'Đã kiểm tra bản sao', message: 'Sách về kho chờ xếp kệ. Phí và lịch sử được giữ nguyên.' });
+    } catch (reason) { showToast({ type: 'error', title: 'Chưa thể khôi phục', message: errorMessage(reason, 'Vui lòng thử lại.') }); }
+    finally { setBusy(false); }
+  };
+  const conditionSelect = <label className="circ-field">Tình trạng sau kiểm tra<select disabled={busy} value={restoreCondition} onChange={event => setRestoreCondition(event.target.value)}><option value="Good">Tốt</option><option value="Fair">Cũ, còn sử dụng được</option><option value="LightDamaged">Hư nhẹ, còn sử dụng được</option></select></label>;
 
   if (loading) return <section className="circ-page"><p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải hồ sơ...</p></section>;
   if (!item) return <section className="circ-page"><div className="circ-card"><p className="circ-error">{error || 'Không tìm thấy hồ sơ sự cố.'}</p><Link className="circ-btn" to={tabPath('overdue')}>Quay lại danh sách</Link></div></section>;
@@ -2110,18 +2088,23 @@ export function CirculationIncidentDetailPage() {
           <div><dt>Loại sự cố</dt><dd>{STATUS_LABELS[item.kind] ?? item.kind}</dd></div>
           <div><dt>Ngày ghi nhận</dt><dd>{formatDateTime(item.createdAt)}</dd></div>
           <div><dt>Ngày quá hạn</dt><dd>{item.overdueDays > 0 ? `${item.overdueDays} ngày` : 'Không quá hạn'}</dd></div>
-          <div><dt>Phí quá hạn dự kiến</dt><dd>{formatMoney(item.suggestedOverdueFine)}</dd></div>
+          <div><dt>Phí quá hạn dự kiến lập thêm</dt><dd>{item.hasRecordedOverdueFine ? 'Đã có khoản phí trên phiếu; không lập trùng' : formatMoney(item.suggestedOverdueFine)}</dd></div>
           <div><dt>Giá trị thay thế</dt><dd>{item.replacementValue ? formatMoney(item.replacementValue) : 'Theo chính sách'}</dd></div>
           <div><dt>Tổng phí hiện tại</dt><dd>{formatMoney(item.totalAmount)}</dd></div>
         </dl>
         {item.description && <p className="circ-incident-detail-note">{item.description}</p>}
+        <p className="circ-hint">Tình trạng bản sao hiện tại: {({ LightDamaged: 'Hư nhẹ — còn sử dụng được', Damaged: 'Hư hỏng — chặn xếp kệ', Lost: 'Thất lạc', Good: 'Tốt', Fair: 'Cũ, còn sử dụng được', New: 'Mới' } as Record<string, string>)[item.copyCondition] || item.copyCondition}. Thanh toán phí không tự phục hồi sách hư nặng.</p>
         {pending ? <div className="circ-incident-detail-form">
-          {item.kind === 'Lost' ? <div className="circ-field"><span>Mức độ</span><div className="circ-incident-fixed-field">Thất lạc · bồi thường theo giá trị sách</div></div> : <label className="circ-field">Mức độ hư hỏng<select value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="Light">Hư hỏng nhẹ</option><option value="Severe">Hư hỏng nặng</option></select></label>}
+          {item.kind === 'Lost' ? <div className="circ-field"><span>Mức độ</span><div className="circ-incident-fixed-field">Thất lạc · bồi thường theo giá trị sách</div></div> : <label className="circ-field">Mức độ hư hỏng<select value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="" disabled>Chọn mức độ sau khi kiểm tra</option><option value="Light">Hư hỏng nhẹ</option><option value="Severe">Hư hỏng nặng</option></select></label>}
+          <p className="circ-hint">{!severity ? 'Chọn mức độ theo kết quả kiểm tra thực tế.' : severity === 'Light' ? 'Hư nhẹ: cho phép xếp kệ sau xác minh, không chờ đóng phí.' : 'Hư nặng / mất: chặn xếp kệ đến khi kiểm tra phục hồi riêng.'}</p>
+          {item.loanStatus !== 'Returned' && <p className="circ-error">Cần ghi nhận trả / thất lạc trên phiếu trước khi xác nhận mức độ.</p>}
+          <label className="circ-check"><input type="checkbox" checked={restoreCopy} disabled={busy || item.loanStatus !== 'Returned'} onChange={event => setRestoreCopy(event.target.checked)} /> Khi từ chối hồ sơ: đã kiểm tra sách, đủ điều kiện sử dụng lại</label>
+          {restoreCopy && conditionSelect}
           <p className="circ-hint">Mức bồi thường theo chính sách: {amount > 0 ? formatMoney(amount) : 'Chưa cấu hình'}{applyOverdue && item.suggestedOverdueFine ? ` · Phí quá hạn ${formatMoney(item.suggestedOverdueFine)}` : ''}</p>
           {item.suggestedOverdueFine && item.suggestedOverdueFine > 0 && <label className="circ-check"><input type="checkbox" checked={applyOverdue} onChange={(event) => setApplyOverdue(event.target.checked)} /> Cộng phí quá hạn {formatMoney(item.suggestedOverdueFine)}</label>}
           <label className="circ-field">Ghi chú xác minh<textarea rows={4} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Ghi nhận kết quả đối chiếu sách và phiếu mượn..." /></label>
-          <div className="circ-actions"><button type="button" className="circ-btn circ-btn--primary" disabled={busy || amount <= 0} onClick={() => void confirm()}>{busy ? 'Đang xác nhận...' : 'Xác nhận hồ sơ'}</button><button type="button" className="circ-btn" disabled={busy} onClick={() => void reject()}>Từ chối / tìm thấy sách</button><Link className="circ-btn" to={tabPath('overdue')}>Quay lại danh sách</Link></div>
-        </div> : <div className="circ-incident-detail-note">Hồ sơ đã được xử lý. {item.totalAmount > 0 && <>Khoản phí liên quan: <Link to={tabPath('fines')}>xem danh sách phí phạt</Link>.</>}</div>}
+          <div className="circ-actions"><button type="button" className="circ-btn circ-btn--primary" disabled={busy || amount <= 0 || !notes.trim() || item.loanStatus !== 'Returned'} onClick={() => void confirm()}>{busy ? 'Đang xác nhận...' : 'Xác nhận hồ sơ'}</button><button type="button" className="circ-btn" disabled={busy || !notes.trim()} onClick={() => void reject()}>Từ chối / tìm thấy sách</button><Link className="circ-btn" to={tabPath('overdue')}>Quay lại danh sách</Link></div>
+        </div> : <><div className="circ-incident-detail-note">Hồ sơ đã được xử lý. {item.totalAmount > 0 && <>Khoản phí liên quan: <Link to={tabPath('fines')}>xem danh sách phí phạt</Link>.</>}</div>{item.canRestoreCopy && <div className="circ-incident-detail-form"><h3>Đã sửa / tìm thấy sách — kiểm tra lại</h3>{conditionSelect}<label className="circ-field">Kết quả kiểm tra<textarea rows={3} maxLength={2000} value={notes} onChange={event => setNotes(event.target.value)} placeholder="Mô tả sửa chữa hoặc việc tìm thấy và kiểm tra sách" /></label><button type="button" className="circ-btn circ-btn--primary" disabled={busy || !notes.trim()} onClick={() => void restore()}>Xác nhận đủ điều kiện sử dụng</button></div>}</>}
       </div>
     </section>
   );
