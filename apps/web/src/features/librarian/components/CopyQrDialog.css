@@ -1,0 +1,17 @@
+.copy-qr-dialog { width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); padding: 0; margin: auto; border: 1px solid #e7e9ed; border-radius: 16px; color: #172033; background: #fff; box-shadow: 0 20px 80px #17203326; }
+.copy-qr-dialog::backdrop { background: #11182780; }
+.copy-qr-body { padding: 24px; }
+.copy-qr-body header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.copy-qr-body h2 { margin: 0; font-size: 22px; font-weight: 650; }
+.copy-qr-body header button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 8px; background: #f3f4f6; cursor: pointer; }
+.copy-qr-book { font-size: 15px; line-height: 1.5; margin: 12px 0 20px; }
+.copy-qr-label { display: flex; align-items: center; flex-direction: column; gap: 4px; padding: 20px 12px; border: 1px solid #e7e9ed; border-radius: 8px; background: #fff; }
+.copy-qr-label > span { font-size: 16px; font-weight: 650; color: #c2410c; }
+.copy-qr-label svg { width: min(224px, 100%); height: auto; }
+.copy-qr-label strong { font-family: ui-monospace, monospace; font-size: 22px; overflow-wrap: anywhere; text-align: center; }
+.copy-qr-hint { margin: 20px 0; color: #616875; font-size: 14px; line-height: 1.6; }
+.copy-qr-done { width: 100%; min-height: 44px; border: 0; border-radius: 8px; background: #172033; color: #fff; font: inherit; cursor: pointer; }
+.copy-qr-body button:focus-visible, .lib-copy-qr:focus-visible { outline: 3px solid #c2410c; outline-offset: 3px; }
+.lib-copy-qr { border: 1px solid #e1e4e8; background: white; color: #354052; border-radius: 6px; min-height: 36px; padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.lib-copy-qr:hover { background: #f3f4f6; }
+.lib-copy-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
