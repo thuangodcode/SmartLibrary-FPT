@@ -86,6 +86,7 @@ public class AppDbContext : DbContext
         });
 
         modelBuilder.Entity<Role>().ToTable("roles");
+        modelBuilder.Entity<Permission>().ToTable("permissions");
 
         modelBuilder.Entity<UserImportBatch>(entity =>
         {
