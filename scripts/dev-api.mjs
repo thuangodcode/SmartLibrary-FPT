@@ -297,9 +297,9 @@ async function runApi() {
       throw new Error('Cổng 5278 đang được một dịch vụ khác sử dụng nhưng không phản hồi health check SmartLibrary API. Hãy dừng đúng dịch vụ đó hoặc đổi cổng API trước khi chạy lại.');
     }
 
-    const apiArgs = ['run', '--project', 'apps/api/src/SmartLibrary.Api'];
+    const apiArgs = ['run', '--project', 'apps/api/src/SmartLibrary.Api', '--', '--environment', 'Development'];
     if (lanMode) {
-      apiArgs.push('--', '--urls', 'http://0.0.0.0:5278');
+      apiArgs.push('--urls', 'http://0.0.0.0:5278');
       console.log('SmartLibrary API đang lắng nghe trên mạng LAN tại cổng 5278.');
     }
 

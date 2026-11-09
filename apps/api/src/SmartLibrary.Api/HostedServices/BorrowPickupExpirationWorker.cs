@@ -13,7 +13,8 @@ namespace SmartLibrary.Api.HostedServices;
 public sealed class BorrowPickupExpirationWorker(
     IServiceScopeFactory scopeFactory,
     IHubContext<NotificationHub> hub,
-    ILogger<BorrowPickupExpirationWorker> logger) : BackgroundService
+    ILogger<BorrowPickupExpirationWorker> logger,
+    IConfiguration configuration) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -27,7 +28,8 @@ public sealed class BorrowPickupExpirationWorker(
                 await circulation.MarkOverdueAsync(stoppingToken);
                 await circulation.ProcessReservationExpirationsAsync(stoppingToken);
                 await CreateRemindersAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(), stoppingToken);
-                await SendDueDateEmailRemindersAsync(
+                if (!configuration.GetValue<bool>("Demo:Isolated"))
+                    await SendDueDateEmailRemindersAsync(
                     scope.ServiceProvider.GetRequiredService<AppDbContext>(),
                     scope.ServiceProvider.GetRequiredService<IEmailService>(),
                     stoppingToken);

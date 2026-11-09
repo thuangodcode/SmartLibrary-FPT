@@ -34,6 +34,15 @@ static void LoadDotEnv()
 LoadDotEnv();
 
 var builder = WebApplication.CreateBuilder(args);
+// Ignored, opt-in settings for a private local demo. Never load this file in production.
+if (builder.Environment.IsDevelopment())
+    builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false).AddCommandLine(args);
+if (builder.Configuration.GetValue<bool>("Demo:Isolated"))
+{
+    var demoConnection = new Npgsql.NpgsqlConnectionStringBuilder(builder.Configuration.GetConnectionString("DefaultConnection"));
+    if (demoConnection.Host is not ("127.0.0.1" or "localhost") || demoConnection.Database != "smartlibrary_demo")
+        throw new InvalidOperationException("Isolated demo settings require the loopback smartlibrary_demo database.");
+}
 
 // ── Serilog ──
 Log.Logger = new LoggerConfiguration()
@@ -87,6 +96,8 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        if (!builder.Configuration.GetValue<bool>("Demo:Isolated"))
+        {
         try
         {
             db.Database.ExecuteSqlRaw("ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url TEXT;");
@@ -214,6 +225,7 @@ try
             Log.Warning(exSql, "Could not ensure news_articles table or seed defaults.");
         }
 
+        }
         db.Database.Migrate();
         db.Database.ExecuteSqlRaw("""
             CREATE TABLE IF NOT EXISTS circulation_reminder_settings (
