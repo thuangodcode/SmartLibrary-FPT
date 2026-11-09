@@ -155,8 +155,10 @@ public class CirculationController : ControllerBase
             ? "Đã lập hồ sơ chờ thủ thư xác minh. Chưa tính bồi thường và không tự khóa tài khoản."
             : loan.CreatedFineAmount is > 0
                 ? $"Đã trả sách. Đã lập phí quá hạn {loan.CreatedFineAmount:0}đ ({loan.OverdueDays} ngày)."
+                : loan.OverdueFineAlreadyExists
+                    ? $"Đã trả sách quá hạn {loan.OverdueDays} ngày. Phí quá hạn đã được ghi nhận trước đó; không lập trùng. Xem khoản phí trên phiếu."
                 : loan.OverdueDays > 0
-                    ? $"Đã trả sách quá hạn {loan.OverdueDays} ngày. Chưa lập phí vì chưa cấu hình mức phạt hoặc đã có khoản phí."
+                    ? $"Đã trả sách quá hạn {loan.OverdueDays} ngày. Chưa lập phí vì chưa cấu hình mức phạt quá hạn."
                     : "Đã ghi nhận trả sách.";
         return Ok(ApiResponse<CirculationLoanDto>.Ok(loan, new { message }));
     }
@@ -181,9 +183,9 @@ public class CirculationController : ControllerBase
     }
 
     [HttpPost("loans/{id:guid}/checkout")]
-    public async Task<IActionResult> CompleteCheckout(Guid id, CancellationToken ct)
+    public async Task<IActionResult> CompleteCheckout(Guid id, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] CompleteCheckoutRequest? request, CancellationToken ct)
     {
-        var result = await _circulation.CompleteCheckoutAsync(id, CirculationService.ReadUserId(User), ct);
+        var result = await _circulation.CompleteCheckoutAsync(id, CirculationService.ReadUserId(User), ct, request?.Barcode);
         if (!result.IsSuccess)
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
         await BroadcastBorrowUpdateAsync(result.Data!, ct);
@@ -191,10 +193,10 @@ public class CirculationController : ControllerBase
     }
 
     [HttpPost("loans/{id:guid}/reject")]
-    public async Task<IActionResult> Reject(Guid id, CancellationToken ct)
+    public async Task<IActionResult> Reject(Guid id, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] RejectLoanRequest? request, CancellationToken ct)
     {
         var existing = await _circulation.GetLoanAsync(id, ct);
-        var result = await _circulation.RejectAsync(id, ct);
+        var result = await _circulation.RejectAsync(id, ct, request?.Notes);
         if (!result.IsSuccess)
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
         if (existing.IsSuccess)
@@ -364,6 +366,28 @@ public class CirculationController : ControllerBase
         var result = await _circulation.RejectIncidentAsync(id, request ?? new RejectIncidentRequest(), CirculationService.ReadUserId(User), ct);
         return result.IsSuccess
             ? Ok(ApiResponse<CirculationIncidentDto>.Ok(result.Data!, new { message = "Đã từ chối hồ sơ sau khi đối chiếu." }))
+            : BadRequest(ApiResponse<object>.Fail(result.Error!));
+    }
+
+    [HttpGet("loans/{id:guid}/detail")]
+    public async Task<IActionResult> LoanDetail(Guid id, CancellationToken ct)
+    {
+        var data = await _circulation.GetLoanDetailAsync(id, ct);
+        return data is null ? NotFound(ApiResponse<object>.Fail("Không tìm thấy phiếu.")) : Ok(ApiResponse<StaffLoanDetailDto>.Ok(data));
+    }
+
+    [HttpGet("incidents/{id:guid}")]
+    public async Task<IActionResult> Incident(Guid id, CancellationToken ct)
+    {
+        var data = await _circulation.GetIncidentAsync(id, ct);
+        return data is null ? NotFound(ApiResponse<object>.Fail("Không tìm thấy hồ sơ.")) : Ok(ApiResponse<CirculationIncidentDto>.Ok(data));
+    }
+
+    [HttpPost("incidents/{id:guid}/restore-copy")]
+    public async Task<IActionResult> RestoreCopy(Guid id, [FromBody] RestoreIncidentCopyRequest request, CancellationToken ct)
+    {
+        var result = await _circulation.RestoreIncidentCopyAsync(id, request, CirculationService.ReadUserId(User), ct);
+        return result.IsSuccess ? Ok(ApiResponse<CirculationIncidentDto>.Ok(result.Data!, new { message = "Đã kiểm tra, bản sao về kho chờ xếp. Phí được giữ nguyên." }))
             : BadRequest(ApiResponse<object>.Fail(result.Error!));
     }
 
