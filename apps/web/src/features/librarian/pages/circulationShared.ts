@@ -63,6 +63,7 @@ export interface CirculationIncident {
   readerName: string;
   overdueDays: number;
   suggestedOverdueFine?: number | null;
+  hasRecordedOverdueFine?: boolean;
   replacementValue?: number | null;
   assessedFee?: number | null;
   compensationAmount: number;
@@ -73,6 +74,9 @@ export interface CirculationIncident {
   description?: string | null;
   createdAt: string;
   confirmedAt?: string | null;
+  copyCondition: string;
+  loanStatus: string;
+  canRestoreCopy: boolean;
 }
 
 export interface CirculationFine {
