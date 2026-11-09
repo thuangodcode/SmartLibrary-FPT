@@ -162,6 +162,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
   // Edit category modal states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editName, setEditName] = useState('');
+  const [editCode, setEditCode] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
@@ -346,6 +347,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
     setConfirmEditOpen(false);
     if (!category) return;
     setEditName(category.name);
+    setEditCode(category.code);
     setEditDescription(category.description || '');
     setEditImageFile(null);
     setEditImagePreview(category.imageUrl || null);
@@ -404,11 +406,16 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       });
       return;
     }
+    if (!/^[A-Z]{1,16}$/.test(editCode.trim())) {
+      showToast({ type: 'error', title: 'Mã danh mục không hợp lệ', message: 'Dùng 1–16 chữ cái A–Z, ví dụ KHTN.' });
+      return;
+    }
 
     setSavingEdit(true);
     try {
       const formData = new FormData();
       formData.append('Name', trimmed);
+      formData.append('Code', editCode.trim());
       if (editDescription.trim()) {
         formData.append('Description', editDescription.trim());
       }
@@ -862,6 +869,11 @@ const LibrarianCategoryBooksPage: React.FC = () => {
               </div>
 
               <div className="lib-cat-form-group">
+                <label htmlFor="cat-edit-code">Mã danh mục <span className="req">*</span></label>
+                <input id="cat-edit-code" value={editCode} onChange={event => setEditCode(event.target.value.toUpperCase())} maxLength={16} pattern="[A-Za-z]{1,16}" required />
+                <small>Mã dùng để cấp mã đầu sách mới. Đổi tiền tố không đổi mã sách, bản sao hoặc QR đã có.</small>
+              </div>
+              <div className="lib-cat-form-group">
                 <label htmlFor="cat-edit-desc">Mô tả danh mục</label>
                 <textarea
                   id="cat-edit-desc"
@@ -963,7 +975,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
                 <option value="">Tất cả danh mục</option>
                 {existingBookCategories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
               </select>
-              <button type="button" className="lib-cat-manage-fields-button" onClick={() => navigate('/librarian/books/copies?tab=sorting&newBook=1')}><Plus size={16} /> Tạo đầu sách mới</button>
+              <button type="button" className="lib-cat-manage-fields-button" onClick={() => navigate(`/librarian/books/copies?tab=sorting&newBook=1&categoryId=${categoryId}`)}><Plus size={16} /> Tạo đầu sách mới</button>
             </div>
             {existingBooksError ? <div className="lib-cat-existing-empty"><AlertCircle size={28} /><strong>Ch&#432;a t&#7843;i &#273;&#432;&#7907;c danh s&#225;ch</strong><span>{existingBooksError}</span><button type="button" onClick={() => setExistingBooksRetry(value => value + 1)}>Th&#7917; l&#7841;i</button></div> : existingBooksLoading ? <div className="lib-cat-existing-empty">Đang tải danh sách đầu sách...</div> : filteredExistingBooks.length ? (
               <div className="lib-cat-existing-books">
