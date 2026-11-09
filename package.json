@@ -12,7 +12,10 @@
     "dev:mobile": "npm --prefix apps/mobile start",
     "build:mobile": "npm --prefix apps/mobile run typecheck",
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:mobile\"",
-    "dev:lan": "concurrently \"npm run dev:api:lan\" \"npm run dev:web\" \"npm run dev:mobile\""
+    "dev:lan": "concurrently \"npm run dev:api:lan\" \"npm run dev:web\" \"npm run dev:mobile\"",
+    "demo:seed": "dotnet run --project tools/SmartLibrary.Demo -- .env",
+    "demo:repair-auth": "dotnet run --project tools/SmartLibrary.Demo -- .env --repair-auth",
+    "demo:overdue": "dotnet run --project tools/SmartLibrary.Demo -- .env --overdue"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
