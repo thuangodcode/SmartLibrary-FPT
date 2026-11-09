@@ -30,6 +30,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5278';
 export interface BookDetailData {
   id: string;
   code: string;
+  codeCategoryId?: string | null;
   title: string;
   isbn?: string | null;
   description?: string | null;
@@ -49,7 +50,7 @@ export interface BookDetailData {
 interface BookCopyItem {
   id: string;
   barcode: string;
-  condition: 'New' | 'Good' | 'Fair' | 'Damaged' | 'Lost';
+  condition: 'New' | 'Good' | 'Fair' | 'LightDamaged' | 'Damaged' | 'Lost';
   location: string | null;
   isAvailable: boolean;
   hasOverdueLoan: boolean;
@@ -71,6 +72,7 @@ const COPY_PAGE_SIZE = 20;
 
 const getCopyStatus = (copy: BookCopyItem) => {
   if (copy.condition === 'Lost') return { label: 'Thất lạc', className: 'is-lost' };
+  if (copy.condition === 'LightDamaged') return { label: 'Hư nhẹ · còn sử dụng được', className: 'is-available' };
   if (copy.condition === 'Damaged') return { label: 'Hư hỏng', className: 'is-damaged' };
   if (copy.hasOverdueLoan) return { label: 'Quá hạn', className: 'is-overdue' };
   if (copy.hasActiveLoan) return { label: 'Đang mượn', className: 'is-borrowed' };
@@ -793,7 +795,7 @@ const LibrarianBookDetailPage: React.FC = () => {
 
               <div className="lib-cat-form-group">
                 <label>Danh mục sách</label>
-                <fieldset className="lib-book-edit-category-picker"><legend>Danh m&#7909;c s&#225;ch <span>*</span></legend><p>Ch&#7885;n t&#7845;t c&#7843; danh m&#7909;c ph&#249; h&#7907;p v&#7899;i &#273;&#7847;u s&#225;ch n&#224;y.</p><div>{categories.map(category => <label key={category.id}><input type="checkbox" checked={editCategoryIds.includes(category.id)} onChange={event => setEditCategoryIds(current => event.target.checked ? [...current, category.id] : current.filter(id => id !== category.id))} /><span>{category.name}</span></label>)}</div>{editCategoryIds.length === 0 && <small>H&#227;y ch&#7885;n &#237;t nh&#7845;t m&#7897;t danh m&#7909;c &#273;&#7875; l&#432;u thay &#273;&#7893;i.</small>}</fieldset>
+                <fieldset className="lib-book-edit-category-picker"><legend>Danh mục sách <span>*</span></legend><p>Danh mục cấp mã được giữ cố định. Có thể thêm các danh mục khác để phân loại.</p><div>{categories.map(category => <label key={category.id}><input type="checkbox" checked={editCategoryIds.includes(category.id)} disabled={book.codeCategoryId === category.id} onChange={event => setEditCategoryIds(current => event.target.checked ? [...current, category.id] : current.filter(id => id !== category.id))} /><span>{category.name}{book.codeCategoryId === category.id ? ' · Cấp mã' : ''}</span></label>)}</div>{editCategoryIds.length === 0 && <small>Hãy chọn ít nhất một danh mục để lưu thay đổi.</small>}</fieldset>
               </div>
 
               <div className="lib-cat-form-group">
