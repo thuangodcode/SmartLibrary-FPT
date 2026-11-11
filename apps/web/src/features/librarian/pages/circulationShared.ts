@@ -46,6 +46,7 @@ export interface CirculationLoan {
   hasFine?: boolean;
   renewalCount?: number;
   canRenew?: boolean;
+  renewalUnavailableReason?: string | null;
   requiresApproval?: boolean;
   createdFineAmount?: number | null;
   incidentOpened?: boolean;
@@ -130,13 +131,13 @@ export const STATUS_LABELS: Record<string, string> = {
   Pending: 'Chờ xác nhận',
   Approved: 'Đã tiếp nhận',
   Borrowed: 'Đang mượn',
-  Returned: 'Đã trả',
+  Returned: 'Đã ghi nhận trả',
   Overdue: 'Quá hạn',
   Rejected: 'Từ chối',
   Paid: 'Đã thanh toán',
   PendingReview: 'Chờ xác minh',
   CompensationPending: 'Chờ thanh toán',
-  Resolved: 'Đã xử lý',
+  Resolved: 'Đã hoàn tất trách nhiệm bồi thường',
   Light: 'Hư hỏng nhẹ',
   Severe: 'Hư hỏng nặng',
   Lost: 'Mất sách',

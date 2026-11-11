@@ -39,6 +39,8 @@ interface CirculationLoan {
   canRenew: boolean;
   renewalUnavailableReason?: string | null;
   hasOpenFine: boolean;
+  hasFine?: boolean;
+  copyCondition?: string;
   suggestedFine: number | null;
 }
 
@@ -108,7 +110,7 @@ const statusLabel: Record<string, string> = {
   Approved: 'Đã tiếp nhận',
   Borrowed: 'Đang mượn',
   Overdue: 'Quá hạn',
-  Returned: 'Đã trả',
+  Returned: 'Đã ghi nhận trả',
   Rejected: 'Từ chối',
   Cancelled: 'Đã hủy',
   PendingPayment: 'Chưa thanh toán',
@@ -511,12 +513,14 @@ const HistoryPage = () => {
                   )}
                   <div className="history-record-dates">
                     <span>Mượn: {formatDateTime(loan.borrowDate)}</span>
-                    <span>Hạn trả: {formatDateTime(loan.dueDate)}</span>
+                    <span>Hạn trả (hết ngày): {formatDate(loan.dueDate)}</span>
                     <span>Đã trả: {formatDate(loan.returnDate)}</span>
                     <span>Gia hạn: {loan.renewalCount} lần</span>
                   </div>
+                  <span>Bản sao hiện tại: {({ LightDamaged: 'Hư nhẹ · còn sử dụng được', Damaged: 'Hư hỏng · chưa đủ điều kiện sử dụng', Lost: 'Thất lạc · chưa tìm thấy', New: 'Mới', Good: 'Tốt', Fair: 'Cũ, còn sử dụng được' } as Record<string, string>)[loan.copyCondition || ''] || 'Chưa xác định'}</span>
+                  {!loan.hasOpenFine && <span>Khoản phí: {loan.hasFine ? 'Đã thanh toán hoặc miễn' : 'Chưa lập khoản phí'}</span>}
                   {loan.hasOpenFine && <span className="history-record-warning">Phiếu này đang có phí chưa thanh toán.</span>}
-                  {loan.suggestedFine != null && (
+                  {['Borrowed', 'Overdue'].includes(loan.status) && loan.suggestedFine != null && (
                     <span className="history-record-warning">
                       Phí quá hạn tạm tính: {loan.suggestedFine.toLocaleString('vi-VN')}đ
                     </span>

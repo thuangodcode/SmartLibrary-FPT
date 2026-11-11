@@ -30,6 +30,7 @@ import {
   isVisiblePolicyParameter,
   isMoneyPolicyParameter,
   policyParameterLabel,
+  policyFeeWarning,
   policyHref,
   usePolicyClient,
   validatePolicyForm,
@@ -661,6 +662,9 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
             )}
             <label className="pol-form-wide">Mô tả / lưu ý<textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
           </div>
+          {form.policyType === 'FineFee' && <p className="pol-field-hint">Hai mức bồi thường cố định: hư nhẹ và hư nặng/mất sách. Thay đổi chỉ áp dụng khi lập phí mới; số tiền trên khoản phí đã lập được giữ nguyên.</p>}
+          {policyFeeWarning(form.policyType, form.parameters) && <p className="pol-empty--error" role="alert">{policyFeeWarning(form.policyType, form.parameters)}</p>}
+          {form.policyType === 'Renewal' && <p className="pol-field-hint">“Không gia hạn khi quá hạn” áp dụng cho cả độc giả và thủ thư. Khi bật, cửa sổ tự gia hạn sau hạn không được sử dụng. Hạn trả tính đến hết ngày theo giờ Việt Nam.</p>}
           <h2 className="pol-section-title">Cấu hình chính sách · {TYPE_LABELS[form.policyType]}</h2>
           <div className="pol-form-grid">
             {form.parameters.map((p, idx) => {

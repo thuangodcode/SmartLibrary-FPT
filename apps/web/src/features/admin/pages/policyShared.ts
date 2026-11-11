@@ -154,8 +154,8 @@ export const DEFAULT_PARAMS: Record<PolicyType, PolicyParameter[]> = {
   ],
   FineFee: [
     { key: 'overdue_fee_per_day', value: '', label: 'Phạt quá hạn mỗi ngày (đồng)' },
-    { key: 'damage_fee', value: '', label: 'Phí phạt sách hỏng (đồng)' },
-    { key: 'lost_book_fee', value: '', label: 'Phí phạt sách mất / hư nặng (đồng)' },
+    { key: 'damage_fee', value: '', label: 'Phí hư hỏng nhẹ (đồng)' },
+    { key: 'lost_book_fee', value: '', label: 'Phí hư nặng / mất sách (đồng)' },
     { key: 'restrict_if_unpaid', value: 'true', label: 'Hạn chế mượn khi còn phí chưa thanh toán' },
   ],
   CategoryOverride: [
@@ -218,9 +218,9 @@ export function policyParameterLabel(type: PolicyType, key: string, savedLabel?:
     renewal_days_en: 'Số ngày mỗi lần gia hạn',
     pickup_slot_minutes: 'Thời lượng mỗi khung nhận sách (phút)',
     pickup_days_ahead: 'Số ngày được đặt lịch trước',
-    damaged_book_fee: 'Phí phạt sách hỏng (đồng)',
-    lost_fee: 'Phí phạt sách mất / hư hỏng nặng (đồng)',
-    lost_book_fee: 'Phí phạt sách mất / hư hỏng nặng (đồng)',
+    damaged_book_fee: 'Phí hư hỏng nhẹ (đồng)',
+    lost_fee: 'Phí hư nặng / mất sách (đồng)',
+    lost_book_fee: 'Phí hư nặng / mất sách (đồng)',
     overdue_fee_per_day: 'Phạt quá hạn mỗi ngày (đồng)',
     damage_compensation_factor: 'Hệ số bồi thường sách mất',
     lost_book_compensation_factor: 'Hệ số bồi thường sách mất',
@@ -250,6 +250,16 @@ function isIntInRange(value: string, min: number, max: number): boolean {
   if (!/^-?\d+$/.test(value)) return false;
   const number = Number(value);
   return Number.isInteger(number) && number >= min && number <= max;
+}
+
+export function policyFeeWarning(type: PolicyType, parameters: PolicyParameter[]): string | null {
+  if (type !== 'FineFee') return null;
+  const values = new Map(parameters.map(item => [item.key, item.value.trim()]));
+  const light = Number(values.get('damage_fee') || values.get('damaged_book_fee'));
+  const severe = Number(values.get('lost_book_fee') || values.get('lost_fee'));
+  return light > 0 && severe > 0 && severe < light
+    ? 'Phí hư nặng / mất sách đang thấp hơn phí hư hỏng nhẹ. Hãy kiểm tra lại trước khi áp dụng chính sách.'
+    : null;
 }
 
 export function validatePolicyForm(form: FormState): string | null {
@@ -353,7 +363,7 @@ export function buildSummaryCards(parameters: PolicyParameter[]): SummaryCard[] 
     cards.push({
       value: format ? format(param.value) : param.value,
       unit,
-      label: param.label && param.label !== key ? param.label : fallbackLabel,
+      label: FEE_KEYS.has(key) ? fallbackLabel : param.label && param.label !== key ? param.label : fallbackLabel,
     });
   };
 
@@ -362,8 +372,8 @@ export function buildSummaryCards(parameters: PolicyParameter[]): SummaryCard[] 
   take('max_renewals', 'lần', 'Số lần gia hạn tối đa');
   take('renewal_days', 'ngày', 'Số ngày mỗi lần gia hạn');
   take('overdue_fee_per_day', 'đ/ngày', 'Phạt quá hạn', formatFee);
-  take('damage_fee', 'đ', 'Phí sách hỏng', formatFee);
-  take('lost_book_fee', 'đ', 'Phí sách mất', formatFee);
+  take('damage_fee', 'đ', 'Phí hư hỏng nhẹ', formatFee);
+  take('lost_book_fee', 'đ', 'Phí hư nặng / mất sách', formatFee);
   take('hold_hours', 'giờ', 'Thời gian giữ sách');
   take('pickup_deadline_hours', 'giờ', 'Hạn nhận sách');
   return cards.slice(0, 3);

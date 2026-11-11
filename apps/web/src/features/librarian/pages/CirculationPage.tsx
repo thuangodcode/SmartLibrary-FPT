@@ -1029,9 +1029,13 @@ function LoansView() {
             <div className="circ-loan-detail-grid">
               <div><span>Độc giả</span><strong>{detail.readerName}</strong></div>
               <div><span>Email</span><strong>{detail.readerEmail || 'Chưa có email'}</strong></div>
+              <div><span>Phiếu mượn</span><strong>{STATUS_LABELS[detail.displayStatus] || detail.status}</strong></div>
+              <div><span>Bản sao hiện tại</span><strong>{({ LightDamaged: 'Hư nhẹ · còn sử dụng được', Damaged: 'Hư hỏng · chưa đủ điều kiện sử dụng', Lost: 'Thất lạc · chưa tìm thấy', New: 'Mới', Good: 'Tốt', Fair: 'Cũ, còn sử dụng được' } as Record<string, string>)[detail.copyCondition || ''] || 'Chưa xác định'}</strong></div>
+              <div><span>Khoản phí</span><strong>{detail.hasOpenFine ? 'Còn khoản chưa thanh toán' : detail.hasFine ? 'Đã thanh toán hoặc miễn' : 'Chưa lập khoản phí'}</strong></div>
               <div><span>Ngày mượn</span><strong>{formatDate(detail.borrowDate)}</strong></div>
               <div><span>Hạn trả</span><strong>{formatDate(detail.dueDate)}</strong></div>
             </div>
+            {['Borrowed', 'Overdue'].includes(detail.status) && detail.canRenew === false && detail.renewalUnavailableReason && <p className="circ-hint">{detail.renewalUnavailableReason}</p>}
             <div className="circ-loan-detail-actions">
               {detail.displayStatus !== 'Returned' && (
                 <Link className="circ-btn circ-btn--primary" to={`${tabPath('return')}?barcode=${encodeURIComponent(detail.barcode)}`}>Trả sách</Link>
@@ -1961,7 +1965,7 @@ function OverdueView() {
         <div className="circ-card-head"><div><h2>Hư hỏng & thất lạc</h2><p>Đối chiếu hồ sơ và xử lý bồi thường theo chính sách thư viện.</p></div></div>
         <div className="circ-toolbar circ-overdue-filters">
           <select aria-label="Lọc trạng thái hồ sơ sự cố" value={incidentStatus} onChange={(event) => setIncidentStatus(event.target.value)}>
-            <option value="All">Tất cả trạng thái</option><option value="PendingReview">Chờ xác minh</option><option value="CompensationPending">Chờ thanh toán</option><option value="Resolved">Đã xử lý</option><option value="Rejected">Đã từ chối</option>
+            <option value="All">Tất cả trạng thái</option><option value="PendingReview">Chờ xác minh</option><option value="CompensationPending">Chờ thanh toán</option><option value="Resolved">Đã hoàn tất trách nhiệm bồi thường</option><option value="Rejected">Đã từ chối</option>
           </select>
           <AnimatedCalendar mode="range" value={incidentDates} onChange={setIncidentDates} placeholder="Lọc theo ngày tạo hồ sơ" ariaLabel="Lọc sự cố theo ngày tạo" />
           {incidentDates.length > 0 && <button type="button" className="circ-btn" onClick={() => setIncidentDates([])}>Xóa ngày lọc</button>}
@@ -2085,7 +2089,7 @@ export function CirculationIncidentDetailPage() {
       <div className="circ-incident-detail-card circ-card">
         <div className="circ-card-head"><div><span className="circ-eyebrow">HỒ SƠ TRẢ SÁCH CẦN XÁC MINH</span><h2>{item.bookTitle}</h2><p>{item.barcode} · {item.readerName}</p></div><span className={`circ-badge is-${item.status.toLowerCase()}`}>{STATUS_LABELS[item.status] ?? item.status}</span></div>
         <dl className="circ-incident-detail-grid">
-          <div><dt>Loại sự cố</dt><dd>{STATUS_LABELS[item.kind] ?? item.kind}</dd></div>
+          <div><dt>Phiếu mượn</dt><dd>{STATUS_LABELS[item.loanStatus] || item.loanStatus}</dd></div><div><dt>Loại sự cố</dt><dd>{STATUS_LABELS[item.kind] ?? item.kind}</dd></div>
           <div><dt>Ngày ghi nhận</dt><dd>{formatDateTime(item.createdAt)}</dd></div>
           <div><dt>Ngày quá hạn</dt><dd>{item.overdueDays > 0 ? `${item.overdueDays} ngày` : 'Không quá hạn'}</dd></div>
           <div><dt>Phí quá hạn dự kiến lập thêm</dt><dd>{item.hasRecordedOverdueFine ? 'Đã có khoản phí trên phiếu; không lập trùng' : formatMoney(item.suggestedOverdueFine)}</dd></div>
@@ -2095,16 +2099,16 @@ export function CirculationIncidentDetailPage() {
         {item.description && <p className="circ-incident-detail-note">{item.description}</p>}
         <p className="circ-hint">Tình trạng bản sao hiện tại: {({ LightDamaged: 'Hư nhẹ — còn sử dụng được', Damaged: 'Hư hỏng — chặn xếp kệ', Lost: 'Thất lạc', Good: 'Tốt', Fair: 'Cũ, còn sử dụng được', New: 'Mới' } as Record<string, string>)[item.copyCondition] || item.copyCondition}. Thanh toán phí không tự phục hồi sách hư nặng.</p>
         {pending ? <div className="circ-incident-detail-form">
-          {item.kind === 'Lost' ? <div className="circ-field"><span>Mức độ</span><div className="circ-incident-fixed-field">Thất lạc · bồi thường theo giá trị sách</div></div> : <label className="circ-field">Mức độ hư hỏng<select value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="" disabled>Chọn mức độ sau khi kiểm tra</option><option value="Light">Hư hỏng nhẹ</option><option value="Severe">Hư hỏng nặng</option></select></label>}
+          {item.kind === 'Lost' ? <div className="circ-field"><span>Mức độ</span><div className="circ-incident-fixed-field">Thất lạc · bồi thường theo mức cố định của thư viện</div></div> : <label className="circ-field">Mức độ hư hỏng<select value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="" disabled>Chọn mức độ sau khi kiểm tra</option><option value="Light">Hư hỏng nhẹ</option><option value="Severe">Hư hỏng nặng</option></select></label>}
           <p className="circ-hint">{!severity ? 'Chọn mức độ theo kết quả kiểm tra thực tế.' : severity === 'Light' ? 'Hư nhẹ: cho phép xếp kệ sau xác minh, không chờ đóng phí.' : 'Hư nặng / mất: chặn xếp kệ đến khi kiểm tra phục hồi riêng.'}</p>
           {item.loanStatus !== 'Returned' && <p className="circ-error">Cần ghi nhận trả / thất lạc trên phiếu trước khi xác nhận mức độ.</p>}
           <label className="circ-check"><input type="checkbox" checked={restoreCopy} disabled={busy || item.loanStatus !== 'Returned'} onChange={event => setRestoreCopy(event.target.checked)} /> Khi từ chối hồ sơ: đã kiểm tra sách, đủ điều kiện sử dụng lại</label>
           {restoreCopy && conditionSelect}
-          <p className="circ-hint">Mức bồi thường theo chính sách: {amount > 0 ? formatMoney(amount) : 'Chưa cấu hình'}{applyOverdue && item.suggestedOverdueFine ? ` · Phí quá hạn ${formatMoney(item.suggestedOverdueFine)}` : ''}</p>
+          <p className="circ-hint">Bồi thường cố định theo chính sách: {amount > 0 ? formatMoney(amount) : 'Chưa cấu hình'}{applyOverdue && item.suggestedOverdueFine ? ` · Phí quá hạn ${formatMoney(item.suggestedOverdueFine)}` : ''}</p>
           {item.suggestedOverdueFine && item.suggestedOverdueFine > 0 && <label className="circ-check"><input type="checkbox" checked={applyOverdue} onChange={(event) => setApplyOverdue(event.target.checked)} /> Cộng phí quá hạn {formatMoney(item.suggestedOverdueFine)}</label>}
           <label className="circ-field">Ghi chú xác minh<textarea rows={4} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Ghi nhận kết quả đối chiếu sách và phiếu mượn..." /></label>
           <div className="circ-actions"><button type="button" className="circ-btn circ-btn--primary" disabled={busy || amount <= 0 || !notes.trim() || item.loanStatus !== 'Returned'} onClick={() => void confirm()}>{busy ? 'Đang xác nhận...' : 'Xác nhận hồ sơ'}</button><button type="button" className="circ-btn" disabled={busy || !notes.trim()} onClick={() => void reject()}>Từ chối / tìm thấy sách</button><Link className="circ-btn" to={tabPath('overdue')}>Quay lại danh sách</Link></div>
-        </div> : <><div className="circ-incident-detail-note">Hồ sơ đã được xử lý. {item.totalAmount > 0 && <>Khoản phí liên quan: <Link to={tabPath('fines')}>xem danh sách phí phạt</Link>.</>}</div>{item.canRestoreCopy && <div className="circ-incident-detail-form"><h3>Đã sửa / tìm thấy sách — kiểm tra lại</h3>{conditionSelect}<label className="circ-field">Kết quả kiểm tra<textarea rows={3} maxLength={2000} value={notes} onChange={event => setNotes(event.target.value)} placeholder="Mô tả sửa chữa hoặc việc tìm thấy và kiểm tra sách" /></label><button type="button" className="circ-btn circ-btn--primary" disabled={busy || !notes.trim()} onClick={() => void restore()}>Xác nhận đủ điều kiện sử dụng</button></div>}</>}
+        </div> : <><div className="circ-incident-detail-note">Trách nhiệm bồi thường: {STATUS_LABELS[item.status] || item.status}. {item.totalAmount > 0 && <>Khoản phí liên quan: <Link to={tabPath('fines')}>xem danh sách phí phạt</Link>.</>}</div>{item.canRestoreCopy && <div className="circ-incident-detail-form"><h3>Đã sửa / tìm thấy sách — kiểm tra lại</h3>{conditionSelect}<label className="circ-field">Kết quả kiểm tra<textarea rows={3} maxLength={2000} value={notes} onChange={event => setNotes(event.target.value)} placeholder="Mô tả sửa chữa hoặc việc tìm thấy và kiểm tra sách" /></label><button type="button" className="circ-btn circ-btn--primary" disabled={busy || !notes.trim()} onClick={() => void restore()}>Xác nhận đủ điều kiện sử dụng</button></div>}</>}
       </div>
     </section>
   );
