@@ -32,4 +32,8 @@ declare module 'lucide-react-native' {
   export const MessageCircle: ComponentType<IconProps>;
   export const FileText: ComponentType<IconProps>;
   export const Star: ComponentType<IconProps>;
+  export const ScanLine: ComponentType<IconProps>;
+  export const RotateCcw: ComponentType<IconProps>;
+  export const Boxes: ComponentType<IconProps>;
+  export const Check: ComponentType<IconProps>;
 }
