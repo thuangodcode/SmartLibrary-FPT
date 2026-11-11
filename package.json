@@ -15,6 +15,7 @@
     "dev:lan": "concurrently \"npm run dev:api:lan\" \"npm run dev:web\" \"npm run dev:mobile\"",
     "demo:seed": "dotnet run --project tools/SmartLibrary.Demo -- .env",
     "demo:repair-auth": "dotnet run --project tools/SmartLibrary.Demo -- .env --repair-auth",
+    "demo:align": "dotnet run --project tools/SmartLibrary.Demo -- .env --align-workflow",
     "demo:overdue": "dotnet run --project tools/SmartLibrary.Demo -- .env --overdue"
   },
   "devDependencies": {

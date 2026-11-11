@@ -21,6 +21,15 @@ await using (var check = new NpgsqlCommand("SELECT count(*) FROM pg_database WHE
 await using var db = Context(localConnection);
 if (await db.Database.CanConnectAsync() && await db.Database.SqlQueryRaw<int>("SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_schema='public' AND table_name='profiles'").SingleAsync() > 0)
 {
+    if (args.Contains("--align-workflow"))
+    {
+        await using var align = await db.Database.BeginTransactionAsync();
+        await DemoDefaults.AlignPoliciesAsync(db);
+        await DemoDefaults.RenameBooksAsync(db);
+        await db.SaveChangesAsync();
+        await align.CommitAsync();
+        Console.WriteLine("Local demo aligned: light 20,000; severe/lost 100,000; overdue 5,000/day; block overdue renewal. Existing fines and workflow progress preserved.");
+    }
     if (args.Contains("--repair-auth"))
     {
         // Only the guarded local target is modified; the source transaction cannot write.
@@ -57,7 +66,7 @@ if (await db.Database.CanConnectAsync() && await db.Database.SqlQueryRaw<int>("S
         var staffId = await db.UserProfiles.Where(u => u.Role.Name == "Librarian").Select(u => u.Id).FirstAsync();
         var handoffSettings = await new CirculationRepository(db).GetSettingsAsync(CancellationToken.None);
         var pickup = CirculationRules.PickupSlots(handoffSettings, DateTimeOffset.UtcNow).First().PickupAt.UtcDateTime;
-        var book = new Book { Code = "DEMO013", CodeCategoryId = category.Id, Categories = [category], Title = "[Demo] Chờ giao sách — đối chiếu mã", Language = "vi", TotalCopies = 1 };
+        var book = new Book { Code = "DEMO013", CodeCategoryId = category.Id, Categories = [category], Title = "[Demo] Sách thực hành 13", Description = "Ca thực hành: đối chiếu bản sao và giao sách.", Language = "vi", TotalCopies = 1 };
         var copy = new BookCopy { Book = book, Barcode = "DEMO013-01", Condition = BookCondition.Good, IsAvailable = false };
         db.Add(new BorrowRecord { ReaderId = reader.Id, BookCopy = copy, LibrarianId = staffId, Status = BorrowStatus.Approved, PickupAt = pickup, AcceptedAt = DateTime.UtcNow, Notes = "[DEMO-LOCAL] Phiếu chờ giao bổ sung sau kiểm thử." });
         await db.SaveChangesAsync();
@@ -120,6 +129,8 @@ await db.SaveChangesAsync();
 await db.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS \"__EFMigrationsHistory\" (migration_id varchar(150) PRIMARY KEY, product_version varchar(32) NOT NULL)");
 foreach (var migration in db.Database.GetMigrations())
     await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"__EFMigrationsHistory\" VALUES ({migration}, {"9.0.2"}) ON CONFLICT DO NOTHING");
+await DemoDefaults.AlignPoliciesAsync(db);
+await db.SaveChangesAsync();
 var settings = await new CirculationRepository(db).GetSettingsAsync(CancellationToken.None);
 var now = DateTime.UtcNow;
 var staff = profiles.First(item => roles.Single(role => role.Id == item.RoleId).Name == "Librarian");
@@ -173,5 +184,7 @@ Copy(9, "Sẵn sàng trên kệ — mượn mới", location: demoShelf.Name);
 Copy(10, "Chiếm đủ sức chứa kệ FULL", location: fullShelf.Name);
 Copy(11, "Để dành thử quá hạn", location: demoShelf.Name);
 Copy(12, "Để dành thử trả hư hỏng", location: demoShelf.Name);
+await db.SaveChangesAsync();
+await DemoDefaults.RenameBooksAsync(db);
 await db.SaveChangesAsync();
 Console.WriteLine($"Local demo ready for {longReader.Email}: DEMO001-01 through DEMO012-01. Real fines were not copied; Supabase unchanged.");
