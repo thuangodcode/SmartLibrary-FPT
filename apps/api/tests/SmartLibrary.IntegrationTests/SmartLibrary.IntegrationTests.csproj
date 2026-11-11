@@ -22,4 +22,9 @@
     <ProjectReference Include="..\..\src\SmartLibrary.Api\SmartLibrary.Api.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="../../../../supabase/migrations/00028_align_compensation_fees.sql"
+             Link="Migrations/00028_align_compensation_fees.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
