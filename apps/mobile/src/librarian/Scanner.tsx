@@ -3,7 +3,8 @@ import { AppState, Keyboard, Linking, Platform, Pressable, StyleSheet, Text, Tex
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { isDevice } from 'expo-device';
 import { KeyboardScrollView } from '../KeyboardScrollView';
-import { Action, C, Notice, Title, u } from './ui';
+import { Action, C, Disclosure, Notice, Title, u } from './ui';
+import { scanFeedback } from './feedback';
 
 export function Scanner({ onCode, paused, purpose = 'lookup' }: { onCode: (code: string) => void; paused: boolean; purpose?: 'lookup' | 'checkout' }) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -32,11 +33,11 @@ export function Scanner({ onCode, paused, purpose = 'lookup' }: { onCode: (code:
       setError('Hãy dùng mã bản sao ghi dưới QR của thư viện, ví dụ KHTN002-01.');
       return;
     }
-    locked.current = true; setReady(false); setError(''); Keyboard.dismiss(); onCode(value);
+    locked.current = true; setReady(false); setError(''); Keyboard.dismiss(); scanFeedback(); onCode(value);
   };
 
-  return <KeyboardScrollView contentContainerStyle={purpose === 'checkout' ? u.section : u.page}>
-    <Title title={purpose === 'checkout' ? 'Quét để giao sách' : 'Quét bản sao'} detail={purpose === 'checkout' ? 'Quét QR hoặc nhập mã để đối chiếu với bản sao trên phiếu.' : 'Nhận diện cuốn sách để trả hoặc xếp lên kệ.'} />
+  const content = <>
+    <Title title={purpose === 'checkout' ? 'Quét để giao sách' : 'Một mã, đúng một cuốn'} detail={purpose === 'checkout' ? 'Quét QR hoặc nhập mã để đối chiếu với bản sao trên phiếu.' : 'Xem tình trạng, vị trí và thao tác phù hợp với bản sao.'} />
     <View style={s.tabs}>{([{ id: 'camera', title: 'Camera' }, { id: 'manual', title: 'Nhập mã' }] as const).map(item => <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: mode === item.id }} onPress={() => { setMode(item.id); setError(''); }} style={[s.tab, mode === item.id && s.selected]}><Text style={[s.tabText, mode === item.id && { color: C.ink }]}>{item.title}</Text></Pressable>)}</View>
     {mode === 'camera' && <View style={s.cameraFrame}>
       {available && permission?.granted && foreground && !paused && !cameraError ? <CameraView
@@ -51,11 +52,13 @@ export function Scanner({ onCode, paused, purpose = 'lookup' }: { onCode: (code:
     </View>}
     {mode === 'manual' && <View style={u.panel}><Text style={u.itemTitle}>Mã bản sao</Text><TextInput accessibilityLabel="Mã bản sao" value={code} onChangeText={text => { setCode(text); locked.current = false; setReady(true); setError(''); }} autoCapitalize="characters" autoCorrect={false} placeholder="Ví dụ: KHTN002-01" placeholderTextColor={C.muted} style={u.input} returnKeyType="search" maxLength={100} onSubmitEditing={() => accept(code)} editable={!paused} /><Action title={purpose === 'checkout' ? 'Đối chiếu mã bản sao' : 'Tra cứu bản sao'} onPress={() => accept(code)} disabled={!code.trim() || paused} /></View>}
     {!!error && <Notice text={error} error />}
-    {purpose === 'lookup' && <View style={s.help}><Text style={u.sectionTitle}>Mỗi cuốn, một mã riêng</Text><Text style={u.body}>Quét QR trong mục Bản sao & kệ sách trên web. Mã bản sao có dạng KHTN002-01, khác với ISBN in trên bìa sách.</Text><Text style={u.body}>Sau khi nhận diện, bạn sẽ kiểm tra thông tin và xác nhận trước khi thay đổi dữ liệu.</Text></View>}
-  </KeyboardScrollView>;
+    {purpose === 'lookup' && <Disclosure title="Mã nào dùng để quét?" detail="QR bản sao của thư viện, khác ISBN trên bìa sách"><Text style={u.body}>Mở QR trong mục Bản sao & kệ sách trên web. Mã bản sao có dạng KHTN002-01.</Text><Text style={u.body}>Quét chỉ nhận diện. Bạn sẽ kiểm tra thông tin và xác nhận riêng trước khi thay đổi dữ liệu.</Text></Disclosure>}
+  </>;
+  // The checkout form already lives inside a WorkSheet scroll view.
+  return purpose === 'checkout' ? <View style={u.section}>{content}</View> : <KeyboardScrollView contentContainerStyle={u.page}>{content}</KeyboardScrollView>;
 }
 const s = StyleSheet.create({
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderColor: C.line }, tab: { flex: 1, minHeight: 48, justifyContent: 'center', alignItems: 'center', borderBottomWidth: 2, borderColor: 'transparent' }, selected: { borderColor: C.accent }, tabText: { fontSize: 15, fontWeight: '600', color: C.muted },
+  tabs: { flexDirection: 'row', backgroundColor: '#e5eaf0', borderRadius: 14, padding: 4 }, tab: { flex: 1, minHeight: 44, justifyContent: 'center', alignItems: 'center', borderRadius: 11 }, selected: { backgroundColor: C.white }, tabText: { fontSize: 15, fontWeight: '600', color: C.muted },
   cameraFrame: { height: 320, borderRadius: 16, overflow: 'hidden', backgroundColor: '#18202c' }, cameraPlaceholder: { flex: 1, padding: 24, justifyContent: 'center', gap: 16 }, cameraTitle: { color: '#fff', fontSize: 20, lineHeight: 27, fontWeight: '600' }, cameraHint: { color: '#d4d9df', fontSize: 14, lineHeight: 21 },
   viewfinder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 24 }, frame: { width: 210, height: 210, borderRadius: 16, borderWidth: 2, borderColor: '#fff' }, cameraText: { color: '#fff', fontSize: 14, backgroundColor: '#18202c', padding: 8 }, scanAgain: { position: 'absolute', bottom: 16, left: 20, right: 20 }, help: { gap: 12 },
 });

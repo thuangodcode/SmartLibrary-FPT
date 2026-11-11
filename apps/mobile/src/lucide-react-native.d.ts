@@ -36,4 +36,11 @@ declare module 'lucide-react-native' {
   export const RotateCcw: ComponentType<IconProps>;
   export const Boxes: ComponentType<IconProps>;
   export const Check: ComponentType<IconProps>;
+  export const ArrowRight: ComponentType<IconProps>;
+  export const CheckCircle2: ComponentType<IconProps>;
+  export const ClipboardCheck: ComponentType<IconProps>;
+  export const ChevronDown: ComponentType<IconProps>;
+  export const QrCode: ComponentType<IconProps>;
+  export const ShieldCheck: ComponentType<IconProps>;
+  export const TriangleAlert: ComponentType<IconProps>;
 }
