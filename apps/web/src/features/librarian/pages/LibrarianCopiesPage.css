@@ -379,6 +379,7 @@
 .lib-copies-new-book-modal { width: min(100%, 760px); }
 .lib-copies-new-book-modal .lib-copies-field b { color: #d92d20; }
 .lib-copies-new-book-cover { width: 96px; max-height: 132px; object-fit: cover; border: 1px solid #e8ecf3; border-radius: 8px; }
+.lib-copies-cover-preview { display: flex; align-items: center; gap: 16px; }
 .lib-copies-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 20px; }
 .lib-copies-modal > header > div { display: flex; align-items: flex-start; gap: 12px; }
 .lib-copies-modal > header > div > span { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border-radius: 12px; background: #fff0e7; color: #d94712; }
@@ -402,7 +403,9 @@
 .lib-copies-category-picker label { display: flex; align-items: center; gap: 8px; min-height: 36px; border: 1px solid #e8ecf3; border-radius: 8px; padding: 0 9px; color: #344054; font-size: 12px; cursor: pointer; }
 .lib-copies-category-picker label:has(input:checked) { border-color: #f0a174; background: #fff8f3; color: #9a3412; }
 .lib-copies-category-picker input { accent-color: #e9621b; }
-.lib-copies-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.lib-copies-form-row { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 12px; }
+.lib-copies-code-field input[readonly] { background: #f6f7f9; cursor: default; }
+.lib-copies-code-field > button { justify-self: start; }
 .lib-copies-intake-note { margin-top: 16px; border: 1px solid #f4d6c5; border-radius: 10px; background: #fff9f5; padding: 12px; color: #875235; font-size: 11px; line-height: 1.55; }
 .lib-copies-modal > footer { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; }
 .lib-copies-modal footer button[type="button"] { min-height: 40px; border: 1px solid #e1e6ee; border-radius: 9px; background: #fff; padding: 0 15px; color: #596579; font-size: 12px; font-weight: 650; cursor: pointer; }

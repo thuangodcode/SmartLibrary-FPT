@@ -18,9 +18,10 @@ import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
+import { CopyQrDialog, type CopyQrLabel } from '../components/CopyQrDialog';
 import './LibrarianCopiesPage.css';
 
-type CopyCondition = 'New' | 'Good' | 'Fair' | 'Damaged' | 'Lost';
+type CopyCondition = 'New' | 'Good' | 'Fair' | 'LightDamaged' | 'Damaged' | 'Lost';
 
 interface CopyItem {
   id: string;
@@ -102,6 +103,7 @@ interface BookCopyGroup {
 interface CategoryOption {
   id: string;
   name: string;
+  code: string;
 }
 
 interface SortingCopy {
@@ -117,12 +119,13 @@ interface SortingBookDetails extends SortingBookOption {
 }
 
 const PAGE_SIZE = 20;
-const CONDITIONS: CopyCondition[] = ['New', 'Good', 'Fair', 'Damaged', 'Lost'];
+const CONDITIONS: CopyCondition[] = ['New', 'Good', 'Fair', 'LightDamaged', 'Damaged', 'Lost'];
 const conditionLabels: Record<CopyCondition, string> = {
   New: 'Mới',
   Good: 'Tốt',
   Fair: 'Trung bình',
-  Damaged: 'Hư hỏng',
+  LightDamaged: 'Hư nhẹ — còn sử dụng được',
+  Damaged: 'Hư hỏng / chờ kiểm tra',
   Lost: 'Thất lạc',
 };
 
@@ -131,6 +134,7 @@ const LibrarianCopiesPage: React.FC = () => {
   const { showToast } = useToast();
   const [tab, setTab] = useState<'copies' | 'sorting' | 'locations'>(() => new URLSearchParams(window.location.search).get('tab') === 'sorting' ? 'sorting' : 'copies');
   const [copies, setCopies] = useState<CopyItem[]>([]);
+  const [qrCopy, setQrCopy] = useState<CopyQrLabel | null>(null);
   const [bookGroups, setBookGroups] = useState<BookCopyGroup[]>([]);
   const [copyBookSearch, setCopyBookSearch] = useState('');
   const [selectedCopyBook, setSelectedCopyBook] = useState<BookCopyGroup | null>(null);
@@ -151,12 +155,18 @@ const LibrarianCopiesPage: React.FC = () => {
   const [newBookOpen, setNewBookOpen] = useState(() => new URLSearchParams(window.location.search).get('newBook') === '1');
   const [newBookTitle, setNewBookTitle] = useState('');
   const [newBookCode, setNewBookCode] = useState('');
-  const [newBookCodeState, setNewBookCodeState] = useState<'idle' | 'checking' | 'available' | 'taken' | 'error'>('idle');
+  const [newBookCodeState, setNewBookCodeState] = useState<'idle' | 'checking' | 'available' | 'error'>('idle');
+  const [newBookCodeRefresh, setNewBookCodeRefresh] = useState(0);
+  const [newBookCodeError, setNewBookCodeError] = useState('');
   const [newBookAuthor, setNewBookAuthor] = useState('');
   const [newBookIsbn, setNewBookIsbn] = useState('');
   const [newBookYear, setNewBookYear] = useState('');
   const [newBookLanguage, setNewBookLanguage] = useState('vi');
-  const [newBookCategoryIds, setNewBookCategoryIds] = useState<string[]>([]);
+  const [newBookCategoryIds, setNewBookCategoryIds] = useState<string[]>(() => {
+    const categoryId = new URLSearchParams(window.location.search).get('categoryId');
+    return categoryId ? [categoryId] : [];
+  });
+  const [newBookCodeCategoryId, setNewBookCodeCategoryId] = useState(() => new URLSearchParams(window.location.search).get('categoryId') || '');
   const [newBookQuantity, setNewBookQuantity] = useState(1);
   const [newBookDescription, setNewBookDescription] = useState('');
   const [newBookCover, setNewBookCover] = useState<File | null>(null);
@@ -394,25 +404,24 @@ const LibrarianCopiesPage: React.FC = () => {
   }, [headers, showToast, sortingBooksRefresh, sortingSearch, tab]);
 
   useEffect(() => {
-    const code = newBookCode.trim();
-    if (!newBookOpen || !code || !/^[a-zA-Z0-9]{1,32}$/.test(code)) {
+    if (!newBookOpen || !newBookCodeCategoryId) {
       return;
     }
     let cancelled = false;
     const timer = window.setTimeout(async () => {
-      if (!cancelled) setNewBookCodeState('checking');
+      if (!cancelled) { setNewBookCodeState('checking'); setNewBookCode(''); setNewBookCodeError(''); }
       try {
-        const params = new URLSearchParams({ code });
-        const response = await fetch(`${API_BASE_URL}/api/v1/books/code-availability?${params}`, { headers });
-        const result = await parseApiResponse<Envelope<{ available: boolean }>>(response);
-        if (!response.ok || !result?.success || !result.data) throw new Error(result?.error || 'Không kiểm tra được mã sách.');
-        if (!cancelled) setNewBookCodeState(result.data.available ? 'available' : 'taken');
-      } catch {
-        if (!cancelled) setNewBookCodeState('error');
+        const params = new URLSearchParams({ categoryId: newBookCodeCategoryId });
+        const response = await fetch(`${API_BASE_URL}/api/v1/books/next-code?${params}`, { headers });
+        const result = await parseApiResponse<Envelope<{ code: string }>>(response);
+        if (!response.ok || !result?.success || !result.data?.code) throw new Error(result?.error || 'Không thể lấy mã sách tự động.');
+        if (!cancelled) { setNewBookCode(result.data.code); setNewBookCodeState('available'); }
+      } catch (caught) {
+        if (!cancelled) { setNewBookCodeState('error'); setNewBookCodeError(caught instanceof Error ? caught.message : 'Không thể lấy mã sách tự động.'); }
       }
     }, 350);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [headers, newBookCode, newBookOpen]);
+  }, [headers, newBookCodeCategoryId, newBookCodeRefresh, newBookOpen]);
 
   useEffect(() => {
     if (tab !== 'sorting' || !sortingBookId) return;
@@ -478,12 +487,13 @@ const LibrarianCopiesPage: React.FC = () => {
   const handleCreateAndIntakeBook = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const code = newBookCode.trim();
-    if (!newBookTitle.trim() || newBookCategoryIds.length === 0 || !/^[a-zA-Z0-9]{1,32}$/.test(code) || newBookCodeState !== 'available') return;
+    if (!newBookTitle.trim() || !newBookCategoryIds.includes(newBookCodeCategoryId) || !code || newBookCodeState !== 'available') return;
     if (newBookQuantity < 1 || newBookQuantity > 500) return;
     setSaving(true);
     try {
       const body = new FormData();
       body.append('Code', code);
+      body.append('CodeCategoryId', newBookCodeCategoryId);
       body.append('Title', newBookTitle.trim());
       if (newBookAuthor.trim()) body.append('AuthorName', newBookAuthor.trim());
       if (newBookIsbn.trim()) body.append('Isbn', newBookIsbn.trim());
@@ -497,10 +507,20 @@ const LibrarianCopiesPage: React.FC = () => {
       const response = await fetch(`${API_BASE_URL}/api/v1/books/form`, { method: 'POST', headers, body });
       const result = await parseApiResponse<Envelope<{ id: string; title: string }>>(response);
       if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể tạo đầu sách và nhập vào kho.');
-      showToast({ type: 'success', title: 'Đã nhập đầu sách mới', message: `Đã tạo “${newBookTitle.trim()}” cùng ${newBookQuantity} bản sao trong kho.` });
+      showToast({ type: 'success', title: 'Đã nhập đầu sách mới', message: `Đã tạo “${newBookTitle.trim()}” cùng ${newBookQuantity} bản sao trong kho. Chọn Xem QR tại bản sao để mở mã.` });
+      if (newBookCoverPreview) URL.revokeObjectURL(newBookCoverPreview);
       setNewBookTitle(''); setNewBookCode(''); setNewBookCodeState('idle'); setNewBookAuthor(''); setNewBookIsbn(''); setNewBookYear(''); setNewBookLanguage('vi'); setNewBookCategoryIds([]); setNewBookQuantity(1); setNewBookDescription(''); setNewBookCover(null); setNewBookCoverPreview('');
+      setNewBookCodeCategoryId('');
       closeNewBookForm();
       setTab('sorting');
+      setSortingSearch('');
+      if (result.data?.id) {
+        setSortingDetails(null);
+        setSortingSelected([]);
+        setSortingDestinations({});
+        setSortingLoading(true);
+        setSortingBookId(result.data.id);
+      }
       await refreshData();
       setSortingBooksRefresh(current => current + 1);
     } catch (caught) {
@@ -740,7 +760,7 @@ const LibrarianCopiesPage: React.FC = () => {
                       <td>{copy.location || <span className="lib-copies-unassigned">{copy.isAvailable ? 'Trong kho' : 'Ngoài kệ / không khả dụng'}</span>}</td>
                       <td><span className={`lib-copy-condition is-${copy.condition.toLowerCase()}`}>{conditionLabels[copy.condition]}</span></td>
                       <td><span className={`lib-copy-availability ${copy.isAvailable && copy.condition !== 'Damaged' && copy.condition !== 'Lost' ? 'is-available' : 'is-unavailable'}`}>{copy.condition === 'Lost' ? 'Thất lạc' : copy.condition === 'Damaged' ? 'Hư hỏng' : copy.isAvailable ? 'Sẵn sàng' : 'Đang mượn / khóa'}</span></td>
-                      <td><button type="button" className="lib-copy-edit" onClick={() => openEdit(copy)}>Sửa vị trí</button></td>
+                      <td><div className="lib-copy-actions"><button type="button" className="lib-copy-qr" onClick={() => setQrCopy(copy)} aria-label={`Xem mã QR ${copy.barcode}`}>Xem QR</button><button type="button" className="lib-copy-edit" onClick={() => openEdit(copy)}>Sửa vị trí</button></div></td>
                     </tr>
                   ))}</tbody>
                 </table>
@@ -785,6 +805,7 @@ const LibrarianCopiesPage: React.FC = () => {
               <div className="lib-copies-sorting-list">
                 {sortingDetails.copies.map(copy => <article key={copy.id}>
                   <label><input type="checkbox" checked={sortingSelected.includes(copy.id)} onChange={event => setSortingSelected(current => event.target.checked ? [...new Set([...current, copy.id])] : current.filter(id => id !== copy.id))} /><span><strong>{copy.barcode}</strong><small>{conditionLabels[copy.condition]} · {copy.hasBeenReturned ? 'Đã trả về' : 'Chưa có lượt mượn'}</small></span></label>
+                  <button type="button" className="lib-copy-qr" onClick={() => setQrCopy({ barcode: copy.barcode, bookTitle: sortingDetails.title })} aria-label={`Xem mã QR ${copy.barcode}`}>Xem QR</button>
                   <select aria-label={`Vị trí của bản sao ${copy.barcode}`} value={sortingDestinations[copy.id] ?? ''} onChange={event => setSortingDestinations(current => ({ ...current, [copy.id]: event.target.value }))}>
                     <option value="">Giữ trong kho</option>
                     {locations.filter(location => location.availableCapacity > 0).map(location => <option key={location.id} value={location.name}>{location.name} · còn {location.availableCapacity} chỗ</option>)}
@@ -824,13 +845,14 @@ const LibrarianCopiesPage: React.FC = () => {
               ) : shelfCopies.length ? (
                 <div className="lib-copies-table-wrap">
                   <table className="lib-copies-table">
-                    <thead><tr><th>Mã bản sao</th><th>Tình trạng</th><th>Khả dụng</th><th>Ngày nhập</th></tr></thead>
+                    <thead><tr><th>Mã bản sao</th><th>Tình trạng</th><th>Khả dụng</th><th>Ngày nhập</th><th>Mã QR</th></tr></thead>
                     <tbody>{shelfCopies.map(copy => (
                       <tr key={copy.id}>
                         <td><code>{copy.barcode}</code></td>
                         <td><span className={`lib-copy-condition is-${copy.condition.toLowerCase()}`}>{conditionLabels[copy.condition]}</span></td>
                         <td><span className={`lib-copy-availability ${copy.isAvailable && copy.condition !== 'Damaged' && copy.condition !== 'Lost' ? 'is-available' : 'is-unavailable'}`}>{copy.condition === 'Lost' ? 'Thất lạc' : copy.condition === 'Damaged' ? 'Hư hỏng' : copy.isAvailable ? 'Sẵn sàng' : 'Đang mượn / khóa'}</span></td>
                         <td>{new Date(copy.createdAt).toLocaleDateString('vi-VN')}</td>
+                        <td><button type="button" className="lib-copy-qr" onClick={() => setQrCopy(copy)} aria-label={`Xem mã QR ${copy.barcode}`}>Xem QR</button></td>
                       </tr>
                     ))}</tbody>
                   </table>
@@ -888,9 +910,15 @@ const LibrarianCopiesPage: React.FC = () => {
         <div className="lib-copies-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeNewBookForm(); }}>
           <form className="lib-copies-modal lib-copies-new-book-modal" onSubmit={handleCreateAndIntakeBook} role="dialog" aria-modal="true" aria-labelledby="lib-copy-new-book-title">
             <header><div><span><BookCopy size={19} /></span><div><h2 id="lib-copy-new-book-title">Tạo đầu sách mới và nhập kho</h2><p>Điền thông tin sách và số bản nhận về. Tất cả bản sao sẽ được lưu trong kho trước.</p></div></div><button type="button" className="lib-copies-modal-back" onClick={closeNewBookForm}><ChevronLeft size={16} /> Quay lại</button></header>
-            <label className="lib-copies-field">Tên sách <b>*</b><input value={newBookTitle} onChange={event => setNewBookTitle(event.target.value)} placeholder="Ví dụ: Lập trình C# căn bản" required /></label>
+            <label className="lib-copies-field"><span>Tên sách <b>*</b></span><input value={newBookTitle} onChange={event => setNewBookTitle(event.target.value)} placeholder="Ví dụ: Lập trình C# căn bản" required /></label>
+            <fieldset className="lib-copies-category-picker"><legend>Danh mục <b>*</b></legend><p>Chọn danh mục cho đầu sách; một danh mục được dùng để cấp mã.</p><div>{categories.map(category => <label key={category.id}><input type="checkbox" checked={newBookCategoryIds.includes(category.id)} onChange={event => {
+              const next = event.target.checked ? [...newBookCategoryIds, category.id] : newBookCategoryIds.filter(id => id !== category.id);
+              setNewBookCategoryIds(next);
+              if (!next.includes(newBookCodeCategoryId)) { setNewBookCodeCategoryId(next[0] || ''); setNewBookCode(''); setNewBookCodeState('idle'); }
+            }} /><span>{category.name} · {category.code}</span></label>)}</div></fieldset>
+            {newBookCategoryIds.length > 0 && <label className="lib-copies-field"><span>Danh mục cấp mã <b>*</b></span><select value={newBookCodeCategoryId} onChange={event => { setNewBookCodeCategoryId(event.target.value); setNewBookCode(''); setNewBookCodeState('idle'); }} disabled={saving}>{categories.filter(category => newBookCategoryIds.includes(category.id)).map(category => <option key={category.id} value={category.id}>{category.name} · {category.code}</option>)}</select><small>Các danh mục khác dùng để phân loại thêm. Mã bản sao và QR luôn theo mã đầu sách.</small></label>}
             <div className="lib-copies-form-row">
-              <label className="lib-copies-field">Mã sách <b>*</b><input value={newBookCode} onChange={event => { setNewBookCode(event.target.value); setNewBookCodeState('idle'); }} maxLength={32} pattern="[A-Za-z0-9]{1,32}" placeholder="Ví dụ: PY01" required /><small>{newBookCodeState === 'checking' ? 'Đang kiểm tra mã...' : newBookCodeState === 'available' ? 'Mã sách có thể sử dụng.' : newBookCodeState === 'taken' ? 'Mã đã được sử dụng, hãy chọn mã khác.' : newBookCodeState === 'error' ? 'Không kiểm tra được mã sách. Hãy thử lại.' : 'Dùng chữ cái và chữ số, tối đa 32 ký tự.'}</small></label>
+              <div className="lib-copies-field lib-copies-code-field"><label htmlFor="lib-new-book-code">Mã sách tự động</label><input id="lib-new-book-code" value={newBookCode} readOnly placeholder="Chọn danh mục để cấp mã" aria-describedby="lib-new-book-code-help" /><small id="lib-new-book-code-help">{newBookCodeState === 'checking' ? 'Đang lấy mã còn trống...' : newBookCodeState === 'available' ? 'Số thứ tự còn trống nhỏ nhất của danh mục. Mã chính thức được cấp khi lưu.' : newBookCodeState === 'error' ? newBookCodeError : 'Chọn danh mục cấp mã. Mã sách không nhập thủ công.'}</small>{newBookCodeCategoryId && <button type="button" className="lib-copy-qr" disabled={saving} onClick={() => { setNewBookCodeState('checking'); setNewBookCodeRefresh(value => value + 1); }}>Lấy lại mã tự động</button>}</div>
               <label className="lib-copies-field">Tác giả<input value={newBookAuthor} onChange={event => setNewBookAuthor(event.target.value)} placeholder="Tên tác giả" /></label>
             </div>
             <div className="lib-copies-form-row">
@@ -898,12 +926,31 @@ const LibrarianCopiesPage: React.FC = () => {
               <label className="lib-copies-field">Năm xuất bản<input type="number" min={1000} max={new Date().getFullYear() + 1} value={newBookYear} onChange={event => setNewBookYear(event.target.value)} placeholder="Ví dụ: 2026" /></label>
             </div>
             <div className="lib-copies-form-row">
-              <label className="lib-copies-field">Số lượng bản sao <b>*</b><input type="number" min={1} max={500} value={newBookQuantity} onChange={event => setNewBookQuantity(Number(event.target.value))} required /><small>Hệ thống tự tạo mã vạch riêng cho từng bản.</small></label>
+              <label className="lib-copies-field"><span>Số lượng bản sao <b>*</b></span><input type="number" min={1} max={500} value={newBookQuantity} onChange={event => setNewBookQuantity(Number(event.target.value))} required /><small>Mỗi bản có mã riêng. Sau khi tạo, chọn Xem QR để mở mã của từng bản.</small></label>
               <label className="lib-copies-field">Ngôn ngữ<select value={newBookLanguage} onChange={event => setNewBookLanguage(event.target.value)}><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option><option value="ja">Tiếng Nhật</option><option value="ko">Tiếng Hàn</option></select></label>
             </div>
-            <fieldset className="lib-copies-category-picker"><legend>Danh mục <b>*</b></legend><p>Chọn một hoặc nhiều danh mục phù hợp với cuốn sách.</p><div>{categories.map(category => <label key={category.id}><input type="checkbox" checked={newBookCategoryIds.includes(category.id)} onChange={event => setNewBookCategoryIds(current => event.target.checked ? [...current, category.id] : current.filter(id => id !== category.id))} /><span>{category.name}</span></label>)}</div></fieldset>
             <label className="lib-copies-field">Mô tả<textarea rows={3} value={newBookDescription} onChange={event => setNewBookDescription(event.target.value)} placeholder="Tóm tắt nội dung sách hoặc ghi chú..." /></label>
-            <label className="lib-copies-field">Ảnh bìa sách<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={event => { const file = event.target.files?.[0]; if (!file) return; if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 10 * 1024 * 1024) { showToast({ type: 'error', title: 'Ảnh không hợp lệ', message: 'Chọn ảnh JPG, PNG, WEBP hoặc GIF có dung lượng tối đa 10 MB.' }); event.target.value = ''; return; } setNewBookCover(file); setNewBookCoverPreview(URL.createObjectURL(file)); }} /><small>JPG, PNG, WEBP hoặc GIF · tối đa 10 MB</small>{newBookCoverPreview && <img className="lib-copies-new-book-cover" src={newBookCoverPreview} alt="Ảnh bìa xem trước" />}</label>
+            <div className="lib-copies-field">
+              <label htmlFor="lib-new-book-cover">Ảnh bìa sách (không bắt buộc)</label>
+              <input id="lib-new-book-cover" name="CoverImage" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={event => {
+                const file = event.target.files?.[0];
+                if (newBookCoverPreview) URL.revokeObjectURL(newBookCoverPreview);
+                setNewBookCover(null); setNewBookCoverPreview('');
+                if (!file) return;
+                if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 10 * 1024 * 1024) {
+                  showToast({ type: 'error', title: 'Ảnh không hợp lệ', message: 'Chọn ảnh JPG, PNG, WEBP hoặc GIF có dung lượng tối đa 10 MB.' });
+                  event.target.value = ''; return;
+                }
+                setNewBookCover(file); setNewBookCoverPreview(URL.createObjectURL(file));
+              }} />
+              <small>JPG, PNG, WEBP hoặc GIF · tối đa 10 MB. Bỏ trống vẫn tạo được sách, bản sao và QR.</small>
+              {newBookCoverPreview && <div className="lib-copies-cover-preview"><img className="lib-copies-new-book-cover" src={newBookCoverPreview} alt="Ảnh bìa xem trước" /><button type="button" className="lib-copy-qr" disabled={saving} onClick={event => {
+                URL.revokeObjectURL(newBookCoverPreview);
+                setNewBookCover(null); setNewBookCoverPreview('');
+                const input = event.currentTarget.form?.elements.namedItem('CoverImage');
+                if (input instanceof HTMLInputElement) input.value = '';
+              }}>Bỏ ảnh đã chọn</button></div>}
+            </div>
             <aside className="lib-copies-intake-note">Nhập kho trước: sách chưa lên kệ sẽ chưa thể cho mượn. Sau khi nhận sách, vào danh sách kho để sắp xếp từng bản sao lên kệ.</aside>
             <footer><button type="button" onClick={closeNewBookForm}>Hủy</button><button type="submit" disabled={saving || newBookCodeState !== 'available' || newBookCategoryIds.length === 0 || newBookQuantity < 1 || newBookQuantity > 500}>{saving ? 'Đang nhập...' : 'Tạo đầu sách và nhập kho'}</button></footer>
           </form>
@@ -974,6 +1021,7 @@ const LibrarianCopiesPage: React.FC = () => {
           </form>
         </div>
       )}
+      <CopyQrDialog copy={qrCopy} onClose={() => setQrCopy(null)} />
     </section>
   );
 };
