@@ -1,19 +1,19 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform,
   Pressable, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BookOpen, Search, Bell, Home, ClipboardList, CircleUserRound, ArrowUpRight, Clock3, BookMarked, CircleAlert, X, LogOut } from 'lucide-react-native';
+import { BookOpen, Search, ClipboardList, ArrowUpRight, Clock3, BookMarked, CircleAlert, X, LogOut } from 'lucide-react-native';
 import { apiRequest } from './api';
 import { AuthFlow } from './AuthFlow';
 import { ReaderShell } from './ReaderShell';
+import { LibrarianShell } from './LibrarianShell';
 import { COLORS } from './config';
 import { useSession } from './session';
 import type { Book, Loan } from './types';
 
-type Tab = 'home' | 'catalog' | 'activity' | 'account';
 type Screen = 'login' | 'app';
 
 function errorMessage(error: unknown) { return error instanceof Error ? error.message : 'Đã có lỗi xảy ra. Vui lòng thử lại.'; }
@@ -158,75 +158,11 @@ function ReaderApp({ user, token }: { user: NonNullable<ReturnType<typeof useSes
   return <><ReaderShell user={user} token={token} onSignOut={signOut} onBorrow={setSelectedBook} /><BorrowModal book={selectedBook} token={token} onClose={() => setSelectedBook(null)} /></>;
 }
 
-function LibrarianHome({ user, token }: { user: NonNullable<ReturnType<typeof useSession>['user']>; token: string }) {
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [books, setBooks] = useState<Book[]>([]);
-  const [busy, setBusy] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState<{ borrowed?: number; overdue?: number; dueSoon?: number } | undefined>();
-  const [barcode, setBarcode] = useState('');
-  const load = useCallback(async (pull = false) => {
-    pull ? setRefreshing(true) : setBusy(true);
-    try {
-      const [loanResult, statsResult, bookResult] = await Promise.all([
-        apiRequest<unknown>('/api/v1/circulation/loans?page=1&pageSize=6', {}, token),
-        apiRequest<{ borrowed?: number; overdue?: number; dueSoon?: number }>('/api/v1/circulation/stats', {}, token),
-        apiRequest<Book[]>('/api/v1/books?page=1&pageSize=4', {}, token),
-      ]);
-      setStats(statsResult.data);
-      const payload = loanResult.data as { items?: Loan[]; loans?: Loan[] } | Loan[] | undefined;
-      setLoans(Array.isArray(payload) ? payload : payload?.items || payload?.loans || []);
-      setBooks(Array.isArray(bookResult.data) ? bookResult.data : []);
-    } catch (error) { Alert.alert('Không tải được dữ liệu', errorMessage(error)); }
-    finally { setBusy(false); setRefreshing(false); }
-  }, [token]);
-  useEffect(() => { void load(); }, [load]);
-  const lookup = async () => {
-    if (!barcode.trim()) return;
-    try {
-      const result = await apiRequest<unknown>(`/api/v1/circulation/loans?search=${encodeURIComponent(barcode.trim())}&page=1&pageSize=1`, {}, token);
-      const payload = result.data as Loan[] | { items?: Loan[] } | undefined;
-      const found = Array.isArray(payload) ? payload[0] : payload?.items?.[0];
-      if (found) Alert.alert('Đã tìm thấy phiếu', `${found.readerName || 'Độc giả'} · ${found.bookTitle || found.title || ''}\nTrạng thái: ${found.status || 'Đang xử lý'}`);
-      else Alert.alert('Chưa tìm thấy', `Không tìm thấy phiếu phù hợp với “${barcode}”.`);
-    } catch (error) { Alert.alert('Không thể tra cứu', errorMessage(error)); }
-  };
-  return <ScrollView contentContainerStyle={styles.pageContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={COLORS.green} />}>
-    <View style={styles.librarianHero}><View><Text style={styles.welcomeEyebrow}>KHÔNG GIAN THỦ THƯ</Text><Text style={styles.librarianTitle}>Xin chào,{ '\n' }{user.fullName.split(' ').slice(-1)[0]}</Text><Text style={styles.librarianSubtitle}>Quản lý thư viện thật nhẹ nhàng.</Text></View><View style={styles.librarianIcon}><ClipboardList size={27} color="#fff" /></View></View>
-    <View style={styles.sectionHeading}><View><Text style={styles.sectionTitle}>Tổng quan hôm nay</Text><Text style={styles.sectionCaption}>Tình hình hoạt động thư viện</Text></View></View>
-    <View style={styles.statsRow}><View style={styles.statCard}><Text style={styles.statValue}>{busy ? '—' : stats?.borrowed ?? loans.length}</Text><Text style={styles.statLabel}>Đang mượn</Text><View style={styles.statIcon}><ClipboardList size={16} color={COLORS.green} /></View></View><View style={styles.statCard}><Text style={styles.statValue}>{busy ? '—' : stats?.overdue ?? 0}</Text><Text style={styles.statLabel}>Quá hạn</Text><View style={[styles.statIcon, { backgroundColor: '#fff1e4' }]}><CircleAlert size={16} color={COLORS.orange} /></View></View></View>
-    <View style={styles.quickAction}><View style={styles.quickIcon}><Search size={19} color={COLORS.green} /></View><View style={styles.quickCopy}><Text style={styles.quickTitle}>Tra cứu mã vạch</Text><Text style={styles.quickSubtitle}>Tìm nhanh phiếu mượn trong hệ thống</Text></View></View>
-    <View style={styles.barcodeRow}><TextInput value={barcode} onChangeText={setBarcode} placeholder="Nhập mã vạch hoặc mã phiếu" placeholderTextColor="#929e95" style={styles.barcodeInput} returnKeyType="search" onSubmitEditing={() => void lookup()} /><Button title="Tìm" compact onPress={() => void lookup()} /></View>
-    <View style={[styles.sectionHeading, { marginTop: 27 }]}><View><Text style={styles.sectionTitle}>Phiếu mượn gần đây</Text><Text style={styles.sectionCaption}>Các giao dịch mới nhất</Text></View></View>
-    {busy ? <ActivityIndicator color={COLORS.green} style={{ marginVertical: 26 }} /> : loans.length ? loans.map((loan) => <LoanCard key={loan.id} loan={loan} />) : <View style={styles.emptyCard}><ClipboardList size={21} color={COLORS.muted} /><Text style={styles.emptyText}>Chưa có giao dịch gần đây.</Text></View>}
-  </ScrollView>;
-}
-
-function LibrarianScreen({ user, token }: { user: NonNullable<ReturnType<typeof useSession>['user']>; token: string }) {
-  const { signOut } = useSession();
-  const [tab, setTab] = useState<Tab>('home');
-  const screen = useMemo(() => {
-    if (tab === 'home') return <LibrarianHome user={user} token={token} />;
-    if (tab === 'catalog') return <CatalogScreen token={token} librarian />;
-    if (tab === 'activity') return <ActivityScreen token={token} role="Librarian" />;
-    return <AccountScreen user={user} onSignOut={signOut} />;
-  }, [tab, user, token]);
-  return <SafeAreaView edges={['top']} style={[styles.appRoot, { paddingTop: 0 }]}><View style={styles.appTop}><View style={styles.topBrand}><View style={styles.topLogo}><BookOpen size={18} color="#fff" /></View><Text style={styles.topBrandName}>smartlibrary</Text><View style={styles.staffBadge}><Text style={styles.staffBadgeText}>THỦ THƯ</Text></View></View><Pressable onPress={() => Alert.alert('Thông báo', 'Tính năng thông báo đang được kết nối với hệ thống.')} style={styles.notificationButton}><Bell size={19} color={COLORS.ink} /></Pressable></View><View style={styles.flex}>{screen}</View><BottomNav tab={tab} onChange={setTab} librarian /></SafeAreaView>;
-}
-
-function BottomNav({ tab, onChange, librarian }: { tab: Tab; onChange: (tab: Tab) => void; librarian: boolean }) {
-  const items: { id: Tab; label: string; icon: typeof Home }[] = [
-    { id: 'home', label: 'Tổng quan', icon: Home }, { id: 'catalog', label: 'Kho sách', icon: BookOpen },
-    { id: 'activity', label: librarian ? 'Phiếu mượn' : 'Lịch sử', icon: ClipboardList }, { id: 'account', label: 'Tài khoản', icon: CircleUserRound },
-  ];
-  return <SafeAreaView edges={['bottom']} style={styles.bottomNavSafe}><View style={styles.bottomNav}>{items.map((item) => { const Icon = item.icon; const active = item.id === tab; return <Pressable key={item.id} onPress={() => onChange(item.id)} style={styles.navItem}><Icon size={20} color={active ? COLORS.green : COLORS.muted} strokeWidth={active ? 2.4 : 1.8} /><Text style={[styles.navLabel, active && styles.navLabelActive]}>{item.label}</Text>{active && <View style={styles.navActiveMark} />}</Pressable>; })}</View></SafeAreaView>;
-}
-
 export function SmartLibraryApp() {
   const { user, token, loading } = useSession();
   if (loading) return <SafeAreaView style={styles.loading}><ActivityIndicator color={COLORS.green} size="large" /><Text style={styles.loadingText}>Đang mở thư viện…</Text></SafeAreaView>;
   if (!user || !token) return <LoginScreen />;
-  return user.role === 'Librarian' ? <LibrarianScreen user={user} token={token} /> : <ReaderApp user={user} token={token} />;
+  return user.role === 'Librarian' ? <LibrarianShell user={user} token={token} /> : <ReaderApp user={user} token={token} />;
 }
 
 const styles = StyleSheet.create({
