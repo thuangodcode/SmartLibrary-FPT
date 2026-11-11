@@ -20,7 +20,15 @@
         "backgroundColor": "#f4f7f2"
       }
     },
-    "plugins": ["expo-secure-store"],
+    "plugins": [
+      "expo-secure-store",
+      ["expo-camera", {
+        "cameraPermission": "Cho phép SmartLibrary quét mã QR của bản sao sách.",
+        "microphonePermission": false,
+        "recordAudioAndroid": false,
+        "barcodeScannerEnabled": true
+      }]
+    ],
     "extra": {
       "eas": {
         "projectId": ""
