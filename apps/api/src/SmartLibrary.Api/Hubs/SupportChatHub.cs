@@ -70,7 +70,9 @@ public sealed class SupportChatHub(AppDbContext db) : Hub
         {
             ReaderId = readerId,
             SenderId = senderId,
-            Message = message
+            Message = message,
+            IsReadByLibrarian = sender.Id != readerId,
+            IsReadByReader = sender.Id == readerId
         };
         db.SupportChatMessages.Add(row);
         await db.SaveChangesAsync(Context.ConnectionAborted);

@@ -62,14 +62,40 @@ public class CirculationRulesTests
     }
 
     [Fact]
+    public void StartOfLibraryDateUtc_ForSelectedDateUsesVietnamMidnight()
+    {
+        CirculationRules.StartOfLibraryDateUtc(new DateOnly(2026, 10, 24))
+            .Should().Be(new DateTime(2026, 10, 23, 17, 0, 0, DateTimeKind.Utc));
+    }
+
+    [Fact]
     public void OccupiesCopy_ExcludesPendingRequests()
     {
-        CirculationRules.OccupiesCopy(BorrowStatus.Pending).Should().BeFalse();
+        CirculationRules.OccupiesCopy(BorrowStatus.Pending).Should().BeTrue();
         CirculationRules.OccupiesCopy(BorrowStatus.Rejected).Should().BeFalse();
         CirculationRules.OccupiesCopy(BorrowStatus.Returned).Should().BeFalse();
         CirculationRules.OccupiesCopy(BorrowStatus.Borrowed).Should().BeTrue();
         CirculationRules.OccupiesCopy(BorrowStatus.Overdue).Should().BeTrue();
         CirculationRules.OccupiesCopy(BorrowStatus.Approved).Should().BeTrue();
+    }
+
+    [Fact]
+    public void PickupSlots_UsesLibraryHoursAndExcludesSunday()
+    {
+        var slots = CirculationRules.PickupSlots(
+            new CirculationSettings { PickupSlotMinutes = 30, PickupDaysAhead = 14, PickupCapacityPerSlot = 3 },
+            DateTimeOffset.UtcNow);
+        var localSlots = slots.Select(slot => TimeZoneInfo.ConvertTime(slot.PickupAt, TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time")))
+            .ToList();
+
+        localSlots.Should().NotBeEmpty();
+        localSlots.Should().OnlyContain(slot => slot.DayOfWeek != DayOfWeek.Sunday);
+        localSlots.Should().OnlyContain(slot => (slot.Minute == 0 || slot.Minute == 30) && slot.Second == 0);
+        localSlots.Where(slot => slot.DayOfWeek == DayOfWeek.Saturday)
+            .Should().OnlyContain(slot => slot.Hour >= 9 && (slot.Hour < 15));
+        localSlots.Where(slot => slot.DayOfWeek is not DayOfWeek.Saturday)
+            .Should().OnlyContain(slot => slot.Hour >= 9 && slot.Hour < 17);
+        slots.Should().OnlyContain(slot => slot.Capacity == 3 && slot.RemainingCapacity == 3);
     }
 
     [Fact]
@@ -139,6 +165,51 @@ public class CirculationRulesTests
     }
 
     [Fact]
+    public void ValidateRenewal_BlocksReaderWithUnpaidFineOnlyWhenPolicyRequiresIt()
+    {
+        var settings = new CirculationSettings
+        {
+            MaxRenewals = 4,
+            RestrictIfUnpaid = true,
+            SelfRenewBeforeDays = 1,
+            SelfRenewAfterDays = 1
+        };
+        var due = DateTime.UtcNow.AddHours(12);
+
+        CirculationRules.ValidateRenewal(settings, 0, due, DateTime.UtcNow, false, false, false, false, true)
+            .Should().Contain("phí chưa thanh toán");
+        CirculationRules.ValidateRenewal(settings with { RestrictIfUnpaid = false },
+                0, due, DateTime.UtcNow, false, false, false, false, true)
+            .Should().BeNull();
+        CirculationRules.ValidateRenewal(settings, 0, due, DateTime.UtcNow, true, false, false, false, true)
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void ValidateRenewal_AppliesReaderSpecificLimitOverdueReservationAndTextbookRules()
+    {
+        var due = DateTime.UtcNow;
+        var settings = new CirculationSettings
+        {
+            MaxRenewals = 2,
+            BlockRenewIfOverdue = true,
+            BlockRenewIfReserved = true,
+            SelfRenewBeforeDays = 1,
+            SelfRenewAfterDays = 1,
+            TextbookRequiresApproval = true
+        };
+
+        CirculationRules.ValidateRenewal(settings, 2, due, due, false, false, false, false)
+            .Should().Contain("hết số lần");
+        CirculationRules.ValidateRenewal(settings, 0, due, due.AddDays(1), false, true, false, false)
+            .Should().Contain("quá hạn");
+        CirculationRules.ValidateRenewal(settings, 0, due, due, false, false, true, false)
+            .Should().Contain("đặt trước");
+        CirculationRules.ValidateRenewal(settings, 0, due, due, false, false, false, true)
+            .Should().Contain("Giáo trình");
+    }
+
+    [Fact]
     public void MaxBooksFor_UsesGroupThenFallback()
     {
         var settings = new CirculationSettings { MaxBooks = 5, MaxBooksStudent = 10, MaxBooksLecturer = 20 };
@@ -149,9 +220,17 @@ public class CirculationRulesTests
     }
 
     [Fact]
-    public void BorrowDays_UsesLanguageSpecificPolicy()
+    public void BorrowDays_PrefersAdminMaxDays()
     {
-        var settings = new CirculationSettings { BorrowDays = 14, BorrowDaysVi = 7, BorrowDaysForeign = 14 };
+        var settings = new CirculationSettings { BorrowDays = 14, BorrowDaysVi = 7, BorrowDaysForeign = 21 };
+        CirculationRules.BorrowDays(settings, "vi").Should().Be(14);
+        CirculationRules.BorrowDays(settings, "en").Should().Be(14);
+    }
+
+    [Fact]
+    public void BorrowDays_UsesLanguageWhenMaxDaysUnset()
+    {
+        var settings = new CirculationSettings { BorrowDays = 0, BorrowDaysVi = 7, BorrowDaysForeign = 14 };
         CirculationRules.BorrowDays(settings, "vi").Should().Be(7);
         CirculationRules.BorrowDays(settings, "en").Should().Be(14);
     }
@@ -164,29 +243,31 @@ public class CirculationRulesTests
     }
 
     [Fact]
-    public void ValidateIncidentConfirmation_LostNeedsVerifiedValue()
+    public void ValidateIncidentConfirmation_LostNeedsPolicyFee()
     {
         CirculationRules.ValidateIncidentConfirmation(
-            BookIncidentKind.Lost, BookIncidentStatus.PendingReview, BookIncidentSeverity.Lost, null, null)
-            .Should().Contain("giá trị tài liệu");
+            BookIncidentKind.Lost, BookIncidentStatus.PendingReview, BookIncidentSeverity.Lost, 10000, 0)
+            .Should().Contain("lost_book_fee");
         CirculationRules.ValidateIncidentConfirmation(
-            BookIncidentKind.Lost, BookIncidentStatus.PendingReview, BookIncidentSeverity.Light, 200000, 10000)
+            BookIncidentKind.Lost, BookIncidentStatus.PendingReview, BookIncidentSeverity.Light, 10000, 200000)
             .Should().Contain("thất lạc");
         CirculationRules.ValidateIncidentConfirmation(
-            BookIncidentKind.Lost, BookIncidentStatus.PendingReview, BookIncidentSeverity.Lost, 200000, null)
+            BookIncidentKind.Lost, BookIncidentStatus.PendingReview, BookIncidentSeverity.Lost, 10000, 200000)
             .Should().BeNull();
     }
 
     [Fact]
-    public void ValidateIncidentConfirmation_LightDamageIsNotFullReplacement()
+    public void ValidateIncidentConfirmation_LightDamageUsesAdminFee()
     {
         CirculationRules.ValidateIncidentConfirmation(
-            BookIncidentKind.Damage, BookIncidentStatus.PendingReview, BookIncidentSeverity.Light, 200000, null)
-            .Should().Contain("mức phí theo mức độ");
+            BookIncidentKind.Damage, BookIncidentStatus.PendingReview, BookIncidentSeverity.Light, 0, 200000)
+            .Should().Contain("damage_fee");
         CirculationRules.ValidateIncidentConfirmation(
-            BookIncidentKind.Damage, BookIncidentStatus.PendingReview, BookIncidentSeverity.Light, null, 30000)
+            BookIncidentKind.Damage, BookIncidentStatus.PendingReview, BookIncidentSeverity.Light, 10000, 200000)
             .Should().BeNull();
-        CirculationRules.CompensationAmount(BookIncidentSeverity.Light, 200000, 30000).Should().Be(30000);
-        CirculationRules.CompensationAmount(BookIncidentSeverity.Lost, 200000, 30000).Should().Be(200000);
+        CirculationRules.PolicyFee(new CirculationSettings { DamageFee = 10000, LostFee = 200000 }, BookIncidentSeverity.Light)
+            .Should().Be(10000);
+        CirculationRules.PolicyFee(new CirculationSettings { DamageFee = 10000, LostFee = 200000 }, BookIncidentSeverity.Lost)
+            .Should().Be(200000);
     }
 }

@@ -184,7 +184,7 @@ export const RegisterPage: React.FC = () => {
       showToast({
         type: 'success',
         title: 'Xác thực thành công',
-        message: 'Email của bạn đã được xác minh. Hãy nộp ảnh giấy tờ tùy thân.',
+      message: 'Email của bạn đã được xác minh. Hãy nộp ảnh giấy tờ tùy thân.',
       });
 
       setStep(3); // Advance to Step 3
@@ -201,7 +201,7 @@ export const RegisterPage: React.FC = () => {
 
   // Step 3: Upload files and submit reader registration
   const handleSubmitDocs = async () => {
-  if (!frontDoc) {
+    if (!frontDoc) {
     showToast({
       type: 'error',
       title: 'Thiếu giấy tờ',
@@ -214,7 +214,7 @@ export const RegisterPage: React.FC = () => {
       showToast({
         type: 'error',
         title: 'Thiếu mặt sau',
-        message: 'CCCD/CMND yêu cầu phải có cả ảnh mặt sau.',
+      message: 'CCCD/CMND yêu cầu phải có cả ảnh mặt sau.',
       });
       return;
     }
@@ -227,7 +227,6 @@ export const RegisterPage: React.FC = () => {
       });
       return;
     }
-    setIsLoading(true);
     setIsLoading(true);
 
     try {
@@ -542,22 +541,20 @@ export const RegisterPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Loại giấy tờ</label>
+            <label className="mb-2 block text-xs font-bold text-slate-700 dark:text-slate-300">Loại giấy tờ</label>
             <div className="grid grid-cols-3 gap-2">
               {[
                 { key: 'NationalId', label: 'CCCD/CMND' },
                 { key: 'StudentCard', label: 'Thẻ HSSV' },
-                { key: 'DriverLicense', label: 'Bằng Lái Xe' },
+                { key: 'DriverLicense', label: 'Bằng lái xe' },
               ].map(({ key, label }) => (
                 <button
                   key={key}
                   type="button"
-                  onClick={() => setDocType(key)}
-                  className={`py-2 px-1 rounded-xl border text-[11px] font-semibold transition-all ${
-                    docType === key
-                      ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 shadow-sm'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900'
-                  }`}
+                  onClick={() => { setDocType(key); setFrontDoc(null); setBackDoc(null); }}
+                  className={`rounded-xl border px-1 py-2 text-[11px] font-semibold transition-all ${docType === key
+                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm dark:bg-indigo-500/20 dark:text-indigo-300'
+                    : 'border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900'}`}
                 >
                   {label}
                 </button>
@@ -572,7 +569,7 @@ export const RegisterPage: React.FC = () => {
               onFileSelect={setBackDoc}
             />
           </div>
-          <DocumentUploader label="Ảnh Selfie cầm giấy tờ (Tùy chọn)" onFileSelect={setSelfie} />
+          <DocumentUploader label="Ảnh selfie cầm giấy tờ (Tùy chọn)" onFileSelect={setSelfie} />
 
           <button
             onClick={handleSubmitDocs}

@@ -26,6 +26,7 @@ const LibrarianCreateCategoryPage: React.FC = () => {
 
   // Form states
   const [name, setName] = useState('');
+  const [code, setCode] = useState('');
   const [description, setDescription] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -104,6 +105,10 @@ const LibrarianCreateCategoryPage: React.FC = () => {
       setErrorMessage('Vui lòng nhập tên danh mục sách.');
       return;
     }
+    if (!/^[A-Z]{1,16}$/.test(code.trim())) {
+      setErrorMessage('Mã danh mục phải gồm 1–16 chữ cái A–Z, ví dụ KHTN hoặc IT.');
+      return;
+    }
 
     setSubmitting(true);
     setErrorMessage(null);
@@ -111,6 +116,7 @@ const LibrarianCreateCategoryPage: React.FC = () => {
     try {
       const formData = new FormData();
       formData.append('Name', trimmedName);
+      formData.append('Code', code.trim());
       if (description.trim()) {
         formData.append('Description', description.trim());
       }
@@ -178,7 +184,7 @@ const LibrarianCreateCategoryPage: React.FC = () => {
         <div className="lib-create-cat-breadcrumb">
           <span>Thủ thư</span>
           <span>/</span>
-          <span>Sách & Biên mục</span>
+          <span>Quản lý sách</span>
           <span>/</span>
           <strong>Thêm danh mục mới</strong>
         </div>
@@ -234,6 +240,12 @@ const LibrarianCreateCategoryPage: React.FC = () => {
             </span>
           </div>
 
+          <div className="lib-create-cat-form-group">
+            <label htmlFor="cat-code">Mã danh mục <span className="required">*</span></label>
+            <input id="cat-code" value={code} onChange={event => setCode(event.target.value.toUpperCase())} maxLength={16} pattern="[A-Za-z]{1,16}" placeholder="Ví dụ: KHTN" required />
+            <span className="lib-create-cat-help">Mã riêng của danh mục, gồm 1–16 chữ cái A–Z. Đầu sách mới sẽ tự có mã như KHTN001, KHTN002…</span>
+          </div>
+
           {/* Category Description */}
           <div className="lib-create-cat-form-group">
             <label htmlFor="cat-desc">Mô tả danh mục</label>
@@ -285,7 +297,6 @@ const LibrarianCreateCategoryPage: React.FC = () => {
                 <div className="lib-create-cat-dropzone-badges">
                   <span>Hỗ trợ: JPG, PNG, WEBP, GIF</span>
                   <span>Tối đa: 10 MB</span>
-                  <span className="badge-cloud">⚡ Cloudinary Upload</span>
                 </div>
               </div>
             ) : (
@@ -308,7 +319,7 @@ const LibrarianCreateCategoryPage: React.FC = () => {
 
                   <div className="lib-create-cat-cloud-badge">
                     <Sparkles size={14} />
-                    <span>Tệp sẽ được tải trực tiếp lên Cloudinary khi bấm Lưu</span>
+                    <span>Hình ảnh sẽ được lưu cùng thông tin danh mục</span>
                   </div>
 
                   <div className="lib-create-cat-preview-actions">
@@ -354,12 +365,12 @@ const LibrarianCreateCategoryPage: React.FC = () => {
             <button
               type="submit"
               className="lib-create-cat-btn-submit"
-              disabled={submitting || !name.trim()}
+              disabled={submitting || !name.trim() || !/^[A-Z]{1,16}$/.test(code.trim())}
             >
               {submitting ? (
                 <>
                   <div className="lib-create-cat-btn-spinner" />
-                  <span>Đang tải ảnh lên Cloudinary & lưu...</span>
+                  <span>Đang lưu thông tin danh mục...</span>
                 </>
               ) : (
                 <>

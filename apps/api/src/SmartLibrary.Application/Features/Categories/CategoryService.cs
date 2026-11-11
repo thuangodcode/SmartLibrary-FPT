@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Categories.DTOs;
+using SmartLibrary.Application.Features.Books;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Domain.Entities;
 
@@ -41,6 +42,11 @@ public class CategoryService
 
     public async Task<Result<CategoryDto>> CreateAsync(CreateCategoryForm form, CancellationToken ct = default)
     {
+        var code = BookCodeRules.NormalizeCategoryCode(form.Code);
+        if (code is null)
+            return Result<CategoryDto>.Failure("Mã danh mục phải gồm 1–16 chữ cái A–Z, ví dụ KHTN hoặc IT.");
+        if (await _categoryRepository.ExistsByCodeAsync(code, null, ct))
+            return Result<CategoryDto>.Failure("Mã danh mục đã được sử dụng, kể cả trong danh mục đã xóa.");
         var trimmedName = form.Name?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(trimmedName))
         {
@@ -88,6 +94,7 @@ public class CategoryService
         var category = new Category
         {
             Id = Guid.NewGuid(),
+            Code = code,
             Name = trimmedName,
             Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
             ImageUrl = imageUrl,
@@ -100,6 +107,7 @@ public class CategoryService
         var dto = new CategoryDto
         {
             Id = category.Id,
+            Code = category.Code,
             Name = category.Name,
             Description = category.Description,
             ImageUrl = category.ImageUrl,
@@ -118,6 +126,12 @@ public class CategoryService
             return Result<CategoryDto>.Failure("Không tìm thấy danh mục sách.");
         }
 
+        var code = BookCodeRules.NormalizeCategoryCode(form.Code ?? category.Code);
+        if (code is null)
+            return Result<CategoryDto>.Failure("Mã danh mục phải gồm 1–16 chữ cái A–Z.");
+        if (await _categoryRepository.ExistsByCodeAsync(code, id, ct))
+            return Result<CategoryDto>.Failure("Mã danh mục đã được sử dụng, kể cả trong danh mục đã xóa.");
+
         var trimmedName = form.Name?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(trimmedName))
         {
@@ -134,6 +148,7 @@ public class CategoryService
             return Result<CategoryDto>.Failure($"Danh mục sách '{trimmedName}' đã tồn tại.");
         }
 
+        category.Code = code;
         category.Name = trimmedName;
         category.Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim();
 
@@ -176,6 +191,7 @@ public class CategoryService
         return Result<CategoryDto>.Success(dto ?? new CategoryDto
         {
             Id = category.Id,
+            Code = category.Code,
             Name = category.Name,
             Description = category.Description,
             ImageUrl = category.ImageUrl,

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
-import { AlertCircle, Camera, Check, CircleHelp, LoaderCircle, MessageCircle, Send, UserRound } from 'lucide-react';
+import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
+import { AlertCircle, Camera, Check, CircleHelp, ClipboardList, LoaderCircle, MessageCircle, Send, UserRound, X } from 'lucide-react';
 import HomeNavbar from '../../home/components/HomeNavbar';
+import HomeFooter from '../../home/components/HomeFooter';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
@@ -57,7 +58,7 @@ interface Complaint {
   replies: ComplaintReply[];
 }
 
-type SupportTab = 'chat' | 'complaint';
+type SupportTab = 'chat' | 'list' | 'create';
 type RealtimeStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
 const mergeMessages = (current: ChatMessage[], incoming: ChatMessage[]) => {
@@ -100,6 +101,7 @@ const SupportPage = () => {
   const [types, setTypes] = useState<RequestType[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [draft, setDraft] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
   const [connection, setConnection] = useState<HubConnection | null>(null);
@@ -115,8 +117,25 @@ const SupportPage = () => {
   const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (!selectedComplaint) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedComplaint(null);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [selectedComplaint]);
+
+  useEffect(() => {
     if (!token) return undefined;
     let active = true;
+    const markChatRead = async () => {
+      try {
+        await fetchData<{ unreadCount: number }>('/api/v1/support/chat/read', token, { method: 'POST' });
+        if (active) window.dispatchEvent(new Event('reader-support-read'));
+      } catch {
+        // Reading messages still works if the acknowledgement request is temporarily unavailable.
+      }
+    };
     const hub = new HubConnectionBuilder()
       .withUrl(`${API_BASE_URL}/hubs/support-chat`, { accessTokenFactory: () => token })
       .withAutomaticReconnect()
@@ -128,6 +147,7 @@ const SupportPage = () => {
       setMessages((current) => current.some((item) => item.id === message.id)
         ? current
         : [...current, message].sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+      if (message.senderRole !== 'Reader') void markChatRead();
     });
     hub.on('ComplaintReplied', (complaint: Complaint) => {
       if (!active) return;
@@ -168,6 +188,7 @@ const SupportPage = () => {
         setRequestTypeId((current) => current || requestTypes[0]?.id || '');
         setMessages((current) => mergeMessages(current, chatMessages));
         setComplaints(myComplaints);
+        void markChatRead();
       } catch (caught) {
         if (active) setError(caught instanceof Error ? caught.message : 'Không thể tải trang hỗ trợ.');
       } finally {
@@ -175,24 +196,31 @@ const SupportPage = () => {
       }
     };
     void load();
-    void hub.start()
-      .then(() => {
-        if (!active) return;
+    const startHub = async () => {
+      try {
+        await hub.start();
+        if (!active) {
+          await hub.stop();
+          return;
+        }
         setConnection(hub);
         setRealtimeStatus('connected');
-      })
-      .catch((caught: unknown) => {
+      } catch (caught: unknown) {
         if (active) {
           setRealtimeStatus('disconnected');
           setError(caught instanceof Error ? `Không thể kết nối chat realtime: ${caught.message}` : 'Không thể kết nối chat realtime.');
         }
-      });
+      }
+    };
+    void startHub();
 
     return () => {
       active = false;
       setRealtimeStatus('disconnected');
       setConnection(null);
-      void hub.stop();
+      if (hub.state === HubConnectionState.Connected || hub.state === HubConnectionState.Reconnecting) {
+        void hub.stop();
+      }
     };
   }, [token]);
 
@@ -272,10 +300,13 @@ const SupportPage = () => {
         </header>
 
         <div className="support-tabs" role="tablist" aria-label="Kênh hỗ trợ">
-          <button className={tab === 'chat' ? 'is-active' : ''} onClick={() => setTab('chat')} role="tab" aria-selected={tab === 'chat'}>
+          <button id="support-tab-chat" className={tab === 'chat' ? 'is-active' : ''} onClick={() => setTab('chat')} role="tab" aria-controls="support-panel" aria-selected={tab === 'chat'}>
             <MessageCircle size={17} /> Nhắn tin với thủ thư
           </button>
-          <button className={tab === 'complaint' ? 'is-active' : ''} onClick={() => setTab('complaint')} role="tab" aria-selected={tab === 'complaint'}>
+          <button id="support-tab-list" className={tab === 'list' ? 'is-active' : ''} onClick={() => setTab('list')} role="tab" aria-controls="support-panel" aria-selected={tab === 'list'}>
+            <ClipboardList size={17} /> Xem đơn hỗ trợ
+          </button>
+          <button id="support-tab-create" className={tab === 'create' ? 'is-active' : ''} onClick={() => setTab('create')} role="tab" aria-controls="support-panel" aria-selected={tab === 'create'}>
             <CircleHelp size={17} /> Gửi đơn hỗ trợ
           </button>
         </div>
@@ -284,7 +315,7 @@ const SupportPage = () => {
         {notice && <div className="support-alert support-alert--success" role="status"><Check size={17} />{notice}</div>}
 
         {tab === 'chat' ? (
-          <section className="support-chat-card">
+          <section className="support-chat-card" id="support-panel" role="tabpanel" aria-labelledby="support-tab-chat" tabIndex={0}>
             <header className="support-chat-header">
               <div className="support-chat-mark"><MessageCircle size={19} /></div>
               <div><strong>Trao đổi trực tiếp</strong><span>{
@@ -333,9 +364,20 @@ const SupportPage = () => {
               </button>
             </form>
           </section>
+        ) : tab === 'list' ? (
+            <section className="support-complaint-list" id="support-panel" role="tabpanel" aria-labelledby="support-tab-list" tabIndex={0}>
+              <header><div><span className="support-section-eyebrow">THEO DÕI YÊU CẦU</span><h2>Đơn của tôi</h2></div><span>{complaints.length}</span></header>
+              {loading ? <div className="support-chat-empty"><LoaderCircle className="support-spinner" size={21} />Đang tải đơn...</div> :
+                complaints.length ? complaints.map((complaint) => (
+                  <article className="support-ticket" key={complaint.id}>
+                    <div className="support-ticket-top"><strong>{complaint.requestType}</strong><span className={`support-ticket-status support-ticket-status--${complaint.status.toLowerCase()}`}>{statusLabel[complaint.status] ?? complaint.status}</span></div>
+                    <p>{complaint.content}</p>
+                    <footer><time>{dateTime(complaint.createdAt)}</time><span>{complaint.replies.length} phản hồi</span><button type="button" onClick={() => setSelectedComplaint(complaint)}>Xem chi tiết</button></footer>
+                  </article>
+                )) : <div className="support-chat-empty"><CircleHelp size={22} />Bạn chưa gửi đơn hỗ trợ nào.</div>}
+            </section>
         ) : (
-          <div className="support-complaint-layout">
-            <form className="support-complaint-form" onSubmit={(event) => void sendComplaint(event)}>
+            <form className="support-complaint-form" id="support-panel" role="tabpanel" aria-labelledby="support-tab-create" tabIndex={0} onSubmit={(event) => void sendComplaint(event)}>
               <header><span className="support-form-icon"><CircleHelp size={19} /></span><div><h2>Gửi đơn hỗ trợ</h2><p>Đơn sẽ được chuyển đến bộ phận thư viện.</p></div></header>
               <label>
                 Loại đơn
@@ -368,35 +410,24 @@ const SupportPage = () => {
                 Gửi đơn
               </button>
             </form>
-
-            <section className="support-complaint-list">
-              <header><h2>Đơn của tôi</h2><span>{complaints.length}</span></header>
-              {loading ? <div className="support-chat-empty"><LoaderCircle className="support-spinner" size={21} />Đang tải đơn...</div> :
-                complaints.length ? complaints.map((complaint) => (
-                  <article className="support-ticket" key={complaint.id}>
-                    <div className="support-ticket-top"><strong>{complaint.requestType}</strong><span className={`support-ticket-status support-ticket-status--${complaint.status.toLowerCase()}`}>{statusLabel[complaint.status] ?? complaint.status}</span></div>
-                    <div className="support-ticket-handling" aria-label="Thông tin tiếp nhận và xử lý">
-                      <div><strong>Tiếp nhận</strong><span>{complaint.acceptedByName
-                        ? `${complaint.acceptedByName}${complaint.acceptedAt ? ` · ${dateTime(complaint.acceptedAt)}` : ''}`
-                        : 'Đang chờ thủ thư tiếp nhận'}</span></div>
-                      {complaint.dueAt && <div><strong>Hạn xử lý dự kiến</strong><span>{dateTime(complaint.dueAt)}</span></div>}
-                      {complaint.firstRespondedAt && <div><strong>Phản hồi lần đầu</strong><span>{dateTime(complaint.firstRespondedAt)}</span></div>}
-                    </div>
-                    <p>{complaint.content}</p>
-                    {complaint.attachmentUrl && <a href={complaint.attachmentUrl} target="_blank" rel="noreferrer">Xem ảnh đính kèm</a>}
-                    <time>{dateTime(complaint.createdAt)}</time>
-                    {complaint.replies.map((reply) => (
-                      <div className="support-ticket-reply" key={reply.id}>
-                        <strong>Phản hồi từ {reply.senderRole === 'Librarian' ? 'thủ thư' : reply.senderName}</strong>
-                        <p>{reply.message}</p><time>{dateTime(reply.createdAt)}</time>
-                      </div>
-                    ))}
-                  </article>
-                )) : <div className="support-chat-empty"><CircleHelp size={22} />Bạn chưa gửi đơn hỗ trợ nào.</div>}
-            </section>
-          </div>
         )}
       </main>
+      {selectedComplaint && <div className="support-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedComplaint(null); }}>
+        <section className="support-detail-modal" role="dialog" aria-modal="true" aria-labelledby="support-detail-title">
+          <header><div><span className="support-section-eyebrow">CHI TIẾT ĐƠN HỖ TRỢ</span><h2 id="support-detail-title">{selectedComplaint.requestType}</h2></div><button type="button" aria-label="Đóng chi tiết" onClick={() => setSelectedComplaint(null)}><X size={19} /></button></header>
+          <div className="support-detail-meta"><span className={`support-ticket-status support-ticket-status--${selectedComplaint.status.toLowerCase()}`}>{statusLabel[selectedComplaint.status] ?? selectedComplaint.status}</span><time>Gửi lúc {dateTime(selectedComplaint.createdAt)}</time></div>
+          <div className="support-detail-handling">
+            <div><strong>Tiếp nhận</strong><span>{selectedComplaint.acceptedByName ? `${selectedComplaint.acceptedByName}${selectedComplaint.acceptedAt ? ` · ${dateTime(selectedComplaint.acceptedAt)}` : ''}` : 'Đang chờ thủ thư tiếp nhận'}</span></div>
+            {selectedComplaint.dueAt && <div><strong>Hạn xử lý dự kiến</strong><span>{dateTime(selectedComplaint.dueAt)}</span></div>}
+            {selectedComplaint.firstRespondedAt && <div><strong>Phản hồi lần đầu</strong><span>{dateTime(selectedComplaint.firstRespondedAt)}</span></div>}
+          </div>
+          <div className="support-detail-content">{selectedComplaint.content}</div>
+          {selectedComplaint.attachmentUrl && <a className="support-detail-attachment" href={selectedComplaint.attachmentUrl} target="_blank" rel="noreferrer"><Camera size={16} /> Xem ảnh đính kèm</a>}
+          <div className="support-detail-replies"><h3>Trao đổi ({selectedComplaint.replies.length})</h3>{selectedComplaint.replies.length ? selectedComplaint.replies.map((reply) => <article className="support-ticket-reply" key={reply.id}><strong>Phản hồi từ {reply.senderRole === 'Librarian' ? 'thủ thư' : reply.senderName}</strong><p>{reply.message}</p><time>{dateTime(reply.createdAt)}</time></article>) : <p>Chưa có phản hồi cho đơn này.</p>}</div>
+          <footer><button type="button" onClick={() => setSelectedComplaint(null)}>Đóng</button></footer>
+        </section>
+      </div>}
+      <HomeFooter />
     </div>
   );
 };

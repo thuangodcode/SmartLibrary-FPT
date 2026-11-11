@@ -15,7 +15,6 @@ import {
   Layers,
   User,
   Clock,
-  Sparkles,
   MapPin,
   ChevronLeft,
   ChevronRight,
@@ -23,7 +22,6 @@ import {
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { parseApiResponse } from '../../../lib/api';
-import { STORAGE_LOCATIONS } from '../storageLocations';
 import type { CategoryItem } from './LibrarianCategoriesPage';
 import './LibrarianBookDetailPage.css';
 
@@ -32,6 +30,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5278';
 export interface BookDetailData {
   id: string;
   code: string;
+  codeCategoryId?: string | null;
   title: string;
   isbn?: string | null;
   description?: string | null;
@@ -43,6 +42,7 @@ export interface BookDetailData {
   averageRating: number;
   authorNames: string[];
   categoryNames: string[];
+  categoryIds?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -50,7 +50,7 @@ export interface BookDetailData {
 interface BookCopyItem {
   id: string;
   barcode: string;
-  condition: 'New' | 'Good' | 'Fair' | 'Damaged' | 'Lost';
+  condition: 'New' | 'Good' | 'Fair' | 'LightDamaged' | 'Damaged' | 'Lost';
   location: string | null;
   isAvailable: boolean;
   hasOverdueLoan: boolean;
@@ -67,10 +67,12 @@ interface BookCopiesResponse {
   };
 }
 
+
 const COPY_PAGE_SIZE = 20;
 
 const getCopyStatus = (copy: BookCopyItem) => {
   if (copy.condition === 'Lost') return { label: 'Thất lạc', className: 'is-lost' };
+  if (copy.condition === 'LightDamaged') return { label: 'Hư nhẹ · còn sử dụng được', className: 'is-available' };
   if (copy.condition === 'Damaged') return { label: 'Hư hỏng', className: 'is-damaged' };
   if (copy.hasOverdueLoan) return { label: 'Quá hạn', className: 'is-overdue' };
   if (copy.hasActiveLoan) return { label: 'Đang mượn', className: 'is-borrowed' };
@@ -110,9 +112,7 @@ const LibrarianBookDetailPage: React.FC = () => {
   const [editLanguage, setEditLanguage] = useState('vi');
   const [editCustomLanguage, setEditCustomLanguage] = useState('');
   const [editTotalCopies, setEditTotalCopies] = useState(1);
-  const [editLocation, setEditLocation] = useState('');
-  const [editLocationOriginal, setEditLocationOriginal] = useState('');
-  const [editCategoryId, setEditCategoryId] = useState('');
+  const [editCategoryIds, setEditCategoryIds] = useState<string[]>([]);
   const [editDescription, setEditDescription] = useState('');
   const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
   const [editCoverPreview, setEditCoverPreview] = useState<string | null>(null);
@@ -219,19 +219,12 @@ const LibrarianBookDetailPage: React.FC = () => {
     setEditLanguage(book.language && knownLanguages.includes(book.language) ? book.language : 'custom');
     setEditCustomLanguage(book.language && !knownLanguages.includes(book.language) ? book.language : '');
     setEditTotalCopies(book.totalCopies);
-    const currentLocation = copies.find((copy) => copy.location)?.location ?? '';
-    setEditLocation(currentLocation);
-    setEditLocationOriginal(currentLocation);
     setEditDescription(book.description || '');
     setEditCoverFile(null);
     setEditCoverPreview(book.coverImageUrl || null);
     setEditRemoveCover(false);
 
-    // Find category ID matching name if possible
-    if (book.categoryNames && book.categoryNames.length > 0) {
-      const matchedCat = categories.find((c) => c.name === book.categoryNames[0]);
-      if (matchedCat) setEditCategoryId(matchedCat.id);
-    }
+    setEditCategoryIds(book.categoryIds ?? categories.filter(c => book.categoryNames?.includes(c.name)).map(c => c.id));
 
     setIsEditModalOpen(true);
   };
@@ -290,10 +283,8 @@ const LibrarianBookDetailPage: React.FC = () => {
       }
       formData.append('Language', language);
       formData.append('TotalCopies', String(editTotalCopies));
-      if (editLocation !== editLocationOriginal) {
-        formData.append('Location', editLocation);
-      }
-      if (editCategoryId) formData.append('CategoryId', editCategoryId);
+      if (editCategoryIds.length === 0) throw new Error('Vui lòng chọn ít nhất một danh mục.');
+      editCategoryIds.forEach(categoryId => formData.append('CategoryIds', categoryId));
       if (editDescription.trim()) formData.append('Description', editDescription.trim());
       if (editCoverFile) formData.append('CoverImage', editCoverFile);
       if (editRemoveCover) formData.append('RemoveCoverImage', 'true');
@@ -322,13 +313,6 @@ const LibrarianBookDetailPage: React.FC = () => {
       fetchBookDetails();
       setCopiesPage(1);
       setCopiesRefreshKey((current) => current + 1);
-      if (editLocation !== editLocationOriginal) {
-        setCopies((currentCopies) => currentCopies.map((copy) => ({
-          ...copy,
-          location: editLocation.trim() || null,
-        })));
-        setEditLocationOriginal(editLocation);
-      }
     } catch (err: unknown) {
       console.error('Error updating book:', err);
       showToast({
@@ -438,12 +422,6 @@ const LibrarianBookDetailPage: React.FC = () => {
               <div className="lib-book-cover-fallback">
                 <BookOpen size={48} />
                 <span>Chưa có ảnh bìa</span>
-              </div>
-            )}
-            {book.coverImageUrl && (
-              <div className="lib-book-cloudinary-tag">
-                <Sparkles size={11} style={{ display: 'inline', marginRight: 4 }} />
-                Cloudinary Active
               </div>
             )}
           </div>
@@ -817,35 +795,7 @@ const LibrarianBookDetailPage: React.FC = () => {
 
               <div className="lib-cat-form-group">
                 <label>Danh mục sách</label>
-                <select
-                  value={editCategoryId}
-                  onChange={(e) => setEditCategoryId(e.target.value)}
-                >
-                  <option value="">-- Giữ nguyên danh mục hiện tại --</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="lib-cat-form-group">
-                <label htmlFor="book-edit-location">Vị trí kệ sách</label>
-                <select
-                  id="book-edit-location"
-                  value={editLocation}
-                  onChange={(e) => setEditLocation(e.target.value)}
-                >
-                  <option value="">Chưa xếp kệ</option>
-                  {editLocation && !STORAGE_LOCATIONS.includes(editLocation) && (
-                    <option value={editLocation}>{editLocation} (vị trí hiện tại)</option>
-                  )}
-                  {STORAGE_LOCATIONS.map((location) => (
-                    <option key={location} value={location}>{location}</option>
-                  ))}
-                </select>
-                <small>Thay đổi vị trí tại đây sẽ áp dụng cho tất cả bản sao của đầu sách.</small>
+                <fieldset className="lib-book-edit-category-picker"><legend>Danh mục sách <span>*</span></legend><p>Danh mục cấp mã được giữ cố định. Có thể thêm các danh mục khác để phân loại.</p><div>{categories.map(category => <label key={category.id}><input type="checkbox" checked={editCategoryIds.includes(category.id)} disabled={book.codeCategoryId === category.id} onChange={event => setEditCategoryIds(current => event.target.checked ? [...current, category.id] : current.filter(id => id !== category.id))} /><span>{category.name}{book.codeCategoryId === category.id ? ' · Cấp mã' : ''}</span></label>)}</div>{editCategoryIds.length === 0 && <small>Hãy chọn ít nhất một danh mục để lưu thay đổi.</small>}</fieldset>
               </div>
 
               <div className="lib-cat-form-group">
@@ -860,7 +810,7 @@ const LibrarianBookDetailPage: React.FC = () => {
 
               {/* Cover Image Upload */}
               <div className="lib-cat-form-group">
-                <label>Ảnh bìa sách (Cloudinary)</label>
+                <label>Ảnh bìa sách</label>
                 <div className="lib-cat-edit-image-row">
                   {editCoverPreview ? (
                     <div className="lib-cat-edit-preview-box">

@@ -286,6 +286,23 @@
   color: #2e6740;
 }
 
+.librarian-support-unread-total,
+.librarian-support-unread-count {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  place-items: center;
+  border-radius: 999px;
+  background: #c4242a;
+  padding: 0 6px;
+  color: #fff;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  line-height: 1;
+}
+
 .librarian-support-ticket-layout {
   display: grid;
   min-height: 420px;
@@ -647,6 +664,15 @@
   background: #f2f7f2;
 }
 
+.librarian-support-conversation.has-unread:not(.is-selected) {
+  background: #fbfdfb;
+}
+
+.librarian-support-conversation.has-unread strong {
+  color: #203d2c;
+  font-weight: 750;
+}
+
 .librarian-support-conversation > div:nth-child(2) {
   display: grid;
   min-width: 0;
@@ -670,11 +696,24 @@
   white-space: nowrap;
 }
 
+.librarian-support-conversation-meta {
+  display: grid;
+  min-width: max-content;
+  align-self: stretch;
+  justify-items: end;
+  align-content: space-between;
+  gap: 7px;
+}
+
 .librarian-support-conversation time {
-  align-self: flex-start;
   color: #9aa2af;
   font-size: 8px;
   white-space: nowrap;
+}
+
+.librarian-support-unread-count {
+  min-width: 22px;
+  height: 22px;
 }
 
 .librarian-support-chat-panel {

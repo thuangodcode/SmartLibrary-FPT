@@ -2,9 +2,10 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Clock3, MapPin } from 'lucide-react';
 import campusPhoto from '../../../assets/figma/HCM-Campus.jpg';
 import libraryPhoto from '../../../assets/figma/home-library.png';
-import { useAuthStore } from '../../auth/store/useAuthStore';
 import { BookCard } from '../components/BookCard';
+import HomeFooter from '../components/HomeFooter';
 import HomeNavbar from '../components/HomeNavbar';
+import Marquee from '../components/Marquee';
 import { useHomeBooks, useHomeCategories } from '../hooks/useHomeData';
 import { toBookCardData } from '../utils/toBookCardData';
 import './HomePage.css';
@@ -13,27 +14,19 @@ export const HomePage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeCategory = searchParams.get('category') ?? '';
-  const requestedPage = Number(searchParams.get('page') ?? 1);
-  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const categoriesQuery = useHomeCategories();
-  const booksQuery = useHomeBooks(activeCategory, '', page);
+  const booksQuery = useHomeBooks(activeCategory, '', 1);
   const categories = categoriesQuery.data ?? [];
   const books = booksQuery.data?.books ?? [];
+  const splitIndex = Math.ceil(books.length / 2);
+  const firstRailBooks = books.slice(0, splitIndex);
+  const secondRailBooks = books.slice(splitIndex);
   const activeCategoryName = categories.find((category) => category.id === activeCategory)?.name;
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const userRole = useAuthStore((state) => state.user?.role);
   const selectCategory = (categoryId: string) => {
     const nextParams = new URLSearchParams(searchParams);
     if (categoryId) nextParams.set('category', categoryId);
     else nextParams.delete('category');
     nextParams.delete('page');
-    setSearchParams(nextParams);
-  };
-
-  const setPage = (nextPage: number) => {
-    const nextParams = new URLSearchParams(searchParams);
-    if (nextPage > 1) nextParams.set('page', String(nextPage));
-    else nextParams.delete('page');
     setSearchParams(nextParams);
   };
 
@@ -99,7 +92,8 @@ export const HomePage = () => {
           <div className="annual-frame">
             <div className="annual-live-section-heading annual-live-books-heading">
               <div>
-                <h2>{activeCategoryName || 'Gợi ý dành cho bạn'}</h2>
+                <span className="annual-live-eyebrow">Thư viện thông minh</span>
+                <h2>{activeCategoryName || 'Bộ sưu tập đang có'}</h2>
                 <p className="annual-live-books-subtitle">
                   {activeCategoryName
                     ? `Tuyển chọn đầu sách thuộc lĩnh vực ${activeCategoryName}.`
@@ -116,22 +110,38 @@ export const HomePage = () => {
               <div className="annual-live-error" role="alert">Không thể tải đầu sách. {booksQuery.error.message}</div>
             ) : books.length ? (
               <>
-                <div className="annual-live-book-grid" aria-label="Danh sách đầu sách" tabIndex={0}>
-                  {books.map((book) => <BookCard key={book.id} book={toBookCardData(book)} onSelect={() => navigate(`/books/${book.id}`)} />)}
-                </div>
-                {booksQuery.data && booksQuery.data.totalPages > 1 && (
-                  <div className="annual-live-pagination" aria-label="Phân trang đầu sách">
-                    <button type="button" disabled={page <= 1 || booksQuery.isFetching} onClick={() => setPage(page - 1)}>Trang trước</button>
-                    <span>Trang {page} / {booksQuery.data.totalPages}</span>
-                    <button
-                      type="button"
-                      disabled={page >= booksQuery.data.totalPages || booksQuery.isFetching}
-                      onClick={() => setPage(page + 1)}
-                    >
-                      Trang sau
-                    </button>
-                  </div>
-                )}
+                <Marquee
+                  className="annual-live-book-marquee"
+                  aria-label="Hàng sách thứ nhất trong bộ sưu tập"
+                  pauseOnHover
+                  repeat={3}
+                  speed={28}
+                >
+                  {firstRailBooks.map((book) => (
+                    <BookCard
+                      key={book.id}
+                      book={toBookCardData(book)}
+                      onSelect={() => navigate(`/books/${book.id}`)}
+                    />
+                  ))}
+                </Marquee>
+                {secondRailBooks.length > 0 && <Marquee
+                  className="annual-live-book-marquee annual-live-book-marquee--reverse"
+                  aria-label="Hàng sách thứ hai trong bộ sưu tập"
+                  pauseOnHover
+                  repeat={3}
+                  speed={24}
+                  reverse
+                >
+                  {secondRailBooks.map((book) => (
+                    <BookCard
+                      key={book.id}
+                      book={toBookCardData(book)}
+                      onSelect={() => navigate(`/books/${book.id}`)}
+                    />
+                  ))}
+                </Marquee>}
+
               </>
             ) : (
               <div className="annual-live-empty">
@@ -163,23 +173,7 @@ export const HomePage = () => {
         </section>
       </main>
 
-      <footer className="annual-footer">
-        <div className="annual-frame annual-footer-grid">
-          <div><strong>Ghé thư viện</strong><p>Tòa Alpha, Khu Công nghệ cao, TP. Thủ Đức, TP. Hồ Chí Minh</p></div>
-          <div><strong>Khám phá</strong><Link to="/books">Danh mục & đầu sách</Link><Link to="/services">Dịch vụ</Link><Link to="/news">Tin tức</Link><Link to="/policies">Chính sách</Link></div>
-          <div className="annual-footer-hours"><strong>Thời gian</strong><p><span>Thứ Hai – Thứ Sáu</span><span>07:00 – 19:00</span></p><p><span>Thứ Bảy</span><span>07:00 – 17:00</span></p><p><span>Chủ Nhật</span><span>Không phục vụ</span></p></div>
-          <div>
-            <strong>Tài khoản</strong>
-            {isAuthenticated
-              ? <><Link to="/profile">Hồ sơ cá nhân</Link>{userRole === 'Reader' && <><Link to="/support">Hỗ trợ</Link><Link to="/history">Lịch sử</Link></>}</>
-              : <><Link to="/login">Đăng nhập</Link><Link to="/register">Đăng ký</Link></>}
-          </div>
-        </div>
-        <div className="annual-frame annual-footer-legal">
-          <span>© 2026 FPT University HCMC</span>
-          <span>Tri thức dành cho cộng đồng.</span>
-        </div>
-      </footer>
+      <HomeFooter />
     </div>
   );
 };

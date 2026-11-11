@@ -2,6 +2,9 @@ namespace SmartLibrary.Application.Features.Circulation.DTOs;
 
 public class CirculationStatsDto
 {
+    public int Pending { get; init; }
+    public int Approved { get; init; }
+    public int PendingIncidents { get; init; }
     public int Borrowed { get; init; }
     public int BorrowedDelta { get; init; }
     public int Returned { get; init; }
@@ -12,6 +15,17 @@ public class CirculationStatsDto
     public decimal UnpaidFinesDelta { get; init; }
     public int DueSoon { get; init; }
     public int SuggestedFinePerDay { get; init; }
+    public int BorrowDays { get; set; }
+    public int DamageFee { get; set; }
+    public int LostFee { get; set; }
+}
+
+public sealed record CirculationDueReminderSettingsDto(bool IsEnabled, int ReminderDays, DateTime UpdatedAt);
+
+public sealed class UpdateCirculationDueReminderSettingsRequest
+{
+    public bool IsEnabled { get; init; }
+    public int ReminderDays { get; init; } = 7;
 }
 
 public record CirculationLoanDto
@@ -20,6 +34,8 @@ public record CirculationLoanDto
     public string Code { get; init; } = string.Empty;
     public DateTime? BorrowDate { get; init; }
     public DateTime? DueDate { get; init; }
+    public DateTime? PickupAt { get; init; }
+    public DateTime? AcceptedAt { get; init; }
     public DateTime? ReturnDate { get; init; }
     public DateTime CreatedAt { get; init; }
     public string Status { get; init; } = string.Empty;
@@ -29,19 +45,29 @@ public record CirculationLoanDto
     public string ReaderName { get; init; } = string.Empty;
     public string? ReaderEmail { get; init; }
     public string? StudentId { get; init; }
+    public string? LibrarianName { get; init; }
     public Guid BookCopyId { get; init; }
     public string Barcode { get; init; } = string.Empty;
     public string BookTitle { get; init; } = string.Empty;
+    public string? CoverImageUrl { get; init; }
     public string? CopyCondition { get; init; }
+    public string? ReturnCondition { get; init; }
+    public string? Notes { get; init; }
     public decimal? SuggestedFine { get; init; }
     public bool HasOpenFine { get; init; }
     public bool HasFine { get; init; }
     public int RenewalCount { get; init; }
     public bool CanRenew { get; init; }
+    public string? RenewalUnavailableReason { get; init; }
     public bool RequiresApproval { get; init; }
     public string? Language { get; init; }
     public decimal? CreatedFineAmount { get; init; }
+    public bool OverdueFineAlreadyExists { get; init; }
     public bool IncidentOpened { get; init; }
+    public Guid? IncidentId { get; init; }
+    public Guid? ReadyReservationReaderId { get; init; }
+    public Guid? ReadyReservationBookId { get; init; }
+    public string? ReadyReservationBookTitle { get; init; }
 }
 
 public record CirculationSettings
@@ -49,23 +75,38 @@ public record CirculationSettings
     public int? MaxBooks { get; init; }
     public int? MaxBooksStudent { get; init; }
     public int? MaxBooksLecturer { get; init; }
-    public int BorrowDays { get; init; } = 14;
-    public int BorrowDaysVi { get; init; } = 7;
-    public int BorrowDaysForeign { get; init; } = 14;
+    public int BorrowDays { get; init; }
+    public int BorrowDaysVi { get; init; }
+    public int BorrowDaysForeign { get; init; }
     public int? MaxRenewals { get; init; }
-    public int RenewalDaysVi { get; init; } = 7;
-    public int RenewalDaysForeign { get; init; } = 14;
+    public int RenewalDays { get; init; }
+    public int RenewalDaysVi { get; init; }
+    public int RenewalDaysForeign { get; init; }
     public bool BlockRenewIfOverdue { get; init; }
     public bool BlockRenewIfReserved { get; init; }
     public int SelfRenewBeforeDays { get; init; } = 1;
     public int SelfRenewAfterDays { get; init; } = 1;
     public bool TextbookRequiresApproval { get; init; }
     public int FinePerDay { get; init; }
+    public int DamageFee { get; init; }
+    public int LostFee { get; init; }
     public bool RestrictIfUnpaid { get; init; } = true;
     public bool AllowReservation { get; init; } = true;
     public int? HoldHours { get; init; }
     public int PickupDeadlineHours { get; init; } = 24;
+    public int PickupSlotMinutes { get; init; } = 30;
+    public int PickupCapacityPerSlot { get; init; } = 5;
+    public int PickupDaysAhead { get; init; } = 14;
+    public bool BlockBorrowIfOverdue { get; init; } = true;
 }
+
+public record PickupSlotDto(DateTimeOffset PickupAt, int RemainingCapacity, int Capacity);
+
+public sealed record CirculationReminderDto(
+    Guid ReaderId, Guid EntityId, Guid BookId, string BookTitle, DateTime? DueAt);
+
+public sealed record ExpiredReservationDto(
+    Guid Id, Guid ReaderId, Guid BookId, string BookTitle, DateTime? ExpiresAt);
 
 public class CirculationCopyIssueDto
 {
@@ -90,6 +131,7 @@ public record CirculationIncidentDto
     public string ReaderName { get; init; } = string.Empty;
     public int OverdueDays { get; init; }
     public decimal? SuggestedOverdueFine { get; init; }
+    public bool HasRecordedOverdueFine { get; init; }
     public decimal? ReplacementValue { get; init; }
     public decimal? AssessedFee { get; init; }
     public decimal CompensationAmount { get; init; }
@@ -100,7 +142,20 @@ public record CirculationIncidentDto
     public string? Description { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? ConfirmedAt { get; init; }
+    public string CopyCondition { get; init; } = string.Empty;
+    public string LoanStatus { get; init; } = string.Empty;
+    public bool CanRestoreCopy { get; init; }
 }
+
+public sealed record CopyCirculationHistoryDto(IReadOnlyList<CirculationLoanDto> Loans, IReadOnlyList<CirculationIncidentDto> Incidents);
+public sealed record StaffLoanDetailDto(CirculationLoanDto Loan, IReadOnlyList<CirculationIncidentDto> Incidents, IReadOnlyList<CirculationFineDto> Fines);
+public sealed class RestoreIncidentCopyRequest
+{
+    public string Condition { get; set; } = "Good";
+    public string Notes { get; set; } = string.Empty;
+}
+public sealed class RejectLoanRequest { public string? Notes { get; set; } }
+public sealed class CompleteCheckoutRequest { public string? Barcode { get; set; } }
 
 public class ConfirmIncidentRequest
 {
@@ -114,7 +169,8 @@ public class ConfirmIncidentRequest
 public class RejectIncidentRequest
 {
     public string? Notes { get; set; }
-    public bool RestoreCopy { get; set; } = true;
+    public bool RestoreCopy { get; set; }
+    public string? Condition { get; set; }
 }
 
 public class CirculationLoanListDto
@@ -134,13 +190,28 @@ public class CirculationFineDto
     public Guid ReaderId { get; init; }
     public string ReaderName { get; init; } = string.Empty;
     public string BookTitle { get; init; } = string.Empty;
+    public string? CoverImageUrl { get; init; }
     public string Barcode { get; init; } = string.Empty;
     public decimal Amount { get; init; }
     public string Reason { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
     public DateTime CreatedAt { get; init; }
     public DateTime? PaidAt { get; init; }
+    public string? PaymentMethod { get; init; }
+    public string? PaymentReference { get; init; }
+    public string? PendingPaymentStatus { get; init; }
+    public string? CheckoutUrl { get; init; }
+    public string? QrCode { get; init; }
+    public DateTime? PaymentExpiresAt { get; init; }
+    public bool ReconciliationRequired { get; init; }
 }
+
+public sealed record FinePaymentCheckoutDto(
+    Guid FineId,
+    decimal Amount,
+    string CheckoutUrl,
+    string QrCode,
+    DateTime? ExpiresAt);
 
 public class CirculationFineListDto
 {
@@ -160,6 +231,14 @@ public class CirculationReservationDto
     public DateTime? ExpiresAt { get; init; }
 }
 
+public sealed class ReaderCirculationHistoryDto
+{
+    public IReadOnlyList<CirculationLoanDto> Loans { get; init; } = [];
+    public int LoanTotalCount { get; init; }
+    public IReadOnlyList<CirculationFineDto> Fines { get; init; } = [];
+    public IReadOnlyList<CirculationReservationDto> Reservations { get; init; } = [];
+}
+
 public class CirculationActivityDto
 {
     public Guid Id { get; init; }
@@ -173,12 +252,15 @@ public class CheckoutRequest
 {
     public string ReaderKey { get; set; } = string.Empty;
     public string Barcode { get; set; } = string.Empty;
+    public Guid? BookId { get; set; }
 }
 
 public class ReturnLoanRequest
 {
     public string Barcode { get; set; } = string.Empty;
     public string? Condition { get; set; }
+    public string? Notes { get; set; }
+    public Guid? LoanId { get; set; }
 }
 
 public class RecordFineRequest
@@ -197,10 +279,23 @@ public class CreateReservationRequest
 public class BorrowRequest
 {
     public string Barcode { get; set; } = string.Empty;
+    public DateTimeOffset PickupAt { get; set; }
 }
 
 /// <summary>Request to borrow an available copy of a book.</summary>
-public sealed record RequestBookBorrowRequest(Guid BookId);
+public sealed record RequestBookBorrowRequest(Guid BookId, DateTimeOffset PickupAt);
+
+/// <summary>Request to join the reservation queue for an unavailable book.</summary>
+public sealed record RequestBookReservationRequest(Guid BookId);
+
+/// <summary>Reader suggestion shown while a librarian searches the reservation form.</summary>
+public sealed record CirculationReaderOptionDto(Guid Id, string FullName, string? StudentId, string Email);
+
+/// <summary>Book suggestion shown while a librarian searches the reservation form.</summary>
+public sealed record CirculationBookOptionDto(Guid Id, string Title, string Code, int AvailableCopies = 0, string? SampleBarcode = null, string? CoverImageUrl = null);
+
+/// <summary>Creates a reservation for a selected reader and book.</summary>
+public sealed record CreateLibrarianReservationRequest(Guid ReaderId, Guid BookId);
 
 public class ReportIncidentRequest
 {

@@ -1,10 +1,11 @@
 using AutoMapper;
+using System.Text.Json;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Books.DTOs;
+using SmartLibrary.Application.Features.Rag;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Domain.Entities;
 using SmartLibrary.Domain.Enums;
-using SmartLibrary.Domain.Exceptions;
 
 namespace SmartLibrary.Application.Features.Books;
 
@@ -16,24 +17,33 @@ public class BookService
     private readonly IBookRepository _bookRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly IBookCodeGenerator _codeGenerator;
     private readonly IStorageService? _storageService;
+    private readonly IRagIndexer? _ragIndexer;
+    private readonly IBookCatalogCache? _catalogCache;
 
     public BookService(
         IBookRepository bookRepository,
         IUnitOfWork unitOfWork,
         IMapper mapper,
-        IStorageService? storageService = null)
+        IBookCodeGenerator codeGenerator,
+        IStorageService? storageService = null,
+        IRagIndexer? ragIndexer = null,
+        IBookCatalogCache? catalogCache = null)
     {
         _bookRepository = bookRepository;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _codeGenerator = codeGenerator;
         _storageService = storageService;
+        _ragIndexer = ragIndexer;
+        _catalogCache = catalogCache;
     }
 
-    public async Task<PagedResult<BookDto>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, CancellationToken ct = default)
+    public async Task<PagedResult<BookDto>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, bool sortByReviewCount = false, bool reviewCountAscending = false, CancellationToken ct = default, bool sortByBorrowCount = false)
     {
-        var pagedBooks = await _bookRepository.GetPagedAsync(page, pageSize, search, categoryId, ct);
-        var dtos = _mapper.Map<IReadOnlyList<BookDto>>(pagedBooks.Items);
+        var pagedBooks = await _bookRepository.GetPagedAsync(page, pageSize, search, categoryId, sortByReviewCount, reviewCountAscending, ct, sortByBorrowCount);
+        var dtos = pagedBooks.Items.Select(ToBookDto).ToList();
         return new PagedResult<BookDto>(dtos, pagedBooks.TotalCount, pagedBooks.Page, pagedBooks.PageSize);
     }
 
@@ -43,7 +53,7 @@ public class BookService
         if (book is null)
             return Result<BookDto>.Failure(Errors.NotFound);
 
-        return Result<BookDto>.Success(_mapper.Map<BookDto>(book));
+        return Result<BookDto>.Success(ToBookDto(book));
     }
 
     public async Task<Result<BookAvailabilityDto>> GetAvailabilityAsync(Guid id, CancellationToken ct = default)
@@ -57,22 +67,46 @@ public class BookService
 
     public async Task<Result<BookDto>> CreateAsync(CreateBookRequest request, CancellationToken ct = default)
     {
-        var code = NormalizeBookCode(request.Code);
-        if (code is null)
+        var categoryIds = request.CategoryIds.Where(id => id != Guid.Empty).Distinct().ToList();
+        var primaryId = request.CodeCategoryId ?? (categoryIds.Count == 1 ? categoryIds[0] : (Guid?)null);
+        if (!primaryId.HasValue || !categoryIds.Contains(primaryId.Value))
+            return Result<BookDto>.Failure("Chọn một danh mục cấp mã trong các danh mục của đầu sách.");
+        var categories = new List<Category>();
+        foreach (var id in categoryIds)
         {
-            return Result<BookDto>.Failure("Mã sách chỉ được gồm 1–32 chữ cái hoặc chữ số.");
+            var category = await _unitOfWork.Repository<Category>().GetByIdAsync(id, ct);
+            if (category is null || category.IsDeleted)
+                return Result<BookDto>.Failure("Một hoặc nhiều danh mục không còn tồn tại.");
+            categories.Add(category);
         }
-        if (await _bookRepository.IsCodeTakenAsync(code, ct))
-        {
-            return Result<BookDto>.Failure("Mã sách đã được sử dụng. Vui lòng nhập mã khác.");
-        }
-
+        var generated = await _codeGenerator.GetNextAsync(primaryId.Value, true, ct);
+        if (!generated.IsSuccess) return Result<BookDto>.Failure(generated.Error!);
         var book = _mapper.Map<Book>(request);
-        book.Code = code;
+        book.Code = generated.Data!;
+        book.CodeCategoryId = primaryId;
+        book.Categories = categories;
         await _bookRepository.AddAsync(book, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
-        return Result<BookDto>.Success(_mapper.Map<BookDto>(book));
+        return Result<BookDto>.Success(ToBookDto(book));
+    }
+
+    public async Task<Result<bool>> AddCategoryAsync(Guid bookId, Guid categoryId, CancellationToken ct = default)
+    {
+        var book = await _bookRepository.GetWithDetailsAsync(bookId, ct);
+        if (book is null) return Result<bool>.Failure(Errors.NotFound);
+
+        var category = await _unitOfWork.Repository<Category>().GetByIdAsync(categoryId, ct);
+        if (category is null || category.IsDeleted) return Result<bool>.Failure(Errors.NotFound);
+        if (book.Categories.Any(existing => existing.Id == categoryId))
+            return Result<bool>.Failure("Đầu sách đã có trong danh mục này.");
+
+        book.Categories.Add(category);
+        book.UpdatedAt = DateTime.UtcNow;
+        await _bookRepository.UpdateAsync(book, ct);
+        await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagBookAsync(book.Id, deleted: false, ct);
+        return Result<bool>.Success(true);
     }
 
     public async Task<bool> IsBookCodeAvailableAsync(string? code, CancellationToken ct = default)
@@ -89,16 +123,6 @@ public class BookService
             return Result<BookDto>.Failure("Tiêu đề sách không được để trống.");
         }
 
-        var code = NormalizeBookCode(form.Code);
-        if (code is null)
-        {
-            return Result<BookDto>.Failure("Mã sách chỉ được gồm 1–32 chữ cái hoặc chữ số.");
-        }
-        if (await _bookRepository.IsCodeTakenAsync(code, ct))
-        {
-            return Result<BookDto>.Failure("Mã sách đã được sử dụng. Vui lòng nhập mã khác.");
-        }
-
         if (form.TotalCopies is < 1 or > 500)
         {
             return Result<BookDto>.Failure("Số lượng bản sao phải từ 1 đến 500.");
@@ -106,11 +130,35 @@ public class BookService
 
         var copies = form.TotalCopies;
         var location = string.IsNullOrWhiteSpace(form.Location) ? null : form.Location.Trim();
+        var shelfQuantity = form.ShelfQuantity ?? (location is null ? 0 : copies);
+        if (shelfQuantity < 0 || shelfQuantity > copies || (shelfQuantity > 0 && location is null))
+            return Result<BookDto>.Failure("Số bản đưa lên kệ phải từ 0 đến tổng số bản sao và cần chọn kệ nếu số lượng lớn hơn 0.");
         if (location?.Length > 255)
         {
             return Result<BookDto>.Failure("Vị trí lưu trữ không được vượt quá 255 ký tự.");
         }
 
+        var categoryIds = form.CategoryIds
+            .Concat(form.CategoryId.HasValue ? new[] { form.CategoryId.Value } : Array.Empty<Guid>())
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList();
+        if (categoryIds.Count == 0)
+            return Result<BookDto>.Failure("Vui lòng chọn ít nhất một danh mục cho đầu sách.");
+        var primaryId = form.CodeCategoryId ?? (categoryIds.Count == 1 ? categoryIds[0] : (Guid?)null);
+        if (!primaryId.HasValue || !categoryIds.Contains(primaryId.Value))
+            return Result<BookDto>.Failure("Chọn một danh mục cấp mã trong các danh mục của đầu sách.");
+
+        var bookCategories = new List<Category>(categoryIds.Count);
+        foreach (var categoryId in categoryIds)
+        {
+            var category = await _unitOfWork.Repository<Category>().GetByIdAsync(categoryId, ct);
+            if (category is null || category.IsDeleted)
+                return Result<BookDto>.Failure("Một hoặc nhiều danh mục đã chọn không còn tồn tại.");
+            bookCategories.Add(category);
+        }
+        if (form.CoverImage is { Length: > 0 } && _storageService is null)
+            return Result<BookDto>.Failure("Dịch vụ lưu trữ ảnh chưa được cấu hình.");
         string? coverUrl = null;
         if (form.CoverImage != null && form.CoverImage.Length > 0 && _storageService != null)
         {
@@ -120,31 +168,29 @@ public class BookService
             coverUrl = await _storageService.UploadFileAsync(stream, safeName, "books", ct);
         }
 
+        var generated = await _codeGenerator.GetNextAsync(primaryId.Value, true, ct);
+        if (!generated.IsSuccess) return Result<BookDto>.Failure(generated.Error!);
+        var code = generated.Data!;
         var book = new Book
         {
             Id = Guid.NewGuid(),
             Code = code,
+            CodeCategoryId = primaryId,
             Title = trimmedTitle,
             Isbn = string.IsNullOrWhiteSpace(form.Isbn) ? null : form.Isbn.Trim(),
             Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
+            CustomFieldsJson = NormalizeCustomFieldsJson(form.CustomFieldsJson),
             CoverImageUrl = coverUrl,
             PublishedYear = form.PublishedYear,
             Language = string.IsNullOrWhiteSpace(form.Language) ? "vi" : form.Language.Trim(),
             PageCount = form.PageCount,
             TotalCopies = copies,
-            AvailableCopies = copies,
+            AvailableCopies = shelfQuantity,
             AverageRating = 0m,
             IsDeleted = false
         };
 
-        if (form.CategoryId.HasValue)
-        {
-            var category = await _unitOfWork.Repository<Category>().GetByIdAsync(form.CategoryId.Value, ct);
-            if (category != null)
-            {
-                book.Categories.Add(category);
-            }
-        }
+        foreach (var category in bookCategories) book.Categories.Add(category);
 
         if (!string.IsNullOrWhiteSpace(form.AuthorName))
         {
@@ -172,7 +218,7 @@ public class BookService
                 BookId = book.Id,
                 Barcode = $"{code}-{i:D2}",
                 Condition = SmartLibrary.Domain.Enums.BookCondition.New,
-                Location = location,
+                Location = i <= shelfQuantity ? location : null,
                 IsAvailable = true,
                 IsDeleted = false
             };
@@ -181,22 +227,41 @@ public class BookService
 
         await _bookRepository.AddAsync(book, ct);
         await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagBookAsync(book.Id, deleted: false, ct);
 
         var createdBook = await _bookRepository.GetWithDetailsAsync(book.Id, ct);
-        return Result<BookDto>.Success(_mapper.Map<BookDto>(createdBook ?? book));
+        return Result<BookDto>.Success(ToBookDto(createdBook ?? book));
     }
 
     public async Task<Result<BookDto>> UpdateAsync(Guid id, UpdateBookRequest request, CancellationToken ct = default)
     {
-        var book = await _bookRepository.GetByIdAsync(id, ct);
+        var book = await _bookRepository.GetWithDetailsAsync(id, ct);
         if (book is null)
             return Result<BookDto>.Failure(Errors.NotFound);
 
+        var requestedCategoryIds = request.CategoryIds.Where(categoryId => categoryId != Guid.Empty).Distinct().ToList();
+        if (requestedCategoryIds.Count > 0 && book.CodeCategoryId.HasValue && !requestedCategoryIds.Contains(book.CodeCategoryId.Value))
+            return Result<BookDto>.Failure("Cần giữ danh mục cấp mã của đầu sách để bảo toàn mã bản sao và QR. Có thể thêm các danh mục khác.");
+        var requestedCategories = new List<Category>(requestedCategoryIds.Count);
+        foreach (var categoryId in requestedCategoryIds)
+        {
+            var category = await _unitOfWork.Repository<Category>().GetByIdAsync(categoryId, ct);
+            if (category is null || category.IsDeleted)
+                return Result<BookDto>.Failure("Một hoặc nhiều danh mục đã chọn không còn tồn tại.");
+            requestedCategories.Add(category);
+        }
+
         _mapper.Map(request, book);
+        if (requestedCategoryIds.Count > 0)
+        {
+            book.Categories.Clear();
+            foreach (var category in requestedCategories) book.Categories.Add(category);
+        }
         await _bookRepository.UpdateAsync(book, ct);
         await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagBookAsync(book.Id, deleted: false, ct);
 
-        return Result<BookDto>.Success(_mapper.Map<BookDto>(book));
+        return Result<BookDto>.Success(ToBookDto(book));
     }
 
     public async Task<Result<BookDto>> UpdateFromFormAsync(Guid id, UpdateBookForm form, CancellationToken ct = default)
@@ -238,9 +303,8 @@ public class BookService
         else if (copyCountDifference > 0)
         {
             var nextCopyNumber = await _bookRepository.GetNextCopyNumberAsync(id, book.Code, ct);
-            var locationForNewCopies = form.Location is null
-                ? activeCopies.Select(copy => copy.Location).FirstOrDefault()
-                : string.IsNullOrWhiteSpace(form.Location) ? null : form.Location.Trim();
+            // Newly added copies enter the warehouse; shelf placement is managed per copy.
+            const string? locationForNewCopies = null;
 
             for (var index = 0; index < copyCountDifference; index++)
             {
@@ -260,23 +324,16 @@ public class BookService
         }
 
         book.TotalCopies = requestedTotalCopies;
-        book.AvailableCopies = activeCopies.Count(copy => !copy.IsDeleted && copy.IsAvailable);
+        book.AvailableCopies = activeCopies.Count(copy => !copy.IsDeleted && copy.IsAvailable && copy.Location is not null && copy.Condition is not (SmartLibrary.Domain.Enums.BookCondition.Damaged or SmartLibrary.Domain.Enums.BookCondition.Lost));
 
         book.Title = form.Title.Trim();
         book.Isbn = string.IsNullOrWhiteSpace(form.Isbn) ? null : form.Isbn.Trim();
         book.Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim();
+        if (form.CustomFieldsJson is not null)
+            book.CustomFieldsJson = NormalizeCustomFieldsJson(form.CustomFieldsJson);
         book.PublishedYear = form.PublishedYear;
         book.Language = string.IsNullOrWhiteSpace(form.Language) ? "vi" : form.Language.Trim();
         book.PageCount = form.PageCount;
-        if (form.Location is not null)
-        {
-            var location = string.IsNullOrWhiteSpace(form.Location) ? null : form.Location.Trim();
-            foreach (var copy in book.Copies.Where(copy => !copy.IsDeleted))
-            {
-                copy.Location = location;
-            }
-        }
-
         if (form.RemoveCoverImage)
         {
             book.CoverImageUrl = null;
@@ -314,21 +371,57 @@ public class BookService
             book.Authors.Add(author);
         }
 
-        if (form.CategoryId.HasValue)
+        var requestedCategoryIds = (form.CategoryIds ?? Enumerable.Empty<Guid>())
+            .Concat(form.CategoryId.HasValue ? new[] { form.CategoryId.Value } : Array.Empty<Guid>())
+            .Where(categoryId => categoryId != Guid.Empty)
+            .Distinct()
+            .ToList();
+        if (requestedCategoryIds.Count > 0)
         {
-            var category = await _unitOfWork.Repository<Category>().GetByIdAsync(form.CategoryId.Value, ct);
-            if (category != null)
+            if (book.CodeCategoryId.HasValue && !requestedCategoryIds.Contains(book.CodeCategoryId.Value))
+                return Result<BookDto>.Failure("Cần giữ danh mục cấp mã của đầu sách. Có thể thêm các danh mục khác.");
+            book.Categories.Clear();
+            foreach (var categoryId in requestedCategoryIds)
             {
-                book.Categories.Clear();
-                book.Categories.Add(category);
+                var category = await _unitOfWork.Repository<Category>().GetByIdAsync(categoryId, ct);
+                if (category is null || category.IsDeleted)
+                    return Result<BookDto>.Failure("Một hoặc nhiều danh mục không còn tồn tại. Vui lòng tải lại danh sách.");
+                if (!book.Categories.Any(existing => existing.Id == category.Id))
+                    book.Categories.Add(category);
             }
         }
 
         await _bookRepository.UpdateAsync(book, ct);
         await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagBookAsync(book.Id, deleted: false, ct);
 
         var updatedBook = await _bookRepository.GetWithDetailsAsync(id, ct);
-        return Result<BookDto>.Success(_mapper.Map<BookDto>(updatedBook ?? book));
+        return Result<BookDto>.Success(ToBookDto(updatedBook ?? book));
+    }
+
+    private BookDto ToBookDto(Book book)
+    {
+        var dto = _mapper.Map<BookDto>(book);
+        dto.CustomFields = ParseCustomFields(book.CustomFieldsJson);
+        dto.ReviewCount = book.ReviewCount;
+        dto.BorrowCount = book.BorrowCount;
+        return dto;
+    }
+
+    private static string NormalizeCustomFieldsJson(string? json)
+        => JsonSerializer.Serialize(ParseCustomFields(json));
+
+    private static Dictionary<string, string> ParseCustomFields(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new Dictionary<string, string>();
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>();
+        }
+        catch (JsonException)
+        {
+            return new Dictionary<string, string>();
+        }
     }
 
     private static string? NormalizeBookCode(string? code)
@@ -353,7 +446,39 @@ public class BookService
         book.IsDeleted = true;
         await _bookRepository.UpdateAsync(book, ct);
         await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagBookAsync(book.Id, deleted: true, ct);
 
         return Result<bool>.Success(true);
+    }
+
+    public async Task<Result<bool>> RestoreAsync(Guid id, CancellationToken ct = default)
+    {
+        var book = await _bookRepository.GetDeletedWithDetailsAsync(id, ct);
+        if (book is null) return Result<bool>.Failure(Errors.NotFound);
+
+        book.IsDeleted = false;
+        await _bookRepository.UpdateAsync(book, ct);
+        await _unitOfWork.SaveChangesAsync(ct);
+        await SyncRagBookAsync(book.Id, deleted: false, ct);
+        return Result<bool>.Success(true);
+    }
+
+    private async Task SyncRagBookAsync(Guid bookId, bool deleted, CancellationToken ct)
+    {
+        _catalogCache?.Invalidate();
+        if (_ragIndexer is null)
+            return;
+
+        try
+        {
+            if (deleted)
+                await _ragIndexer.DeleteAsync("book", bookId, ct);
+            else
+                await _ragIndexer.UpsertBookAsync(bookId, ct);
+        }
+        catch
+        {
+            // Không chặn lưu sách nếu Gemini/RAG lỗi.
+        }
     }
 }

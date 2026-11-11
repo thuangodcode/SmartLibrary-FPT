@@ -57,14 +57,36 @@ SmartLibrary-FPT/
 ### 1. Backend API
 
 ```bash
-cd apps/api
-dotnet restore
-dotnet build
-dotnet run --project src/SmartLibrary.Api
-# API chạy tại: https://localhost:5001
-# Swagger: https://localhost:5001/swagger
-# Health check: https://localhost:5001/health
+# Chạy từ thư mục gốc repository
+npm run dev:api
+# API chạy tại: http://localhost:5278
+# Swagger: http://localhost:5278/swagger
+# Health check: http://localhost:5278/api/health-check
 ```
+
+### AI tìm kiếm sách local (không cần API Key)
+
+SmartLibrary hỗ trợ chạy chat bằng Ollama và embedding bằng ONNX trên máy chạy API. Gợi ý cấu hình mặc định là **Qwen 2.5 3B** (`qwen2.5:3b`) cho máy phổ thông; dùng `qwen2.5:7b` nếu máy có nhiều RAM/GPU và ưu tiên câu trả lời tốt hơn.
+
+1. Cài Ollama từ [ollama.com](https://ollama.com/) và tải model:
+
+   ```bash
+   ollama pull qwen2.5:3b
+   ```
+
+2. Đảm bảo Ollama đang chạy tại `http://localhost:11434` trên cùng máy với API. Nếu API chạy trong container hoặc trên máy khác, nhập địa chỉ Ollama mà **máy chạy API** có thể truy cập (ví dụ `http://host.docker.internal:11434` trong Docker Desktop).
+3. Trong trang cấu hình AI của thủ thư, chọn **Ollama (local)**, model `qwen2.5:3b`, URL Ollama và **ONNX cục bộ** làm embedding; lưu rồi kiểm tra kết nối.
+4. Chọn dùng cấu hình cho thư viện, bật dịch vụ AI theo quyền Admin và chạy **Đồng bộ dữ liệu RAG** để tạo lại chỉ mục sách.
+
+Embedding `multilingual-e5-small` ONNX được tải một lần (khoảng 118 MB) vào máy chủ API; Ollama cũng cần tải model một lần. Sau đó suy luận chat và embedding chạy local, không gửi câu hỏi/nội dung sách tới dịch vụ AI bên ngoài và không cần API Key. Dữ liệu tài khoản/kho sách vẫn sử dụng cơ sở dữ liệu đã cấu hình (Supabase/PostgreSQL).
+
+### Thanh toán phí phạt PayOS
+
+Luồng phí phạt hỗ trợ tiền mặt tại quầy và PayOS. Chỉ webhook PayOS đã xác thực chữ ký mới xác nhận giao dịch trực tuyến; URL chuyển hướng không được dùng làm bằng chứng thanh toán. Cấu hình `PayOS__ClientId`, `PayOS__ApiKey`, `PayOS__ChecksumKey`, `PayOS__ReturnUrl` và `PayOS__CancelUrl` qua biến môi trường (Render) hoặc `.env` local. Không đưa credentials vào Git/chat.
+
+Đăng ký webhook HTTPS công khai với PayOS tại `https://<api-host>/api/v1/payments/payos/webhook`. Return/Cancel URLs cần trỏ đến trang `/history` của frontend. Migration API `20261026000000_AddPayOSFinePayments` được áp dụng khi API khởi động; nếu triển khai schema bằng Supabase CLI, áp dụng thêm `supabase/migrations/00024_payos_fine_payments.sql`.
+
+`npm run dev:api` kiểm tra health check trước khi khởi động. Nếu API đang chạy khỏe trên cổng `5278`, lệnh sẽ bám vào tiến trình hiện có; nhấn **Ctrl+C** trong terminal đó để dừng đúng API của repository. Có thể dừng API tường minh bằng `npm run dev:api:stop`. Nếu cổng đang bị dịch vụ khác chiếm, lệnh sẽ báo rõ để bạn xử lý xung đột.
 
 ### 2. Web App
 
@@ -80,12 +102,20 @@ npm run dev
 ### 3. Mobile App
 
 ```bash
-cd apps/mobile
+# Từ thư mục gốc repository
 npm install
-cp .env.example .env.local
-npx expo start
-# Scan QR code bằng Expo Go
+npm --prefix apps/mobile install
+npm run dev:lan
+# Quét QR Expo bằng Expo Go trên điện thoại cùng mạng với máy tính
 ```
+
+Trước lần chạy đầu, tạo `.env` từ `.env.example` ở thư mục gốc và điền thông tin Supabase/PostgreSQL của môi trường bạn được phép sử dụng. `.env` không được đưa lên Git; clone code không tự mang theo database, khóa dịch vụ hay tài khoản đăng nhập. Mobile tự lấy host LAN từ Expo, không cần đặt `EXPO_PUBLIC_API_URL` khi chạy cùng API local bằng `npm run dev:lan`.
+
+Mobile hiện hỗ trợ hai vai trò **Reader** và **Librarian (Thủ thư)**. Đăng nhập bằng tài khoản đã được kích hoạt trong hệ thống; vai trò Admin không được phép truy cập ứng dụng mobile.
+
+Để nhiều điện thoại thật dùng cùng API khi quét QR, kết nối chúng và máy tính vào cùng Wi-Fi. Có thể chạy `npm run dev:lan` để bật các dịch vụ cùng lúc. Nếu QR không hiện trong terminal được `concurrently` chia sẻ, chạy API bằng `npm run dev:api:lan` ở terminal thứ nhất, rồi mở terminal thứ hai và chạy `npm run dev:mobile`; Expo Go sẽ hiện QR riêng. Expo tự lấy IP máy chạy Metro làm host API cho app mobile. Nếu Windows Firewall chặn kết nối, cho phép Node/Expo và .NET trên mạng Private (Metro thường dùng cổng 8081; API dùng 5278). Quét QR bằng Expo Go trên từng điện thoại và đăng nhập bằng tài khoản Reader/Thủ thư riêng của người đó. Không dùng `localhost` cho điện thoại thật vì nó trỏ về chính điện thoại.
+
+`EXPO_PUBLIC_API_URL` là tùy chọn: để trống khi dùng `npm run dev:lan`, app sẽ tự dùng host LAN của Expo; chỉ cấu hình biến này khi dùng API ở máy chủ riêng. Không đặt `localhost` hoặc `10.0.2.2` cho điện thoại thật (`10.0.2.2` chỉ dành cho Android Emulator). Chế độ LAN chỉ mở API trong mạng nội bộ; để dùng ngoài mạng đó, cần triển khai API tại địa chỉ HTTPS công khai. QR Expo chỉ cấp mã chạy app qua Expo Go, không tự đưa API hay cơ sở dữ liệu lên Internet.
 
 ### 4. Supabase (Local)
 

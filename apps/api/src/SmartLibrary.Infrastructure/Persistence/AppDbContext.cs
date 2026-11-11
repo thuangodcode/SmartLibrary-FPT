@@ -14,7 +14,9 @@ public class AppDbContext : DbContext
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     public DbSet<Book> Books => Set<Book>();
+    public DbSet<BookFieldConfiguration> BookFieldConfigurations => Set<BookFieldConfiguration>();
     public DbSet<BookCopy> BookCopies => Set<BookCopy>();
+    public DbSet<StorageShelf> StorageShelves => Set<StorageShelf>();
     public DbSet<Author> Authors => Set<Author>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Publisher> Publishers => Set<Publisher>();
@@ -23,7 +25,9 @@ public class AppDbContext : DbContext
     public DbSet<BorrowRecord> BorrowRecords => Set<BorrowRecord>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<Fine> Fines => Set<Fine>();
+    public DbSet<FinePayment> FinePayments => Set<FinePayment>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<ReaderFavorite> ReaderFavorites => Set<ReaderFavorite>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<BookEmbedding> BookEmbeddings => Set<BookEmbedding>();
     public DbSet<ReadingPreference> ReadingPreferences => Set<ReadingPreference>();
@@ -39,10 +43,16 @@ public class AppDbContext : DbContext
     public DbSet<ReportReview> ReportReviews => Set<ReportReview>();
     public DbSet<ReportRequest> ReportRequests => Set<ReportRequest>();
     public DbSet<BookIncident> BookIncidents => Set<BookIncident>();
+    public DbSet<AiSetting> AiSettings => Set<AiSetting>();
+    public DbSet<UserAiSetting> UserAiSettings => Set<UserAiSetting>();
+    public DbSet<CirculationReminderSetting> CirculationReminderSettings => Set<CirculationReminderSetting>();
+    public DbSet<RagDocument> RagDocuments => Set<RagDocument>();
     public DbSet<SupportRequestType> SupportRequestTypes => Set<SupportRequestType>();
     public DbSet<SupportComplaint> SupportComplaints => Set<SupportComplaint>();
     public DbSet<SupportComplaintReply> SupportComplaintReplies => Set<SupportComplaintReply>();
     public DbSet<SupportChatMessage> SupportChatMessages => Set<SupportChatMessage>();
+    public DbSet<NewsArticle> NewsArticles => Set<NewsArticle>();
+    public DbSet<NewsComment> NewsComments => Set<NewsComment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,6 +60,14 @@ public class AppDbContext : DbContext
 
         // Apply all configurations from this assembly
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+        modelBuilder.Entity<BookFieldConfiguration>(entity =>
+        {
+            entity.ToTable("book_field_configurations");
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.FieldsJson).HasColumnName("fields").HasColumnType("jsonb").IsRequired();
+            entity.Property(item => item.UpdatedAt).HasColumnName("updated_at");
+        });
 
         modelBuilder.Entity<RolePermission>(entity =>
         {
@@ -68,6 +86,7 @@ public class AppDbContext : DbContext
         });
 
         modelBuilder.Entity<Role>().ToTable("roles");
+        modelBuilder.Entity<Permission>().ToTable("permissions");
 
         modelBuilder.Entity<UserImportBatch>(entity =>
         {
@@ -101,19 +120,58 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<BorrowRecord>(entity =>
         {
             entity.ToTable("borrow_records");
+            entity.HasIndex(x => new { x.Status, x.BorrowDate })
+                .HasDatabaseName("idx_borrow_records_status_borrow_date")
+                .HasFilter("is_deleted = FALSE");
+            entity.HasIndex(x => new { x.Status, x.DueDate })
+                .HasDatabaseName("idx_borrow_records_status_due_date")
+                .HasFilter("is_deleted = FALSE");
+            entity.HasIndex(x => new { x.ReaderId, x.BorrowDate })
+                .HasDatabaseName("idx_borrow_records_reader_borrow_date")
+                .HasFilter("is_deleted = FALSE");
             entity.Property(b => b.Status).HasConversion(
                 v => v.ToString().ToLower(),
                 v => Enum.Parse<BorrowStatus>(v, true)
+            );
+            entity.Property(b => b.ReturnCondition).HasConversion(
+                v => v.HasValue ? v.Value.ToString().ToLower() : null,
+                v => v == null ? null : Enum.Parse<BookCondition>(v, true)
             );
         });
 
         modelBuilder.Entity<Fine>(entity =>
         {
             entity.ToTable("fines");
+            entity.HasIndex(x => new { x.Status, x.CreatedAt })
+                .HasDatabaseName("idx_fines_status_created_at")
+                .HasFilter("is_deleted = FALSE");
+            entity.HasIndex(x => new { x.ReaderId, x.CreatedAt })
+                .HasDatabaseName("idx_fines_reader_created_at")
+                .HasFilter("is_deleted = FALSE");
             entity.Property(f => f.Status).HasConversion(
                 v => v.ToString().ToLower(),
                 v => Enum.Parse<FineStatus>(v, true)
             );
+            entity.Property(f => f.PaymentMethod).HasMaxLength(20);
+            entity.Property(f => f.PaymentReference).HasMaxLength(100);
+            entity.HasMany(f => f.Payments).WithOne(p => p.Fine).HasForeignKey(p => p.FineId);
+        });
+
+        modelBuilder.Entity<FinePayment>(entity =>
+        {
+            entity.ToTable("fine_payments");
+            entity.Property(payment => payment.Method).HasMaxLength(20);
+            entity.Property(payment => payment.Status).HasConversion(
+                value => value.ToString().ToLower(),
+                value => Enum.Parse<FinePaymentStatus>(value, true));
+            entity.Property(payment => payment.PaymentLinkId).HasMaxLength(100);
+            entity.Property(payment => payment.ProviderReference).HasMaxLength(100);
+            entity.HasIndex(payment => payment.OrderCode)
+                .IsUnique()
+                .HasFilter("order_code IS NOT NULL");
+            entity.HasIndex(payment => payment.FineId)
+                .IsUnique()
+                .HasFilter("status = 'pending' AND method = 'PayOS'");
         });
 
         modelBuilder.Entity<Notification>(entity =>
@@ -132,6 +190,16 @@ public class AppDbContext : DbContext
                 v => v.ToString().ToLower(),
                 v => Enum.Parse<BookCondition>(v, true)
             );
+        });
+
+        modelBuilder.Entity<StorageShelf>(entity =>
+        {
+            entity.ToTable("storage_shelves");
+            entity.HasKey(shelf => shelf.Id);
+            entity.Property(shelf => shelf.Name).HasMaxLength(255).IsRequired();
+            entity.Property(shelf => shelf.Capacity).HasDefaultValue(100);
+            entity.Property(shelf => shelf.IsDeleted).HasDefaultValue(false);
+            entity.HasIndex(shelf => shelf.Name).IsUnique().HasFilter("is_deleted = FALSE");
         });
 
         modelBuilder.Entity<Review>(entity =>
@@ -234,6 +302,59 @@ public class AppDbContext : DbContext
             entity.HasOne(x => x.OverdueFine).WithMany().HasForeignKey(x => x.OverdueFineId).OnDelete(DeleteBehavior.SetNull);
         });
 
+        modelBuilder.Entity<AiSetting>(entity =>
+        {
+            entity.ToTable("ai_settings");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.EncryptedApiKey).HasColumnName("encrypted_api_key");
+            entity.Property(x => x.ApiKeyLast4).HasMaxLength(8);
+            entity.Property(x => x.Provider).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.ChatModel).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.EmbeddingModel).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.BaseUrl).HasMaxLength(500);
+            entity.Property(x => x.ProviderKeysJson).HasColumnName("provider_keys_json");
+            entity.Property(x => x.LibrarianCriteriaJson).HasColumnName("librarian_criteria_json");
+            entity.Property(x => x.ReaderSuggestedQuestionsJson).HasColumnName("reader_suggested_questions_json");
+            entity.Property(x => x.IndexEmbeddingModel).HasMaxLength(100);
+            entity.Property(x => x.LastTestMessage).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<UserAiSetting>(entity =>
+        {
+            entity.ToTable("user_ai_settings");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.UserId).IsUnique();
+            entity.Property(x => x.EncryptedApiKey).HasColumnName("encrypted_api_key");
+            entity.Property(x => x.ApiKeyLast4).HasMaxLength(8);
+            entity.Property(x => x.Provider).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.ChatModel).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.EmbeddingModel).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.BaseUrl).HasMaxLength(500);
+            entity.Property(x => x.ProviderKeysJson).HasColumnName("provider_keys_json");
+            entity.Property(x => x.LastTestMessage).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<CirculationReminderSetting>(entity =>
+        {
+            entity.ToTable("circulation_reminder_settings");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.IsEnabled).HasColumnName("is_enabled").HasDefaultValue(false);
+            entity.Property(x => x.ReminderDays).HasColumnName("reminder_days").HasDefaultValue(7);
+            entity.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+        });
+
+        modelBuilder.Entity<RagDocument>(entity =>
+        {
+            entity.ToTable("rag_documents");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SourceType).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Title).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Content).IsRequired();
+            entity.Property(x => x.ContentHash).HasMaxLength(64).IsRequired();
+            entity.HasIndex(x => new { x.SourceType, x.SourceId }).IsUnique();
+        });
+
         modelBuilder.Entity<ReportReview>(entity =>
         {
             entity.ToTable("report_reviews");
@@ -278,9 +399,39 @@ public class AppDbContext : DbContext
         {
             entity.ToTable("support_chat_messages");
             entity.Property(x => x.Message).HasMaxLength(2000).IsRequired();
+            entity.Property(x => x.IsReadByLibrarian).HasDefaultValue(false);
+            entity.Property(x => x.IsReadByReader).HasDefaultValue(false);
             entity.HasIndex(x => new { x.ReaderId, x.CreatedAt });
+            entity.HasIndex(x => new { x.ReaderId, x.IsReadByLibrarian });
+            entity.HasIndex(x => new { x.ReaderId, x.IsReadByReader });
             entity.HasOne(x => x.Reader).WithMany().HasForeignKey(x => x.ReaderId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Sender).WithMany().HasForeignKey(x => x.SenderId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<NewsArticle>(entity =>
+        {
+            entity.ToTable("news_articles");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Title).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.Category).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Summary).HasMaxLength(1000).IsRequired();
+            entity.Property(x => x.AuthorName).HasMaxLength(150);
+            entity.HasIndex(x => x.IsPinned)
+                .IsUnique()
+                .HasFilter("is_pinned = TRUE AND is_published = TRUE");
+        });
+
+        modelBuilder.Entity<NewsComment>(entity =>
+        {
+            entity.ToTable("news_comments");
+            entity.HasKey(comment => comment.Id);
+            entity.Property(comment => comment.Content).HasMaxLength(2000).IsRequired();
+            entity.Property(comment => comment.IsDeleted).HasDefaultValue(false);
+            entity.HasIndex(comment => new { comment.NewsArticleId, comment.CreatedAt });
+            entity.HasIndex(comment => comment.ParentCommentId);
+            entity.HasOne(comment => comment.NewsArticle).WithMany().HasForeignKey(comment => comment.NewsArticleId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(comment => comment.Author).WithMany().HasForeignKey(comment => comment.AuthorId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(comment => comment.ParentComment).WithMany(comment => comment.Replies).HasForeignKey(comment => comment.ParentCommentId).OnDelete(DeleteBehavior.Cascade);
         });
 
         // Global query filter for soft delete

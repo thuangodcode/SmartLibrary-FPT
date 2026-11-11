@@ -4,8 +4,10 @@
 @librarianId = 00000000-0000-0000-0000-000000000001
 @templateId = 00000000-0000-0000-0000-000000000002
 @requestId = 00000000-0000-0000-0000-000000000003
+@loanId = 00000000-0000-0000-0000-000000000008
 @reportId = 00000000-0000-0000-0000-000000000004
 @bookId = 00000000-0000-0000-0000-000000000005
+@readerId = 00000000-0000-0000-0000-000000000007
 @reviewId = 00000000-0000-0000-0000-000000000006
 @readerToken = replace-with-reader-access-token
 
@@ -17,6 +19,50 @@ Accept: application/json
 # Public: check current book-copy availability before enabling the borrow action.
 GET {{SmartLibrary.Api_HostAddress}}/api/v1/books/{{bookId}}/availability
 Accept: application/json
+
+###
+
+# Reader: join the reservation queue when no book copy can currently be borrowed.
+POST {{SmartLibrary.Api_HostAddress}}/api/v1/me/circulation/book-reservations
+Authorization: {{readerToken}}
+Content-Type: application/json
+
+{
+  "bookId": "{{bookId}}"
+}
+
+###
+
+# Reader: renew an eligible active loan owned by the authenticated reader.
+POST {{SmartLibrary.Api_HostAddress}}/api/v1/me/circulation/loans/{{loanId}}/renew
+Authorization: {{readerToken}}
+Accept: application/json
+
+###
+
+# Librarian: search reader names, student IDs, and email addresses for the reservation form.
+GET {{SmartLibrary.Api_HostAddress}}/api/v1/circulation/reservation-reader-options?search=SE1
+Authorization: {{librarianToken}}
+Accept: application/json
+
+###
+
+# Librarian: search book titles, book codes, and ISBNs for the reservation form.
+GET {{SmartLibrary.Api_HostAddress}}/api/v1/circulation/reservation-book-options?search=Python
+Authorization: {{librarianToken}}
+Accept: application/json
+
+###
+
+# Librarian: create a reservation for the selected reader and unavailable book.
+POST {{SmartLibrary.Api_HostAddress}}/api/v1/circulation/reservations/by-book
+Authorization: {{librarianToken}}
+Content-Type: application/json
+
+{
+  "readerId": "{{readerId}}",
+  "bookId": "{{bookId}}"
+}
 
 ###
 

@@ -2,7 +2,9 @@ import React from 'react';
 import { ArrowUpRight, BookOpen, Check, Clock3, Star } from 'lucide-react';
 import type { Book } from '../types';
 import { BookCover } from './BookCover';
+import FavoriteBookButton from './FavoriteBookButton';
 import './BookCard.css';
+import './FavoriteBookButton.css';
 
 interface BookCardProps {
   book: Book;
@@ -31,10 +33,10 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
 
   return (
     <article className={`book-card book-card--${book.status}`} data-ui="book-card">
-      {/* AI Match Badge (if present) */}
-      {book.matchScore && (
+      <FavoriteBookButton bookId={book.id} title={book.title} />
+      {book.matchLabel && (
         <div className="book-card__match">
-          <span>{book.matchScore}% Match</span>
+          <span>{book.matchLabel}</span>
         </div>
       )}
 
@@ -61,7 +63,7 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
         <div className="book-card__copy">
           <div className="book-card__meta">
             <span className="book-card__category">{book.category}</span>
-            <div className="book-card__rating" aria-label={`${book.rating} trên 5 sao, ${book.reviewCount} đánh giá`}>
+            <div className={`book-card__rating${book.reviewCount > 0 || book.borrowCount !== undefined ? ' has-metrics' : ''}`} aria-label={`${book.rating} trên 5 sao, ${book.reviewCount} đánh giá`}>
               <Star aria-hidden="true" />
               <span>{book.rating.toFixed(1)}</span>
               <small>{book.reviewCount ? `${book.reviewCount} đánh giá` : 'Chưa có đánh giá'}</small>
@@ -73,6 +75,9 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onSelect }) => {
           </h3>
 
           <p className="book-card__author">{book.author}</p>
+          {book.borrowCount !== undefined && (
+            <p className="book-card__borrow-count"><BookOpen aria-hidden="true" />{book.borrowCount.toLocaleString('vi-VN')} lượt mượn</p>
+          )}
         </div>
 
         {/* AI Recommendation Reason */}

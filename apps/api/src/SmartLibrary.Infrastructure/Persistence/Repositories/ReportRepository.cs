@@ -9,7 +9,9 @@ public sealed class ReportRepository(AppDbContext db) : IReportRepository
     public IQueryable<LibraryReport> Reports => db.LibraryReports;
     public IQueryable<ReportTemplate> Templates => db.ReportTemplates;
     public IQueryable<BorrowRecord> BorrowRecords => db.BorrowRecords;
+    public IQueryable<BookCopy> BookCopies => db.BookCopies;
     public IQueryable<Fine> Fines => db.Fines;
+    public IQueryable<FinePayment> FinePayments => db.FinePayments;
     public IQueryable<UserProfile> Users => db.UserProfiles;
     public IQueryable<Notification> Notifications => db.Notifications;
     public IQueryable<ReportReview> Reviews => db.ReportReviews;

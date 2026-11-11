@@ -13,11 +13,16 @@ public class PolicyRuleService
 
     private readonly IPolicyRuleRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPolicyRagSyncQueue? _policyRagSyncQueue;
 
-    public PolicyRuleService(IPolicyRuleRepository repository, IUnitOfWork unitOfWork)
+    public PolicyRuleService(
+        IPolicyRuleRepository repository,
+        IUnitOfWork unitOfWork,
+        IPolicyRagSyncQueue? policyRagSyncQueue = null)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
+        _policyRagSyncQueue = policyRagSyncQueue;
     }
 
     public Task<PolicyRuleListResultDto> GetPagedAsync(
@@ -133,6 +138,7 @@ public class PolicyRuleService
         await _unitOfWork.SaveChangesAsync(ct);
 
         var created = await _repository.GetByIdWithDetailsAsync(entity.Id, ct);
+        QueueRagPolicySync(entity.Id, entity.Status, deleted: false);
         return Result<PolicyRuleDetailDto>.Success(MapDetail(created!));
     }
 
@@ -160,7 +166,7 @@ public class PolicyRuleService
         var overridesGeneral = request.OverridesGeneral || policyType == PolicyRuleType.CategoryOverride;
 
         var parameters = request.Parameters
-            .Where(x => !string.IsNullOrWhiteSpace(x.Key))
+            .Where(x => !string.IsNullOrWhiteSpace(x.Key) && !string.IsNullOrWhiteSpace(x.Value))
             .GroupBy(x => x.Key.Trim(), StringComparer.OrdinalIgnoreCase)
             .Select(g => g.Last())
             .Select(p => new PolicyRuleParameter
@@ -168,7 +174,7 @@ public class PolicyRuleService
                 Id = Guid.NewGuid(),
                 PolicyRuleId = id.Value,
                 ParamKey = p.Key.Trim(),
-                ParamValue = p.Value?.Trim() ?? string.Empty,
+                ParamValue = p.Value!.Trim(),
                 DisplayLabel = p.Label?.Trim()
             }).ToList();
         var targets = request.Targets
@@ -223,6 +229,7 @@ public class PolicyRuleService
         await _unitOfWork.SaveChangesAsync(ct);
 
         var updated = await _repository.GetByIdWithDetailsAsync(id.Value, ct);
+        QueueRagPolicySync(id.Value, status, deleted: false);
         return Result<PolicyRuleDetailDto>.Success(MapDetail(updated!));
     }
 
@@ -238,6 +245,18 @@ public class PolicyRuleService
         var entity = await _repository.GetByKeyWithDetailsAsync(key, ct);
         if (entity is null)
             return Result<PolicyRuleDetailDto>.Failure("Không tìm thấy quy định.");
+
+        var statusError = PolicyParameterRules.Validate(
+            entity.PolicyType.ToString(),
+            newStatus.ToString(),
+            entity.Parameters.Select(p => new PolicyRuleParameterDto
+            {
+                Key = p.ParamKey,
+                Value = p.ParamValue,
+                Label = p.DisplayLabel
+            }));
+        if (statusError is not null)
+            return Result<PolicyRuleDetailDto>.Failure(statusError);
 
         var before = SerializeSnapshot(entity);
         var oldStatus = entity.Status;
@@ -272,6 +291,7 @@ public class PolicyRuleService
         await _unitOfWork.SaveChangesAsync(ct);
 
         var updated = await _repository.GetByIdWithDetailsAsync(entity.Id, ct);
+        QueueRagPolicySync(entity.Id, newStatus, deleted: false);
         return Result<PolicyRuleDetailDto>.Success(MapDetail(updated!));
     }
 
@@ -310,7 +330,13 @@ public class PolicyRuleService
         }, ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
+        QueueRagPolicySync(entity.Id, entity.Status, deleted: true);
         return Result<bool>.Success(true);
+    }
+
+    private void QueueRagPolicySync(Guid policyId, PolicyRuleStatus status, bool deleted)
+    {
+        _policyRagSyncQueue?.Enqueue(policyId, !deleted && status == PolicyRuleStatus.Active);
     }
 
     private async Task<Result<string>> ResolveCodeAsync(
@@ -344,17 +370,17 @@ public class PolicyRuleService
         if (request.EffectiveFrom.HasValue && request.EffectiveTo.HasValue
             && request.EffectiveTo < request.EffectiveFrom)
             return "Ngày kết thúc phải sau ngày bắt đầu.";
-        return null;
+        return PolicyParameterRules.Validate(request.PolicyType, request.Status, request.Parameters);
     }
 
     private static void ApplyChildren(PolicyRule entity, UpsertPolicyRuleRequest request)
     {
-        foreach (var p in request.Parameters.Where(x => !string.IsNullOrWhiteSpace(x.Key)))
+        foreach (var p in request.Parameters.Where(x => !string.IsNullOrWhiteSpace(x.Key) && !string.IsNullOrWhiteSpace(x.Value)))
         {
             entity.Parameters.Add(new PolicyRuleParameter
             {
                 ParamKey = p.Key.Trim(),
-                ParamValue = p.Value?.Trim() ?? string.Empty,
+                ParamValue = p.Value!.Trim(),
                 DisplayLabel = p.Label?.Trim()
             });
         }

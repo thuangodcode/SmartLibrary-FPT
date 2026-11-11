@@ -46,6 +46,9 @@ public class GlobalExceptionMiddleware
 
         var (statusCode, errorCode, message) = exception switch
         {
+            _ when postgresException?.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected => (
+                HttpStatusCode.Conflict, Errors.ValidationFailed,
+                "Dữ liệu vừa thay đổi bởi thao tác khác. Chưa lưu thay đổi; hãy tải lại trạng thái rồi thử lại."),
             _ when missingReportsSchema => (
                 HttpStatusCode.ServiceUnavailable, 
                 "Cơ sở dữ liệu báo cáo chưa được khởi tạo. API đang áp dụng migration; hãy tải lại sau khi API khởi động xong.",

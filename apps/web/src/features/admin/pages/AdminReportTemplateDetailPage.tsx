@@ -269,7 +269,7 @@ const AdminReportTemplateDetailPage: React.FC = () => {
     setTmplDesc(template.description ?? '');
     setTmplPeriod(parsedConfig?.period || 'Month');
     setTmplGroupBy(parsedConfig?.groupBy || 'Day');
-    setTmplMetrics(metrics);
+    setTmplMetrics(template.reportType === 'Finance' ? ['Amount'] : metrics.filter((metric) => metric !== 'Amount'));
     setTmplEnabled(template.isEnabled);
     setEditOpen(true);
   };
@@ -624,7 +624,7 @@ const AdminReportTemplateDetailPage: React.FC = () => {
                 <div className="form-row-2">
                   <label>Tên mẫu <b>*</b><input autoFocus value={tmplName} onChange={(event) => setTmplName(event.target.value)} required /></label>
                   <label>Loại báo cáo
-                    <select value={tmplType} onChange={(event) => setTmplType(event.target.value)}>
+                    <select value={tmplType} onChange={(event) => { const nextType = event.target.value; setTmplType(nextType); setTmplMetrics(nextType === 'Finance' ? ['Amount'] : ['Borrowed', 'Returned']); }}>
                       <option value="Activity">Hoạt động mượn trả</option>
                       <option value="Finance">Tài chính</option>
                       <option value="Collection">Kho sách</option>
@@ -647,7 +647,7 @@ const AdminReportTemplateDetailPage: React.FC = () => {
                 </div>
                 <fieldset className="template-edit-metrics">
                   <legend>Chỉ số bắt buộc</legend>
-                  {(['Borrowed', 'Returned'] as const).map((metric) => (
+                  {(['Borrowed', 'Returned', 'Amount'] as const).filter((metric) => tmplType === 'Finance' ? metric === 'Amount' : metric !== 'Amount').map((metric) => (
                     <label key={metric}>
                       <input
                         type="checkbox"

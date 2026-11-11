@@ -184,6 +184,7 @@ public class PolicyRuleRepository : IPolicyRuleRepository
     private IQueryable<PolicyRule> QueryWithDetails() =>
         _context.PolicyRules
             .AsNoTracking()
+            .AsSingleQuery()
             .Include(p => p.Parameters)
             .Include(p => p.Targets)
             .Include(p => p.Histories)

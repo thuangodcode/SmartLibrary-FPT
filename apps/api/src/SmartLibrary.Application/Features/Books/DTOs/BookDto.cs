@@ -7,9 +7,11 @@ public class BookDto
 {
     public Guid Id { get; set; }
     public string Code { get; set; } = string.Empty;
+    public Guid? CodeCategoryId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Isbn { get; set; }
     public string? Description { get; set; }
+    public Dictionary<string, string> CustomFields { get; set; } = new();
     public string? CoverImageUrl { get; set; }
     public int? PublishedYear { get; set; }
     public string Language { get; set; } = string.Empty;
@@ -17,8 +19,12 @@ public class BookDto
     public int TotalCopies { get; set; }
     public int AvailableCopies { get; set; }
     public decimal AverageRating { get; set; }
+    public int ReviewCount { get; set; }
+    public int? BorrowCount { get; set; }
     public List<string> AuthorNames { get; set; } = new();
     public List<string> CategoryNames { get; set; } = new();
+    public List<Guid> CategoryIds { get; set; } = new();
+    public List<string> CopyLocations { get; set; } = new();
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

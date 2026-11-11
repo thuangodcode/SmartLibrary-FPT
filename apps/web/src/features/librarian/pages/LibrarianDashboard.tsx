@@ -3,6 +3,7 @@ import {
   Users,
   BookOpen,
   FileCheck,
+  LayoutDashboard,
   LoaderCircle,
   BookCopy,
   ArrowUpRight,
@@ -93,7 +94,10 @@ const LibrarianDashboard: React.FC = () => {
       {/* Header */}
       <header className="lib-page-heading">
         <div>
-          <p className="lib-eyebrow">THỦ THƯ / BẢNG ĐIỀU KHIỂN</p>
+          <div className="lib-eyebrow">
+            <LayoutDashboard size={14} />
+            <span>KHÔNG GIAN THỦ THƯ • TỔNG QUAN HỆ THỐNG</span>
+          </div>
           <h1>Tổng Quan Nghiệp Vụ Thư Viện</h1>
           <p className="lib-page-description">
             Theo dõi hoạt động mượn trả, phê duyệt hồ sơ bạn đọc và quản lý kho sách theo thời gian thực.

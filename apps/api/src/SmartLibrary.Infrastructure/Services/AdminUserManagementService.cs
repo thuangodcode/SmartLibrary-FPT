@@ -24,7 +24,7 @@ namespace SmartLibrary.Infrastructure.Services;
 public sealed class AdminUserManagementService : IAdminUserManagementService
 {
     private const int MaximumImportRows = 1000;
-    private sealed record IdentityDocumentSummary(Guid Id, string Side, string? DocumentLast4);
+    private sealed record IdentityDocumentSummary(Guid Id, string Side, string? DocumentLast4, string? StoragePath = null);
 
     private readonly AppDbContext _dbContext;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -106,9 +106,20 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
                 if (!Enum.TryParse<AccountStatus>(status, true, out var parsedStatus))
                     throw new ValidationException("Trạng thái tài khoản không hợp lệ.");
 
-                users = users.Where(user =>
-                    user.Status == parsedStatus &&
-                    (parsedStatus != AccountStatus.Active || user.IsActive));
+                var matchingUserIds = parsedStatus == AccountStatus.Active
+                    ? _dbContext.Database.SqlQuery<Guid>($"""
+                        SELECT id AS "Value"
+                        FROM profiles
+                        WHERE status::text = {parsedStatus.ToString()}
+                          AND is_active = TRUE
+                        """)
+                    : _dbContext.Database.SqlQuery<Guid>($"""
+                        SELECT id AS "Value"
+                        FROM profiles
+                        WHERE status::text = {parsedStatus.ToString()}
+                        """);
+
+                users = users.Where(user => matchingUserIds.Contains(user.Id));
             }
         }
 
@@ -322,7 +333,10 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
             {
                 request.Id,
                 DocumentType = request.DocumentType.ToString(),
-                Status = request.Status.ToString()
+                Status = request.Status.ToString(),
+                FrontDocUrl = request.Documents.Where(d => d.Side == DocumentSide.Front).Select(d => d.StoragePath).FirstOrDefault(),
+                BackDocUrl = request.Documents.Where(d => d.Side == DocumentSide.Back).Select(d => d.StoragePath).FirstOrDefault(),
+                SelfieDocUrl = request.Documents.Where(d => d.Side == DocumentSide.Selfie).Select(d => d.StoragePath).FirstOrDefault(),
             })
             .FirstOrDefaultAsync(cancellationToken);
         var documents = registration is null
@@ -333,7 +347,8 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
                 .Select(document => new IdentityDocumentSummary(
                     document.Id,
                     document.Side.ToString(),
-                    document.DocumentLast4))
+                    document.DocumentLast4,
+                    document.StoragePath))
                 .ToListAsync(cancellationToken);
 
         return new
@@ -363,6 +378,9 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
                     registration.Id,
                     registration.DocumentType,
                     registration.Status,
+                    registration.FrontDocUrl,
+                    registration.BackDocUrl,
+                    registration.SelfieDocUrl,
                     Documents = documents
                 }
         };

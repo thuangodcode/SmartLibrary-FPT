@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowDownToLine,
   CalendarDays,
+  ChartNoAxesCombined,
   CheckCircle2,
   ClipboardList,
   ChevronLeft,
@@ -43,6 +44,7 @@ import {
 } from '../../reports/reportTemplateUtils';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import './LibrarianReportsPage.css';
+import './LibrarianReportStatus.css';
 
 interface ApiEnvelope<T> {
   success?: boolean;
@@ -152,6 +154,7 @@ export const LibrarianReportsPage: React.FC = () => {
   const [monthFilter, setMonthFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [reportContentTab, setReportContentTab] = useState<'requests' | 'archive'>('requests');
 
   const [createMode, setCreateMode] = useState<CreateMode>('auto');
   const [manualRows, setManualRows] = useState<ManualReportRow[]>([emptyManualRow()]);
@@ -164,11 +167,11 @@ export const LibrarianReportsPage: React.FC = () => {
   const [reportName, setReportName] = useState('');
   const [periodStart, setPeriodStart] = useState(() => {
     const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().split('T')[0];
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
   });
   const [periodEnd, setPeriodEnd] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   const [format, setFormat] = useState('CSV');
   const [submitting, setSubmitting] = useState(false);
@@ -270,6 +273,7 @@ export const LibrarianReportsPage: React.FC = () => {
     () => templates.find((t) => t.id === selectedTemplateId),
     [templates, selectedTemplateId],
   );
+  const isFinanceTemplate = activeTemplate?.reportType === 'Finance';
 
   const activeRequest = useMemo(
     () => requests.find((request) => request.id === requestId),
@@ -288,8 +292,11 @@ export const LibrarianReportsPage: React.FC = () => {
   }, [activeRequest]);
 
   const activeTemplateConfig = useMemo(
-    () => parseTemplateConfiguration(activeTemplate?.configuration),
-    [activeTemplate?.configuration],
+    () => {
+      const config = parseTemplateConfiguration(activeTemplate?.configuration);
+      return activeTemplate?.reportType === 'Finance' ? { ...config, metrics: ['Amount'] } : config;
+    },
+    [activeTemplate?.configuration, activeTemplate?.reportType],
   );
 
   const templateMetrics = useMemo(() => getTemplateMetrics(activeTemplateConfig), [activeTemplateConfig]);
@@ -519,7 +526,10 @@ export const LibrarianReportsPage: React.FC = () => {
       {/* ── Header ── */}
       <header className="lib-reports-header">
         <div>
-          <p className="lib-reports-eyebrow">NGHIỆP VỤ THỦ THƯ · BÁO CÁO HOẠT ĐỘNG</p>
+          <div className="lib-reports-eyebrow">
+            <ChartNoAxesCombined size={14} />
+            <span>KHÔNG GIAN THỦ THƯ • THỐNG KÊ & BÁO CÁO</span>
+          </div>
           <h1>Quản lý báo cáo</h1>
           <p>Lập báo cáo định kỳ theo mẫu chuẩn quy định và gửi Admin xét duyệt, theo dõi phản hồi.</p>
         </div>
@@ -581,7 +591,16 @@ export const LibrarianReportsPage: React.FC = () => {
         </article>
       </section>
 
-      <section className="lib-reports-panel lib-report-requests-panel">
+      <div className="lib-report-content-tabs" role="tablist" aria-label="Nội dung thống kê và báo cáo">
+        <button type="button" role="tab" id="lib-report-tab-requests" aria-selected={reportContentTab === 'requests'} aria-controls="lib-report-panel-requests" className={reportContentTab === 'requests' ? 'active' : ''} onClick={() => setReportContentTab('requests')}>
+          <ClipboardList size={16}/> Báo cáo được giao <span>{requests.filter((request) => request.status !== 'Submitted').length}</span>
+        </button>
+        <button type="button" role="tab" id="lib-report-tab-archive" aria-selected={reportContentTab === 'archive'} aria-controls="lib-report-panel-archive" className={reportContentTab === 'archive' ? 'active' : ''} onClick={() => setReportContentTab('archive')}>
+          <FileText size={16}/> Báo cáo đã gửi <span>{reports?.totalCount ?? 0}</span>
+        </button>
+      </div>
+
+      {reportContentTab === 'requests' && <section className="lib-reports-panel lib-report-requests-panel" id="lib-report-panel-requests" role="tabpanel" aria-labelledby="lib-report-tab-requests" tabIndex={0}>
         <div className="lib-panel-header">
           <div className="lib-panel-header-copy">
             <span>YÊU CẦU TỪ ADMIN</span>
@@ -608,9 +627,21 @@ export const LibrarianReportsPage: React.FC = () => {
                 {request.lastReviewComment && request.lastReportStatus === 'Rejected' && (
                   <p className="lib-request-feedback"><strong>Admin yêu cầu chỉnh sửa:</strong> {request.lastReviewComment}</p>
                 )}
-                <span className={`lib-request-status ${request.status === 'Submitted' ? 'is-submitted' : ''}`}>
-                  {request.lastReportStatus === 'Approved' ? 'Đã duyệt' : request.status === 'Submitted' ? 'Đã nộp · chờ duyệt' : request.lastReportStatus === 'Rejected' ? 'Cần nộp lại' : 'Chờ nộp'}
-                </span>
+                <div className="lib-request-statuses" aria-label="Trạng thái báo cáo">
+                  {request.lastReportStatus === 'Approved' ? (
+                    <span className="lib-request-status is-approved"><CheckCircle2 size={13}/>Đã duyệt</span>
+                  ) : request.status === 'Submitted' ? (
+                    <>
+                      <span className="lib-request-status is-submitted"><Send size={13}/>Đã gửi</span>
+                      <span className={`lib-request-status is-review${request.lastReportStatus === 'Rejected' ? ' is-rejected' : ''}`}>
+                        {request.lastReportStatus === 'Rejected' ? <AlertCircle size={13}/> : <Clock size={13}/>}
+                        {request.lastReportStatus === 'Rejected' ? 'Cần nộp lại' : 'Chờ duyệt'}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="lib-request-status is-waiting"><Clock size={13}/>{request.lastReportStatus === 'Rejected' ? 'Cần nộp lại' : 'Chờ gửi'}</span>
+                  )}
+                </div>
                 {request.status === 'Submitted'
                   ? request.reportId && <Link className="lib-request-action secondary" to={`/librarian/reports/${request.reportId}`}><Eye size={15}/> Xem báo cáo đã gửi</Link>
                   : <button type="button" className="lib-request-action" onClick={() => navigate(`/librarian/reports/new?requestId=${request.id}`)}><Send size={15}/>{request.lastReportStatus === 'Rejected' ? 'Chỉnh sửa & nộp lại' : 'Lập báo cáo'}</button>}
@@ -620,10 +651,10 @@ export const LibrarianReportsPage: React.FC = () => {
         ) : (
           <div className="lib-request-empty"><ClipboardList size={22}/><strong>Chưa có yêu cầu mới từ Admin</strong><span>Các yêu cầu được giao cho bạn sẽ hiển thị tại đây.</span></div>
         )}
-      </section>
+      </section>}
 
       {/* ── Main Panel: List of Reports ── */}
-      <section className="lib-reports-panel">
+      {reportContentTab === 'archive' && <section className="lib-reports-panel" id="lib-report-panel-archive" role="tabpanel" aria-labelledby="lib-report-tab-archive" tabIndex={0}>
         <div className="lib-panel-header">
           <div className="lib-panel-header-copy">
             <span>DANH SÁCH LƯU TRỮ</span>
@@ -807,7 +838,7 @@ export const LibrarianReportsPage: React.FC = () => {
             </div>
           </div>
         )}
-      </section>
+      </section>}
 
       {/* ── Trang: Tạo & gửi báo cáo mới cho Admin ── */}
       {createModalOpen && (
@@ -930,9 +961,10 @@ export const LibrarianReportsPage: React.FC = () => {
                         <thead>
                           <tr>
                             <th>Ngày</th>
-                            <th>Nhóm sách</th>
+                            <th>{isFinanceTemplate ? 'Khoản phí' : 'Nhóm sách'}</th>
                             {templateMetrics.includes('Borrowed') && <th>Lượt mượn</th>}
                             {templateMetrics.includes('Returned') && <th>Lượt trả</th>}
+                            {templateMetrics.includes('Amount') && <th>Số tiền (VND)</th>}
                             <th>Ghi chú</th>
                             <th />
                           </tr>
@@ -955,7 +987,7 @@ export const LibrarianReportsPage: React.FC = () => {
                                 <input
                                   type="text"
                                   value={row.category}
-                                  placeholder="VD: Khoa học"
+                                  placeholder={isFinanceTemplate ? 'VD: Phí quá hạn' : 'VD: Khoa học'}
                                   onChange={(e) =>
                                     setManualRows((rows) =>
                                       rows.map((r, i) => (i === idx ? { ...r, category: e.target.value } : r)),
@@ -995,6 +1027,17 @@ export const LibrarianReportsPage: React.FC = () => {
                                   />
                                 </td>
                               )}
+                              {templateMetrics.includes('Amount') && (
+                                <td>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={row.amount}
+                                    onChange={(e) => setManualRows((rows) => rows.map((r, i) => i === idx ? { ...r, amount: Number(e.target.value) || 0 } : r))}
+                                  />
+                                </td>
+                              )}
                               <td>
                                 <input
                                   type="text"
@@ -1020,6 +1063,7 @@ export const LibrarianReportsPage: React.FC = () => {
                             </tr>
                           ))}
                         </tbody>
+                        {isFinanceTemplate && <tfoot><tr><th colSpan={2}>Tổng chi phí</th><th>{manualRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0).toLocaleString('vi-VN')} ₫</th><th colSpan={2} /></tr></tfoot>}
                       </table>
                     </div>
                     {manualValidationIssues.length > 0 && (

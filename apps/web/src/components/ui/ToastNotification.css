@@ -80,6 +80,24 @@
   overflow-wrap: anywhere;
 }
 
+.toast-notification__action {
+  margin-top: 8px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--toast-accent);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--toast-accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toast-notification__action:hover {
+  background: var(--toast-icon-bg);
+}
+
 .toast-notification__close {
   display: grid;
   width: 28px;

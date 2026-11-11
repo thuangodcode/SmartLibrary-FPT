@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 
-export type CirculationTab = 'loans' | 'return' | 'overdue' | 'fines';
+export type CirculationTab = 'loans' | 'return' | 'reservations' | 'overdue' | 'fines';
 
 export interface CirculationStats {
   borrowed: number;
@@ -14,6 +14,9 @@ export interface CirculationStats {
   unpaidFinesDelta: number;
   dueSoon: number;
   suggestedFinePerDay: number;
+  borrowDays: number;
+  damageFee: number;
+  lostFee: number;
 }
 
 export interface CirculationLoan {
@@ -21,6 +24,8 @@ export interface CirculationLoan {
   code: string;
   borrowDate?: string | null;
   dueDate?: string | null;
+  pickupAt?: string | null;
+  acceptedAt?: string | null;
   returnDate?: string | null;
   createdAt?: string | null;
   status: string;
@@ -30,9 +35,11 @@ export interface CirculationLoan {
   readerName: string;
   readerEmail?: string | null;
   studentId?: string | null;
+  librarianName?: string | null;
   bookCopyId: string;
   barcode: string;
   bookTitle: string;
+  coverImageUrl?: string | null;
   copyCondition?: string | null;
   suggestedFine?: number | null;
   hasOpenFine?: boolean;
@@ -56,6 +63,7 @@ export interface CirculationIncident {
   readerName: string;
   overdueDays: number;
   suggestedOverdueFine?: number | null;
+  hasRecordedOverdueFine?: boolean;
   replacementValue?: number | null;
   assessedFee?: number | null;
   compensationAmount: number;
@@ -66,6 +74,9 @@ export interface CirculationIncident {
   description?: string | null;
   createdAt: string;
   confirmedAt?: string | null;
+  copyCondition: string;
+  loanStatus: string;
+  canRestoreCopy: boolean;
 }
 
 export interface CirculationFine {
@@ -81,14 +92,23 @@ export interface CirculationFine {
   status: string;
   createdAt: string;
   paidAt?: string | null;
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
+  pendingPaymentStatus?: string | null;
+  checkoutUrl?: string | null;
+  qrCode?: string | null;
+  paymentExpiresAt?: string | null;
+  reconciliationRequired?: boolean;
 }
 
 export interface CirculationReservation {
   id: string;
+  bookId: string;
   readerName: string;
   bookTitle: string;
   status: string;
   reservedAt: string;
+  expiresAt?: string | null;
 }
 
 export interface CirculationActivity {
@@ -108,7 +128,7 @@ export interface ApiResult<T> {
 
 export const STATUS_LABELS: Record<string, string> = {
   Pending: 'Chờ xác nhận',
-  Approved: 'Đã duyệt',
+  Approved: 'Đã tiếp nhận',
   Borrowed: 'Đang mượn',
   Returned: 'Đã trả',
   Overdue: 'Quá hạn',
@@ -137,14 +157,21 @@ export const TABS = [
     to: '/librarian/circulation/return',
     label: 'Trả sách',
     crumb: 'Trả sách',
-    description: 'Ghi nhận trả sách, tình trạng bản sao và đặt chỗ khi sách sẵn sàng.',
+    description: 'Ghi nhận trả sách và tình trạng của bản sao.',
+  },
+  {
+    id: 'reservations',
+    to: '/librarian/circulation/reservations',
+    label: 'Đặt chỗ',
+    crumb: 'Đặt chỗ',
+    description: 'Theo dõi hàng đợi đặt trước và thông báo độc giả khi sách sẵn sàng.',
   },
   {
     id: 'overdue',
     to: '/librarian/circulation/overdue',
-    label: 'Quá hạn',
-    crumb: 'Quá hạn',
-    description: 'Theo dõi phiếu quá hạn và xác minh hồ sơ mất sách, hư hỏng.',
+    label: 'Quá hạn & Sự cố',
+    crumb: 'Quá hạn & Sự cố',
+    description: 'Theo dõi phiếu quá hạn và xử lý hồ sơ sự cố hư hỏng, thất lạc sách.',
   },
   {
     id: 'fines',
@@ -160,7 +187,7 @@ export function tabPath(tab: CirculationTab) {
 }
 
 export function isCirculationTab(value?: string): value is CirculationTab {
-  return value === 'loans' || value === 'return' || value === 'overdue' || value === 'fines';
+  return value === 'loans' || value === 'return' || value === 'reservations' || value === 'overdue' || value === 'fines';
 }
 
 export function formatDate(value?: string | null) {
@@ -174,7 +201,7 @@ export function formatDateTime(value?: string | null) {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('vi-VN');
+  return date.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 }
 
 export function formatMoney(value?: number | null) {

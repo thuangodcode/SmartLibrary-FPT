@@ -12,36 +12,98 @@ public class CirculationServiceTests
 {
     private readonly Mock<ICirculationRepository> _repo = new();
     private readonly Mock<IUnitOfWork> _uow = new();
+    private readonly Mock<IPayOSPaymentGateway> _payOS = new();
     private readonly CirculationService _sut;
     private readonly CirculationSettings _settings = new()
     {
         MaxBooks = 2,
         BorrowDays = 14,
         MaxRenewals = 4,
+        RenewalDays = 14,
         FinePerDay = 5000,
+        DamageFee = 10000,
+        LostFee = 200000,
         RestrictIfUnpaid = true,
-        AllowReservation = true
+        AllowReservation = true,
+        PickupCapacityPerSlot = 5,
+        PickupSlotMinutes = 30,
+        PickupDaysAhead = 14
     };
 
     public CirculationServiceTests()
     {
-        _sut = new CirculationService(_repo.Object, _uow.Object);
+        _sut = new CirculationService(_repo.Object, _uow.Object, _payOS.Object);
+        _payOS.SetupGet(x => x.IsConfigured).Returns(true);
         _repo.Setup(x => x.GetSettingsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(_settings);
+        _repo.Setup(x => x.CountActiveLoansAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
+        _repo.Setup(x => x.HasOverdueLoansAsync(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repo.Setup(x => x.CountPickupRequestsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
+        _repo.Setup(x => x.GetPickupRequestCountsAsync(It.IsAny<IReadOnlyList<DateTime>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<DateTime, int>());
+        _repo.Setup(x => x.GetExpiredPickupRequestIdsAsync(It.IsAny<DateTime>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<Guid>());
+        _repo.Setup(x => x.LockBorrowReaderAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _repo.Setup(x => x.LockPickupSlotAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _repo.Setup(x => x.LockReservationBookAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _repo.Setup(x => x.LockBorrowRequestAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _repo.Setup(x => x.ReloadTrackedLoanAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         _repo.Setup(x => x.InTransactionAsync(It.IsAny<Func<Task<SmartLibrary.Application.Common.Result<CirculationLoanDto>>>>(), It.IsAny<CancellationToken>()))
             .Returns((Func<Task<SmartLibrary.Application.Common.Result<CirculationLoanDto>>> work, CancellationToken _) => work());
         _repo.Setup(x => x.InTransactionAsync(It.IsAny<Func<Task<SmartLibrary.Application.Common.Result<CirculationIncidentDto>>>>(), It.IsAny<CancellationToken>()))
             .Returns((Func<Task<SmartLibrary.Application.Common.Result<CirculationIncidentDto>>> work, CancellationToken _) => work());
+        _repo.Setup(x => x.InTransactionAsync(It.IsAny<Func<Task<SmartLibrary.Application.Common.Result<CirculationReservationDto>>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<SmartLibrary.Application.Common.Result<CirculationReservationDto>>> work, CancellationToken _) => work());
+        _repo.Setup(x => x.InTransactionAsync(It.IsAny<Func<Task<SmartLibrary.Application.Common.Result<CirculationFineDto>>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<SmartLibrary.Application.Common.Result<CirculationFineDto>>> work, CancellationToken _) => work());
+        _repo.Setup(x => x.InTransactionAsync(It.IsAny<Func<Task<SmartLibrary.Application.Common.Result<FinePaymentCheckoutDto>>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<SmartLibrary.Application.Common.Result<FinePaymentCheckoutDto>>> work, CancellationToken _) => work());
+        _repo.Setup(x => x.InTransactionAsync(It.IsAny<Func<Task<SmartLibrary.Application.Common.Result<bool>>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<SmartLibrary.Application.Common.Result<bool>>> work, CancellationToken _) => work());
+        _repo.Setup(x => x.InTransactionAsync(It.IsAny<Func<Task<CirculationLoanDto>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<CirculationLoanDto>> work, CancellationToken _) => work());
         _repo.Setup(x => x.AddNotificationAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         _repo.Setup(x => x.AddLoanAsync(It.IsAny<BorrowRecord>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         _repo.Setup(x => x.AddFineAsync(It.IsAny<Fine>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _repo.Setup(x => x.AddFinePaymentAsync(It.IsAny<FinePayment>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _repo.Setup(x => x.LockFineAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _repo.Setup(x => x.GetPendingPayOSPaymentAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((FinePayment?)null);
         _repo.Setup(x => x.CountReadyReservationsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
         _repo.Setup(x => x.CountAvailableCopiesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        _repo.Setup(x => x.ExpireReadyReservationsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<Guid>());
+        _repo.Setup(x => x.ExpireReadyReservationsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<ExpiredReservationDto>());
         _repo.Setup(x => x.TryClaimIncidentAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         _repo.Setup(x => x.ReadyNextReservationAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Reservation?)null);
         _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" S ")]
+    public async Task SearchReaderOptions_WhenQueryIsShort_ReturnsEmptyWithoutQueryingRepository(string? search)
+    {
+        var result = await _sut.SearchReaderOptionsAsync(search);
+
+        result.Should().BeEmpty();
+        _repo.Verify(
+            x => x.SearchReaderOptionsAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task SearchBookOptions_TrimsQueryAndLimitsResults()
+    {
+        _repo.Setup(x => x.SearchBookOptionsAsync("Python", 8, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<CirculationBookOptionDto>());
+
+        var result = await _sut.SearchBookOptionsAsync("  Python  ");
+
+        result.Should().BeEmpty();
+        _repo.Verify(
+            x => x.SearchBookOptionsAsync("Python", 8, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     private static UserProfile ActiveReader() => new()
@@ -58,6 +120,7 @@ public class CirculationServiceTests
         Id = Guid.NewGuid(),
         BookId = Guid.NewGuid(),
         Barcode = "SL-000101",
+        Location = "Tầng 1 - Kệ A",
         IsAvailable = true,
         Condition = BookCondition.Good,
         Book = new Book { Title = "Clean Code", Language = "en", AvailableCopies = 2, Categories = [] }
@@ -69,7 +132,6 @@ public class CirculationServiceTests
         var reader = ActiveReader();
         _repo.Setup(x => x.FindReaderAsync("sv@fpt.edu.vn", It.IsAny<CancellationToken>())).ReturnsAsync(reader);
         _repo.Setup(x => x.HasUnpaidFinesAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _repo.Setup(x => x.CountActiveLoansAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(0);
         var copy = ReadyCopy();
         copy.IsAvailable = false;
         _repo.Setup(x => x.FindCopyByBarcodeAsync("SL-000101", It.IsAny<CancellationToken>())).ReturnsAsync(copy);
@@ -87,7 +149,6 @@ public class CirculationServiceTests
         var copy = ReadyCopy();
         _repo.Setup(x => x.FindReaderAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
         _repo.Setup(x => x.HasUnpaidFinesAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _repo.Setup(x => x.CountActiveLoansAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(0);
         _repo.Setup(x => x.FindCopyByBarcodeAsync(copy.Barcode, It.IsAny<CancellationToken>())).ReturnsAsync(copy);
         _repo.Setup(x => x.HasActiveLoanAsync(copy.Id, null, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _repo.Setup(x => x.TryClaimCopyAsync(copy.Id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
@@ -129,17 +190,138 @@ public class CirculationServiceTests
     }
 
     [Fact]
+    public async Task PayFine_WhenCashReceived_RecordsCashChannelAndReceipt()
+    {
+        var id = Guid.NewGuid();
+        var librarianId = Guid.NewGuid();
+        var fine = new Fine
+        {
+            Id = id,
+            ReaderId = Guid.NewGuid(),
+            Status = FineStatus.Pending,
+            Amount = 5000
+        };
+        _repo.Setup(x => x.GetTrackedFineAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(fine);
+        _repo.Setup(x => x.GetFineDtoAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationFineDto { Id = id, Status = "Paid", Amount = 5000, PaymentMethod = "Cash" });
+
+        var result = await _sut.PayFineAsync(id, librarianId);
+
+        result.IsSuccess.Should().BeTrue();
+        fine.Status.Should().Be(FineStatus.Paid);
+        fine.PaymentMethod.Should().Be("Cash");
+        fine.RecordedById.Should().Be(librarianId);
+        _repo.Verify(x => x.AddFinePaymentAsync(It.Is<FinePayment>(payment =>
+            payment.FineId == id
+            && payment.Method == "Cash"
+            && payment.Status == FinePaymentStatus.Paid
+            && payment.Amount == fine.Amount
+            && payment.RecordedById == librarianId), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreatePayOSCheckout_UsesExactFineAmountAndReusesPendingIntent()
+    {
+        var fine = new Fine
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = Guid.NewGuid(),
+            Status = FineStatus.Pending,
+            Amount = 5000
+        };
+        var checkout = new PayOSCheckoutResult(
+            "payos-link", "https://payos.vn/checkout", "qr-payload", DateTime.UtcNow.AddMinutes(15));
+        _repo.Setup(x => x.GetTrackedFineAsync(fine.Id, It.IsAny<CancellationToken>())).ReturnsAsync(fine);
+        _repo.Setup(x => x.GetPendingPayOSPaymentAsync(fine.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((FinePayment?)null);
+        _payOS.Setup(x => x.CreateCheckoutAsync(
+                fine.Id, It.IsAny<long>(), 5000, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(checkout);
+
+        var result = await _sut.CreatePayOSCheckoutAsync(fine.Id, Guid.NewGuid(), fine.ReaderId);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.Amount.Should().Be(5000);
+        result.Data.CheckoutUrl.Should().Be(checkout.CheckoutUrl);
+        _repo.Verify(x => x.AddFinePaymentAsync(It.Is<FinePayment>(payment =>
+            payment.FineId == fine.Id
+            && payment.Method == "PayOS"
+            && payment.Amount == 5000
+            && payment.Status == FinePaymentStatus.Pending), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ProcessPayOSWebhook_WhenAmountDoesNotMatch_DoesNotSettleFine()
+    {
+        const long orderCode = 123456;
+        var fine = new Fine
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = Guid.NewGuid(),
+            Status = FineStatus.Pending,
+            Amount = 5000
+        };
+        var payment = new FinePayment
+        {
+            FineId = fine.Id,
+            Fine = fine,
+            Method = "PayOS",
+            Status = FinePaymentStatus.Pending,
+            Amount = 5000,
+            OrderCode = orderCode,
+            PaymentLinkId = "payos-link"
+        };
+        var data = new PayOSWebhookPayload(
+            orderCode, 4000, "FINE 12345678", "", "bank-reference", "",
+            "VND", "payos-link", "00", "", null, null, null, null, null, null);
+        _repo.Setup(x => x.GetFineIdForPaymentOrderAsync(orderCode, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(fine.Id);
+        _repo.Setup(x => x.GetTrackedFinePaymentByOrderCodeAsync(orderCode, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payment);
+        _repo.Setup(x => x.GetTrackedFineAsync(fine.Id, It.IsAny<CancellationToken>())).ReturnsAsync(fine);
+        _payOS.Setup(x => x.VerifyWebhookAsync(It.IsAny<PayOSWebhookEnvelope>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(data);
+
+        var result = await _sut.ProcessPayOSWebhookAsync(new PayOSWebhookEnvelope(
+            "00", "success", true, data, "verified-by-gateway"));
+
+        result.IsSuccess.Should().BeFalse();
+        fine.Status.Should().Be(FineStatus.Pending);
+        payment.Status.Should().Be(FinePaymentStatus.Pending);
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task RecordFine_WhenOverdueFineExists_DoesNotDuplicate()
     {
         var loanId = Guid.NewGuid();
         _repo.Setup(x => x.GetTrackedLoanAsync(loanId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BorrowRecord { Id = loanId, ReaderId = Guid.NewGuid() });
+            .ReturnsAsync(new BorrowRecord { Id = loanId, ReaderId = Guid.NewGuid(), Status = BorrowStatus.Returned, DueDate = DateTime.UtcNow.AddDays(-3), ReturnDate = DateTime.UtcNow });
         _repo.Setup(x => x.HasOverdueFineAsync(loanId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         var result = await _sut.RecordFineAsync(new RecordFineRequest { BorrowRecordId = loanId, Amount = 15000 });
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("đã có phí quá hạn");
+    }
+
+    [Fact]
+    public async Task RecordFine_IgnoresClientAmount_UsesAdminPolicy()
+    {
+        var loanId = Guid.NewGuid();
+        var due = DateTime.UtcNow.AddDays(-3);
+        _repo.Setup(x => x.GetTrackedLoanAsync(loanId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BorrowRecord { Id = loanId, ReaderId = Guid.NewGuid(), Status = BorrowStatus.Returned, DueDate = due, ReturnDate = DateTime.UtcNow });
+        _repo.Setup(x => x.HasOverdueFineAsync(loanId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repo.Setup(x => x.GetFineDtoAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationFineDto { Amount = 15000, Status = "Pending" });
+
+        var result = await _sut.RecordFineAsync(new RecordFineRequest { BorrowRecordId = loanId, Amount = 50000 });
+
+        var expected = CirculationRules.OverdueFineAmount(
+            CirculationRules.CalendarOverdueDays(due, DateTime.UtcNow), _settings.FinePerDay);
+        result.IsSuccess.Should().BeTrue();
+        _repo.Verify(x => x.AddFineAsync(It.Is<Fine>(fine => fine.Amount == expected), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -163,7 +345,7 @@ public class CirculationServiceTests
         _repo.Setup(x => x.GetLoanAsync(loan.Id, _settings.FinePerDay, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CirculationLoanDto { Id = loan.Id, Barcode = copy.Barcode, Status = "Returned" });
 
-        var result = await _sut.ReturnAsync(new ReturnLoanRequest { Barcode = copy.Barcode, Condition = "Lost" }, Guid.NewGuid());
+        var result = await _sut.ReturnAsync(new ReturnLoanRequest { Barcode = copy.Barcode, Condition = "Lost", Notes = "Độc giả không tìm thấy sách." }, Guid.NewGuid());
 
         result.IsSuccess.Should().BeTrue();
         result.Data!.IncidentOpened.Should().BeTrue();
@@ -174,16 +356,39 @@ public class CirculationServiceTests
     }
 
     [Fact]
-    public async Task ConfirmIncident_WhenLostWithoutValue_Fails()
+    public async Task ConfirmIncident_WhenLostFeeMissing_Fails()
+    {
+        var incident = PendingLostIncident();
+        _repo.Setup(x => x.GetSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationSettings { FinePerDay = 5000, DamageFee = 10000, LostFee = 0 });
+        _repo.Setup(x => x.GetTrackedIncidentAsync(incident.Id, It.IsAny<CancellationToken>())).ReturnsAsync(incident);
+
+        var result = await _sut.ConfirmIncidentAsync(
+            incident.Id,
+            new ConfirmIncidentRequest { Severity = "Lost", ReplacementValue = 5000 },
+            Guid.NewGuid());
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("lost_book_fee");
+        _repo.Verify(x => x.AddFineAsync(It.IsAny<Fine>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ConfirmIncident_IgnoresClientAmount_UsesAdminPolicy()
     {
         var incident = PendingLostIncident();
         _repo.Setup(x => x.GetTrackedIncidentAsync(incident.Id, It.IsAny<CancellationToken>())).ReturnsAsync(incident);
+        _repo.Setup(x => x.HasCompensationFineAsync(incident.BorrowRecordId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repo.Setup(x => x.GetIncidentDtoAsync(incident.Id, _settings.FinePerDay, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationIncidentDto { Id = incident.Id, Status = "CompensationPending", CompensationAmount = 200000 });
 
-        var result = await _sut.ConfirmIncidentAsync(incident.Id, new ConfirmIncidentRequest { Severity = "Lost" }, Guid.NewGuid());
+        var result = await _sut.ConfirmIncidentAsync(
+            incident.Id,
+            new ConfirmIncidentRequest { Severity = "Lost", ReplacementValue = 5000 },
+            Guid.NewGuid());
 
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("giá trị tài liệu");
-        _repo.Verify(x => x.AddFineAsync(It.IsAny<Fine>(), It.IsAny<CancellationToken>()), Times.Never);
+        result.IsSuccess.Should().BeTrue();
+        _repo.Verify(x => x.AddFineAsync(It.Is<Fine>(fine => fine.Amount == 200000), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -251,7 +456,7 @@ public class CirculationServiceTests
         _repo.Setup(x => x.AddFineAsync(It.IsAny<Fine>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         _repo.Setup(x => x.AddNotificationAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         _repo.Setup(x => x.GetIncidentDtoAsync(incident.Id, _settings.FinePerDay, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CirculationIncidentDto { Id = incident.Id, Status = "CompensationPending", CompensationAmount = 20000 });
+            .ReturnsAsync(new CirculationIncidentDto { Id = incident.Id, Status = "CompensationPending", CompensationAmount = 10000 });
 
         var result = await _sut.ConfirmIncidentAsync(incident.Id, new ConfirmIncidentRequest
         {
@@ -261,8 +466,8 @@ public class CirculationServiceTests
 
         result.IsSuccess.Should().BeTrue();
         incident.BookCopy.IsAvailable.Should().BeTrue();
-        incident.BookCopy.Condition.Should().Be(BookCondition.Damaged);
-        _repo.Verify(x => x.AddFineAsync(It.Is<Fine>(f => f.Amount == 20000 && f.Reason.StartsWith("Bồi thường hư hỏng")), It.IsAny<CancellationToken>()), Times.Once);
+        incident.BookCopy.Condition.Should().Be(BookCondition.LightDamaged);
+        _repo.Verify(x => x.AddFineAsync(It.Is<Fine>(f => f.Amount == 10000 && f.Reason.StartsWith("Bồi thường hư hỏng")), It.IsAny<CancellationToken>()), Times.Once);
         _repo.Verify(x => x.AddFineAsync(It.Is<Fine>(f => f.Reason.StartsWith("Phạt quá hạn")), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -273,7 +478,7 @@ public class CirculationServiceTests
         var copy = ReadyCopy();
         _repo.Setup(x => x.FindReaderAsync(reader.Email, It.IsAny<CancellationToken>())).ReturnsAsync(reader);
         _repo.Setup(x => x.HasUnpaidFinesAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _repo.Setup(x => x.CountActiveLoansAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(0);
+        _repo.Setup(x => x.CountActiveLoansAsync(reader.Id, It.IsAny<Guid?>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
         _repo.Setup(x => x.FindCopyByBarcodeAsync(copy.Barcode, It.IsAny<CancellationToken>())).ReturnsAsync(copy);
         _repo.Setup(x => x.HasActiveLoanAsync(copy.Id, null, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _repo.Setup(x => x.CountReadyReservationsAsync(copy.BookId, reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -286,24 +491,176 @@ public class CirculationServiceTests
     }
 
     [Fact]
-    public async Task RequestBorrow_CreatesPendingWithoutClaimingCopy()
+    public async Task RequestBorrow_CreatesPendingAndClaimsCopy()
     {
         var reader = ActiveReader();
         var copy = ReadyCopy();
+        var pickupAt = CirculationRules.PickupSlots(_settings, DateTimeOffset.UtcNow).First().PickupAt;
         _repo.Setup(x => x.FindReaderAsync(reader.Id.ToString(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
         _repo.Setup(x => x.HasUnpaidFinesAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _repo.Setup(x => x.CountActiveLoansAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(0);
         _repo.Setup(x => x.FindCopyByBarcodeAsync(copy.Barcode, It.IsAny<CancellationToken>())).ReturnsAsync(copy);
+        _repo.Setup(x => x.FindAvailableCopyForBookAsync(copy.BookId, It.IsAny<CancellationToken>())).ReturnsAsync(copy);
         _repo.Setup(x => x.HasActiveLoanAsync(copy.Id, null, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repo.Setup(x => x.TryClaimCopyAsync(copy.Id, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _repo.Setup(x => x.GetLoanAsync(It.IsAny<Guid>(), _settings.FinePerDay, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CirculationLoanDto { Status = "Pending", Barcode = copy.Barcode });
+            .ReturnsAsync(new CirculationLoanDto { Status = "Pending", Barcode = copy.Barcode, PickupAt = pickupAt.UtcDateTime });
 
-        var result = await _sut.RequestBorrowAsync(reader.Id, new BorrowRequest { Barcode = copy.Barcode });
+        var result = await _sut.RequestBorrowAsync(reader.Id, new BorrowRequest { Barcode = copy.Barcode, PickupAt = pickupAt });
 
         result.IsSuccess.Should().BeTrue();
         result.Data!.Status.Should().Be("Pending");
+        _repo.Verify(x => x.TryClaimCopyAsync(copy.Id, It.IsAny<CancellationToken>()), Times.Once);
+        _repo.Verify(x => x.AddLoanAsync(It.Is<BorrowRecord>(l =>
+            l.Status == BorrowStatus.Pending && l.PickupAt == pickupAt.UtcDateTime), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RequestBorrow_WhenSlotCapacityReached_DoesNotClaimCopy()
+    {
+        var reader = ActiveReader();
+        var pickupAt = CirculationRules.PickupSlots(_settings, DateTimeOffset.UtcNow).First().PickupAt;
+        _repo.Setup(x => x.FindReaderAsync(reader.Id.ToString(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+        _repo.Setup(x => x.CountPickupRequestsAsync(pickupAt.UtcDateTime, It.IsAny<CancellationToken>())).ReturnsAsync(5);
+
+        var result = await _sut.RequestBorrowBookAsync(reader.Id, Guid.NewGuid(), pickupAt);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("đã đủ số lượt");
         _repo.Verify(x => x.TryClaimCopyAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
-        _repo.Verify(x => x.AddLoanAsync(It.Is<BorrowRecord>(l => l.Status == BorrowStatus.Pending), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RequestBorrow_WhenReaderHasOverdueBooks_IsBlockedByPolicy()
+    {
+        var reader = ActiveReader();
+        var pickupAt = CirculationRules.PickupSlots(_settings, DateTimeOffset.UtcNow).First().PickupAt;
+        _repo.Setup(x => x.FindReaderAsync(reader.Id.ToString(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+        _repo.Setup(x => x.HasOverdueLoansAsync(reader.Id, It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var result = await _sut.RequestBorrowBookAsync(reader.Id, Guid.NewGuid(), pickupAt);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("quá hạn");
+        _repo.Verify(x => x.FindAvailableCopyForBookAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repo.Verify(x => x.AddNotificationAsync(It.Is<Notification>(n => n.Title.Contains("bị từ chối")), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteCheckout_WhenApproved_StartsBorrowPeriodAndNotifiesReader()
+    {
+        var reader = ActiveReader();
+        reader.StudentId = "SE123456";
+        var copy = ReadyCopy();
+        copy.IsAvailable = false;
+        var loan = new BorrowRecord
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = reader.Id,
+            BookCopyId = copy.Id,
+            Status = BorrowStatus.Approved,
+            PickupAt = DateTime.UtcNow.AddHours(1),
+            AcceptedAt = DateTime.UtcNow,
+            BookCopy = copy
+        };
+        _repo.Setup(x => x.GetTrackedLoanAsync(loan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(loan);
+        _repo.Setup(x => x.FindReaderAsync(reader.Id.ToString(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+        _repo.Setup(x => x.GetLoanAsync(loan.Id, _settings.FinePerDay, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationLoanDto { Id = loan.Id, Status = "Borrowed", ReaderId = reader.Id });
+
+        var result = await _sut.CompleteCheckoutAsync(loan.Id, Guid.NewGuid());
+
+        result.IsSuccess.Should().BeTrue();
+        loan.Status.Should().Be(BorrowStatus.Borrowed);
+        loan.BorrowDate.Should().NotBeNull();
+        loan.DueDate.Should().BeCloseTo(loan.BorrowDate!.Value.AddDays(14), TimeSpan.FromSeconds(1));
+        _repo.Verify(x => x.AddNotificationAsync(It.Is<Notification>(notification =>
+            notification.Title == "Đã hoàn tất mượn sách"
+            && notification.Message.Contains("SE123456")
+            && notification.Message.Contains(copy.Id.ToString())
+            && notification.Message.Contains(copy.Barcode)), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteCheckout_WhenAdminSetsSevenDays_UsesSevenDays()
+    {
+        var settings = _settings with { BorrowDays = 7, BorrowDaysVi = 14 };
+        _repo.Setup(x => x.GetSettingsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(settings);
+        var reader = ActiveReader();
+        var copy = ReadyCopy();
+        copy.IsAvailable = false;
+        var loan = new BorrowRecord
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = reader.Id,
+            BookCopyId = copy.Id,
+            Status = BorrowStatus.Approved,
+            BookCopy = copy
+        };
+        _repo.Setup(x => x.GetTrackedLoanAsync(loan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(loan);
+        _repo.Setup(x => x.FindReaderAsync(reader.Id.ToString(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+        _repo.Setup(x => x.GetLoanAsync(loan.Id, settings.FinePerDay, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationLoanDto { Id = loan.Id, Status = "Borrowed" });
+
+        var result = await _sut.CompleteCheckoutAsync(loan.Id, Guid.NewGuid());
+
+        result.IsSuccess.Should().BeTrue();
+        loan.DueDate.Should().BeCloseTo(loan.BorrowDate!.Value.AddDays(7), TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task CompleteCheckout_WhenBorrowDaysMissing_Fails()
+    {
+        _repo.Setup(x => x.GetSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationSettings { FinePerDay = 5000 });
+        var reader = ActiveReader();
+        var copy = ReadyCopy();
+        var loan = new BorrowRecord
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = reader.Id,
+            BookCopyId = copy.Id,
+            Status = BorrowStatus.Approved,
+            BookCopy = copy
+        };
+        _repo.Setup(x => x.GetTrackedLoanAsync(loan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(loan);
+        _repo.Setup(x => x.FindReaderAsync(reader.Id.ToString(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+
+        var result = await _sut.CompleteCheckoutAsync(loan.Id, Guid.NewGuid());
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("thời hạn mượn");
+        loan.Status.Should().Be(BorrowStatus.Approved);
+    }
+
+    [Fact]
+    public async Task ExpireUncollectedPickup_ReleasesHeldCopyAfterGracePeriod()
+    {
+        var reader = ActiveReader();
+        var copy = ReadyCopy();
+        copy.IsAvailable = false;
+        var loan = new BorrowRecord
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = reader.Id,
+            BookCopyId = copy.Id,
+            PickupAt = DateTime.UtcNow.AddMinutes(-31),
+            Status = BorrowStatus.Approved,
+            BookCopy = copy
+        };
+        _repo.Setup(x => x.GetExpiredPickupRequestIdsAsync(It.IsAny<DateTime>(), 100, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { loan.Id });
+        _repo.Setup(x => x.GetTrackedLoanAsync(loan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(loan);
+        _repo.Setup(x => x.GetLoanAsync(loan.Id, _settings.FinePerDay, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationLoanDto { Id = loan.Id, Status = "Rejected", ReaderId = reader.Id });
+
+        var expired = await _sut.ExpireUncollectedPickupsAsync();
+
+        expired.Should().ContainSingle();
+        loan.Status.Should().Be(BorrowStatus.Rejected);
+        copy.IsAvailable.Should().BeTrue();
+        copy.Book.AvailableCopies.Should().Be(3);
+        _repo.Verify(x => x.AddNotificationAsync(It.Is<Notification>(notification =>
+            notification.Title == "Yêu cầu mượn đã hết hạn"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -390,6 +747,64 @@ public class CirculationServiceTests
     }
 
     [Fact]
+    public async Task Renew_WhenEligibleSelfService_ExtendsDueDateAndPersistsRenewal()
+    {
+        var originalDueDate = DateTime.UtcNow.AddHours(12);
+        var loan = new BorrowRecord
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = Guid.NewGuid(),
+            Status = BorrowStatus.Borrowed,
+            DueDate = originalDueDate,
+            BookCopy = ReadyCopy()
+        };
+        _repo.Setup(x => x.GetTrackedLoanAsync(loan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(loan);
+        _repo.Setup(x => x.HasUnpaidFinesAsync(loan.ReaderId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repo.Setup(x => x.HasOtherReservationAsync(loan.BookCopy.BookId, loan.ReaderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _repo.Setup(x => x.GetLoanAsync(loan.Id, _settings.FinePerDay, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationLoanDto
+            {
+                Id = loan.Id,
+                DueDate = loan.DueDate,
+                RenewalCount = 1
+            });
+
+        var result = await _sut.RenewAsync(loan.Id, loan.ReaderId, byLibrarian: false);
+
+        result.IsSuccess.Should().BeTrue();
+        loan.DueDate.Should().BeAfter(originalDueDate);
+        loan.DueDate.Should().BeCloseTo(originalDueDate.AddDays(_settings.RenewalDays), TimeSpan.FromSeconds(1));
+        loan.RenewalCount.Should().Be(1);
+        loan.Status.Should().Be(BorrowStatus.Borrowed);
+        loan.Notes.Should().Contain("Tự gia hạn lần 1");
+        result.Data!.CanRenew.Should().BeFalse();
+        result.Data.RenewalUnavailableReason.Should().Contain("cửa sổ");
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Renew_WhenReaderDoesNotOwnLoan_FailsWithoutUpdating()
+    {
+        var loan = new BorrowRecord
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = Guid.NewGuid(),
+            Status = BorrowStatus.Borrowed,
+            DueDate = DateTime.UtcNow.AddHours(12),
+            BookCopy = ReadyCopy()
+        };
+        _repo.Setup(x => x.GetTrackedLoanAsync(loan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(loan);
+
+        var result = await _sut.RenewAsync(loan.Id, Guid.NewGuid(), byLibrarian: false);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("phiếu của mình");
+        loan.RenewalCount.Should().Be(0);
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task ReportIncident_DoesNotCreateCompensation()
     {
         var readerId = Guid.NewGuid();
@@ -415,6 +830,58 @@ public class CirculationServiceTests
         loan.Status.Should().Be(BorrowStatus.Borrowed);
     }
 
+    [Fact]
+    public async Task Return_DamageWithoutNotes_DoesNotChangeLoan()
+    {
+        var result = await _sut.ReturnAsync(new ReturnLoanRequest { Barcode = "BOOK-01", Condition = "damaged" }, Guid.NewGuid());
+        result.IsSuccess.Should().BeFalse();
+        _repo.Verify(x => x.FindActiveLoanByBarcodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Confirm_ReaderReportBeforeReturn_CannotReleaseCopyOrCharge()
+    {
+        var incident = PendingLostIncident();
+        incident.BorrowRecord.Status = BorrowStatus.Borrowed;
+        _repo.Setup(x => x.GetTrackedIncidentAsync(incident.Id, It.IsAny<CancellationToken>())).ReturnsAsync(incident);
+        var result = await _sut.ConfirmIncidentAsync(incident.Id, new ConfirmIncidentRequest { Severity = "Lost" }, Guid.NewGuid());
+        result.IsSuccess.Should().BeFalse();
+        incident.BookCopy.IsAvailable.Should().BeFalse();
+        _repo.Verify(x => x.AddFineAsync(It.IsAny<Fine>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Reject_ResponsibilityOnly_PreservesDamagedCopy()
+    {
+        var incident = PendingLostIncident();
+        incident.BookCopy.Condition = BookCondition.Damaged;
+        _repo.Setup(x => x.GetTrackedIncidentAsync(incident.Id, It.IsAny<CancellationToken>())).ReturnsAsync(incident);
+        _repo.Setup(x => x.GetIncidentDtoAsync(incident.Id, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(new CirculationIncidentDto { Id = incident.Id });
+        var result = await _sut.RejectIncidentAsync(incident.Id, new RejectIncidentRequest { Notes = "Sách hỏng đã có trước khi mượn." }, Guid.NewGuid());
+        result.IsSuccess.Should().BeTrue();
+        incident.BookCopy.Condition.Should().Be(BookCondition.Damaged);
+        incident.BookCopy.IsAvailable.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Reject_RestoreWithoutPhysicalCondition_FailsBeforeChangingState()
+    {
+        var result = await _sut.RejectIncidentAsync(Guid.NewGuid(), new RejectIncidentRequest { Notes = "Đã tìm thấy sách.", RestoreCopy = true }, Guid.NewGuid());
+        result.IsSuccess.Should().BeFalse();
+        _repo.Verify(x => x.TryClaimIncidentAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Return_StaleLoanId_DoesNotReturnNewBorrowersLoan()
+    {
+        var copy = ReadyCopy();
+        var loan = new BorrowRecord { Id = Guid.NewGuid(), Status = BorrowStatus.Borrowed, BookCopy = copy };
+        _repo.Setup(x => x.FindActiveLoanByBarcodeAsync(copy.Barcode, It.IsAny<CancellationToken>())).ReturnsAsync(loan);
+        var result = await _sut.ReturnAsync(new ReturnLoanRequest { Barcode = copy.Barcode, LoanId = Guid.NewGuid() }, Guid.NewGuid());
+        result.IsSuccess.Should().BeFalse();
+        loan.Status.Should().Be(BorrowStatus.Borrowed);
+    }
+
     private static BookIncident PendingLostIncident()
     {
         var copy = ReadyCopy();
@@ -429,7 +896,7 @@ public class CirculationServiceTests
             Severity = BookIncidentSeverity.Lost,
             Status = BookIncidentStatus.PendingReview,
             BookCopy = copy,
-            BorrowRecord = new BorrowRecord { DueDate = DateTime.UtcNow.AddDays(2) }
+            BorrowRecord = new BorrowRecord { Status = BorrowStatus.Returned, ReturnDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(2) }
         };
     }
 
@@ -452,6 +919,151 @@ public class CirculationServiceTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("hết số lần");
+        _repo.Verify(x => x.LockBorrowRequestAsync(loan.Id, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateBookReservation_WhenCopiesRemain_Fails()
+    {
+        var reader = ActiveReader();
+        var bookId = Guid.NewGuid();
+        _repo.Setup(x => x.GetBookTitleAsync(bookId, It.IsAny<CancellationToken>())).ReturnsAsync("Clean Code");
+        _repo.Setup(x => x.FindReaderAsync(reader.Id.ToString(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+        _repo.Setup(x => x.HasOpenReservationAsync(reader.Id, bookId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repo.Setup(x => x.HasActiveLoanForBookAsync(reader.Id, bookId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repo.Setup(x => x.CountAvailableCopiesAsync(bookId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _repo.Setup(x => x.CountReadyReservationsAsync(bookId, Guid.Empty, It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        var result = await _sut.CreateMyReservationForBookAsync(reader.Id, bookId);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("còn bản sao");
+        _repo.Verify(x => x.AddReservationAsync(It.IsAny<Reservation>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateLibrarianReservation_WhenCopiesAreUnavailable_CreatesQueueEntryAndNotifiesReader()
+    {
+        var reader = ActiveReader();
+        var bookId = Guid.NewGuid();
+        var reservationId = Guid.Empty;
+        _repo.Setup(x => x.GetBookTitleAsync(bookId, It.IsAny<CancellationToken>())).ReturnsAsync("Clean Code");
+        _repo.Setup(x => x.FindReaderAccountAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+        _repo.Setup(x => x.HasOpenReservationAsync(reader.Id, bookId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repo.Setup(x => x.HasActiveLoanForBookAsync(reader.Id, bookId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repo.Setup(x => x.CountAvailableCopiesAsync(bookId, It.IsAny<CancellationToken>())).ReturnsAsync(0);
+        _repo.Setup(x => x.CountReadyReservationsAsync(bookId, Guid.Empty, It.IsAny<CancellationToken>())).ReturnsAsync(0);
+        _repo.Setup(x => x.AddReservationAsync(It.IsAny<Reservation>(), It.IsAny<CancellationToken>()))
+            .Callback<Reservation, CancellationToken>((reservation, _) =>
+            {
+                reservation.Id = Guid.NewGuid();
+                reservationId = reservation.Id;
+            })
+            .Returns(Task.CompletedTask);
+        _repo.Setup(x => x.GetReservationsForReaderAsync(reader.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => new[]
+            {
+                new CirculationReservationDto
+                {
+                    Id = reservationId,
+                    ReaderId = reader.Id,
+                    BookId = bookId,
+                    BookTitle = "Clean Code"
+                }
+            });
+
+        var result = await _sut.CreateLibrarianReservationAsync(
+            new CreateLibrarianReservationRequest(reader.Id, bookId));
+
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.BookId.Should().Be(bookId);
+        _repo.Verify(x => x.LockReservationBookAsync(bookId, It.IsAny<CancellationToken>()), Times.Once);
+        _repo.Verify(x => x.AddNotificationAsync(
+            It.Is<Notification>(notification => notification.UserId == reader.Id
+                && notification.Title == "Đã đặt trước"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateLibrarianReservation_WhenCopiesRemain_FailsWithoutAddingReservation()
+    {
+        var reader = ActiveReader();
+        var bookId = Guid.NewGuid();
+        _repo.Setup(x => x.GetBookTitleAsync(bookId, It.IsAny<CancellationToken>())).ReturnsAsync("Clean Code");
+        _repo.Setup(x => x.FindReaderAccountAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+        _repo.Setup(x => x.HasOpenReservationAsync(reader.Id, bookId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repo.Setup(x => x.HasActiveLoanForBookAsync(reader.Id, bookId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repo.Setup(x => x.CountAvailableCopiesAsync(bookId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _repo.Setup(x => x.CountReadyReservationsAsync(bookId, Guid.Empty, It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        var result = await _sut.CreateLibrarianReservationAsync(
+            new CreateLibrarianReservationRequest(reader.Id, bookId));
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("vẫn còn");
+        _repo.Verify(x => x.AddReservationAsync(It.IsAny<Reservation>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetBorrowableCopyCount_ExcludesCopiesHeldForReadyReservations()
+    {
+        var bookId = Guid.NewGuid();
+        _repo.Setup(x => x.CountAvailableCopiesAsync(bookId, It.IsAny<CancellationToken>())).ReturnsAsync(2);
+        _repo.Setup(x => x.CountReadyReservationsAsync(bookId, Guid.Empty, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _sut.GetBorrowableCopyCountAsync(bookId);
+
+        result.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Return_LeavesCopyInWarehouseForLibrarianSorting()
+    {
+        var order = new List<string>();
+        var copy = ReadyCopy();
+        copy.IsAvailable = false;
+        var loan = new BorrowRecord
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = Guid.NewGuid(),
+            BookCopyId = copy.Id,
+            BookCopy = copy,
+            Status = BorrowStatus.Borrowed,
+            DueDate = DateTime.UtcNow.AddDays(1)
+        };
+        var reservation = new Reservation
+        {
+            Id = Guid.NewGuid(),
+            ReaderId = Guid.NewGuid(),
+            BookId = copy.BookId,
+            Book = copy.Book,
+            ExpiresAt = DateTime.UtcNow.AddHours(24)
+        };
+        _repo.Setup(x => x.FindActiveLoanByBarcodeAsync(copy.Barcode, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(loan);
+        _repo.Setup(x => x.CountAvailableCopiesAsync(copy.BookId, It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("availability"))
+            .ReturnsAsync(1);
+        _repo.Setup(x => x.CountReadyReservationsAsync(copy.BookId, Guid.Empty, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _repo.Setup(x => x.ReadyNextReservationAsync(copy.BookId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(reservation);
+        _repo.Setup(x => x.GetLoanAsync(loan.Id, _settings.FinePerDay, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CirculationLoanDto { Id = loan.Id, Status = "Returned" });
+        _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("save"))
+            .ReturnsAsync(1);
+
+        var result = await _sut.ReturnAsync(new ReturnLoanRequest { Barcode = copy.Barcode }, Guid.NewGuid());
+
+        result.IsSuccess.Should().BeTrue();
+        result.Data!.ReadyReservationReaderId.Should().BeNull();
+        copy.Location.Should().BeNull();
+        _repo.Verify(x => x.ReadyNextReservationAsync(copy.BookId, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repo.Verify(x => x.AddNotificationAsync(
+            It.Is<Notification>(notification => notification.UserId == reservation.ReaderId
+                && notification.Title == "Sách sẵn sàng nhận"),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -472,7 +1084,7 @@ public class CirculationServiceTests
         _repo.Setup(x => x.HasActiveLoanAsync(copy.Id, null, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _repo.Setup(x => x.ExpireReadyReservationsAsync(It.IsAny<CancellationToken>()))
             .Callback(() => order.Add("expire"))
-            .ReturnsAsync(Array.Empty<Guid>());
+            .ReturnsAsync(Array.Empty<ExpiredReservationDto>());
         _repo.Setup(x => x.CountReadyReservationsAsync(copy.BookId, reader.Id, It.IsAny<CancellationToken>()))
             .Callback(() => order.Add("ready"))
             .ReturnsAsync(0);
@@ -517,8 +1129,9 @@ public class CirculationServiceTests
         var result = await _sut.ApproveAsync(loan.Id, Guid.NewGuid());
 
         result.IsSuccess.Should().BeTrue();
-        loan.Status.Should().Be(BorrowStatus.Borrowed);
-        loan.BorrowDate.Should().NotBeNull();
+        loan.Status.Should().Be(BorrowStatus.Approved);
+        loan.BorrowDate.Should().BeNull();
+        loan.AcceptedAt.Should().NotBeNull();
         _repo.Verify(x => x.TryClaimCopyAsync(loan.BookCopyId, It.IsAny<CancellationToken>()), Times.Once);
         _repo.Verify(x => x.ExpireReadyReservationsAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
     }
@@ -545,13 +1158,12 @@ public class CirculationServiceTests
         var reader = ActiveReader();
         var loan = PendingLoan(reader);
         SetupApprovePath(loan, reader, claim: true);
-        _repo.Setup(x => x.CountReadyReservationsAsync(loan.BookCopy.BookId, loan.ReaderId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        _repo.Setup(x => x.CountAvailableCopiesAsync(loan.BookCopy.BookId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _repo.Setup(x => x.HasOtherBorrowRequestAsync(loan.BookCopyId, loan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         var result = await _sut.ApproveAsync(loan.Id, Guid.NewGuid());
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("đặt trước");
+        result.Error.Should().Contain("phân cho phiếu khác");
         loan.Status.Should().Be(BorrowStatus.Pending);
         _repo.Verify(x => x.TryClaimCopyAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -573,7 +1185,7 @@ public class CirculationServiceTests
     }
 
     [Fact]
-    public async Task Approve_WhenCopyUnavailable_DoesNotMarkBorrowed()
+    public async Task Approve_WhenCopyAlreadyHeldForThisRequest_DoesNotClaimAgain()
     {
         var reader = ActiveReader();
         var loan = PendingLoan(reader);
@@ -582,9 +1194,8 @@ public class CirculationServiceTests
 
         var result = await _sut.ApproveAsync(loan.Id, Guid.NewGuid());
 
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("không sẵn sàng");
-        loan.Status.Should().Be(BorrowStatus.Pending);
+        result.IsSuccess.Should().BeTrue();
+        loan.Status.Should().Be(BorrowStatus.Approved);
         _repo.Verify(x => x.TryClaimCopyAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -623,7 +1234,10 @@ public class CirculationServiceTests
     public async Task ExpireHold_WhenCopyUnusable_DoesNotReadyNextReader()
     {
         var bookId = Guid.NewGuid();
-        _repo.Setup(x => x.ExpireReadyReservationsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { bookId });
+        _repo.Setup(x => x.ExpireReadyReservationsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[]
+        {
+            new ExpiredReservationDto(Guid.NewGuid(), Guid.NewGuid(), bookId, "Expired book", DateTime.UtcNow.AddMinutes(-1))
+        });
         _repo.Setup(x => x.CountAvailableCopiesAsync(bookId, It.IsAny<CancellationToken>())).ReturnsAsync(0);
         _repo.Setup(x => x.GetReservationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<CirculationReservationDto>());
@@ -712,7 +1326,6 @@ public class CirculationServiceTests
     {
         _repo.Setup(x => x.FindReaderAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
         _repo.Setup(x => x.HasUnpaidFinesAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _repo.Setup(x => x.CountActiveLoansAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(0);
     }
 
     private void SetupApprovePath(BorrowRecord loan, UserProfile reader, bool claim)
@@ -720,7 +1333,6 @@ public class CirculationServiceTests
         _repo.Setup(x => x.GetTrackedLoanAsync(loan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(loan);
         _repo.Setup(x => x.FindReaderAsync(loan.ReaderId.ToString(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
         _repo.Setup(x => x.HasUnpaidFinesAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _repo.Setup(x => x.CountActiveLoansAsync(reader.Id, It.IsAny<CancellationToken>())).ReturnsAsync(0);
         _repo.Setup(x => x.HasActiveLoanAsync(loan.BookCopyId, loan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _repo.Setup(x => x.TryClaimCopyAsync(loan.BookCopyId, It.IsAny<CancellationToken>())).ReturnsAsync(claim);
     }
@@ -743,6 +1355,7 @@ public class CirculationServiceTests
         Id = source.Id,
         BookId = source.BookId,
         Barcode = source.Barcode,
+        Location = source.Location,
         IsAvailable = source.IsAvailable,
         Condition = source.Condition,
         Book = source.Book

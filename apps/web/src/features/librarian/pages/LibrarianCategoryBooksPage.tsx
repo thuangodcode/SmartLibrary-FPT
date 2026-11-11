@@ -7,9 +7,7 @@ import {
   BookMarked,
   Layers,
   Calendar,
-  Globe,
   AlertCircle,
-  Copy,
   RefreshCw,
   Pencil,
   Trash2,
@@ -17,24 +15,15 @@ import {
   UploadCloud,
   X,
   Image as ImageIcon,
-  FileText,
-  User,
-  Barcode,
   HelpCircle,
-  MapPin,
 } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { parseApiResponse } from '../../../lib/api';
-import { STORAGE_LOCATIONS } from '../storageLocations';
 import type { CategoryItem } from './LibrarianCategoriesPage';
 import './LibrarianCategoryBooksPage.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5278';
-const BOOK_CODE_PATTERN = /^[a-zA-Z0-9]{1,32}$/;
-
-type BookCodeAvailability = 'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'error';
-
 export interface BookItem {
   id: string;
   code: string;
@@ -143,6 +132,7 @@ const BookCard: React.FC<{ book: BookItem }> = ({ book }) => {
 const LibrarianCategoryBooksPage: React.FC = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
   const navigate = useNavigate();
+  const isAddBookRoute = window.location.pathname.endsWith('/add');
   const accessToken = useAuthStore((s) => s.accessToken);
   const { showToast } = useToast();
 
@@ -172,64 +162,76 @@ const LibrarianCategoryBooksPage: React.FC = () => {
   // Edit category modal states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editName, setEditName] = useState('');
+  const [editCode, setEditCode] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
   const [editRemoveImage, setEditRemoveImage] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Add Book modal states
-  const [isAddBookModalOpen, setIsAddBookModalOpen] = useState(false);
-  const [bookTitle, setBookTitle] = useState('');
-  const [bookCode, setBookCode] = useState('');
-  const [bookCodeAvailability, setBookCodeAvailability] = useState<BookCodeAvailability>('idle');
-  const [bookAuthor, setBookAuthor] = useState('');
-  const [bookIsbn, setBookIsbn] = useState('');
-  const [bookYear, setBookYear] = useState('');
-  const [bookLanguage, setBookLanguage] = useState('vi');
-  const [customBookLanguage, setCustomBookLanguage] = useState('');
-  const [bookTotalCopies, setBookTotalCopies] = useState(1);
-  const [bookLocation, setBookLocation] = useState('');
-  const [bookDescription, setBookDescription] = useState('');
-  const [bookCoverFile, setBookCoverFile] = useState<File | null>(null);
-  const [bookCoverPreview, setBookCoverPreview] = useState<string | null>(null);
-  const [savingBook, setSavingBook] = useState(false);
-
+  const [existingBookSearch, setExistingBookSearch] = useState('');
+  const [existingBookCategoryFilter, setExistingBookCategoryFilter] = useState('');
+  const [existingBooks, setExistingBooks] = useState<BookItem[]>([]);
+  const [existingBookCategories, setExistingBookCategories] = useState<CategoryItem[]>([]);
+  const [existingBooksLoading, setExistingBooksLoading] = useState(false);
+  const [existingBooksError, setExistingBooksError] = useState<string | null>(null);
+  const [existingBooksRetry, setExistingBooksRetry] = useState(0);
+  const [addingExistingBookId, setAddingExistingBookId] = useState<string | null>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
-  const bookCoverInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredExistingBooks = existingBooks.filter(book =>
+    !existingBookCategoryFilter || book.categoryNames?.includes(existingBookCategories.find(item => item.id === existingBookCategoryFilter)?.name ?? '')
+  );
 
   useEffect(() => {
-    const code = bookCode.trim();
-    if (!isAddBookModalOpen || !code || !BOOK_CODE_PATTERN.test(code)) return;
+    if (!isAddBookRoute) return;
+    let cancelled = false;
+    const headers: Record<string, string> = {};
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    void fetch(`${API_BASE_URL}/api/v1/categories`, { headers })
+      .then(async response => {
+        const result = await parseApiResponse<{ success?: boolean; data?: CategoryItem[]; error?: string }>(response);
+        if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể tải danh mục sách.');
+        if (!cancelled) setExistingBookCategories(result.data ?? []);
+      })
+      .catch(caught => {
+        if (!cancelled) showToast({ type: 'error', title: 'Không thể tải danh mục', message: caught instanceof Error ? caught.message : 'Vui lòng thử lại.' });
+      });
+    return () => { cancelled = true; };
+  }, [accessToken, isAddBookRoute, showToast]);
 
+  useEffect(() => {
+    if (!isAddBookRoute) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
+      setExistingBooksLoading(true);
+      setExistingBooksError(null);
       try {
         const headers: Record<string, string> = {};
         if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-        const params = new URLSearchParams({ code });
-        const response = await fetch(`${API_BASE_URL}/api/v1/books/code-availability?${params}`, { headers });
-        const result = await parseApiResponse<{
-          success?: boolean;
-          data?: { available: boolean };
-          error?: string;
-        }>(response);
-        if (!response.ok || !result?.success || !result.data) {
-          throw new Error(result?.error || 'Không thể kiểm tra mã sách.');
-        }
-        if (!cancelled) {
-          setBookCodeAvailability(result.data.available ? 'available' : 'taken');
-        }
-      } catch {
-        if (!cancelled) setBookCodeAvailability('error');
+        const allBooks: BookItem[] = [];
+        let page = 1;
+        let totalPages = 1;
+        do {
+          const params = new URLSearchParams({ page: String(page), pageSize: '100' });
+          if (existingBookSearch.trim()) params.set('search', existingBookSearch.trim());
+          const response = await fetch(`${API_BASE_URL}/api/v1/books?${params}`, { headers });
+          const result = await parseApiResponse<{ success?: boolean; data?: BookItem[]; error?: string; meta?: { totalPages?: number } }>(response);
+          if (!response.ok || !result?.success) throw new Error(result?.error || 'Unable to load the book list.');
+          allBooks.push(...(result.data ?? []));
+          totalPages = Math.max(1, result.meta?.totalPages ?? 1);
+          page += 1;
+        } while (page <= totalPages && page <= 100);
+        if (!cancelled) setExistingBooks(allBooks.filter(book => !book.categoryNames?.includes(category?.name ?? '')));
+      } catch (caught) {
+        if (!cancelled) setExistingBooksError(caught instanceof Error ? caught.message : 'Vui lòng thử lại.');
+        if (!cancelled) showToast({ type: 'error', title: 'Không thể tải đầu sách', message: caught instanceof Error ? caught.message : 'Vui lòng thử lại.' });
+      } finally {
+        if (!cancelled) setExistingBooksLoading(false);
       }
-    }, 350);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [accessToken, bookCode, isAddBookModalOpen]);
+    }, 250);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [accessToken, category?.name, existingBookSearch, existingBooksRetry, isAddBookRoute, showToast]);
 
   const markInitialRequestComplete = (request: 'category' | 'books') => {
     initialRequestsRef.current[request] = true;
@@ -345,6 +347,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
     setConfirmEditOpen(false);
     if (!category) return;
     setEditName(category.name);
+    setEditCode(category.code);
     setEditDescription(category.description || '');
     setEditImageFile(null);
     setEditImagePreview(category.imageUrl || null);
@@ -403,11 +406,16 @@ const LibrarianCategoryBooksPage: React.FC = () => {
       });
       return;
     }
+    if (!/^[A-Z]{1,16}$/.test(editCode.trim())) {
+      showToast({ type: 'error', title: 'Mã danh mục không hợp lệ', message: 'Dùng 1–16 chữ cái A–Z, ví dụ KHTN.' });
+      return;
+    }
 
     setSavingEdit(true);
     try {
       const formData = new FormData();
       formData.append('Name', trimmed);
+      formData.append('Code', editCode.trim());
       if (editDescription.trim()) {
         formData.append('Description', editDescription.trim());
       }
@@ -503,133 +511,23 @@ const LibrarianCategoryBooksPage: React.FC = () => {
     }
   };
 
-  // File change in Add Book
-  const handleBookCoverChange = (file: File | null) => {
-    if (!file) return;
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!validTypes.includes(file.type)) {
-      showToast({
-        type: 'error',
-        title: 'Định dạng không hợp lệ',
-        message: 'Chỉ chấp nhận các tệp ảnh JPG, PNG, WEBP hoặc GIF.',
-      });
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      showToast({
-        type: 'error',
-        title: 'Ảnh quá lớn',
-        message: 'Dung lượng ảnh không được vượt quá 10MB.',
-      });
-      return;
-    }
-
-    setBookCoverFile(file);
-    setBookCoverPreview(URL.createObjectURL(file));
-  };
-
-  // Submit Add Book
-  const handleCreateBook = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!categoryId) return;
-
-    const trimmedTitle = bookTitle.trim();
-    if (!trimmedTitle) {
-      showToast({
-        type: 'warning',
-        title: 'Thiếu thông tin',
-        message: 'Vui lòng nhập tiêu đề sách.',
-      });
-      return;
-    }
-
-    const trimmedCode = bookCode.trim();
-    if (!BOOK_CODE_PATTERN.test(trimmedCode) || bookCodeAvailability !== 'available') {
-      showToast({
-        type: 'warning',
-        title: 'Mã sách chưa hợp lệ',
-        message: bookCodeAvailability === 'taken'
-          ? 'Mã sách đã được sử dụng. Vui lòng chọn mã khác.'
-          : bookCodeAvailability === 'error'
-            ? 'Chưa kiểm tra được mã sách. Hãy thử lại trước khi lưu.'
-            : 'Nhập mã gồm 1–32 chữ cái hoặc chữ số và chờ hệ thống xác nhận chưa được sử dụng.',
-      });
-      return;
-    }
-
-    const language = bookLanguage === 'custom' ? customBookLanguage.trim() : bookLanguage;
-    if (!language) {
-      showToast({
-        type: 'warning',
-        title: 'Thiếu ngôn ngữ',
-        message: 'Vui lòng chọn hoặc nhập ngôn ngữ của sách.',
-      });
-      return;
-    }
-
-    setSavingBook(true);
+  const handleAddExistingBook = async (book: BookItem) => {
+    if (!categoryId || addingExistingBookId) return;
+    setAddingExistingBookId(book.id);
     try {
-      const formData = new FormData();
-      formData.append('Code', trimmedCode);
-      formData.append('Title', trimmedTitle);
-      if (bookAuthor.trim()) formData.append('AuthorName', bookAuthor.trim());
-      if (bookIsbn.trim()) formData.append('Isbn', bookIsbn.trim());
-      if (bookYear) formData.append('PublishedYear', bookYear);
-      formData.append('Language', language);
-      formData.append('TotalCopies', String(Math.max(1, bookTotalCopies || 1)));
-      if (bookLocation) formData.append('Location', bookLocation);
-      if (bookDescription.trim()) formData.append('Description', bookDescription.trim());
-      formData.append('CategoryId', categoryId);
-      if (bookCoverFile) formData.append('CoverImage', bookCoverFile);
-
-      const headers: Record<string, string> = {};
-      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-      const res = await fetch(`${API_BASE_URL}/api/v1/books/form`, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
-
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(json?.error || json?.message || 'Không thể thêm đầu sách.');
-      }
-
-      showToast({
-        type: 'success',
-        title: 'Thành công',
-        message: `Đã thêm "${trimmedTitle}" với mã ${trimmedCode}; mã bản sao bắt đầu từ ${trimmedCode}-01.`,
-      });
-
-      // Reset form
-      setBookTitle('');
-      setBookCode('');
-      setBookCodeAvailability('idle');
-      setBookAuthor('');
-      setBookIsbn('');
-      setBookYear('');
-      setBookLanguage('vi');
-      setCustomBookLanguage('');
-      setBookTotalCopies(1);
-      setBookLocation('');
-      setBookDescription('');
-      setBookCoverFile(null);
-      setBookCoverPreview(null);
-      setIsAddBookModalOpen(false);
-
-      // Refresh list
-      fetchCategoryBooks();
-      fetchCategoryInfo();
-    } catch (err: unknown) {
-      console.error('Error creating book:', err);
-      showToast({
-        type: 'error',
-        title: 'Lỗi thêm đầu sách',
-        message: err instanceof Error ? err.message : 'Có lỗi xảy ra khi tạo đầu sách.',
-      });
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+      const response = await fetch(`${API_BASE_URL}/api/v1/categories/${categoryId}/books/${book.id}`, { method: 'POST', headers });
+      const result = await parseApiResponse<{ success?: boolean; data?: boolean; error?: string }>(response);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể thêm đầu sách vào danh mục.');
+      showToast({ type: 'success', title: 'Đã thêm vào danh mục', message: `“${book.title}” đã được thêm vào danh mục ${category?.name ?? ''}.` });
+      setExistingBooks(current => current.filter(item => item.id !== book.id));
+      void fetchCategoryBooks();
+      void fetchCategoryInfo();
+    } catch (caught) {
+      showToast({ type: 'error', title: 'Không thể thêm đầu sách', message: caught instanceof Error ? caught.message : 'Vui lòng thử lại.' });
     } finally {
-      setSavingBook(false);
+      setAddingExistingBookId(null);
     }
   };
 
@@ -670,7 +568,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
         <div className="lib-cat-books-breadcrumb">
           <span>Thủ thư</span>
           <span>/</span>
-          <span>Sách & Biên mục</span>
+          <span>Quản lý sách</span>
           <span>/</span>
           <strong>{category?.name || 'Chi tiết danh mục'}</strong>
         </div>
@@ -705,7 +603,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
               <button
                 type="button"
                 className="lib-cat-btn-add-book-banner"
-                onClick={() => setIsAddBookModalOpen(true)}
+                onClick={() => navigate(`/librarian/books/categories/${categoryId}/add`)}
                 title="Thêm một đầu sách mới vào danh mục này"
               >
                 <Plus size={16} />
@@ -823,7 +721,7 @@ const LibrarianCategoryBooksPage: React.FC = () => {
             <button
               type="button"
               className="lib-cat-btn-add-book-center"
-              onClick={() => setIsAddBookModalOpen(true)}
+              onClick={() => navigate(`/librarian/books/categories/${categoryId}/add`)}
             >
               <Plus size={16} />
               <span>Thêm đầu sách đầu tiên</span>
@@ -971,6 +869,11 @@ const LibrarianCategoryBooksPage: React.FC = () => {
               </div>
 
               <div className="lib-cat-form-group">
+                <label htmlFor="cat-edit-code">Mã danh mục <span className="req">*</span></label>
+                <input id="cat-edit-code" value={editCode} onChange={event => setEditCode(event.target.value.toUpperCase())} maxLength={16} pattern="[A-Za-z]{1,16}" required />
+                <small>Mã dùng để cấp mã đầu sách mới. Đổi tiền tố không đổi mã sách, bản sao hoặc QR đã có.</small>
+              </div>
+              <div className="lib-cat-form-group">
                 <label htmlFor="cat-edit-desc">Mô tả danh mục</label>
                 <textarea
                   id="cat-edit-desc"
@@ -1054,287 +957,39 @@ const LibrarianCategoryBooksPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─── Modal 4: Add New Book Modal ─── */}
-      {isAddBookModalOpen && (
-        <div className="lib-cat-modal-overlay" onClick={() => setIsAddBookModalOpen(false)}>
-          <div className="lib-cat-modal-content add-book-modal" onClick={(e) => e.stopPropagation()}>
+      {isAddBookRoute && (
+        <div className="lib-cat-add-book-page">
+          <section className="lib-cat-add-book-card add-book-modal">
             <div className="lib-cat-modal-header">
               <div className="lib-cat-modal-title-row">
-                <div className="lib-cat-modal-badge orange">
-                  <Plus size={14} />
-                  <span>THÊM ĐẦU SÁCH MỚI</span>
-                </div>
-                <button type="button" className="lib-cat-modal-close" onClick={() => setIsAddBookModalOpen(false)}>
-                  <X size={18} />
-                </button>
+                <div className="lib-cat-modal-badge orange"><BookOpen size={14} /><span>CHỌN ĐẦU SÁCH CÓ SẴN</span></div>
+                <button type="button" className="lib-cat-add-back" onClick={() => navigate(`/librarian/books/categories/${categoryId}`)}><ArrowLeft size={16} /> Quay lại</button>
               </div>
-              <h3>Thêm đầu sách vào danh mục "{category?.name}"</h3>
-              <p className="lib-cat-modal-subtitle">
-                Nhập thông tin chi tiết và tải ảnh bìa cuốn sách lên hệ thống Cloudinary thư viện.
-              </p>
+              <h3>Thêm đầu sách vào danh mục “{category?.name}”</h3>
+              <p className="lib-cat-modal-subtitle">Chọn một đầu sách đã có trong thư viện. Muốn tạo đầu sách mới và nhập bản sao vào kho, hãy dùng chức năng Nhập sách tại Quản lý kho.</p>
             </div>
-
-            <form onSubmit={handleCreateBook} className="lib-cat-book-form">
-              <div className="lib-cat-form-grid-2">
-                <div className="lib-cat-form-group col-span-2">
-                  <label htmlFor="book-title">
-                    <FileText size={14} />
-                    <span>Tiêu đề sách</span>
-                    <span className="req">*</span>
-                  </label>
-                  <input
-                    id="book-title"
-                    type="text"
-                    value={bookTitle}
-                    onChange={(e) => setBookTitle(e.target.value)}
-                    placeholder="Ví dụ: Lập trình C# căn bản, Clean Code..."
-                    required
-                  />
-                </div>
-
-                <div className="lib-cat-form-group">
-                  <label htmlFor="book-code">
-                    <Barcode size={14} />
-                    <span>Mã sách</span>
-                    <span className="req">*</span>
-                  </label>
-                  <input
-                    id="book-code"
-                    type="text"
-                    value={bookCode}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      const normalized = value.trim();
-                      setBookCode(value);
-                      setBookCodeAvailability(
-                        !normalized
-                          ? 'idle'
-                          : BOOK_CODE_PATTERN.test(normalized)
-                            ? 'checking'
-                            : 'invalid',
-                      );
-                    }}
-                    maxLength={32}
-                    pattern="[A-Za-z0-9]{1,32}"
-                    placeholder="Ví dụ: py01"
-                    aria-describedby="book-code-hint"
-                    required
-                  />
-                  <small
-                    id="book-code-hint"
-                    className={`lib-cat-book-code-status is-${bookCodeAvailability}`}
-                    role={bookCodeAvailability === 'taken' || bookCodeAvailability === 'error' ? 'alert' : 'status'}
-                  >
-                    {bookCodeAvailability === 'checking' && 'Đang kiểm tra mã sách...'}
-                    {bookCodeAvailability === 'available' && 'Mã sách chưa được sử dụng.'}
-                    {bookCodeAvailability === 'taken' && 'Mã này đã tồn tại. Hãy nhập mã khác.'}
-                    {bookCodeAvailability === 'invalid' && 'Chỉ dùng chữ cái và chữ số, tối đa 32 ký tự.'}
-                    {bookCodeAvailability === 'error' && 'Không kiểm tra được mã. Vui lòng thử lại.'}
-                    {bookCodeAvailability === 'idle' && 'Mã bản sao sẽ theo dạng mã sách-01, mã sách-02...'}
-                  </small>
-                </div>
-
-                <div className="lib-cat-form-group">
-                  <label htmlFor="book-author">
-                    <User size={14} />
-                    <span>Tác giả</span>
-                  </label>
-                  <input
-                    id="book-author"
-                    type="text"
-                    value={bookAuthor}
-                    onChange={(e) => setBookAuthor(e.target.value)}
-                    placeholder="Ví dụ: Robert C. Martin, Nguyễn Nhật Ánh..."
-                  />
-                </div>
-
-                <div className="lib-cat-form-group">
-                  <label htmlFor="book-isbn">
-                    <Barcode size={14} />
-                    <span>Mã ISBN</span>
-                  </label>
-                  <input
-                    id="book-isbn"
-                    type="text"
-                    value={bookIsbn}
-                    onChange={(e) => setBookIsbn(e.target.value)}
-                    placeholder="Ví dụ: 978-0132350884..."
-                  />
-                </div>
-
-                <div className="lib-cat-form-group">
-                  <label htmlFor="book-year">
-                    <Calendar size={14} />
-                    <span>Năm xuất bản</span>
-                  </label>
-                  <input
-                    id="book-year"
-                    type="number"
-                    min="1900"
-                    max={new Date().getFullYear() + 1}
-                    value={bookYear}
-                    onChange={(e) => setBookYear(e.target.value)}
-                    placeholder={`Ví dụ: ${new Date().getFullYear()}`}
-                  />
-                </div>
-
-                <div className="lib-cat-form-group">
-                  <label htmlFor="book-copies">
-                    <Copy size={14} />
-                    <span>Số lượng cuốn bản sao</span>
-                  </label>
-                  <input
-                    id="book-copies"
-                    type="number"
-                    min="1"
-                    max="500"
-                    value={bookTotalCopies}
-                    onChange={(e) => setBookTotalCopies(parseInt(e.target.value, 10) || 1)}
-                  />
-                  <small>Hệ thống tự tạo mã riêng cho từng cuốn.</small>
-                </div>
-
-                <div className="lib-cat-form-group">
-                  <label htmlFor="book-lang">
-                    <Globe size={14} />
-                    <span>Ngôn ngữ</span>
-                  </label>
-                  <select
-                    id="book-lang"
-                    value={bookLanguage}
-                    onChange={(e) => setBookLanguage(e.target.value)}
-                  >
-                    <option value="vi">Tiếng Việt (vi)</option>
-                    <option value="en">Tiếng Anh (en)</option>
-                    <option value="ja">Tiếng Nhật (ja)</option>
-                    <option value="ko">Tiếng Hàn (ko)</option>
-                    <option value="custom">Thêm ngôn ngữ mới...</option>
-                  </select>
-                </div>
-
-                {bookLanguage === 'custom' && (
-                  <div className="lib-cat-form-group">
-                    <label htmlFor="book-custom-language">
-                      <Globe size={14} />
-                      <span>Ngôn ngữ mới</span>
-                      <span className="req">*</span>
-                    </label>
-                    <input
-                      id="book-custom-language"
-                      type="text"
-                      maxLength={50}
-                      value={customBookLanguage}
-                      onChange={(e) => setCustomBookLanguage(e.target.value)}
-                      placeholder="Nhập tên hoặc mã ngôn ngữ"
-                      required
-                    />
-                  </div>
-                )}
-
-                <div className="lib-cat-form-group">
-                  <label htmlFor="book-location">
-                    <MapPin size={14} />
-                    <span>Vị trí kệ sách</span>
-                  </label>
-                  <select
-                    id="book-location"
-                    value={bookLocation}
-                    onChange={(e) => setBookLocation(e.target.value)}
-                  >
-                    <option value="">Chưa xếp kệ</option>
-                    {STORAGE_LOCATIONS.map((location) => (
-                      <option value={location} key={location}>{location}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="lib-cat-form-group col-span-2">
-                  <label htmlFor="book-desc">Mô tả tóm tắt nội dung</label>
-                  <textarea
-                    id="book-desc"
-                    rows={3}
-                    value={bookDescription}
-                    onChange={(e) => setBookDescription(e.target.value)}
-                    placeholder="Mô tả nội dung cuốn sách, mục lục tóm lược hoặc ghi chú..."
-                  />
-                </div>
-
-                {/* Cover Image Upload */}
-                <div className="lib-cat-form-group col-span-2">
-                  <label>Ảnh bìa sách (Tải lên Cloudinary)</label>
-                  <div className="lib-cat-book-cover-row">
-                    {bookCoverPreview ? (
-                      <div className="lib-cat-book-cover-preview">
-                        <img src={bookCoverPreview} alt="Cover Preview" />
-                        <button
-                          type="button"
-                          className="lib-cat-remove-cover-btn"
-                          onClick={() => {
-                            setBookCoverFile(null);
-                            setBookCoverPreview(null);
-                          }}
-                          title="Hủy ảnh này"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ) : (
-                      <div
-                        className="lib-cat-book-cover-placeholder"
-                        onClick={() => bookCoverInputRef.current?.click()}
-                      >
-                        <ImageIcon size={32} />
-                        <span>Chưa có ảnh bìa</span>
-                      </div>
-                    )}
-
-                    <div className="lib-cat-book-cover-picker">
-                      <input
-                        ref={bookCoverInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,image/gif"
-                        style={{ display: 'none' }}
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files.length > 0) {
-                            handleBookCoverChange(e.target.files[0]);
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="lib-cat-btn-choose-file"
-                        onClick={() => bookCoverInputRef.current?.click()}
-                      >
-                        <UploadCloud size={16} />
-                        <span>{bookCoverPreview ? 'Đổi ảnh bìa khác' : 'Chọn ảnh bìa từ máy tính'}</span>
-                      </button>
-                      <span className="lib-cat-edit-file-hint">JPG, PNG, WEBP (Tối đa 10MB)</span>
-                    </div>
-                  </div>
-                </div>
+            <div className="lib-cat-add-book-context"><span>Danh m&#7909;c &#273;ang m&#7903;</span><strong>{category?.name ?? '&#272;ang t&#7843;i danh m&#7909;c...'}</strong><small>Ch&#7885;n &#273;&#7847;u s&#225;ch c&#243; s&#7861;n &#273;&#7875; th&#234;m. C&#225;c danh m&#7909;c &#273;&#227; g&#225;n cho s&#225;ch s&#7869; &#273;&#432;&#7907;c gi&#7919; nguy&#234;n.</small></div>
+            <div className="lib-cat-add-book-toolbar">
+              <label className="lib-cat-existing-search"><Search size={17} /><input value={existingBookSearch} onChange={event => setExistingBookSearch(event.target.value)} placeholder="Tìm theo tên sách, mã sách hoặc ISBN..." /></label>
+              <select className="lib-cat-existing-category-filter" aria-label="Lọc theo danh mục" value={existingBookCategoryFilter} onChange={event => setExistingBookCategoryFilter(event.target.value)}>
+                <option value="">Tất cả danh mục</option>
+                {existingBookCategories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+              <button type="button" className="lib-cat-manage-fields-button" onClick={() => navigate(`/librarian/books/copies?tab=sorting&newBook=1&categoryId=${categoryId}`)}><Plus size={16} /> Tạo đầu sách mới</button>
+            </div>
+            {existingBooksError ? <div className="lib-cat-existing-empty"><AlertCircle size={28} /><strong>Ch&#432;a t&#7843;i &#273;&#432;&#7907;c danh s&#225;ch</strong><span>{existingBooksError}</span><button type="button" onClick={() => setExistingBooksRetry(value => value + 1)}>Th&#7917; l&#7841;i</button></div> : existingBooksLoading ? <div className="lib-cat-existing-empty">Đang tải danh sách đầu sách...</div> : filteredExistingBooks.length ? (
+              <div className="lib-cat-existing-books">
+                {filteredExistingBooks.map(book => <article key={book.id}>
+                  <div className="lib-cat-existing-cover">{book.coverImageUrl ? <img src={book.coverImageUrl} alt="" /> : <BookOpen size={20} />}</div>
+                  <div className="lib-cat-existing-info"><strong>{book.title}</strong><span>Mã {book.code}{book.authorNames?.length ? ` · ${book.authorNames.join(', ')}` : ''}</span><small>{book.totalCopies} bản sao · {book.categoryNames?.join(', ') || 'Chưa phân loại'}</small></div>
+                  <button type="button" onClick={() => void handleAddExistingBook(book)} disabled={Boolean(addingExistingBookId)}>{addingExistingBookId === book.id ? 'Đang thêm...' : 'Thêm vào danh mục'}</button>
+                </article>)}
               </div>
-
-              <div className="lib-cat-modal-actions">
-                <button
-                  type="button"
-                  className="lib-cat-modal-btn-cancel"
-                  onClick={() => setIsAddBookModalOpen(false)}
-                  disabled={savingBook || bookCodeAvailability !== 'available'}
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="lib-cat-modal-btn-save"
-                  disabled={savingBook}
-                >
-                  {savingBook ? 'Đang thêm đầu sách...' : 'Thêm đầu sách'}
-                </button>
-              </div>
-            </form>
-          </div>
+            ) : <div className="lib-cat-existing-empty"><BookOpen size={28} /><strong>{existingBookSearch.trim() || existingBookCategoryFilter ? 'Không tìm thấy đầu sách phù hợp' : 'Không còn đầu sách để thêm'}</strong><span>{existingBookSearch.trim() || existingBookCategoryFilter ? 'Thử thay đổi từ khóa hoặc danh mục lọc.' : 'Các đầu sách trong thư viện đã thuộc danh mục này hoặc chưa được tạo.'}</span></div>}
+          </section>
         </div>
       )}
+
     </div>
   );
 };

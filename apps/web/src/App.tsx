@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import HomePage from './features/home/pages/HomePage';
 import HomeCatalogPage from './features/home/pages/HomeCatalogPage';
 import BookDetailPage from './features/home/pages/BookDetailPage';
 import HomeInfoPage from './features/home/pages/HomeInfoPage';
+import NewsArticleDetailPage from './features/home/pages/NewsArticleDetailPage';
+import RagAskPanel from './features/home/components/RagAskPanel';
 import LoginPage from './features/auth/pages/LoginPage';
 import RegisterPage from './features/auth/pages/RegisterPage';
 import VerifyEmailPage from './features/auth/pages/VerifyEmailPage';
@@ -18,11 +20,15 @@ import ReadersManagementPage from './features/librarian/pages/ReadersManagementP
 import LibrarianReportsPage from './features/librarian/pages/LibrarianReportsPage';
 import LibrarianReportDetailPage from './features/librarian/pages/LibrarianReportDetailPage';
 import LibrarianModulePage from './features/librarian/pages/LibrarianModulePage';
+import LibrarianAiPage from './features/librarian/pages/LibrarianAiPage';
+import AdminAiSettingsPage from './features/admin/pages/AdminAiSettingsPage';
 import LibrarianCategoriesPage from './features/librarian/pages/LibrarianCategoriesPage';
+import LibrarianCopiesPage from './features/librarian/pages/LibrarianCopiesPage';
 import LibrarianCreateCategoryPage from './features/librarian/pages/LibrarianCreateCategoryPage';
 import LibrarianCategoryBooksPage from './features/librarian/pages/LibrarianCategoryBooksPage';
 import LibrarianBookDetailPage from './features/librarian/pages/LibrarianBookDetailPage';
-import CirculationPage from './features/librarian/pages/CirculationPage';
+import LibrarianNewsPage from './features/librarian/pages/LibrarianNewsPage';
+import CirculationPage, { CirculationIncidentDetailPage, DirectCheckoutPage } from './features/librarian/pages/CirculationPage';
 import { AdminLayout } from './features/admin/components/AdminLayout';
 import AdminOverviewPage from './features/admin/pages/AdminOverviewPage';
 import AdminSectionPage from './features/admin/pages/AdminSectionPage';
@@ -38,9 +44,11 @@ import AdminReportTemplateDetailPage from './features/admin/pages/AdminReportTem
 import AdminRegulationsPage from './features/admin/pages/AdminRegulationsPage';
 import ProfilePage from './features/profile/pages/ProfilePage';
 import HistoryPage from './features/profile/pages/HistoryPage';
+import ReaderFavoritesPage from './features/home/pages/ReaderFavoritesPage';
 import SupportPage from './features/profile/pages/SupportPage';
 import LibrarianSupportPage from './features/librarian/pages/LibrarianSupportPage';
 import { useAuthStore } from './features/auth/store/useAuthStore';
+import PinnedNewsPoster from './features/home/components/PinnedNewsPoster';
 
 function ProfileEntry() {
   const role = useAuthStore((state) => state.user?.role);
@@ -49,21 +57,32 @@ function ProfileEntry() {
   return <ProfilePage />;
 }
 
+function LibrarianBooksEntry() {
+  const [searchParams] = useSearchParams();
+  return searchParams.get('view') === 'copies'
+    ? <Navigate to="/librarian/books/copies" replace />
+    : <LibrarianCategoriesPage />;
+}
+
 function App() {
   const hydrate = useAuthStore((s) => s.hydrate);
+  const role = useAuthStore((s) => s.user?.role);
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
 
   return (
+    <>
+    <PinnedNewsPoster />
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<HomePage />} />
       <Route path="/books" element={<HomeCatalogPage />} />
       <Route path="/books/:bookId" element={<BookDetailPage />} />
-      <Route path="/services" element={<HomeInfoPage section="services" />} />
+      <Route path="/services" element={<Navigate to="/books" replace />} />
       <Route path="/news" element={<HomeInfoPage section="news" />} />
+      <Route path="/news/:articleId" element={<NewsArticleDetailPage />} />
       <Route path="/policies" element={<HomeInfoPage section="policies" />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
@@ -79,6 +98,11 @@ function App() {
       <Route path="/history" element={
         <RoleGuard allowedRoles={['Reader']}>
           <HistoryPage />
+        </RoleGuard>
+      } />
+      <Route path="/favorites" element={
+        <RoleGuard allowedRoles={['Reader']}>
+          <ReaderFavoritesPage />
         </RoleGuard>
       } />
       <Route path="/support" element={
@@ -97,19 +121,26 @@ function App() {
         <Route path="registrations" element={<RegistrationApprovalPage />} />
         <Route path="readers" element={<ReadersManagementPage />} />
         <Route path="readers/:userId" element={<AdminUserDetailPage audience="librarian" />} />
-        <Route path="books" element={<LibrarianCategoriesPage />} />
+        <Route path="books" element={<LibrarianBooksEntry />} />
+        <Route path="books/copies" element={<LibrarianCopiesPage />} />
         <Route path="books/categories/new" element={<LibrarianCreateCategoryPage />} />
         <Route path="books/categories/:categoryId" element={<LibrarianCategoryBooksPage />} />
+        <Route path="books/categories/:categoryId/add" element={<LibrarianCategoryBooksPage />} />
         <Route path="books/:bookId" element={<LibrarianBookDetailPage />} />
-        <Route path="copies" element={<Navigate to="/librarian/books?view=copies" replace />} />
+        <Route path="copies" element={<Navigate to="/librarian/books/copies" replace />} />
         <Route path="loans" element={<LibrarianModulePage />} />
         <Route path="fines" element={<LibrarianModulePage />} />
-        <Route path="ai-recommendations" element={<LibrarianModulePage />} />
+        <Route path="ai-settings" element={<LibrarianAiPage />} />
+        <Route path="ai-recommendations" element={<Navigate to="/librarian/ai-settings" replace />} />
         <Route path="circulation" element={<Navigate to="/librarian/circulation/loans" replace />} />
+        <Route path="circulation/direct-borrow" element={<DirectCheckoutPage />} />
+        <Route path="circulation/incidents/:incidentId" element={<CirculationIncidentDetailPage />} />
         <Route path="circulation/:tab" element={<CirculationPage />} />
         <Route path="reports" element={<LibrarianReportsPage />} />
         <Route path="reports/new" element={<LibrarianReportsPage />} />
         <Route path="reports/:id" element={<LibrarianReportDetailPage />} />
+        <Route path="news" element={<LibrarianNewsPage />} />
+        <Route path="news/:articleId" element={<NewsArticleDetailPage librarianMode />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="support/requests" element={<LibrarianSupportPage view="requests" />} />
         <Route path="support/replies" element={<LibrarianSupportPage view="replies" />} />
@@ -136,7 +167,7 @@ function App() {
         <Route path="regulations/create" element={<AdminRegulationsPage mode="create" />} />
         <Route path="regulations/:regulationId/edit" element={<AdminRegulationsPage mode="edit" />} />
         <Route path="regulations/:regulationId" element={<AdminRegulationsPage mode="view" />} />
-        <Route path="ai-settings" element={<AdminSectionPage title="Cấu hình AI" />} />
+        <Route path="ai-settings" element={<AdminAiSettingsPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
         <Route path="reports/assignments" element={<AdminReportsPage />} />
         <Route path="reports/activity" element={<AdminReportsPage />} />
@@ -151,6 +182,8 @@ function App() {
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Route>
     </Routes>
+    {role === 'Reader' && <RagAskPanel />}
+    </>
   );
 }
 

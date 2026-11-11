@@ -3,6 +3,7 @@ using SmartLibrary.Application.Common;
 using SmartLibrary.Domain.Enums;
 using SmartLibrary.Application.Features.Books;
 using SmartLibrary.Domain.Entities;
+using SmartLibrary.Infrastructure.Text;
 
 namespace SmartLibrary.Infrastructure.Persistence.Repositories;
 
@@ -11,41 +12,173 @@ namespace SmartLibrary.Infrastructure.Persistence.Repositories;
 /// </summary>
 public class BookRepository : RepositoryBase<Book>, IBookRepository
 {
-    public BookRepository(AppDbContext context) : base(context) { }
+    private readonly IBookCatalogCache _catalog;
 
-    public async Task<PagedResult<Book>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, CancellationToken ct = default)
+    public BookRepository(AppDbContext context, IBookCatalogCache catalog) : base(context)
     {
-        var query = _dbSet
-            .AsNoTracking()
-            .Include(b => b.Authors)
-            .Include(b => b.Categories)
-            .Where(b => !b.IsDeleted)
-            .AsQueryable();
+        _catalog = catalog;
+    }
 
-        if (categoryId.HasValue)
-        {
-            query = query.Where(b => b.Categories.Any(c => c.Id == categoryId.Value && !c.IsDeleted));
-        }
-
+    public async Task<PagedResult<Book>> GetPagedAsync(int page, int pageSize, string? search = null, Guid? categoryId = null, bool sortByReviewCount = false, bool reviewCountAscending = false, CancellationToken ct = default, bool sortByBorrowCount = false)
+    {
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var searchLower = search.Trim().ToLower();
-            query = query.Where(b =>
-                b.Title.ToLower().Contains(searchLower) ||
-                b.Code.ToLower().Contains(searchLower) ||
-                (b.Isbn != null && b.Isbn.ToLower().Contains(searchLower)));
+            var snapshots = await _catalog.GetAsync(ct);
+            if (categoryId.HasValue)
+                snapshots = snapshots.Where(book => book.CategoryIds.Contains(categoryId.Value)).ToList();
+
+            var ranked = snapshots
+                .Select(book => (
+                    Book: book,
+                    Score: BookKeywordRanker.Score(
+                        search,
+                        book.Title,
+                        book.Description,
+                        book.Code,
+                        book.Isbn,
+                        book.Authors,
+                        book.Categories,
+                        book.Language)))
+                .Where(item => item.Score > 0)
+                .OrderByDescending(item => item.Score)
+                .ThenBy(item => item.Book.Title)
+                .ToList();
+
+            if (sortByBorrowCount)
+            {
+                var matchingIds = ranked.Select(item => item.Book.Id).ToList();
+                var borrowCounts = await _context.BorrowRecords.AsNoTracking()
+                    .Where(record => !record.IsDeleted && matchingIds.Contains(record.BookCopy.BookId)
+                        && (record.Status == BorrowStatus.Borrowed || record.Status == BorrowStatus.Returned || record.Status == BorrowStatus.Overdue))
+                    .GroupBy(record => record.BookCopy.BookId)
+                    .Select(group => new { BookId = group.Key, Count = group.Count() })
+                    .ToDictionaryAsync(item => item.BookId, item => item.Count, ct);
+                ranked = ranked.OrderByDescending(item => borrowCounts.GetValueOrDefault(item.Book.Id))
+                    .ThenByDescending(item => item.Score).ThenBy(item => item.Book.Title).ToList();
+            }
+            else if (sortByReviewCount)
+            {
+                // EF Core 9 may evaluate captured arrays through Span.Contains,
+                // which fails during query parameter extraction on this target.
+                var matchingIds = ranked.Select(item => item.Book.Id).ToList();
+                var reviewCounts = await _context.Reviews.IgnoreQueryFilters().AsNoTracking()
+                    .Where(review => !review.IsDeleted && matchingIds.Contains(review.BookId))
+                    .GroupBy(review => review.BookId)
+                    .Select(group => new { BookId = group.Key, Count = group.Count() })
+                    .ToDictionaryAsync(item => item.BookId, item => item.Count, ct);
+
+                ranked = (reviewCountAscending
+                        ? ranked.OrderBy(item => reviewCounts.GetValueOrDefault(item.Book.Id))
+                        : ranked.OrderByDescending(item => reviewCounts.GetValueOrDefault(item.Book.Id)))
+                    .ThenByDescending(item => item.Score)
+                    .ThenBy(item => item.Book.Title)
+                    .ToList();
+            }
+
+            var pageBooks = ranked
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(item =>
+                {
+                    var book = ToBook(item.Book);
+                    return book;
+                })
+                .ToList();
+            if (pageBooks.Count > 0)
+            {
+                var pageIds = pageBooks.Select(book => book.Id).ToList();
+                var reviewCounts = await _context.Reviews.IgnoreQueryFilters().AsNoTracking()
+                    .Where(review => !review.IsDeleted && pageIds.Contains(review.BookId))
+                    .GroupBy(review => review.BookId)
+                    .Select(group => new { BookId = group.Key, Count = group.Count() })
+                    .ToDictionaryAsync(item => item.BookId, item => item.Count, ct);
+                foreach (var book in pageBooks) book.ReviewCount = reviewCounts.GetValueOrDefault(book.Id);
+                await PopulateBorrowCountsAsync(pageBooks, pageIds, ct);
+            }
+            return new PagedResult<Book>(pageBooks, ranked.Count, page, pageSize);
+        }
+
+        // Apply soft-delete predicates explicitly for the root and included relations.
+        var query = _dbSet.IgnoreQueryFilters().AsNoTracking().Where(book => !book.IsDeleted);
+        if (categoryId.HasValue)
+        {
+            var selectedCategoryId = categoryId.Value;
+            query = query.Where(book => book.Categories.Any(category => category.Id == selectedCategoryId && !category.IsDeleted));
         }
 
         var totalCount = await query.CountAsync(ct);
+        var orderedQuery = OrderCatalog(query, _context, sortByReviewCount, reviewCountAscending, sortByBorrowCount);
 
-        var items = await query
-            .OrderByDescending(b => b.CreatedAt)
+        var items = await orderedQuery
+            .AsSplitQuery()
+            .Include(book => book.Authors.Where(author => !author.IsDeleted))
+            .Include(book => book.Categories.Where(category => !category.IsDeleted))
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
 
+        if (items.Count > 0)
+        {
+            var pageIds = items.Select(book => book.Id).ToList();
+            var reviewCounts = await _context.Reviews.IgnoreQueryFilters().AsNoTracking()
+                .Where(review => !review.IsDeleted && pageIds.Contains(review.BookId))
+                .GroupBy(review => review.BookId)
+                .Select(group => new { BookId = group.Key, Count = group.Count() })
+                .ToDictionaryAsync(item => item.BookId, item => item.Count, ct);
+            foreach (var book in items) book.ReviewCount = reviewCounts.GetValueOrDefault(book.Id);
+            await PopulateBorrowCountsAsync(items, pageIds, ct);
+        }
+
         return new PagedResult<Book>(items, totalCount, page, pageSize);
     }
+
+    private async Task PopulateBorrowCountsAsync(List<Book> books, List<Guid> bookIds, CancellationToken ct)
+    {
+        var counts = await _context.BorrowRecords.AsNoTracking()
+            .Where(record => !record.IsDeleted && bookIds.Contains(record.BookCopy.BookId)
+                && (record.Status == BorrowStatus.Borrowed || record.Status == BorrowStatus.Returned || record.Status == BorrowStatus.Overdue))
+            .GroupBy(record => record.BookCopy.BookId)
+            .Select(group => new { BookId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(item => item.BookId, item => item.Count, ct);
+        foreach (var book in books) book.BorrowCount = counts.GetValueOrDefault(book.Id);
+    }
+
+    // Correlated counts translate to SQL without the problematic GroupJoin/DefaultIfEmpty.
+    public static IQueryable<Book> OrderCatalog(IQueryable<Book> query, AppDbContext context, bool sortByReviewCount, bool reviewCountAscending, bool sortByBorrowCount)
+    {
+        if (sortByBorrowCount)
+            return query.OrderByDescending(book => context.BorrowRecords.Count(record =>
+                    !record.IsDeleted && record.BookCopy.BookId == book.Id &&
+                    (record.Status == BorrowStatus.Borrowed || record.Status == BorrowStatus.Returned || record.Status == BorrowStatus.Overdue)))
+                .ThenBy(book => book.Title).ThenBy(book => book.Id);
+
+        if (sortByReviewCount)
+        {
+            var reviews = context.Reviews.IgnoreQueryFilters().Where(review => !review.IsDeleted);
+            return (reviewCountAscending
+                    ? query.OrderBy(book => reviews.Count(review => review.BookId == book.Id))
+                    : query.OrderByDescending(book => reviews.Count(review => review.BookId == book.Id)))
+                .ThenBy(book => book.Title).ThenBy(book => book.Id);
+        }
+
+        return query.OrderByDescending(book => book.CreatedAt).ThenBy(book => book.Id);
+    }
+
+    private static Book ToBook(BookCatalogItem item) => new()
+    {
+        Id = item.Id,
+        Title = item.Title,
+        Description = item.Description,
+        Code = item.Code,
+        Isbn = item.Isbn,
+        Language = item.Language ?? "vi",
+        CoverImageUrl = item.CoverImageUrl,
+        PublishedYear = item.PublishedYear,
+        AvailableCopies = item.AvailableCopies,
+        TotalCopies = item.TotalCopies,
+        Authors = item.Authors.Select(name => new Author { Name = name }).ToList(),
+        Categories = item.Categories.Select(name => new Category { Name = name }).ToList()
+    };
 
     public async Task<Book?> GetByIsbnAsync(string isbn, CancellationToken ct = default)
         => await _dbSet.FirstOrDefaultAsync(b => b.Isbn == isbn, ct);
@@ -63,6 +196,14 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
             .Include(b => b.Publisher)
             .Include(b => b.Copies)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+    public async Task<Book?> GetDeletedWithDetailsAsync(Guid id, CancellationToken ct = default)
+        => await _dbSet.IgnoreQueryFilters()
+            .Include(b => b.Authors)
+            .Include(b => b.Categories)
+            .Include(b => b.Publisher)
+            .Include(b => b.Copies)
+            .FirstOrDefaultAsync(b => b.Id == id && b.IsDeleted, ct);
 
     public async Task<int> GetNextCopyNumberAsync(Guid bookId, string bookCode, CancellationToken ct = default)
     {
@@ -93,6 +234,7 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
             copy.IsAvailable
             && copy.Condition != BookCondition.Damaged
             && copy.Condition != BookCondition.Lost
+            && copy.Location != null
             && !_context.BorrowRecords.Any(loan =>
                 loan.BookCopyId == copy.Id
                 && (loan.Status == BorrowStatus.Approved

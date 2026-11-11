@@ -6,6 +6,7 @@ export interface HomeCategory {
   id: string;
   name: string;
   description?: string | null;
+  customFields?: Record<string, string>;
   imageUrl?: string | null;
   bookCount: number;
 }
@@ -16,14 +17,23 @@ export interface HomeBook {
   title: string;
   isbn?: string | null;
   description?: string | null;
+  customFields?: Record<string, string>;
   coverImageUrl?: string | null;
   publishedYear?: number | null;
   language?: string;
   totalCopies: number;
   availableCopies: number;
   averageRating?: number;
+  reviewCount?: number;
+  borrowCount?: number;
   authorNames: string[];
   categoryNames: string[];
+  copyLocations?: string[];
+}
+
+export interface HomeBookHighlights {
+  topRated: HomeBook[];
+  mostBorrowed: HomeBook[];
 }
 
 export interface BookReview {
@@ -73,9 +83,10 @@ export function useHomeCategories() {
   });
 }
 
-export function useHomeBooks(categoryId: string, search: string, page: number) {
+export function useHomeBooks(categoryId: string, search: string, page: number, enabled = true, sortByReviewCount = false, reviewCountAscending = false) {
   return useQuery({
-    queryKey: ['public-home-books', categoryId, search, page],
+    queryKey: ['public-home-books', categoryId, search, page, sortByReviewCount, reviewCountAscending],
+    enabled,
     queryFn: async ({ signal }) => {
       const params = new URLSearchParams({
         page: String(page),
@@ -83,6 +94,10 @@ export function useHomeBooks(categoryId: string, search: string, page: number) {
       });
       if (categoryId) params.set('categoryId', categoryId);
       if (search.trim()) params.set('search', search.trim());
+      if (sortByReviewCount) {
+        params.set('sortByReviewCount', 'true');
+        params.set('reviewCountAscending', String(reviewCountAscending));
+      }
 
       const response = await fetch(`${API_BASE_URL}/api/v1/books?${params}`, { signal });
       const result = await getApiData<HomeBook[]>(response, 'Không tải được đầu sách');
@@ -92,6 +107,39 @@ export function useHomeBooks(categoryId: string, search: string, page: number) {
         totalCount: result.meta?.totalCount ?? result.data.length,
         totalPages: result.meta?.totalPages ?? 1,
       };
+    },
+    staleTime: 60_000,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useHomeBookSuggestions(search: string) {
+  const query = search.trim();
+  return useQuery({
+    queryKey: ['public-home-book-suggestions', query],
+    enabled: query.length >= 2,
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({ page: '1', pageSize: '8', search: query });
+      const response = await fetch(`${API_BASE_URL}/api/v1/books?${params}`, { signal });
+      const result = await getApiData<HomeBook[]>(response, 'Không tải được gợi ý sách');
+      if (!Array.isArray(result.data)) throw new Error('Dữ liệu gợi ý sách không hợp lệ.');
+      return result.data;
+    },
+    staleTime: 30_000,
+  });
+}
+
+export function useHomeBookHighlights(enabled: boolean) {
+  return useQuery({
+    queryKey: ['public-home-book-highlights'],
+    enabled,
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`${API_BASE_URL}/api/v1/books/highlights`, { signal });
+      const result = await getApiData<HomeBookHighlights>(response, 'Không tải được sách nổi bật');
+      if (!Array.isArray(result.data.topRated) || !Array.isArray(result.data.mostBorrowed)) {
+        throw new Error('Dữ liệu sách nổi bật không hợp lệ.');
+      }
+      return result.data;
     },
     staleTime: 60_000,
   });

@@ -3,6 +3,7 @@ import {
   AlertCircle,
   ArrowDownToLine,
   ArrowLeft,
+  ChartNoAxesCombined,
   CheckCircle2,
   Clock,
   Eye,
@@ -33,6 +34,8 @@ interface ReportRow {
   category: string;
   borrowed: number;
   returned: number;
+  overdue?: number;
+  amount?: number;
   notes: string | null;
 }
 
@@ -42,6 +45,7 @@ interface ReportDetail {
   name: string;
   submitter: string;
   templateName: string;
+  templateReportType?: string | null;
   createdAt: string;
   periodStart: string;
   periodEnd: string;
@@ -61,6 +65,8 @@ const formatDateTime = (val: string) =>
   new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(
     new Date(val),
   );
+
+const formatMoney = (amount: number) => `${(amount || 0).toLocaleString('vi-VN')} ₫`;
 
 const LibrarianReportDetailPage: React.FC = () => {
   const { id } = useParams();
@@ -123,6 +129,13 @@ const LibrarianReportDetailPage: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const isFinanceReport = report?.templateReportType === 'Finance';
+  const isCollectionReport = report?.templateReportType === 'Collection';
+  const financeTotalRow = report?.rows.find((row) => row.category.toLocaleLowerCase('vi').startsWith('tổng'));
+  const totalReportAmount = financeTotalRow?.amount
+    ?? report?.rows.reduce((total, row) => row.category.toLocaleLowerCase('vi').startsWith('tổng') ? total : total + (row.amount ?? 0), 0)
+    ?? 0;
+
   return (
     <div className="lib-reports-page">
       <div className="lib-panel-header" style={{ marginBottom: 4 }}>
@@ -133,7 +146,10 @@ const LibrarianReportDetailPage: React.FC = () => {
 
       <header className="lib-reports-header">
         <div>
-          <p className="lib-reports-eyebrow">CHI TIẾT BÁO CÁO ĐÃ GỬI</p>
+          <div className="lib-reports-eyebrow">
+            <ChartNoAxesCombined size={14} />
+            <span>KHÔNG GIAN THỦ THƯ • CHI TIẾT BÁO CÁO</span>
+          </div>
           <h1>{report?.name ?? 'Chi tiết báo cáo'}</h1>
           <p>
             Mã: <code style={{ color: '#eb753c', fontWeight: 700 }}>{report?.code ?? '—'}</code>
@@ -230,33 +246,28 @@ const LibrarianReportDetailPage: React.FC = () => {
               )}
             </div>
 
+            {isCollectionReport && <div className="lib-report-finance-total"><div><span>ẢNH CHỤP KHO SÁCH HIỆN TẠI</span></div><p>Hệ thống chưa lưu lịch sử nhập/xuất kho; số liệu này là tồn kho tại thời điểm lập báo cáo, không đại diện tồn kho của kỳ lịch sử.</p></div>}
+            {isFinanceReport && <div className="lib-report-finance-total"><div><span>TỔNG PHÍ PHÁT SINH TRONG KỲ</span><strong>{formatMoney(totalReportAmount)}</strong></div><p>Bao gồm các khoản phí thư viện được ghi nhận trong kỳ báo cáo.</p></div>}
             <div className="lib-table-wrap" style={{ marginTop: 16 }}>
               <table className="lib-table">
                 <thead>
                   <tr>
                     <th>Ngày</th>
-                    <th>Nhóm sách</th>
-                    <th>Lượt mượn</th>
-                    <th>Lượt trả</th>
-                    <th>Ghi chú</th>
+                    {isFinanceReport ? <><th>Khoản phí</th><th>Số tiền (VND)</th><th>Chi tiết</th></> : isCollectionReport ? <><th>Đầu sách</th><th>Tổng bản</th><th>Còn sẵn</th><th>Đang lưu hành</th><th>Ghi chú</th></> : <><th>Phạm vi</th><th>Lượt mượn</th><th>Lượt trả</th><th>Ghi chú</th></>}
                   </tr>
                 </thead>
                 <tbody>
                   {report.rows.length ? (
                     report.rows.map((row, idx) => (
-                      <tr key={idx}>
-                        <td>{formatDate(row.date)}</td>
-                        <td>
-                          <strong>{row.category}</strong>
-                        </td>
-                        <td>{row.borrowed}</td>
-                        <td>{row.returned}</td>
-                        <td>{row.notes || '—'}</td>
+                      <tr key={idx} className={isFinanceReport && row.category.toLocaleLowerCase('vi').startsWith('tổng') ? 'lib-report-total-row' : undefined}>
+                        <td>{isFinanceReport && row.category.toLocaleLowerCase('vi').startsWith('tổng') ? '—' : formatDate(row.date)}</td>
+                        <td><strong>{row.category}</strong></td>
+                        {isFinanceReport ? <><td className="lib-report-money-cell">{formatMoney(row.amount ?? 0)}</td><td>{row.notes || '—'}</td></> : isCollectionReport ? <><td>{row.borrowed}</td><td>{row.returned}</td><td>{row.overdue ?? 0}</td><td>{row.notes || '—'}</td></> : <><td>{row.borrowed}</td><td>{row.returned}</td><td>{row.notes || '—'}</td></>}
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="lib-table-empty">
+                      <td colSpan={isFinanceReport ? 4 : isCollectionReport ? 7 : 5} className="lib-table-empty">
                         Không có dòng dữ liệu.
                       </td>
                     </tr>

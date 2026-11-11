@@ -16,6 +16,7 @@ export interface Book {
   status: 'available' | 'reserved_only' | 'maintenance';
   description: string;
   matchScore?: number;
+  matchLabel?: string;
   recommendReason?: string;
   isNewArrival?: boolean;
   borrowCount?: number;
@@ -44,13 +45,4 @@ export interface FaqItem {
   question: string;
   answer: string;
   category: string;
-}
-
-export interface ServiceItem {
-  id: string;
-  title: string;
-  description: string;
-  iconName: string;
-  route: string;
-  badge?: string;
 }

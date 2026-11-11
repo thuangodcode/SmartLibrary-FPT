@@ -1,20 +1,28 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, Navigate, NavLink, useParams, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import {
-  AlertCircle,
-  ArrowRight,
   BookOpen,
-  ChevronRight,
+  Bookmark,
+  BellRing,
+  Check,
   Clock3,
   Eye,
   LoaderCircle,
-  MoreHorizontal,
+  Mail,
   RefreshCw,
   RotateCcw,
+  Search,
+  UserRound,
   Wallet,
+  X,
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
+import { useToast } from '../../../components/ui/useToast';
+import { AnimatedCalendar } from '../../../components/ui/AnimatedCalendar';
+import { useAuthStore } from '../../auth/store/useAuthStore';
 import {
   STATUS_LABELS,
   TABS,
@@ -42,6 +50,7 @@ import './CirculationPage.css';
 const TAB_ICONS = {
   loans: BookOpen,
   return: RotateCcw,
+  reservations: Bookmark,
   overdue: Clock3,
   fines: Wallet,
 } as const;
@@ -54,11 +63,270 @@ interface LoanList {
   totalPages: number;
 }
 
-interface IncidentDraft {
-  severity: string;
-  amount: string;
-  applyOverdue: boolean;
-  notes: string;
+interface DueReminderSettings {
+  isEnabled: boolean;
+  reminderDays: number;
+  updatedAt: string;
+}
+
+function dateOnly(value: Date): string {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+}
+
+function dayStart(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+interface ReturnResult extends CirculationLoan {
+  incidentOpened?: boolean;
+  incidentId?: string | null;
+}
+
+function policyIncidentFee(stats: CirculationStats | null, severity: string): number {
+  if (!stats || !['Light', 'Severe', 'Lost'].includes(severity)) return 0;
+  return severity === 'Light' ? stats.damageFee || 0 : stats.lostFee || 0;
+}
+
+interface ReservationOption {
+  id: string;
+  label: string;
+  detail: string;
+  studentId?: string | null;
+  email?: string;
+  code?: string;
+  coverImageUrl?: string | null;
+  sampleBarcode?: string | null;
+  availableCopies?: number;
+}
+
+function ReservationAutocomplete({
+  label,
+  value,
+  selected,
+  placeholder,
+  endpoint,
+  onChange,
+  onSelect,
+  onClear,
+}: {
+  label: string;
+  value: string;
+  selected: ReservationOption | null;
+  placeholder: string;
+  endpoint: 'reader' | 'book';
+  onChange: (value: string) => void;
+  onSelect: (option: ReservationOption) => void;
+  onClear: () => void;
+}) {
+  const [result, setResult] = useState<{
+    query: string;
+    options: ReservationOption[];
+    error: string | null;
+  }>({ query: '', options: [], error: null });
+  const [focused, setFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listboxId = useId();
+  const headers = useCirculationAuth();
+  const query = value.trim();
+
+  useEffect(() => {
+    if (!query) return undefined;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const path = endpoint === 'reader'
+            ? '/api/v1/circulation/reservation-reader-options'
+            : '/api/v1/circulation/reservation-book-options';
+          const response = await fetch(`${API_BASE_URL}${path}?search=${encodeURIComponent(query)}`, {
+            headers,
+            signal: controller.signal,
+          });
+          if (response.status === 404) {
+            throw new Error('API gợi ý chưa có trên máy chủ. Hãy cập nhật và khởi động lại backend.');
+          }
+          const result = await parseApiResponse<ApiResult<Array<{
+            id: string;
+            fullName?: string;
+            studentId?: string | null;
+            email?: string;
+            title?: string;
+            code?: string;
+            availableCopies?: number;
+            sampleBarcode?: string | null;
+            coverImageUrl?: string | null;
+          }>>>(response);
+          if (!response.ok || !result?.success || !result.data) {
+            throw new Error(result?.error || 'Không tải được danh sách gợi ý.');
+          }
+          setResult({
+            query,
+            options: result.data.map((item) => endpoint === 'reader'
+              ? {
+                id: item.id,
+                label: item.fullName || '',
+                detail: [item.studentId, item.email].filter(Boolean).join(' · '),
+                studentId: item.studentId,
+                email: item.email,
+              }
+              : {
+                id: item.id,
+                label: item.title || '',
+                detail: [
+                  item.code,
+                  item.availableCopies !== undefined
+                    ? item.availableCopies > 0
+                      ? `${item.availableCopies} bản sao sẵn sàng`
+                      : 'Hết bản sao'
+                    : null,
+                ].filter(Boolean).join(' · '),
+                code: item.code,
+                coverImageUrl: item.coverImageUrl,
+                sampleBarcode: item.sampleBarcode,
+                availableCopies: item.availableCopies,
+              }),
+            error: null,
+          });
+        } catch (caught) {
+          if (controller.signal.aborted) return;
+          setResult({
+            query,
+            options: [],
+            error: errorMessage(caught, 'Không tải được danh sách gợi ý.'),
+          });
+        }
+      })();
+    }, 180);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [endpoint, headers, query]);
+
+  const isCurrentResult = result.query === query;
+  const suggestions = isCurrentResult ? result.options : [];
+  const isSearching = Boolean(query) && !isCurrentResult;
+  const showFeedback = focused && Boolean(query);
+  const FieldIcon = endpoint === 'reader' ? UserRound : BookOpen;
+
+  const selectOption = (option: ReservationOption) => {
+    onSelect(option);
+    setFocused(false);
+    setActiveIndex(-1);
+  };
+
+  return (
+    <div
+      className="circ-autocomplete"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
+      }}
+    >
+      {selected ? (
+        <div className="circ-selected-option">
+          <div className="circ-selected-option__icon"><Check size={18} /></div>
+          <div className="circ-selected-option__content">
+            <span>Đã chọn {label.toLowerCase()}</span>
+            <strong>{selected.label}</strong>
+            {selected.detail && <small>{selected.detail}</small>}
+          </div>
+          <button
+            type="button"
+            className="circ-selected-option__clear"
+            onClick={() => {
+              onClear();
+              window.requestAnimationFrame(() => inputRef.current?.focus());
+            }}
+          >
+            <X size={15} />
+            Đổi
+          </button>
+        </div>
+      ) : (
+        <>
+          <label className="circ-field" htmlFor={listboxId}>
+            <span className="circ-reservation-label">
+              {label}
+            </span>
+            <span className="circ-autocomplete-control">
+              <FieldIcon size={18} aria-hidden="true" />
+              <input
+                ref={inputRef}
+                id={listboxId}
+                value={value}
+                placeholder={placeholder}
+                autoComplete="off"
+                role="combobox"
+                aria-expanded={showFeedback && (suggestions.length > 0 || isSearching)}
+                aria-autocomplete="list"
+                aria-controls={`${listboxId}-options`}
+                aria-activedescendant={activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined}
+                onFocus={() => setFocused(true)}
+                onChange={(event) => {
+                  setActiveIndex(-1);
+                  onChange(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowDown' && suggestions.length) {
+                    event.preventDefault();
+                    setActiveIndex((index) => Math.min(index + 1, suggestions.length - 1));
+                  } else if (event.key === 'ArrowUp' && suggestions.length) {
+                    event.preventDefault();
+                    setActiveIndex((index) => Math.max(index - 1, 0));
+                  } else if (event.key === 'Enter' && activeIndex >= 0) {
+                    event.preventDefault();
+                    const option = suggestions[activeIndex];
+                    if (option) selectOption(option);
+                  } else if (event.key === 'Escape') {
+                    setFocused(false);
+                    setActiveIndex(-1);
+                  }
+                }}
+              />
+              {isSearching && <LoaderCircle className="spin" size={17} aria-label="Đang tìm" />}
+            </span>
+          </label>
+          {showFeedback && (
+            <div className="circ-autocomplete-options" role="listbox" id={`${listboxId}-options`}>
+              {isSearching ? (
+                <p className="circ-autocomplete-feedback">
+                  <LoaderCircle className="spin" size={16} /> Đang tìm trong thư viện...
+                </p>
+              ) : result.error ? (
+                <p className="circ-autocomplete-feedback is-error" role="alert">{result.error}</p>
+              ) : suggestions.length ? (
+                suggestions.map((option, index) => (
+                  <button
+                    type="button"
+                    role="option"
+                    id={`${listboxId}-option-${index}`}
+                    aria-selected={index === activeIndex}
+                    key={option.id}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectOption(option)}
+                  >
+                    {endpoint === 'book' && (option.coverImageUrl
+                      ? <img className="circ-book-option-cover" src={option.coverImageUrl} alt="" loading="lazy" />
+                      : <span className="circ-book-option-cover circ-book-option-cover--empty"><BookOpen size={18} aria-hidden="true" /></span>)}
+                    <span className="circ-book-option-copy">
+                      <strong>{option.label}</strong>
+                      {option.detail && <small>{option.detail}</small>}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <p className="circ-autocomplete-feedback">Không tìm thấy kết quả phù hợp.</p>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 function DebouncedSearchInput({
@@ -99,8 +367,11 @@ function Chrome({ tab, stats, loading }: { tab: CirculationTab; stats: Circulati
         <strong>{current.crumb}</strong>
       </nav>
       <header className="circ-hero">
-        <span className="circ-hero-icon"><HeroIcon size={22} /></span>
         <div>
+          <div className="lib-circ-eyebrow">
+            <HeroIcon size={14} />
+            <span>KHÔNG GIAN THỦ THƯ • QUẢN LÝ DỊCH VỤ</span>
+          </div>
           <h1>{current.label}</h1>
           <p>{current.description}</p>
         </div>
@@ -139,37 +410,109 @@ function Chrome({ tab, stats, loading }: { tab: CirculationTab; stats: Circulati
           </div>
         </article>
       </section>
-      <nav className="circ-tabs" aria-label="Chức năng mượn trả">
-        {TABS.map((item) => {
-          const Icon = TAB_ICONS[item.id];
-          return (
-            <NavLink key={item.id} to={item.to} className={`circ-tab${tab === item.id ? ' is-active' : ''}`}>
-              <Icon size={15} />
-              {item.label}
-            </NavLink>
-          );
-        })}
-      </nav>
     </>
+  );
+}
+
+function WorkflowTabs({
+  label,
+  value,
+  tabs,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  tabs: Array<{ value: string; label: string; count?: number }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="circ-workflow-tabs" role="tablist" aria-label={label}>
+      {tabs.map((tab) => (
+        <button
+          key={tab.value}
+          id={`circ-tab-${tab.value}`}
+          type="button"
+          role="tab"
+          aria-selected={value === tab.value}
+          aria-controls={`circ-panel-${tab.value}`}
+          className={value === tab.value ? 'is-active' : ''}
+          onClick={() => onChange(tab.value)}
+        >
+          {tab.label}
+          {tab.count !== undefined && <span>{tab.count}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CirculationConfirmDialog({
+  eyebrow,
+  title,
+  message,
+  confirmLabel,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  eyebrow: string;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="circ-payment-backdrop" role="presentation" onClick={onCancel}>
+      <section
+        className="circ-payment-dialog circ-confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="circ-confirm-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <p>{eyebrow}</p>
+        <h2 id="circ-confirm-title">{title}</h2>
+        <span>{message}</span>
+        <div className="circ-payment-options circ-confirm-actions">
+          <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={onConfirm}>
+            {busy && <LoaderCircle className="spin" size={14} />}
+            {confirmLabel}
+          </button>
+          <button type="button" className="circ-btn" disabled={busy} onClick={onCancel}>Hủy</button>
+        </div>
+      </section>
+    </div>
   );
 }
 
 function LoansView() {
   const headers = useCirculationAuth();
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const { showToast } = useToast();
   const [params, setParams] = useSearchParams();
   const [stats, setStats] = useState<CirculationStats | null>(null);
   const [list, setList] = useState<LoanList | null>(null);
-  const [fines, setFines] = useState<CirculationFine[]>([]);
   const [pending, setPending] = useState<CirculationLoan[]>([]);
-  const [readerKey, setReaderKey] = useState('');
-  const [borrowBarcode, setBorrowBarcode] = useState('');
+  const [pendingSearch, setPendingSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<CirculationLoan | null>(null);
+  const [loansView, setLoansView] = useState<'pending' | 'list' | 'due'>('pending');
+  const [dueLoans, setDueLoans] = useState<CirculationLoan[]>([]);
+  const [dueLoading, setDueLoading] = useState(false);
+  const [dueError, setDueError] = useState<string | null>(null);
+  const [dueRange, setDueRange] = useState<Date[]>([]);
+  const [dueHorizon, setDueHorizon] = useState<7 | 14 | 30>(30);
+  const [reminderSettings, setReminderSettings] = useState<DueReminderSettings>({ isEnabled: false, reminderDays: 7, updatedAt: '' });
+  const [reminderSaving, setReminderSaving] = useState(false);
+  const [reminderMessage, setReminderMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const search = params.get('q') ?? '';
-  const status = params.get('status') ?? 'All';
+  const borrowedFrom = params.get('borrowedFrom') ?? '';
+  const borrowedTo = params.get('borrowedTo') ?? '';
   const page = Number(params.get('page') ?? '1') || 1;
   const setFilter = useCallback((key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -181,33 +524,142 @@ function LoansView() {
 
   const load = useCallback(async () => {
     try {
-      const query = new URLSearchParams({ page: String(page), pageSize: '8' });
+      const query = new URLSearchParams({ page: String(page), pageSize: '20', status: 'Borrowed' });
       if (search.trim()) query.set('search', search.trim());
-      if (status !== 'All') query.set('status', status);
-      const [statsRes, listRes, fineRes, pendingRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
-        fetch(`${API_BASE_URL}/api/v1/circulation/loans?${query}`, { headers }),
-        fetch(`${API_BASE_URL}/api/v1/circulation/fines?status=Pending`, { headers }),
-        fetch(`${API_BASE_URL}/api/v1/circulation/pending`, { headers }),
-      ]);
-      const statsJson = await parseApiResponse<ApiResult<CirculationStats>>(statsRes);
+      if (borrowedFrom) query.set('borrowedFrom', borrowedFrom);
+      if (borrowedTo) query.set('borrowedTo', borrowedTo);
+      const listRes = await fetch(`${API_BASE_URL}/api/v1/circulation/loans?${query}`, { headers });
       const listJson = await parseApiResponse<ApiResult<LoanList>>(listRes);
-      const fineJson = await parseApiResponse<ApiResult<CirculationFine[]>>(fineRes);
-      const pendingJson = await parseApiResponse<ApiResult<CirculationLoan[]>>(pendingRes);
       if (!listRes.ok || !listJson?.success || !listJson.data) throw new Error(listJson?.error || 'Không tải được danh sách mượn.');
       setError(null);
-      setStats(statsJson?.data ?? null);
       setList(listJson.data);
-      setFines(fineJson?.data ?? []);
-      setPending(pendingJson?.data ?? []);
     } catch (err) {
-      setError(errorMessage(err, 'Lỗi tải dữ liệu.'));
+      const message = errorMessage(err, 'Lỗi tải dữ liệu.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được danh sách mượn', message });
     } finally {
       setLoading(false);
     }
-  }, [headers, page, search, status]);
+  }, [borrowedFrom, borrowedTo, headers, page, search, showToast]);
+
+  const loadDashboard = useCallback(async () => {
+    try {
+      const [statsRes, pendingRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/circulation/pending`, { headers }),
+      ]);
+      const [statsJson, pendingJson] = await Promise.all([
+        parseApiResponse<ApiResult<CirculationStats>>(statsRes),
+        parseApiResponse<ApiResult<CirculationLoan[]>>(pendingRes),
+      ]);
+      if (statsRes.ok && statsJson?.success) setStats(statsJson.data ?? null);
+      if (pendingRes.ok && pendingJson?.success) setPending(pendingJson.data ?? []);
+    } catch (err) {
+      const message = errorMessage(err, 'Không tải được thông tin tổng quan.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được thông tin tổng quan', message });
+    }
+  }, [headers, showToast]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
+
+  useEffect(() => { void Promise.resolve().then(loadDashboard); }, [loadDashboard]);
+
+  useEffect(() => {
+    let active = true;
+    void fetch(`${API_BASE_URL}/api/v1/circulation/due-reminder-settings`, { headers })
+      .then((response) => parseApiResponse<ApiResult<DueReminderSettings>>(response))
+      .then((result) => {
+        if (active && result?.success && result.data) setReminderSettings(result.data);
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [headers]);
+
+  useEffect(() => {
+    if (loansView !== 'due') return undefined;
+    let active = true;
+    const query = new URLSearchParams();
+    if (dueRange.length === 1) {
+      query.set('from', dateOnly(dueRange[0]));
+      query.set('to', dateOnly(dueRange[0]));
+    } else if (dueRange.length > 1) {
+      query.set('from', dateOnly(dueRange[0]));
+      query.set('to', dateOnly(dueRange[1]));
+    }
+    void fetch(`${API_BASE_URL}/api/v1/circulation/loans/due-soon${query.size ? `?${query}` : ''}`, { headers })
+      .then(async (response) => {
+        const result = await parseApiResponse<ApiResult<CirculationLoan[]>>(response);
+        if (!response.ok || !result?.success) throw new Error(result?.error || 'Không tải được sách sắp đến hạn.');
+        if (active) {
+          setDueLoans(result.data ?? []);
+          setDueError(null);
+        }
+      })
+      .catch((reason: unknown) => {
+        if (active) setDueError(errorMessage(reason, 'Không tải được sách sắp đến hạn.'));
+      })
+      .finally(() => { if (active) setDueLoading(false); });
+    return () => { active = false; };
+  }, [dueRange, headers, loansView]);
+
+  const saveReminderSettings = async () => {
+    setReminderSaving(true);
+    setReminderMessage(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/circulation/due-reminder-settings`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(reminderSettings),
+      });
+      const result = await parseApiResponse<ApiResult<DueReminderSettings>>(response);
+      if (!response.ok || !result?.success || !result.data) throw new Error(result?.error || 'Không lưu được cấu hình nhắc hạn.');
+      setReminderSettings(result.data);
+      setReminderMessage(result.meta?.message || 'Đã lưu cấu hình nhắc hạn trả sách.');
+    } catch (reason) {
+      setDueError(errorMessage(reason, 'Không lưu được cấu hình nhắc hạn.'));
+    } finally {
+      setReminderSaving(false);
+    }
+  };
+
+  const refreshRef = useRef(() => {
+    void load();
+    void loadDashboard();
+  });
+  useEffect(() => {
+    refreshRef.current = () => {
+      void load();
+      void loadDashboard();
+    };
+  }, [load, loadDashboard]);
+
+  useEffect(() => {
+    if (!accessToken) return undefined;
+    let active = true;
+    const hub = new HubConnectionBuilder()
+      .withUrl(`${API_BASE_URL}/hubs/notifications`, { accessTokenFactory: () => accessToken })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Warning)
+      .build();
+    hub.on('BorrowRequestUpdated', () => {
+      if (active) refreshRef.current();
+    });
+    hub.onreconnected(() => {
+      if (active) refreshRef.current();
+    });
+    void hub.start().catch((caught: unknown) => {
+      if (active) {
+        const message = errorMessage(caught, 'Không kết nối được cập nhật mượn sách thời gian thực.');
+        setError(message);
+        showToast({ type: 'error', title: 'Lỗi kết nối realtime', message });
+      }
+    });
+    return () => {
+      active = false;
+      void hub.stop();
+    };
+  }, [accessToken, showToast]);
 
   const post = async (url: string, body?: object) => {
     setBusy(true);
@@ -221,59 +673,276 @@ function LoansView() {
       });
       const json = await parseApiResponse<ApiResult<unknown>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Thao tác thất bại.');
-      setMessage(json.meta?.message || 'Đã cập nhật.');
-      setBorrowBarcode('');
+      const message = json.meta?.message || 'Đã cập nhật.';
+      setMessage(message);
+      showToast({ type: 'success', title: 'Thao tác thành công', message });
       await load();
+      await loadDashboard();
     } catch (err) {
-      setError(errorMessage(err, 'Thao tác thất bại.'));
+      const message = errorMessage(err, 'Thao tác thất bại.');
+      setError(message);
+      showToast({ type: 'error', title: 'Thao tác thất bại', message });
     } finally {
       setBusy(false);
     }
   };
 
+  const pendingTerm = pendingSearch.trim().toLocaleLowerCase('vi');
+  const filteredPending = pending.filter((item) => [
+    item.readerName,
+    item.readerEmail,
+    item.studentId,
+    item.bookTitle,
+    item.barcode,
+    item.code,
+  ].some((value) => value?.toLocaleLowerCase('vi').includes(pendingTerm)));
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const dueVisibleLoans = dueLoans.filter((loan) => {
+    const dueDay = dayStart(loan.dueDate);
+    if (dueDay === null) return false;
+    const daysRemaining = Math.ceil((dueDay - todayStart.getTime()) / 86_400_000);
+    return daysRemaining >= 0 && (dueRange.length > 0 || daysRemaining <= dueHorizon);
+  });
+  const dueMilestones = ([7, 14, 30] as const).map((days) => ({
+    days,
+    count: dueLoans.filter((loan) => {
+      const dueDay = dayStart(loan.dueDate);
+      return dueDay !== null && dueDay >= todayStart.getTime() && dueDay <= todayStart.getTime() + days * 86_400_000;
+    }).length,
+  }));
+
   return (
-    <section className="circ-page">
+    <section className="circ-page circ-page--loans">
       <Chrome tab="loans" stats={stats} loading={loading} />
       {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
 
-      <form
-        className="circ-card"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void post('/api/v1/circulation/checkout', { readerKey, barcode: borrowBarcode });
+      <WorkflowTabs
+        label="Nội dung mượn sách"
+        value={loansView}
+        onChange={(value) => {
+          const nextView = value as 'pending' | 'list' | 'due';
+          if (nextView === 'due') setDueLoading(true);
+          setLoansView(nextView);
         }}
-      >
-        <h2>Mượn sách tại quầy</h2>
-        <div className="circ-checkout">
-          <label className="circ-field">
-            Mã thẻ hoặc tên độc giả
-            <input value={readerKey} onChange={(e) => setReaderKey(e.target.value)} placeholder="Nhập mã thẻ, email hoặc mã sinh viên" />
-          </label>
-          <label className="circ-field">
-            Mã vạch sách
-            <input value={borrowBarcode} onChange={(e) => setBorrowBarcode(e.target.value)} placeholder="Quét hoặc nhập mã bản sao, ví dụ py01-01" />
-          </label>
-          <button type="submit" className="circ-btn circ-btn--primary" disabled={busy}>
-            Xác nhận mượn <ArrowRight size={14} />
-          </button>
-        </div>
-      </form>
+        tabs={[
+          { value: 'pending', label: 'Yêu cầu chờ xử lý', count: pending.length },
+          { value: 'list', label: 'Danh sách mượn sách', count: list?.totalCount ?? 0 },
+          { value: 'due', label: 'Sắp đến hạn', count: dueLoans.length },
+        ]}
+      />
 
-      <div className="circ-layout">
+      {loansView === 'due' ? (
+        <section className="circ-due-workspace" id="circ-panel-due" role="tabpanel" aria-labelledby="circ-tab-due" tabIndex={0}>
+          <div className="circ-due-heading">
+            <div>
+              <span className="circ-eyebrow">THEO DÕI HẠN TRẢ</span>
+              <h2>Sách gần đến hạn</h2>
+              <p>Chủ động theo dõi lịch trả và nhắc độc giả trước ngày đến hạn.</p>
+            </div>
+            <AnimatedCalendar
+              mode="range"
+              value={dueRange}
+              onChange={(range) => { setDueLoading(true); setDueRange(range); }}
+              placeholder="Chọn khoảng ngày đến hạn"
+              ariaLabel="Lọc sách theo khoảng ngày đến hạn"
+            />
+          </div>
+
+          <div className="circ-due-milestones" aria-label="Các mốc thời gian đến hạn">
+            {dueMilestones.map(({ days, count }) => (
+              <button
+                key={days}
+                type="button"
+                className={dueHorizon === days ? 'is-active' : ''}
+                onClick={() => setDueHorizon(days)}
+              >
+                <span>Trong {days} ngày</span>
+                <strong>{count}</strong>
+                <small>{count === 1 ? 'phiếu mượn' : 'phiếu mượn'}</small>
+              </button>
+            ))}
+          </div>
+
+          <div className="circ-reminder-settings">
+            <span className="circ-reminder-settings__icon"><Mail size={19} /></span>
+            <div className="circ-reminder-settings__copy">
+              <strong>Nhắc hạn trả qua email</strong>
+              <p>{reminderSettings.isEnabled
+                ? `Hệ thống sẽ tự gửi email trước hạn ${reminderSettings.reminderDays} ngày.`
+                : 'Đang tắt. Bật để hệ thống tự gửi email nhắc độc giả.'}</p>
+            </div>
+            <label className="circ-reminder-days">
+              <span>Nhắc trước</span>
+              <select
+                value={reminderSettings.reminderDays}
+                onChange={(event) => setReminderSettings((current) => ({ ...current, reminderDays: Number(event.target.value) }))}
+              >
+                <option value={7}>7 ngày</option>
+                <option value={14}>14 ngày</option>
+              </select>
+            </label>
+            <label className="circ-reminder-toggle">
+              <input
+                type="checkbox"
+                checked={reminderSettings.isEnabled}
+                onChange={(event) => setReminderSettings((current) => ({ ...current, isEnabled: event.target.checked }))}
+              />
+              <span>Bật tự động</span>
+            </label>
+            <button type="button" className="circ-btn circ-btn--primary" disabled={reminderSaving} onClick={() => void saveReminderSettings()}>
+              {reminderSaving ? <LoaderCircle className="spin" size={15} /> : <BellRing size={15} />}
+              {reminderSaving ? 'Đang lưu...' : 'Lưu cấu hình'}
+            </button>
+          </div>
+          {reminderMessage && <p className="circ-banner is-ok">{reminderMessage}</p>}
+          {dueError && <p className="circ-banner is-err">{dueError}</p>}
+
+          <div className="circ-card circ-due-list-card">
+            <div className="circ-card-head">
+              <div>
+                <h2>Danh sách cần theo dõi</h2>
+                <p>{dueRange.length ? 'Kết quả trong khoảng ngày đã chọn.' : `Các phiếu đến hạn trong ${dueHorizon} ngày tới.`}</p>
+              </div>
+              <span className="circ-count">{dueVisibleLoans.length} phiếu</span>
+            </div>
+            {dueLoading ? (
+              <p className="circ-empty"><LoaderCircle className="spin" size={17} /> Đang tải lịch đến hạn...</p>
+            ) : !dueVisibleLoans.length ? (
+              <p className="circ-empty">Không có sách đến hạn trong mốc thời gian này.</p>
+            ) : (
+              <div className="circ-due-list">
+                {dueVisibleLoans.map((loan) => {
+                  const dueDay = dayStart(loan.dueDate) ?? todayStart.getTime();
+                  const daysLeft = Math.max(0, Math.ceil((dueDay - todayStart.getTime()) / 86_400_000));
+                  return (
+                    <article className="circ-due-row" key={loan.id}>
+                      <div className="circ-due-row__cover">
+                        {loan.coverImageUrl
+                          ? <img src={loan.coverImageUrl} alt={`Bìa sách ${loan.bookTitle}`} loading="lazy" />
+                          : <BookOpen size={22} aria-hidden="true" />}
+                      </div>
+                      <div className="circ-due-row__book">
+                        <strong>{loan.bookTitle}</strong>
+                        <span>{loan.code} · Mã bản sao: {loan.barcode}</span>
+                      </div>
+                      <div className="circ-due-row__reader">
+                        <strong>{loan.readerName}</strong>
+                        <span>{loan.readerEmail || 'Chưa có email độc giả'}</span>
+                      </div>
+                      <div className={`circ-due-row__date${daysLeft <= 3 ? ' is-soon' : ''}`}>
+                        <span>{daysLeft === 0 ? 'Đến hạn hôm nay' : `Còn ${daysLeft} ngày`}</span>
+                        <strong>{formatDate(loan.dueDate)}</strong>
+                      </div>
+                      <button type="button" className="circ-btn" onClick={() => setDetail(loan)}>
+                        <Eye size={14} /> Xem phiếu
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+      ) : loansView === 'pending' ? (
+      <section className="circ-card circ-pending-card" id="circ-panel-pending" role="tabpanel" aria-labelledby="circ-tab-pending" tabIndex={0}>
+        <div className="circ-card-head">
+          <div>
+            <h2>Yêu cầu chờ xử lý</h2>
+            <p className="circ-card-subtitle">Tiếp nhận yêu cầu và xác nhận giao sách tại quầy.</p>
+          </div>
+          <div className="circ-pending-tools">
+            <span className="circ-count">{filteredPending.length} / {pending.length} yêu cầu</span>
+            <Link className="circ-btn circ-btn--primary" to="/librarian/circulation/direct-borrow">Mượn tại quầy</Link>
+          </div>
+        </div>
+        <div className="circ-pending-search">
+          <DebouncedSearchInput
+            value={pendingSearch}
+            onSearch={setPendingSearch}
+          />
+        </div>
+        {loading && !pending.length ? (
+          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải yêu cầu...</p>
+        ) : !filteredPending.length ? (
+          <p className="circ-empty">{pendingSearch.trim() ? 'Không tìm thấy yêu cầu phù hợp.' : 'Không có yêu cầu chờ xử lý.'}</p>
+        ) : (
+          <div className="circ-table-wrap circ-request-table-wrap">
+            <table className="circ-table circ-request-table">
+              <thead>
+                <tr>
+                  <th>Độc giả</th>
+                  <th>Sách / bản sao</th>
+                  <th>Lịch nhận</th>
+                  <th>Tiếp nhận</th>
+                  <th>Trạng thái</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPending.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <span className="circ-reader">
+                        <span className="circ-avatar">{initials(item.readerName)}</span>
+                        <span className="circ-request-reader-info">
+                          <strong>{item.readerName}</strong>
+                          <small>{item.studentId || item.readerEmail || 'Chưa có mã độc giả'}</small>
+                        </span>
+                      </span>
+                    </td>
+                    <td className="circ-request-book-cell">
+                      <strong>{item.bookTitle}</strong>
+                      <small>Mã bản sao: {item.barcode}</small>
+                    </td>
+                    <td>{formatDateTime(item.pickupAt)}</td>
+                    <td>
+                      {item.status === 'Approved' ? (
+                        <span className="circ-request-accepted-info">
+                          <strong>{item.librarianName || 'Thủ thư'}</strong>
+                          <small>{formatDateTime(item.acceptedAt)}</small>
+                        </span>
+                      ) : <span className="circ-request-pending-info">Chưa tiếp nhận</span>}
+                    </td>
+                    <td>
+                      <span className={`circ-badge is-${item.status.toLowerCase()}`}>
+                        {STATUS_LABELS[item.status] ?? item.status}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="circ-request-actions">
+                        {item.status === 'Pending' ? (
+                          <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${item.id}/approve`)}>Tiếp nhận</button>
+                        ) : (
+                          <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${item.id}/checkout`)}>Giao sách</button>
+                        )}
+                        <button type="button" className="circ-btn circ-btn--quiet" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${item.id}/reject`)}>Từ chối</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      ) : <div className="circ-layout circ-layout--loans" id="circ-panel-list" role="tabpanel" aria-labelledby="circ-tab-list" tabIndex={0}>
         <div className="circ-main">
           <div className="circ-card">
             <div className="circ-card-head">
               <h2>Danh sách mượn sách</h2>
               <div className="circ-toolbar">
                 <DebouncedSearchInput key={search} value={search} onSearch={(value) => setFilter('q', value)} />
-                <select value={status} onChange={(e) => setFilter('status', e.target.value)}>
-                  <option value="All">Tất cả trạng thái</option>
-                  <option value="Borrowed">Đang mượn</option>
-                  <option value="Returned">Đã trả</option>
-                  <option value="Overdue">Quá hạn</option>
-                  <option value="Pending">Chờ xác nhận</option>
-                </select>
+                <label className="circ-date-filter">Từ ngày
+                  <input type="date" value={borrowedFrom} max={borrowedTo || undefined}
+                    onChange={(event) => setFilter('borrowedFrom', event.target.value)} />
+                </label>
+                <label className="circ-date-filter">Đến ngày
+                  <input type="date" value={borrowedTo} min={borrowedFrom || undefined}
+                    onChange={(event) => setFilter('borrowedTo', event.target.value)} />
+                </label>
               </div>
             </div>
             {loading && !list ? (
@@ -309,21 +978,6 @@ function LoansView() {
                         <td>
                           <div className="circ-actions">
                             <button type="button" className="circ-btn" onClick={() => setDetail(loan)}><Eye size={14} /> Xem</button>
-                            <details className="circ-more">
-                              <summary aria-label="Thao tác khác"><MoreHorizontal size={16} /></summary>
-                              <div>
-                                {loan.displayStatus !== 'Returned' && (
-                                  <Link to={`${tabPath('return')}?barcode=${encodeURIComponent(loan.barcode)}`}>Trả sách</Link>
-                                )}
-                                {loan.canRenew && loan.displayStatus !== 'Returned' && (
-                                  <button type="button" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${loan.id}/renew`)}>
-                                    Gia hạn{loan.renewalCount ? ` (${loan.renewalCount})` : ''}
-                                  </button>
-                                )}
-                                {loan.displayStatus === 'Overdue' && <Link to={tabPath('overdue')}>Xem quá hạn</Link>}
-                                <button type="button" onClick={() => setDetail(loan)}>Chi tiết phiếu</button>
-                              </div>
-                            </details>
                           </div>
                         </td>
                       </tr>
@@ -349,172 +1003,315 @@ function LoansView() {
             )}
           </div>
 
-          <div className="circ-card">
-            <div className="circ-card-head">
-              <h2>Yêu cầu mượn chờ xác nhận</h2>
-              <small className="circ-count">{pending.length} yêu cầu</small>
-            </div>
-            {loading && !pending.length ? (
-              <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải...</p>
-            ) : !pending.length ? (
-              <p className="circ-empty">Không có yêu cầu chờ duyệt.</p>
-            ) : (
-              <div className="circ-table-wrap">
-                <table className="circ-table">
-                  <thead><tr><th>Độc giả</th><th>Sách</th><th>Ngày gửi</th><th>Thao tác</th></tr></thead>
-                  <tbody>
-                    {pending.map((item) => (
-                      <tr key={item.id}>
-                        <td>{item.readerName}</td>
-                        <td>{item.bookTitle}</td>
-                        <td>{formatDateTime(item.createdAt || item.borrowDate)}</td>
-                        <td className="circ-actions">
-                          <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${item.id}/approve`)}>Xác nhận</button>
-                          <button type="button" className="circ-btn" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${item.id}/reject`)}>Từ chối</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
         </div>
-
-        <aside className="circ-side">
-          <div className="circ-card">
-            <h2>Thông tin nhanh</h2>
-            <div className="circ-quick">
-              <Link to={`${tabPath('loans')}?status=Borrowed`}>
-                <span><BookOpen size={15} /> Sách đang mượn</span>
-                <strong>{stats?.borrowed ?? 0} <ChevronRight size={14} /></strong>
-              </Link>
-              <Link to={tabPath('overdue')}>
-                <span><Clock3 size={15} /> Sắp đến hạn</span>
-                <strong>{stats?.dueSoon ?? 0} <ChevronRight size={14} /></strong>
-              </Link>
-              <Link to={tabPath('overdue')}>
-                <span><AlertCircle size={15} /> Quá hạn</span>
-                <strong>{stats?.overdue ?? 0} <ChevronRight size={14} /></strong>
-              </Link>
-              <Link to={tabPath('fines')}>
-                <span><Wallet size={15} /> Tổng phí phạt</span>
-                <strong>{formatMoney(stats?.unpaidFines)} <ChevronRight size={14} /></strong>
-              </Link>
-            </div>
-          </div>
-          <div className="circ-card">
-            <div className="circ-card-head">
-              <h2>Phí phạt gần đây</h2>
-              <Link to={tabPath('fines')}>Xem tất cả</Link>
-            </div>
-            {fines.slice(0, 4).map((fine) => (
-              <div className="circ-fine-row" key={fine.id}>
-                <div>
-                  <b>{fine.readerName}</b>
-                  <small>{fine.code} · {formatDate(fine.createdAt)}</small>
-                </div>
-                <div className="circ-fine-amt">
-                  <strong>{formatMoney(fine.amount)}</strong>
-                  <em>Chưa thanh toán</em>
-                </div>
-              </div>
-            ))}
-            {fines.length === 0 && <p className="circ-empty">Chưa có khoản phạt chờ thu.</p>}
-          </div>
-          <div className="circ-card">
-            <h2>Lưu ý</h2>
-            <ul className="circ-note">
-              <li>Trả sách đúng hạn để tránh phát sinh phí phạt.</li>
-              <li>Quá hạn sẽ tính theo hạn trả và trạng thái phiếu thực tế.</li>
-              <li>Vui lòng kiểm tra email nhắc hạn nếu độc giả chưa trả.</li>
-            </ul>
-          </div>
-        </aside>
-      </div>
+      </div>}
 
       {detail && (
-        <div className="circ-modal" role="dialog" aria-labelledby="loan-detail-title">
-          <div className="circ-card">
-            <h2 id="loan-detail-title">Chi tiết {detail.code}</h2>
-            <p><b>Độc giả:</b> {detail.readerName}</p>
-            <p><b>Sách:</b> {detail.bookTitle}</p>
-            <p><b>Mã vạch:</b> {detail.barcode}</p>
-            <p><b>Mượn:</b> {formatDate(detail.borrowDate)} · <b>Hạn:</b> {formatDate(detail.dueDate)}</p>
-            <p>
-              <b>Trạng thái:</b> {STATUS_LABELS[detail.displayStatus] ?? detail.displayStatus}
-              {detail.overdueDays > 0 ? ` · Trễ ${detail.overdueDays} ngày` : ''}
-            </p>
-            <div className="circ-actions">
+        <div className="circ-modal" role="presentation" onClick={() => setDetail(null)}>
+          <section className="circ-card circ-loan-detail-modal" role="dialog" aria-modal="true" aria-labelledby="loan-detail-title" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="circ-loan-detail-close" aria-label="Đóng chi tiết" onClick={() => setDetail(null)}><X size={19} /></button>
+            <div className="circ-loan-detail-hero">
+              <div className="circ-loan-detail-cover">
+                {detail.coverImageUrl
+                  ? <img src={detail.coverImageUrl} alt={`Bìa sách ${detail.bookTitle}`} />
+                  : <BookOpen size={34} aria-hidden="true" />}
+              </div>
+              <div className="circ-loan-detail-title">
+                <span className="circ-eyebrow">CHI TIẾT PHIẾU MƯỢN</span>
+                <h2 id="loan-detail-title">{detail.bookTitle}</h2>
+                <p>{detail.code} <span>·</span> Bản sao {detail.barcode}</p>
+                <span className={`circ-badge is-${detail.displayStatus.toLowerCase()}`}>
+                  {STATUS_LABELS[detail.displayStatus] ?? detail.displayStatus}
+                  {detail.overdueDays > 0 ? ` · Trễ ${detail.overdueDays} ngày` : ''}
+                </span>
+              </div>
+            </div>
+            <div className="circ-loan-detail-grid">
+              <div><span>Độc giả</span><strong>{detail.readerName}</strong></div>
+              <div><span>Email</span><strong>{detail.readerEmail || 'Chưa có email'}</strong></div>
+              <div><span>Ngày mượn</span><strong>{formatDate(detail.borrowDate)}</strong></div>
+              <div><span>Hạn trả</span><strong>{formatDate(detail.dueDate)}</strong></div>
+            </div>
+            <div className="circ-loan-detail-actions">
               {detail.displayStatus !== 'Returned' && (
                 <Link className="circ-btn circ-btn--primary" to={`${tabPath('return')}?barcode=${encodeURIComponent(detail.barcode)}`}>Trả sách</Link>
               )}
               <button type="button" className="circ-btn" onClick={() => setDetail(null)}>Đóng</button>
             </div>
-          </div>
+          </section>
         </div>
       )}
     </section>
   );
 }
 
+export function DirectCheckoutPage() {
+  const headers = useCirculationAuth();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+  const [readerOption, setReaderOption] = useState<ReservationOption | null>(null);
+  const [readerSearch, setReaderSearch] = useState('');
+  const [bookOption, setBookOption] = useState<ReservationOption | null>(null);
+  const [bookSearch, setBookSearch] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [borrowDays, setBorrowDays] = useState<number | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers });
+        const result = await parseApiResponse<ApiResult<CirculationStats>>(response);
+        if (response.ok && result?.success) {
+          setBorrowDays(result.data?.borrowDays ?? 0);
+        }
+      } catch {
+        setBorrowDays(null);
+      }
+    })();
+  }, [headers]);
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const finalReaderKey = readerOption?.studentId || readerOption?.email || readerOption?.id || readerSearch.trim();
+    if (!finalReaderKey) {
+      setError('Vui lòng chọn hoặc nhập mã thẻ / thông tin độc giả.');
+      return;
+    }
+    const finalBarcode = bookOption?.sampleBarcode || '';
+    const finalBookId = bookOption?.id;
+
+    if (!finalBarcode && !finalBookId && !bookSearch.trim()) {
+      setError('Vui lòng chọn hoặc nhập tên đầu sách cần mượn.');
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/circulation/checkout`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          readerKey: finalReaderKey,
+          barcode: finalBarcode || bookSearch.trim(),
+          bookId: finalBookId,
+        }),
+      });
+      const result = await parseApiResponse<ApiResult<unknown>>(response);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || 'Không thể hoàn tất mượn sách.');
+      }
+      const msg = result.meta?.message || 'Đã lập phiếu mượn thành công.';
+      setMessage(msg);
+      showToast({ type: 'success', title: 'Mượn sách thành công', message: msg });
+      setReaderOption(null);
+      setReaderSearch('');
+      setBookOption(null);
+      setBookSearch('');
+    } catch (caught) {
+      const msg = errorMessage(caught, 'Không thể hoàn tất mượn sách.');
+      setError(msg);
+      showToast({ type: 'error', title: 'Không thể mượn sách', message: msg });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="circ-page circ-page--direct-checkout">
+      <nav className="circ-crumb" aria-label="Breadcrumb">
+        <Link to="/librarian/circulation/loans">Mượn sách</Link>
+        <span>/</span>
+        <strong>Mượn tại quầy</strong>
+      </nav>
+      <header className="circ-direct-heading">
+        <div>
+          <h1>Mượn sách tại quầy</h1>
+          <p>Lập phiếu mượn trực tiếp sau khi xác minh độc giả và bản sao sách.</p>
+        </div>
+        <Link className="circ-btn" to="/librarian/circulation/loans">Quay lại danh sách</Link>
+      </header>
+      {message && (
+        <div className="circ-banner is-ok">
+          <p>{message}</p>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+            <button type="button" className="circ-btn" onClick={() => setMessage(null)}>Tiếp tục mượn sách</button>
+            <button type="button" className="circ-btn circ-btn--primary" onClick={() => navigate('/librarian/circulation/loans')}>Xem danh sách mượn</button>
+          </div>
+        </div>
+      )}
+      {error && <p className="circ-banner is-err">{error}</p>}
+      <form className="circ-card circ-direct-form" onSubmit={(event) => void submit(event)}>
+        <ReservationAutocomplete
+          label="Mã thẻ hoặc thông tin độc giả"
+          placeholder="Nhập mã thẻ, email, họ tên hoặc MSSV (ví dụ SE1...)"
+          endpoint="reader"
+          value={readerSearch}
+          selected={readerOption}
+          onChange={setReaderSearch}
+          onSelect={(opt) => {
+            setReaderOption(opt);
+            setReaderSearch(opt.label);
+          }}
+          onClear={() => {
+            setReaderOption(null);
+            setReaderSearch('');
+          }}
+        />
+
+        <ReservationAutocomplete
+          label="Tên đầu sách"
+          placeholder="Nhập tên đầu sách, mã sách hoặc quét mã vạch bản sao..."
+          endpoint="book"
+          value={bookSearch}
+          selected={bookOption}
+          onChange={setBookSearch}
+          onSelect={(opt) => {
+            setBookOption(opt);
+            setBookSearch(opt.label);
+          }}
+          onClear={() => {
+            setBookOption(null);
+            setBookSearch('');
+          }}
+        />
+
+        <p className="circ-checkout-hint">
+          {borrowDays && borrowDays > 0
+            ? `Thời hạn mượn theo chính sách Admin: ${borrowDays} ngày. Hệ thống tự tính ngày đến hạn khi xác nhận.`
+            : 'Thời hạn mượn và ngày đến hạn do Backend lấy từ chính sách Admin. Thủ thư không nhập số ngày riêng.'}
+        </p>
+        <button
+          type="submit"
+          className="circ-btn circ-btn--primary"
+          disabled={busy || (!readerOption && !readerSearch.trim()) || (!bookOption && !bookSearch.trim())}
+        >
+          {busy ? <LoaderCircle className="spin" size={14} /> : null}
+          {busy ? 'Đang xử lý...' : 'Xác nhận mượn sách'}
+        </button>
+      </form>
+    </section>
+  );
+}
+
 function ReturnView() {
   const headers = useCirculationAuth();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
+  const { showToast } = useToast();
   const [stats, setStats] = useState<CirculationStats | null>(null);
-  const [reservations, setReservations] = useState<CirculationReservation[]>([]);
   const [activity, setActivity] = useState<CirculationActivity[]>([]);
-  const [readerKey, setReaderKey] = useState('');
-  const [returnBarcode, setReturnBarcode] = useState(params.get('barcode') ?? '');
-  const [reserveBarcode, setReserveBarcode] = useState('');
-  const [condition, setCondition] = useState('Good');
+  const [selectedReader, setSelectedReader] = useState<ReservationOption | null>(null);
+  const [readerSearch, setReaderSearch] = useState('');
+  const [activeLoans, setActiveLoans] = useState<CirculationLoan[]>([]);
+  const [loadingLoans, setLoadingLoans] = useState(false);
+  const [loansError, setLoansError] = useState<string | null>(null);
+  const [conditions, setConditions] = useState<Record<string, string>>({});
+  const [returningBarcode, setReturningBarcode] = useState<string | null>(null);
+  const [returnMode, setReturnMode] = useState<'reader' | 'barcode' | 'activity'>(params.get('barcode') ? 'barcode' : 'reader');
+  const [defaultCondition, setDefaultCondition] = useState('Good');
+  const [manualBarcode, setManualBarcode] = useState(params.get('barcode') ?? '');
+  const [manualCondition, setManualCondition] = useState('Good');
+  const [returnNotes, setReturnNotes] = useState<Record<string, string>>({});
+  const [manualNotes, setManualNotes] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
-      const [statsRes, reservationRes, activityRes] = await Promise.all([
+      const [statsRes, activityRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
-        fetch(`${API_BASE_URL}/api/v1/circulation/reservations`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/circulation/activity`, { headers }),
       ]);
       const statsJson = await parseApiResponse<ApiResult<CirculationStats>>(statsRes);
-      const reservationJson = await parseApiResponse<ApiResult<CirculationReservation[]>>(reservationRes);
       const activityJson = await parseApiResponse<ApiResult<CirculationActivity[]>>(activityRes);
-      if (!reservationRes.ok || !reservationJson?.success) throw new Error(reservationJson?.error || 'Không tải được đặt chỗ.');
+      if (!statsRes.ok || !statsJson?.success) throw new Error(statsJson?.error || 'Không tải được thống kê.');
+      if (!activityRes.ok || !activityJson?.success) throw new Error(activityJson?.error || 'Không tải được giao dịch.');
       setStats(statsJson?.data ?? null);
-      setReservations(reservationJson.data ?? []);
       setActivity(activityJson?.data ?? []);
       setError(null);
     } catch (err) {
-      setError(errorMessage(err, 'Không tải được dữ liệu trả sách.'));
+      const message = errorMessage(err, 'Không tải được dữ liệu trả sách.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được dữ liệu trả sách', message });
     } finally {
       setLoading(false);
+    }
+  }, [headers, showToast]);
+
+  const fetchReaderLoans = useCallback(async (readerId: string) => {
+    setLoadingLoans(true);
+    setLoansError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/circulation/reader-active-loans?readerKey=${encodeURIComponent(readerId)}`, { headers });
+      const json = await parseApiResponse<ApiResult<CirculationLoan[]>>(res);
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Không tải được danh sách sách đang mượn.');
+      setActiveLoans(json.data || []);
+    } catch (err) {
+      setLoansError(errorMessage(err, 'Không tải được danh sách sách đang mượn.'));
+    } finally {
+      setLoadingLoans(false);
     }
   }, [headers]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
-  const post = async (url: string, body?: object) => {
+  const handleReaderSelect = (reader: ReservationOption) => {
+    setSelectedReader(reader);
+    setActiveLoans([]);
+    setLoansError(null);
+    void fetchReaderLoans(reader.id);
+  };
+
+  const handleReaderClear = () => {
+    setSelectedReader(null);
+    setActiveLoans([]);
+    setLoansError(null);
+  };
+
+  const returnBook = async (barcode: string, condition: string, notes: string, loanId?: string) => {
+    if (['Damaged', 'Lost'].includes(condition) && !notes.trim()) {
+      showToast({ type: 'error', title: 'Thiếu mô tả tình trạng', message: 'Ghi rõ hư hỏng hoặc lý do thất lạc trước khi nhận trả.' });
+      return;
+    }
     setBusy(true);
+    setReturningBarcode(barcode);
     setError(null);
     setMessage(null);
     try {
-      const res = await fetch(`${API_BASE_URL}${url}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/circulation/return`, {
         method: 'POST',
         headers,
-        body: body ? JSON.stringify(body) : undefined,
+        body: JSON.stringify({ barcode, condition, notes: notes.trim(), loanId }),
       });
-      const json = await parseApiResponse<ApiResult<unknown>>(res);
-      if (!res.ok || !json?.success) throw new Error(json?.error || 'Thao tác thất bại.');
-      setMessage(json.meta?.message || 'Đã cập nhật.');
+      const json = await parseApiResponse<ApiResult<ReturnResult>>(res);
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Thao tác trả sách thất bại.');
+      const msg = json.meta?.message || 'Đã ghi nhận trả sách thành công.';
+      if (condition !== 'Good' && json.data?.incidentId) {
+        showToast({ type: 'success', title: 'Đã ghi nhận tình trạng sách', message: 'Đang mở hồ sơ sự cố để thủ thư xác minh.' });
+        navigate(`/librarian/circulation/incidents/${json.data.incidentId}`);
+        return;
+      }
+      setMessage(msg);
+      showToast({ type: 'success', title: 'Trả sách thành công', message: msg });
       await load();
+      if (selectedReader) {
+        await fetchReaderLoans(selectedReader.id);
+      }
+      setManualBarcode(''); setManualNotes('');
     } catch (err) {
-      setError(errorMessage(err, 'Thao tác thất bại.'));
+      const msg = errorMessage(err, 'Thao tác trả sách thất bại.');
+      setError(msg);
+      showToast({ type: 'error', title: 'Thao tác thất bại', message: msg });
     } finally {
       setBusy(false);
+      setReturningBarcode(null);
     }
   };
 
@@ -524,76 +1321,30 @@ function ReturnView() {
       <div className="circ-toolbar-end">
         <span />
         <button type="button" className="circ-btn" disabled={loading || busy} onClick={() => void load()}>
-          <RefreshCw size={14} /> Làm mới
+          {loading ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />}
+          {loading ? 'Đang tải...' : 'Làm mới'}
         </button>
       </div>
       {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
-      <div className="circ-form-grid">
-        <form
-          className="circ-card"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void post('/api/v1/circulation/return', { barcode: returnBarcode, condition });
-          }}
-        >
-          <h2>Trả sách</h2>
-          <label className="circ-field">
-            Mã vạch sách
-            <input value={returnBarcode} onChange={(e) => setReturnBarcode(e.target.value)} placeholder="Quét hoặc nhập mã bản sao, ví dụ py01-01" />
-          </label>
-          <label className="circ-field">
-            Tình trạng khi trả
-            <select value={condition} onChange={(e) => setCondition(e.target.value)}>
-              <option value="Good">Bình thường</option>
-              <option value="Fair">Hơi cũ</option>
-              <option value="Damaged">Hư hỏng</option>
-              <option value="Lost">Thất lạc</option>
-            </select>
-          </label>
-          <p className="circ-hint">Hư hỏng hoặc thất lạc chỉ lập hồ sơ chờ xác minh. Thủ thư xác nhận ở mục Quá hạn rồi mới tính bồi thường.</p>
-          <button type="submit" className="circ-btn circ-btn--primary" disabled={busy}>Ghi nhận trả sách</button>
-        </form>
-        <div className="circ-card">
-          <h2>Đặt chỗ</h2>
-          <form
-            className="circ-field"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void post('/api/v1/circulation/reservations', { readerKey, barcode: reserveBarcode });
-            }}
-            style={{ marginBottom: 12 }}
-          >
-            <label className="circ-field">
-              Mã thẻ hoặc tên độc giả
-              <input value={readerKey} onChange={(e) => setReaderKey(e.target.value)} placeholder="Nhập mã thẻ, email hoặc mã sinh viên" />
-            </label>
-            <label className="circ-field">
-              Mã vạch sách cần đặt chỗ
-              <input value={reserveBarcode} onChange={(e) => setReserveBarcode(e.target.value)} placeholder="Mã bản sao cần đặt chỗ, ví dụ py01-01" />
-            </label>
-            <button type="submit" className="circ-btn circ-btn--primary" disabled={busy} style={{ marginTop: 8 }}>Tạo đặt chỗ</button>
-            <p className="circ-hint">Không giữ một bản sao cụ thể cho đến khi sách sẵn sàng.</p>
-          </form>
-          {loading && !reservations.length ? (
-            <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải...</p>
-          ) : !reservations.length ? (
-            <p className="circ-empty">Không có đặt chỗ đang mở.</p>
-          ) : reservations.map((item) => (
-            <div className="circ-reserve-row" key={item.id}>
-              <div>
-                <b>{item.readerName}</b>
-                <small>{item.bookTitle}</small>
-              </div>
-              <span className={`circ-badge is-${item.status.toLowerCase()}`}>{reservationLabel(item.status)}</span>
-              <button type="button" className="circ-btn" disabled={busy} onClick={() => void post(`/api/v1/circulation/reservations/${item.id}/cancel`)}>Hủy đặt</button>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="circ-card">
+
+      <WorkflowTabs
+        label="Nội dung trả sách"
+        value={returnMode}
+        onChange={(value) => setReturnMode(value as 'reader' | 'barcode' | 'activity')}
+        tabs={[
+          { value: 'reader', label: 'Trả theo độc giả' },
+          { value: 'barcode', label: 'Trả nhanh theo mã vạch' },
+          { value: 'activity', label: 'Giao dịch gần đây', count: activity.length },
+        ]}
+      />
+
+      {returnMode === 'activity' ? (
+      <section className="circ-card" id="circ-panel-activity" role="tabpanel" aria-labelledby="circ-tab-activity" tabIndex={0}>
         <h2>Giao dịch gần đây</h2>
-        {!activity.length ? <p className="circ-empty">Chưa có giao dịch gần đây.</p> : (
+        {loading ? (
+          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải giao dịch...</p>
+        ) : !activity.length ? <p className="circ-empty">Chưa có giao dịch gần đây.</p> : (
           <div className="circ-table-wrap">
             <table className="circ-table">
               <thead><tr><th>Thời gian</th><th>Loại</th><th>Mã vạch</th><th>Độc giả</th></tr></thead>
@@ -601,11 +1352,7 @@ function ReturnView() {
                 {activity.map((item) => (
                   <tr key={item.id}>
                     <td>{formatDateTime(item.at)}</td>
-                    <td>
-                      <span className={`circ-badge is-${item.kind.toLowerCase()}`}>
-                        {item.kind === 'Returned' ? 'Trả' : 'Mượn'}
-                      </span>
-                    </td>
+                    <td><span className={`circ-badge is-${item.kind.toLowerCase()}`}>{item.kind === 'Returned' ? 'Trả' : 'Mượn'}</span></td>
                     <td>{item.barcode}</td>
                     <td>{item.readerName}</td>
                   </tr>
@@ -614,23 +1361,483 @@ function ReturnView() {
             </table>
           </div>
         )}
-      </div>
+      </section>
+      ) : <div className="circ-card circ-return-panel" id={`circ-panel-${returnMode}`} role="tabpanel" aria-labelledby={`circ-tab-${returnMode}`} tabIndex={0}>
+        <div className="circ-return-section-header">
+          <div>
+            <h2>Trả sách</h2>
+            <p>Ghi nhận trả sách và kiểm tra tình trạng bản sao, đối chiếu tính toán phí phạt quá hạn hoặc bồi thường.</p>
+          </div>
+        </div>
+
+        {returnMode === 'reader' ? (
+          <>
+            {/* Hàng chọn độc giả và tình trạng sách khi trả */}
+            <div className="circ-return-reader-grid">
+              <div className="circ-return-reader-search">
+                <ReservationAutocomplete
+                  label="Nhập tên độc giả, mã thẻ hoặc MSSV"
+                  placeholder="Tìm theo họ tên, mã sinh viên (ví dụ SE1...), email..."
+                  endpoint="reader"
+                  value={readerSearch}
+                  selected={selectedReader}
+                  onChange={setReaderSearch}
+                  onSelect={(opt) => {
+                    handleReaderSelect(opt);
+                    setReaderSearch(opt.label);
+                  }}
+                  onClear={() => {
+                    handleReaderClear();
+                    setReaderSearch('');
+                  }}
+                />
+              </div>
+
+              <label className="circ-field circ-return-condition-field">
+                <span>Tình trạng sách khi trả</span>
+                <select
+                  value={defaultCondition}
+                  disabled={busy}
+                  onChange={(e) => {
+                    const nextVal = e.target.value;
+                    setDefaultCondition(nextVal);
+                    if (activeLoans.length > 0) {
+                      const updated: Record<string, string> = {};
+                      activeLoans.forEach((l) => { updated[l.id] = nextVal; });
+                      setConditions(updated);
+                    }
+                  }}
+                >
+                  <option value="Good">Bình thường (Đạt tiêu chuẩn)</option>
+                  <option value="Fair">Hơi cũ (Còn nguyên vẹn)</option>
+                  <option value="LightDamaged">Hư nhẹ đã xác minh, không có hư hỏng mới</option>
+                  <option value="Damaged">Hư hỏng (Chờ xác minh bồi thường)</option>
+                  <option value="Lost">Thất lạc (Chờ xác minh bồi thường)</option>
+                </select>
+              </label>
+            </div>
+
+            {/* Khối quy tắc tính phạt */}
+            <div className="circ-return-policy-box">
+              <div className="circ-policy-item">
+                <strong>Quy định phạt quá hạn:</strong>
+                <span>Trễ hạn tính phạt {stats?.suggestedFinePerDay ? `${formatMoney(stats.suggestedFinePerDay)}/ngày` : 'theo chính sách thư viện'}.</span>
+              </div>
+              <div className="circ-policy-item">
+                <strong>Sự cố Hư hỏng & Thất lạc:</strong>
+                <span>Sách hư hỏng hoặc mất sẽ tự động lập hồ sơ chuyển qua mục <strong>Quá hạn & Sự cố</strong> để xác nhận bồi thường.</span>
+              </div>
+            </div>
+
+            {/* Danh sách sách độc giả đang mượn */}
+            {selectedReader && (
+              <div className="circ-reader-loans-panel">
+                <div className="circ-reader-loans-header">
+                  <h3>
+                    <BookOpen size={16} />
+                    Sách đang mượn ({activeLoans.length})
+                  </h3>
+                  <span>Độc giả: <strong>{selectedReader.label}</strong> {selectedReader.detail && `· ${selectedReader.detail}`}</span>
+                </div>
+
+                {loadingLoans ? (
+                  <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang kiểm tra sách độc giả đang mượn...</p>
+                ) : loansError ? (
+                  <p className="circ-banner is-err">{loansError}</p>
+                ) : activeLoans.length === 0 ? (
+                  <div className="circ-no-loans-box">
+                    <Check size={18} />
+                    <div>
+                      <strong>Độc giả hiện không có sách nào đang mượn.</strong>
+                      <p>Tất cả sách trước đó đã được hoàn trả đầy đủ vào thư viện.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="circ-active-loans-grid">
+                    {activeLoans.map((loan) => {
+                      const cond = conditions[loan.id] || (loan.copyCondition === 'LightDamaged' ? 'LightDamaged' : defaultCondition);
+                      const isProcessing = busy && returningBarcode === loan.barcode;
+                      return (
+                        <article className="circ-active-loan-card" key={loan.id}>
+                          <div className="circ-loan-card-info">
+                            <h4>{loan.bookTitle}</h4>
+                            <div className="circ-loan-card-meta">
+                              <span>Mã vạch: <strong>{loan.barcode}</strong></span>
+                              <span>Mượn: {formatDate(loan.borrowDate)}</span>
+                              <span>Hạn trả: <strong>{formatDate(loan.dueDate)}</strong></span>
+                            </div>
+                            <div className="circ-loan-card-status">
+                              <span className={`circ-badge is-${loan.status.toLowerCase()}`}>
+                                {loan.status === 'Overdue' ? `Quá hạn ${loan.overdueDays} ngày` : 'Đang mượn'}
+                              </span>
+                              {loan.overdueDays > 0 && loan.createdFineAmount ? (
+                                <span className="circ-fine-tag">Phí quá hạn: {formatMoney(loan.createdFineAmount)}</span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="circ-loan-card-action">
+                            <label className="circ-condition-select">
+                              <span>Tình trạng khi trả:</span>
+                              <select
+                                value={cond}
+                                disabled={busy}
+                                onChange={(e) => setConditions((prev) => ({ ...prev, [loan.id]: e.target.value }))}
+                              >
+                                <option value="Good">Bình thường</option>
+                                {loan.copyCondition === 'LightDamaged' && <option value="LightDamaged">Hư nhẹ đã xác minh, không có hư hỏng mới</option>}
+                                <option value="Fair">Hơi cũ</option>
+                                <option value="Damaged">Hư hỏng</option>
+                                <option value="Lost">Thất lạc</option>
+                              </select>
+                            </label>
+                            <label className="circ-field">Mô tả tình trạng / ghi chú<textarea rows={2} maxLength={2000} disabled={busy} value={returnNotes[loan.id] || ''} onChange={event => setReturnNotes(previous => ({ ...previous, [loan.id]: event.target.value }))} placeholder={['Damaged', 'Lost'].includes(cond) ? 'Bắt buộc: mô tả hư hỏng hoặc lý do thất lạc' : 'Ghi chú nhận trả (nếu có)'} /></label>
+                            <button
+                              type="button"
+                              className="circ-btn circ-btn--primary"
+                              disabled={busy}
+                              onClick={() => void returnBook(loan.barcode, cond, returnNotes[loan.id] || '', loan.id)}
+                            >
+                              {isProcessing ? <LoaderCircle className="spin" size={14} /> : <RotateCcw size={14} />}
+                              {isProcessing ? 'Đang ghi nhận...' : 'Ghi nhận trả sách'}
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          /* Trả nhanh theo mã vạch bản sao */
+          <form
+            className="circ-barcode-return-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (manualBarcode.trim()) void returnBook(manualBarcode.trim(), manualCondition, manualNotes);
+            }}
+          >
+            <div className="circ-return-reader-grid">
+              <label className="circ-field">
+                <span>Mã vạch sách cần trả</span>
+                <input
+                  value={manualBarcode}
+                  onChange={(e) => setManualBarcode(e.target.value)}
+                  placeholder="Quét hoặc nhập mã bản sao (ví dụ py01-01)"
+                  autoFocus
+                />
+              </label>
+              <label className="circ-field circ-return-condition-field">
+                <span>Tình trạng khi trả</span>
+                <select value={manualCondition} onChange={(e) => setManualCondition(e.target.value)}>
+                  <option value="Good">Bình thường (Đạt tiêu chuẩn)</option>
+                  <option value="Fair">Hơi cũ (Còn nguyên vẹn)</option>
+                  <option value="LightDamaged">Hư nhẹ đã xác minh, không có hư hỏng mới</option>
+                  <option value="Damaged">Hư hỏng (Chờ xác minh bồi thường)</option>
+                  <option value="Lost">Thất lạc (Chờ xác minh bồi thường)</option>
+                </select>
+              </label></div>
+
+            <div className="circ-return-policy-box">
+              <div className="circ-policy-item">
+                <strong>Quy định phạt quá hạn:</strong>
+                <span>Trễ hạn tính phạt {stats?.suggestedFinePerDay ? `${formatMoney(stats.suggestedFinePerDay)}/ngày` : 'theo chính sách thư viện'}.</span>
+              </div>
+              <div className="circ-policy-item">
+                <strong>Sự cố Hư hỏng & Thất lạc:</strong>
+                <span>Sách hư hỏng hoặc mất sẽ tự động lập hồ sơ chuyển qua mục <strong>Quá hạn & Sự cố</strong> để xác nhận bồi thường.</span>
+              </div>
+            </div>
+
+            <label className="circ-field">Mô tả tình trạng / ghi chú<textarea rows={3} maxLength={2000} value={manualNotes} onChange={event => setManualNotes(event.target.value)} placeholder="Bắt buộc khi báo hỏng hoặc thất lạc" /></label>
+            <div className="circ-return-actions-row">
+              <button
+                type="submit"
+                className="circ-btn circ-btn--primary"
+                disabled={busy || !manualBarcode.trim()}
+              >
+                {busy ? <LoaderCircle className="spin" size={14} /> : <RotateCcw size={14} />}
+                {busy ? 'Đang ghi nhận...' : 'Ghi nhận trả sách'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>}
+    </section>
+  );
+}
+
+function ReservationsView() {
+  const headers = useCirculationAuth();
+  const { showToast } = useToast();
+  const [stats, setStats] = useState<CirculationStats | null>(null);
+  const [reservations, setReservations] = useState<CirculationReservation[]>([]);
+  const [readerSearch, setReaderSearch] = useState('');
+  const [readerOption, setReaderOption] = useState<ReservationOption | null>(null);
+  const [bookSearch, setBookSearch] = useState('');
+  const [bookOption, setBookOption] = useState<ReservationOption | null>(null);
+  const [reservationSearch, setReservationSearch] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [reservationView, setReservationView] = useState<'create' | 'queue'>('create');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [statsRes, reservationRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/circulation/reservations`, { headers }),
+      ]);
+      const [statsJson, reservationJson] = await Promise.all([
+        parseApiResponse<ApiResult<CirculationStats>>(statsRes),
+        parseApiResponse<ApiResult<CirculationReservation[]>>(reservationRes),
+      ]);
+      if (!statsRes.ok || !statsJson?.success) throw new Error(statsJson?.error || 'Không tải được thống kê.');
+      if (!reservationRes.ok || !reservationJson?.success) throw new Error(reservationJson?.error || 'Không tải được đặt chỗ.');
+      setStats(statsJson.data ?? null);
+      setReservations(reservationJson.data ?? []);
+      setError(null);
+    } catch (caught) {
+      const message = errorMessage(caught, 'Không tải được dữ liệu đặt chỗ.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được dữ liệu đặt chỗ', message });
+    } finally {
+      setLoading(false);
+    }
+  }, [headers, showToast]);
+
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+
+  const filteredReservations = reservations.filter((item) => {
+    const query = reservationSearch.trim().toLocaleLowerCase();
+    return !query
+      || item.readerName.toLocaleLowerCase().includes(query)
+      || item.bookTitle.toLocaleLowerCase().includes(query);
+  });
+
+  const post = async (url: string, body?: object) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}${url}`, {
+        method: 'POST',
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const result = await parseApiResponse<ApiResult<unknown>>(response);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Thao tác thất bại.');
+      const successMessage = result.meta?.message || 'Đã cập nhật.';
+      setMessage(successMessage);
+      showToast({ type: 'success', title: 'Cập nhật thành công', message: successMessage });
+      await load();
+      return true;
+    } catch (caught) {
+      const message = errorMessage(caught, 'Thao tác thất bại.');
+      setError(message);
+      showToast({ type: 'error', title: 'Thao tác thất bại', message });
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="circ-page circ-page--reservations">
+      <Chrome tab="reservations" stats={stats} loading={loading} />
+      {message && <p className="circ-banner is-ok">{message}</p>}
+      {error && <p className="circ-banner is-err">{error}</p>}
+      <WorkflowTabs
+        label="Nội dung đặt chỗ"
+        value={reservationView}
+        onChange={(value) => setReservationView(value as 'create' | 'queue')}
+        tabs={[
+          { value: 'create', label: 'Tạo đặt chỗ' },
+          { value: 'queue', label: 'Danh sách đặt chỗ', count: reservations.length },
+        ]}
+      />
+      {reservationView === 'create' ? (
+      <section className="circ-card circ-reservation-create" id="circ-panel-create" role="tabpanel" aria-labelledby="circ-tab-create" tabIndex={0}>
+        <div className="circ-reservation-intro">
+          <span className="circ-reservation-intro__icon"><Bookmark size={21} /></span>
+          <div>
+            <span className="circ-reservation-eyebrow">QUẢN LÝ HÀNG ĐỢI</span>
+            <h2>Tạo đặt chỗ tại quầy</h2>
+            <p>Tìm đúng độc giả và đầu sách để thêm yêu cầu vào hàng đợi.</p>
+          </div>
+        </div>
+        <form
+          className="circ-reservation-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!readerOption || !bookOption) {
+              setError('Chọn độc giả và đầu sách từ danh sách gợi ý trước khi tạo đặt chỗ.');
+              return;
+            }
+            void post('/api/v1/circulation/reservations/by-book', {
+              readerId: readerOption.id,
+              bookId: bookOption.id,
+            }).then((created) => {
+              if (!created) return;
+              setReaderSearch('');
+              setReaderOption(null);
+              setBookSearch('');
+              setBookOption(null);
+            });
+          }}
+        >
+          <ReservationAutocomplete
+            label="Tên độc giả hoặc mã sinh viên"
+            value={readerSearch}
+            selected={readerOption}
+            placeholder="Nhập tên hoặc mã sinh viên (ví dụ: SE1)"
+            endpoint="reader"
+            onChange={(value) => {
+              setReaderSearch(value);
+              setReaderOption(null);
+              setError(null);
+            }}
+            onSelect={(option) => {
+              setReaderOption(option);
+              setReaderSearch('');
+              setError(null);
+            }}
+            onClear={() => setReaderOption(null)}
+          />
+          <ReservationAutocomplete
+            label="Tên đầu sách"
+            value={bookSearch}
+            selected={bookOption}
+            placeholder="Nhập tên đầu sách cần đặt trước"
+            endpoint="book"
+            onChange={(value) => {
+              setBookSearch(value);
+              setBookOption(null);
+              setError(null);
+            }}
+            onSelect={(option) => {
+              setBookOption(option);
+              setBookSearch('');
+              setError(null);
+            }}
+            onClear={() => setBookOption(null)}
+          />
+          <div className="circ-reservation-submit">
+            <p className="circ-hint">Chỉ đặt trước khi không còn bản sao có thể mượn. Độc giả được thông báo khi sách sẵn sàng.</p>
+            <button
+              type="submit"
+              className="circ-btn circ-btn--primary"
+              disabled={busy || !readerOption || !bookOption}
+            >
+              {busy ? <LoaderCircle className="spin" size={16} /> : <Bookmark size={16} />}
+              {busy ? 'Đang xử lý...' : 'Tạo đặt chỗ'}
+            </button>
+          </div>
+        </form>
+      </section>
+      ) : (
+      <section className="circ-card circ-reservation-queue" id="circ-panel-queue" role="tabpanel" aria-labelledby="circ-tab-queue" tabIndex={0}>
+        <div className="circ-card-head">
+          <div>
+            <h2>Danh sách đặt chỗ đang mở</h2>
+            <p>Quản lý các yêu cầu đang chờ và theo dõi trạng thái phục vụ.</p>
+          </div>
+          <button type="button" className="circ-btn" disabled={loading || busy} onClick={() => void load()}>
+            {loading ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />}
+            {loading ? 'Đang tải...' : 'Làm mới'}
+          </button>
+        </div>
+        <div className="circ-reservation-toolbar">
+          <label className="circ-reservation-search">
+            <Search size={17} aria-hidden="true" />
+            <input
+              value={reservationSearch}
+              onChange={(event) => setReservationSearch(event.target.value)}
+              placeholder="Tìm theo độc giả hoặc đầu sách..."
+              aria-label="Tìm đặt chỗ theo độc giả hoặc đầu sách"
+            />
+          </label>
+          <span>{filteredReservations.length} / {reservations.length} yêu cầu</span>
+        </div>
+        {loading ? (
+          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải đặt chỗ...</p>
+        ) : !reservations.length ? (
+          <p className="circ-empty">Không có đặt chỗ đang mở.</p>
+        ) : !filteredReservations.length ? (
+          <p className="circ-empty">Không có đặt chỗ nào khớp với từ khóa tìm kiếm.</p>
+        ) : (
+          <div className="circ-reservation-list">
+            {filteredReservations.map((item) => (
+              <div className="circ-reserve-row" key={item.id}>
+                <div className="circ-reserve-row__people">
+                  <b>{item.readerName}</b>
+                  <small>{item.bookTitle}</small>
+                </div>
+                <span className={`circ-badge is-${item.status.toLowerCase()}`}>{reservationLabel(item.status)}</span>
+                <small className="circ-reserve-expiry">
+                  {item.expiresAt ? `Hết hạn: ${formatDateTime(item.expiresAt)}` : `Đặt lúc: ${formatDateTime(item.reservedAt)}`}
+                </small>
+                <button
+                  type="button"
+                  className="circ-btn circ-reserve-cancel"
+                  disabled={busy}
+                  onClick={() => void post(`/api/v1/circulation/reservations/${item.id}/cancel`)}
+                >
+                  Hủy đặt
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+      )}
     </section>
   );
 }
 
 function OverdueView() {
   const headers = useCirculationAuth();
+  const { showToast } = useToast();
   const [stats, setStats] = useState<CirculationStats | null>(null);
   const [items, setItems] = useState<CirculationLoan[]>([]);
   const [incidents, setIncidents] = useState<CirculationIncident[]>([]);
-  const [drafts, setDrafts] = useState<Record<string, IncidentDraft>>({});
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [overdueLoadFailed, setOverdueLoadFailed] = useState(false);
+  const [incidentLoadFailed, setIncidentLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [overdueStatus, setOverdueStatus] = useState('All');
+  const [incidentStatus, setIncidentStatus] = useState('All');
+  const [overdueDates, setOverdueDates] = useState<Date[]>([]);
+  const [incidentDates, setIncidentDates] = useState<Date[]>([]);
+  const [overdueView, setOverdueView] = useState<'overdue' | 'incidents'>('overdue');
+
+  const inDateRange = (value: string | null | undefined, dates: Date[]) => {
+    if (!dates.length) return true;
+    if (!value) return false;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return false;
+    const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    const start = dates[0] ? new Date(dates[0].getFullYear(), dates[0].getMonth(), dates[0].getDate()).getTime() : -Infinity;
+    const endDate = dates[1] ?? dates[0];
+    const end = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()).getTime() : Infinity;
+    return day >= start && day <= end;
+  };
+  const visibleOverdue = items.filter((loan) => {
+    const statusMatch = overdueStatus === 'All'
+      || (overdueStatus === 'Unrecorded' && !loan.hasFine && !loan.hasOpenFine)
+      || (overdueStatus === 'Unpaid' && loan.hasOpenFine)
+      || (overdueStatus === 'Paid' && loan.hasFine && !loan.hasOpenFine);
+    return statusMatch && inDateRange(loan.dueDate, overdueDates);
+  });
+  const visibleIncidents = incidents.filter((item) =>
+    (incidentStatus === 'All' || item.status === incidentStatus) && inDateRange(item.createdAt, incidentDates));
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const [statsRes, overdueRes, incidentRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
@@ -640,121 +1847,80 @@ function OverdueView() {
       const statsJson = await parseApiResponse<ApiResult<CirculationStats>>(statsRes);
       const overdueJson = await parseApiResponse<ApiResult<CirculationLoan[]>>(overdueRes);
       const incidentJson = await parseApiResponse<ApiResult<CirculationIncident[]>>(incidentRes);
-      if (!overdueRes.ok || !overdueJson?.success) throw new Error(overdueJson?.error || 'Không tải được sách quá hạn.');
-      setError(null);
-      setStats(statsJson?.data ?? null);
-      setItems(overdueJson.data ?? []);
-      setIncidents(incidentJson?.data ?? []);
+      const errors: string[] = [];
+      if (statsRes.ok && statsJson?.success && statsJson.data) {
+        setStats(statsJson.data ?? null);
+      } else {
+        setStats(null);
+        errors.push(statsJson?.error || 'Không tải được chính sách phí.');
+      }
+      if (overdueRes.ok && overdueJson?.success && overdueJson.data) {
+        setItems(overdueJson.data ?? []);
+        setOverdueLoadFailed(false);
+      } else {
+        setOverdueLoadFailed(true);
+        errors.push(overdueJson?.error || 'Không tải được sách quá hạn.');
+      }
+      if (incidentRes.ok && incidentJson?.success && incidentJson.data) {
+        setIncidents(incidentJson.data ?? []);
+        setIncidentLoadFailed(false);
+      } else {
+        setIncidentLoadFailed(true);
+        errors.push(incidentJson?.error || 'Không tải được hồ sơ sự cố.');
+      }
+      const error = errors.length > 0 ? errors.join(' ') : null;
+      setError(error);
+      if (error) {
+        showToast({ type: 'error', title: 'Dữ liệu quá hạn chưa đầy đủ', message: error });
+      }
     } catch (err) {
-      setError(errorMessage(err, 'Lỗi tải dữ liệu.'));
+      const message = errorMessage(err, 'Lỗi tải dữ liệu.');
+      setOverdueLoadFailed(true);
+      setIncidentLoadFailed(true);
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được dữ liệu quá hạn', message });
     } finally {
       setLoading(false);
     }
-  }, [headers]);
+  }, [headers, showToast]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
-  const draftOf = (item: CirculationIncident): IncidentDraft => drafts[item.id] ?? {
-    severity: item.kind === 'Lost' ? 'Lost' : 'Light',
-    amount: '',
-    applyOverdue: item.overdueDays > 0,
-    notes: '',
-  };
-
-  const patchDraft = (id: string, item: CirculationIncident, patch: Partial<IncidentDraft>) => {
-    setDrafts((current) => ({ ...current, [id]: { ...draftOf(item), ...patch } }));
-  };
-
-  const recordFine = async (loan: CirculationLoan) => {
-    const suggested = loan.suggestedFine && loan.suggestedFine > 0 ? String(loan.suggestedFine) : '0';
-    const amount = Number(window.prompt('Nhập số tiền phạt (VND). Không tự tạo phạt nếu bạn hủy.', suggested) ?? '0');
-    if (!amount || amount <= 0) return;
-    setBusy(true);
-    setMessage(null);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/circulation/fines`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ borrowRecordId: loan.id, amount, reason: `Phạt quá hạn ${loan.overdueDays} ngày` }),
-      });
-      const json = await parseApiResponse<ApiResult<unknown>>(res);
-      if (!res.ok || !json?.success) throw new Error(json?.error || 'Không ghi nhận được phạt.');
-      setMessage(json.meta?.message || 'Đã ghi nhận phạt.');
-      await load();
-    } catch (err) {
-      setError(errorMessage(err, 'Không ghi nhận được phạt.'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const confirmIncident = async (item: CirculationIncident) => {
-    const draft = draftOf(item);
-    const amount = Number(draft.amount);
-    if (!amount || amount <= 0) {
-      setError('Nhập số tiền sau khi đã đối chiếu bản sao và phiếu mượn. Hệ thống không tự lấy giá sách.');
-      return;
-    }
-    setBusy(true);
-    setMessage(null);
-    setError(null);
-    try {
-      const body = {
-        severity: draft.severity,
-        applyOverdue: draft.applyOverdue,
-        notes: draft.notes,
-        replacementValue: draft.severity === 'Light' ? null : amount,
-        assessedFee: draft.severity === 'Light' ? amount : null,
-      };
-      const res = await fetch(`${API_BASE_URL}/api/v1/circulation/incidents/${item.id}/confirm`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      });
-      const json = await parseApiResponse<ApiResult<CirculationIncident>>(res);
-      if (!res.ok || !json?.success) throw new Error(json?.error || 'Không xác nhận được hồ sơ.');
-      setMessage(json.meta?.message || 'Đã xác nhận bồi thường.');
-      await load();
-    } catch (err) {
-      setError(errorMessage(err, 'Không xác nhận được hồ sơ.'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const rejectIncident = async (item: CirculationIncident) => {
-    setBusy(true);
-    setMessage(null);
-    setError(null);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/circulation/incidents/${item.id}/reject`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ notes: draftOf(item).notes, restoreCopy: true }),
-      });
-      const json = await parseApiResponse<ApiResult<unknown>>(res);
-      if (!res.ok || !json?.success) throw new Error(json?.error || 'Không từ chối được hồ sơ.');
-      setMessage(json.meta?.message || 'Đã từ chối hồ sơ.');
-      await load();
-    } catch (err) {
-      setError(errorMessage(err, 'Không từ chối được hồ sơ.'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
-    <section className="circ-page">
+    <section className="circ-page circ-page--overdue">
       <Chrome tab="overdue" stats={stats} loading={loading} />
       <div className="circ-toolbar-end">
         <span />
-        <button type="button" className="circ-btn" onClick={() => void load()}><RefreshCw size={14} /> Làm mới</button>
+        <button type="button" className="circ-btn" disabled={loading} onClick={() => void load()}>
+          {loading ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />}
+          {loading ? 'Đang tải...' : 'Làm mới'}
+        </button>
       </div>
-      {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
-      <div className="circ-card">
-        <h2>Sách quá hạn</h2>
-        {!items.length ? <p className="circ-empty">Không có sách quá hạn.</p> : (
+      <WorkflowTabs
+        label="Nội dung quá hạn và sự cố"
+        value={overdueView}
+        onChange={(value) => setOverdueView(value as 'overdue' | 'incidents')}
+        tabs={[
+          { value: 'overdue', label: 'Sách quá hạn', count: items.length },
+          { value: 'incidents', label: 'Hư hỏng và thất lạc', count: incidents.length },
+        ]}
+      />
+      {overdueView === 'overdue' ? (
+      <section className="circ-card" id="circ-panel-overdue" role="tabpanel" aria-labelledby="circ-tab-overdue" tabIndex={0}>
+        <div className="circ-card-head"><div><h2>Sách quá hạn</h2><p>Phí đang hiển thị là tạm tính. Khi nhận trả mới chốt phí theo ngày trả thực tế.</p></div></div>
+        <div className="circ-toolbar circ-overdue-filters">
+          <select aria-label="Lọc trạng thái sách quá hạn" value={overdueStatus} onChange={(event) => setOverdueStatus(event.target.value)}>
+            <option value="All">Tất cả trạng thái</option><option value="Unrecorded">Chưa ghi nhận phí</option><option value="Unpaid">Chưa thanh toán</option><option value="Paid">Đã thanh toán</option>
+          </select>
+          <AnimatedCalendar mode="range" value={overdueDates} onChange={setOverdueDates} placeholder="Lọc theo hạn trả" ariaLabel="Lọc sách quá hạn theo hạn trả" />
+          {overdueDates.length > 0 && <button type="button" className="circ-btn" onClick={() => setOverdueDates([])}>Xóa ngày lọc</button>}
+        </div>
+        {loading ? (
+          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải danh sách quá hạn...</p>
+        ) : overdueLoadFailed ? (
+          <p className="circ-error" role="alert">Không thể xác định danh sách quá hạn. Hãy bấm “Làm mới” để thử lại.</p>
+        ) : !visibleOverdue.length ? <p className="circ-empty">Không có sách quá hạn phù hợp bộ lọc.</p> : (
           <div className="circ-table-wrap">
             <table className="circ-table">
               <thead>
@@ -763,7 +1929,7 @@ function OverdueView() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((loan) => (
+                {visibleOverdue.map((loan) => (
                   <tr key={loan.id}>
                     <td>{loan.readerName}</td>
                     <td>{loan.barcode} · {loan.bookTitle}</td>
@@ -776,15 +1942,12 @@ function OverdueView() {
                       ) : loan.hasFine ? (
                         <span className="circ-badge is-paid">Đã thanh toán</span>
                       ) : (
-                        <span className="circ-badge is-borrowed">Chưa ghi nhận</span>
+                        <span className="circ-badge is-borrowed">Chưa chốt · đang mượn</span>
                       )}
                     </td>
                     <td className="circ-actions">
-                      {loan.hasOpenFine || loan.hasFine ? (
-                        <Link className="circ-btn" to={tabPath('fines')}>Xem</Link>
-                      ) : (
-                        <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void recordFine(loan)}>Ghi nhận phạt</button>
-                      )}
+                      <Link className="circ-btn circ-btn--primary" to={tabPath('return') + '?barcode=' + encodeURIComponent(loan.barcode)}>Xử lý trả sách</Link>
+                      {(loan.hasOpenFine || loan.hasFine) && <Link className="circ-btn" to={tabPath('fines')}>Xem phí đã lập</Link>}
                     </td>
                   </tr>
                 ))}
@@ -792,70 +1955,156 @@ function OverdueView() {
             </table>
           </div>
         )}
-      </div>
-      <div className="circ-card">
-        <h2>Hư hỏng & thất lạc</h2>
-        <p className="circ-hint">Không ghi nhận mất sách hay bồi thường khi độc giả tự báo. Thủ thư đối chiếu bản sao, phiếu mượn rồi xác nhận. Hư hỏng nhẹ tính phí theo mức độ; hư hỏng nặng hoặc mất sách mới mua đền. Không tự khóa tài khoản.</p>
-        {!incidents.length ? <p className="circ-empty">Chưa có hồ sơ mất sách hoặc hư hỏng.</p> : incidents.map((item) => {
-          const draft = draftOf(item);
-          const amount = Number(draft.amount) || 0;
-          const overdue = draft.applyOverdue ? (item.suggestedOverdueFine ?? 0) : 0;
-          const pending = item.status === 'PendingReview';
-          return (
-            <article className="circ-incident" key={item.id}>
-              <div className="circ-incident-head">
-                <div>
-                  <b>{item.barcode} · {item.bookTitle}</b>
-                  <small>{item.readerName}</small>
-                </div>
-                <span className={`circ-badge is-${item.status.toLowerCase()}`}>{STATUS_LABELS[item.status] ?? item.status}</span>
-              </div>
-              <p className="circ-incident-meta">
-                {STATUS_LABELS[item.kind] ?? item.kind}
-                {item.severity !== 'Unknown' ? ` · ${STATUS_LABELS[item.severity] ?? item.severity}` : ' · chưa đánh giá'}
-                {item.overdueDays > 0 ? ` · quá hạn ${item.overdueDays} ngày` : ''}
-                {item.totalAmount > 0 ? ` · ${formatMoney(item.totalAmount)}` : ''}
-              </p>
-              {item.description && <p className="circ-incident-note">{item.description}</p>}
-              {pending ? (
-                <div className="circ-incident-form">
-                  <label className="circ-field">
-                    Mức độ
-                    <select value={draft.severity} onChange={(e) => patchDraft(item.id, item, { severity: e.target.value })} disabled={item.kind === 'Lost'}>
-                      {item.kind !== 'Lost' && <option value="Light">Hư hỏng nhẹ, còn dùng được</option>}
-                      {item.kind !== 'Lost' && <option value="Severe">Hư hỏng nặng, phải mua đền</option>}
-                      <option value="Lost">Mất sách, bồi thường giá trị tài liệu</option>
-                    </select>
-                  </label>
-                  <label className="circ-field">
-                    {draft.severity === 'Light' ? 'Mức phí theo độ hư hỏng (VND)' : 'Giá trị bồi thường / mua đền (VND)'}
-                    <input type="number" min={1} value={draft.amount} onChange={(e) => patchDraft(item.id, item, { amount: e.target.value })} placeholder="Thủ thư nhập sau khi xác minh" />
-                  </label>
-                  <label className="circ-check">
-                    <input type="checkbox" checked={draft.applyOverdue} onChange={(e) => patchDraft(item.id, item, { applyOverdue: e.target.checked })} disabled={item.overdueDays <= 0} />
-                    Cộng phạt quá hạn {item.suggestedOverdueFine ? formatMoney(item.suggestedOverdueFine) : '(chưa có mức trong chính sách)'}
-                  </label>
-                  <label className="circ-field">
-                    Biên bản / ghi chú xác minh
-                    <input value={draft.notes} onChange={(e) => patchDraft(item.id, item, { notes: e.target.value })} placeholder="Đã đối chiếu bản sao và phiếu mượn" />
-                  </label>
-                  {amount > 0 && (
-                    <p className="circ-hint">Tạm tính: {formatMoney(amount)}{overdue ? ` + ${formatMoney(overdue)} = ${formatMoney(amount + overdue)}` : ''}. Đây không phải mức cố định cho mọi trường hợp.</p>
-                  )}
-                  <div className="circ-actions">
-                    <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void confirmIncident(item)}>Xác nhận bồi thường</button>
-                    <button type="button" className="circ-btn" disabled={busy} onClick={() => void rejectIncident(item)}>Từ chối / tìm thấy sách</button>
-                    <Link className="circ-btn" to={tabPath('fines')}>Xem phí</Link>
-                  </div>
-                </div>
-              ) : (
-                <div className="circ-actions">
-                  <Link className="circ-btn" to={tabPath('fines')}>Xem phí phạt</Link>
-                </div>
-              )}
-            </article>
-          );
-        })}
+      </section>
+      ) : (
+      <section className="circ-card" id="circ-panel-incidents" role="tabpanel" aria-labelledby="circ-tab-incidents" tabIndex={0}>
+        <div className="circ-card-head"><div><h2>Hư hỏng & thất lạc</h2><p>Đối chiếu hồ sơ và xử lý bồi thường theo chính sách thư viện.</p></div></div>
+        <div className="circ-toolbar circ-overdue-filters">
+          <select aria-label="Lọc trạng thái hồ sơ sự cố" value={incidentStatus} onChange={(event) => setIncidentStatus(event.target.value)}>
+            <option value="All">Tất cả trạng thái</option><option value="PendingReview">Chờ xác minh</option><option value="CompensationPending">Chờ thanh toán</option><option value="Resolved">Đã xử lý</option><option value="Rejected">Đã từ chối</option>
+          </select>
+          <AnimatedCalendar mode="range" value={incidentDates} onChange={setIncidentDates} placeholder="Lọc theo ngày tạo hồ sơ" ariaLabel="Lọc sự cố theo ngày tạo" />
+          {incidentDates.length > 0 && <button type="button" className="circ-btn" onClick={() => setIncidentDates([])}>Xóa ngày lọc</button>}
+        </div>
+        {loading ? (
+          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải hồ sơ sự cố...</p>
+        ) : incidentLoadFailed ? (
+          <p className="circ-error" role="alert">Không thể tải hồ sơ sự cố. Hãy bấm “Làm mới” để thử lại.</p>
+        ) : !visibleIncidents.length ? <p className="circ-empty">Không có hồ sơ phù hợp bộ lọc.</p> : (
+          <div className="circ-table-wrap"><table className="circ-table"><thead><tr><th>Ngày tạo</th><th>Độc giả</th><th>Sách / mã vạch</th><th>Loại sự cố</th><th>Trạng thái</th><th>Số tiền</th><th>Thao tác</th></tr></thead><tbody>
+          {visibleIncidents.map((item) => (
+            <tr key={item.id}><td>{formatDate(item.createdAt)}</td><td>{item.readerName}</td><td>{item.bookTitle}<small>{item.barcode}</small></td><td>{STATUS_LABELS[item.kind] ?? item.kind}{item.severity !== 'Unknown' ? ` · ${STATUS_LABELS[item.severity] ?? item.severity}` : ''}</td><td><span className={`circ-badge is-${item.status.toLowerCase()}`}>{STATUS_LABELS[item.status] ?? item.status}</span></td><td>{item.totalAmount > 0 ? formatMoney(item.totalAmount) : 'Chưa xác định'}</td><td><Link className="circ-btn" to={`/librarian/circulation/incidents/${item.id}`}>Xem chi tiết</Link></td></tr>
+          ))}
+          </tbody></table></div>
+        )}
+      </section>
+      )}
+
+    </section>
+  );
+}
+
+export function CirculationIncidentDetailPage() {
+  const { incidentId = '' } = useParams();
+  const navigate = useNavigate();
+  const headers = useCirculationAuth();
+  const { showToast } = useToast();
+  const [item, setItem] = useState<CirculationIncident | null>(null);
+  const [stats, setStats] = useState<CirculationStats | null>(null);
+  const [severity, setSeverity] = useState('');
+  const [applyOverdue, setApplyOverdue] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [restoreCopy, setRestoreCopy] = useState(false);
+  const [restoreCondition, setRestoreCondition] = useState('Fair');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([
+      fetch(`${API_BASE_URL}/api/v1/circulation/incidents/${incidentId}`, { headers }).then((response) => parseApiResponse<ApiResult<CirculationIncident>>(response)),
+      fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }).then((response) => parseApiResponse<ApiResult<CirculationStats>>(response)),
+    ]).then(([incidentResult, statsResult]) => {
+      if (!active) return;
+      const found = incidentResult?.data ?? null;
+      setItem(found);
+      setStats(statsResult?.data ?? null);
+      if (!found) setError(incidentResult?.success ? 'Không tìm thấy hồ sơ sự cố.' : incidentResult?.error ?? 'Không tải được hồ sơ sự cố.');
+      else {
+        setSeverity(found.kind === 'Lost' ? 'Lost' : '');
+        setApplyOverdue(found.overdueDays > 0 && (found.suggestedOverdueFine ?? 0) > 0);
+      }
+    }).catch((reason: unknown) => {
+      if (active) setError(errorMessage(reason, 'Không tải được hồ sơ sự cố.'));
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [headers, incidentId]);
+
+  const confirm = async () => {
+    if (!item) return;
+    if (!notes.trim()) { showToast({ type: 'error', title: 'Thiếu kết luận', message: 'Nhập kết quả xác minh trước khi xác nhận.' }); return; }
+    const fee = policyIncidentFee(stats, severity);
+    if (fee <= 0) {
+      showToast({ type: 'error', title: 'Chưa thể xác nhận', message: 'Chính sách bồi thường chưa có mức phí hợp lệ.' });
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/circulation/incidents/${item.id}/confirm`, {
+        method: 'POST', headers, body: JSON.stringify({ severity, applyOverdue, notes }),
+      });
+      const result = await parseApiResponse<ApiResult<CirculationIncident>>(response);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không xác nhận được hồ sơ.');
+      showToast({ type: 'success', title: 'Xác nhận thành công', message: result.meta?.message || 'Hồ sơ đã được xác nhận và bổ sung vào danh sách phí phạt.' });
+      navigate('/librarian/circulation/overdue?focusIncident=' + encodeURIComponent(item.id), { replace: true });
+    } catch (reason) {
+      showToast({ type: 'error', title: 'Không xác nhận được hồ sơ', message: errorMessage(reason, 'Vui lòng thử lại.') });
+    } finally { setBusy(false); }
+  };
+
+  const reject = async () => {
+    if (!item) return;
+    if (!notes.trim()) { showToast({ type: 'error', title: 'Thiếu kết luận', message: 'Nhập lý do từ chối hồ sơ.' }); return; }
+    setBusy(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/circulation/incidents/${item.id}/reject`, {
+        method: 'POST', headers, body: JSON.stringify({ notes, restoreCopy, condition: restoreCopy ? restoreCondition : undefined }),
+      });
+      const result = await parseApiResponse<ApiResult<unknown>>(response);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không xử lý được hồ sơ.');
+      showToast({ type: 'success', title: 'Đã xử lý hồ sơ', message: result.meta?.message || 'Hồ sơ đã được từ chối sau khi đối chiếu.' });
+      navigate('/librarian/circulation/overdue', { replace: true });
+    } catch (reason) {
+      showToast({ type: 'error', title: 'Không xử lý được hồ sơ', message: errorMessage(reason, 'Vui lòng thử lại.') });
+    } finally { setBusy(false); }
+  };
+
+  const restore = async () => {
+    if (!item || !notes.trim()) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/circulation/incidents/${item.id}/restore-copy`, { method: 'POST', headers, body: JSON.stringify({ condition: restoreCondition, notes: notes.trim() }) });
+      const result = await parseApiResponse<ApiResult<CirculationIncident>>(response);
+      if (!response.ok || !result?.success || !result.data) throw new Error(result?.error || 'Không thể khôi phục bản sao.');
+      setItem(result.data); setNotes('');
+      showToast({ type: 'success', title: 'Đã kiểm tra bản sao', message: 'Sách về kho chờ xếp kệ. Phí và lịch sử được giữ nguyên.' });
+    } catch (reason) { showToast({ type: 'error', title: 'Chưa thể khôi phục', message: errorMessage(reason, 'Vui lòng thử lại.') }); }
+    finally { setBusy(false); }
+  };
+  const conditionSelect = <label className="circ-field">Tình trạng sau kiểm tra<select disabled={busy} value={restoreCondition} onChange={event => setRestoreCondition(event.target.value)}><option value="Good">Tốt</option><option value="Fair">Cũ, còn sử dụng được</option><option value="LightDamaged">Hư nhẹ, còn sử dụng được</option></select></label>;
+
+  if (loading) return <section className="circ-page"><p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải hồ sơ...</p></section>;
+  if (!item) return <section className="circ-page"><div className="circ-card"><p className="circ-error">{error || 'Không tìm thấy hồ sơ sự cố.'}</p><Link className="circ-btn" to={tabPath('overdue')}>Quay lại danh sách</Link></div></section>;
+
+  const pending = item.status === 'PendingReview';
+  const amount = policyIncidentFee(stats, severity);
+  return (
+    <section className="circ-page circ-page--overdue">
+      <Chrome tab="overdue" stats={stats} loading={false} />
+      <div className="circ-incident-detail-card circ-card">
+        <div className="circ-card-head"><div><span className="circ-eyebrow">HỒ SƠ TRẢ SÁCH CẦN XÁC MINH</span><h2>{item.bookTitle}</h2><p>{item.barcode} · {item.readerName}</p></div><span className={`circ-badge is-${item.status.toLowerCase()}`}>{STATUS_LABELS[item.status] ?? item.status}</span></div>
+        <dl className="circ-incident-detail-grid">
+          <div><dt>Loại sự cố</dt><dd>{STATUS_LABELS[item.kind] ?? item.kind}</dd></div>
+          <div><dt>Ngày ghi nhận</dt><dd>{formatDateTime(item.createdAt)}</dd></div>
+          <div><dt>Ngày quá hạn</dt><dd>{item.overdueDays > 0 ? `${item.overdueDays} ngày` : 'Không quá hạn'}</dd></div>
+          <div><dt>Phí quá hạn dự kiến lập thêm</dt><dd>{item.hasRecordedOverdueFine ? 'Đã có khoản phí trên phiếu; không lập trùng' : formatMoney(item.suggestedOverdueFine)}</dd></div>
+          <div><dt>Giá trị thay thế</dt><dd>{item.replacementValue ? formatMoney(item.replacementValue) : 'Theo chính sách'}</dd></div>
+          <div><dt>Tổng phí hiện tại</dt><dd>{formatMoney(item.totalAmount)}</dd></div>
+        </dl>
+        {item.description && <p className="circ-incident-detail-note">{item.description}</p>}
+        <p className="circ-hint">Tình trạng bản sao hiện tại: {({ LightDamaged: 'Hư nhẹ — còn sử dụng được', Damaged: 'Hư hỏng — chặn xếp kệ', Lost: 'Thất lạc', Good: 'Tốt', Fair: 'Cũ, còn sử dụng được', New: 'Mới' } as Record<string, string>)[item.copyCondition] || item.copyCondition}. Thanh toán phí không tự phục hồi sách hư nặng.</p>
+        {pending ? <div className="circ-incident-detail-form">
+          {item.kind === 'Lost' ? <div className="circ-field"><span>Mức độ</span><div className="circ-incident-fixed-field">Thất lạc · bồi thường theo giá trị sách</div></div> : <label className="circ-field">Mức độ hư hỏng<select value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="" disabled>Chọn mức độ sau khi kiểm tra</option><option value="Light">Hư hỏng nhẹ</option><option value="Severe">Hư hỏng nặng</option></select></label>}
+          <p className="circ-hint">{!severity ? 'Chọn mức độ theo kết quả kiểm tra thực tế.' : severity === 'Light' ? 'Hư nhẹ: cho phép xếp kệ sau xác minh, không chờ đóng phí.' : 'Hư nặng / mất: chặn xếp kệ đến khi kiểm tra phục hồi riêng.'}</p>
+          {item.loanStatus !== 'Returned' && <p className="circ-error">Cần ghi nhận trả / thất lạc trên phiếu trước khi xác nhận mức độ.</p>}
+          <label className="circ-check"><input type="checkbox" checked={restoreCopy} disabled={busy || item.loanStatus !== 'Returned'} onChange={event => setRestoreCopy(event.target.checked)} /> Khi từ chối hồ sơ: đã kiểm tra sách, đủ điều kiện sử dụng lại</label>
+          {restoreCopy && conditionSelect}
+          <p className="circ-hint">Mức bồi thường theo chính sách: {amount > 0 ? formatMoney(amount) : 'Chưa cấu hình'}{applyOverdue && item.suggestedOverdueFine ? ` · Phí quá hạn ${formatMoney(item.suggestedOverdueFine)}` : ''}</p>
+          {item.suggestedOverdueFine && item.suggestedOverdueFine > 0 && <label className="circ-check"><input type="checkbox" checked={applyOverdue} onChange={(event) => setApplyOverdue(event.target.checked)} /> Cộng phí quá hạn {formatMoney(item.suggestedOverdueFine)}</label>}
+          <label className="circ-field">Ghi chú xác minh<textarea rows={4} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Ghi nhận kết quả đối chiếu sách và phiếu mượn..." /></label>
+          <div className="circ-actions"><button type="button" className="circ-btn circ-btn--primary" disabled={busy || amount <= 0 || !notes.trim() || item.loanStatus !== 'Returned'} onClick={() => void confirm()}>{busy ? 'Đang xác nhận...' : 'Xác nhận hồ sơ'}</button><button type="button" className="circ-btn" disabled={busy || !notes.trim()} onClick={() => void reject()}>Từ chối / tìm thấy sách</button><Link className="circ-btn" to={tabPath('overdue')}>Quay lại danh sách</Link></div>
+        </div> : <><div className="circ-incident-detail-note">Hồ sơ đã được xử lý. {item.totalAmount > 0 && <>Khoản phí liên quan: <Link to={tabPath('fines')}>xem danh sách phí phạt</Link>.</>}</div>{item.canRestoreCopy && <div className="circ-incident-detail-form"><h3>Đã sửa / tìm thấy sách — kiểm tra lại</h3>{conditionSelect}<label className="circ-field">Kết quả kiểm tra<textarea rows={3} maxLength={2000} value={notes} onChange={event => setNotes(event.target.value)} placeholder="Mô tả sửa chữa hoặc việc tìm thấy và kiểm tra sách" /></label><button type="button" className="circ-btn circ-btn--primary" disabled={busy || !notes.trim()} onClick={() => void restore()}>Xác nhận đủ điều kiện sử dụng</button></div>}</>}
       </div>
     </section>
   );
@@ -863,6 +2112,7 @@ function OverdueView() {
 
 function FinesView() {
   const headers = useCirculationAuth();
+  const { showToast } = useToast();
   const [stats, setStats] = useState<CirculationStats | null>(null);
   const [items, setItems] = useState<CirculationFine[]>([]);
   const [status, setStatus] = useState('All');
@@ -872,76 +2122,167 @@ function FinesView() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedFine, setSelectedFine] = useState<CirculationFine | null>(null);
+  const [cashConfirmation, setCashConfirmation] = useState<'cash' | 'cancel-payos' | null>(null);
+  const [paymentCheckout, setPaymentCheckout] = useState<{
+    fineId: string; amount: number; checkoutUrl: string; qrCode: string; expiresAt: string | null;
+  } | null>(null);
+  const paymentConfirmationNotified = useRef<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(searchInput), 400);
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (quiet = false, includePaidDuringCheckout = false) => {
+    if (!quiet) setLoading(true);
     try {
       const query = new URLSearchParams();
       if (search.trim()) query.set('search', search.trim());
-      if (status !== 'All') query.set('status', status);
-      const [statsRes, fineRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
-        fetch(`${API_BASE_URL}/api/v1/circulation/fines?${query}`, { headers }),
-      ]);
-      const statsJson = await parseApiResponse<ApiResult<CirculationStats>>(statsRes);
+      if (status !== 'All' && !(includePaidDuringCheckout && status === 'Pending')) {
+        query.set('status', status);
+      }
+      const fineRes = await fetch(`${API_BASE_URL}/api/v1/circulation/fines?${query}`, { headers });
       const fineJson = await parseApiResponse<ApiResult<CirculationFine[]>>(fineRes);
       if (!fineRes.ok || !fineJson?.success) throw new Error(fineJson?.error || 'Không tải được phí phạt.');
       setError(null);
-      setStats(statsJson?.data ?? null);
       setItems(fineJson.data ?? []);
     } catch (err) {
-      setError(errorMessage(err, 'Lỗi tải dữ liệu.'));
+      const message = errorMessage(err, 'Lỗi tải dữ liệu.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được danh sách phí phạt', message });
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
-  }, [headers, search, status]);
+  }, [headers, search, showToast, status]);
 
-  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+  useEffect(() => { void Promise.resolve().then(() => load()); }, [load]);
 
-  const pay = async (id: string) => {
-    if (!window.confirm('Xác nhận đã thu tiền phạt này? Hệ thống không tự đánh dấu đã thanh toán.')) return;
+  const loadStats = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers });
+      const result = await parseApiResponse<ApiResult<CirculationStats>>(response);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không tải được thống kê.');
+      setStats(result.data ?? null);
+    } catch (err) {
+      const message = errorMessage(err, 'Không tải được thống kê.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không tải được thống kê', message });
+    }
+  }, [headers, showToast]);
+
+  useEffect(() => { void Promise.resolve().then(loadStats); }, [loadStats]);
+
+  const payCash = async (id: string) => {
     setBusy(true);
     setMessage(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/circulation/fines/${id}/pay`, { method: 'POST', headers });
+      const res = await fetch(`${API_BASE_URL}/api/v1/circulation/fines/${id}/pay/cash`, { method: 'POST', headers });
       const json = await parseApiResponse<ApiResult<unknown>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Không ghi nhận thanh toán.');
-      setMessage(json.meta?.message || 'Đã ghi nhận thanh toán.');
-      await load();
+      const message = json.meta?.message || 'Đã ghi nhận thanh toán tiền mặt.';
+      setMessage(message);
+      showToast({ type: 'success', title: 'Đã ghi nhận thanh toán', message });
+      setSelectedFine(null);
+      setPaymentCheckout(null);
+      setCashConfirmation(null);
+      await Promise.all([load(), loadStats()]);
     } catch (err) {
-      setError(errorMessage(err, 'Không ghi nhận thanh toán.'));
+      const message = errorMessage(err, 'Không ghi nhận thanh toán.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không ghi nhận thanh toán', message });
     } finally {
       setBusy(false);
     }
   };
+
+  const createPayOSCheckout = async (fine: CirculationFine) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/circulation/fines/${fine.id}/pay/payos`, {
+        method: 'POST',
+        headers,
+      });
+      const result = await parseApiResponse<ApiResult<{
+        fineId: string; amount: number; checkoutUrl: string; qrCode: string; expiresAt: string | null;
+      }>>(response);
+      if (!response.ok || !result?.success || !result.data) {
+        throw new Error(result?.error || 'Không thể tạo thanh toán PayOS.');
+      }
+      setPaymentCheckout(result.data);
+      await load();
+    } catch (err) {
+      const message = errorMessage(err, 'Không thể tạo thanh toán PayOS.');
+      setError(message);
+      showToast({ type: 'error', title: 'Không thể tạo thanh toán PayOS', message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const checkoutFine = paymentCheckout
+    ? items.find((fine) => fine.id === paymentCheckout.fineId)
+    : undefined;
+  const paymentConfirmed = checkoutFine?.status === 'Paid';
+
+  useEffect(() => {
+    if (!paymentCheckout || paymentConfirmed) return undefined;
+    const timer = window.setInterval(() => void load(true, true), 5000);
+    return () => window.clearInterval(timer);
+  }, [load, paymentCheckout, paymentConfirmed]);
+
+  useEffect(() => {
+    if (!paymentCheckout || !paymentConfirmed
+      || paymentConfirmationNotified.current === paymentCheckout.fineId) return;
+    paymentConfirmationNotified.current = paymentCheckout.fineId;
+    showToast({
+      type: 'success',
+      title: 'Đã xác nhận thanh toán',
+      message: 'PayOS đã xác nhận giao dịch.',
+    });
+    void Promise.all([load(), loadStats()]);
+  }, [load, loadStats, paymentCheckout, paymentConfirmed, showToast]);
 
   return (
     <section className="circ-page">
       <Chrome tab="fines" stats={stats} loading={loading} />
       {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
-      <div className="circ-card">
+      <WorkflowTabs
+        label="Lọc danh sách phí phạt"
+        value={status}
+        onChange={setStatus}
+        tabs={[
+          { value: 'All', label: 'Tất cả' },
+          { value: 'Pending', label: 'Chưa thanh toán' },
+          { value: 'Paid', label: 'Đã thanh toán' },
+        ]}
+      />
+      <div className="circ-card" id={`circ-panel-${status}`} role="tabpanel" aria-labelledby={`circ-tab-${status}`} tabIndex={0}>
         <div className="circ-card-head">
           <h2>Danh sách phí phạt</h2>
           <div className="circ-toolbar">
             <input value={searchInput} placeholder="Tìm độc giả, mã vạch, sách..." onChange={(e) => setSearchInput(e.target.value)} />
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="All">Tất cả</option>
-              <option value="Pending">Chưa thanh toán</option>
-              <option value="Paid">Đã thanh toán</option>
-            </select>
+            <button
+              type="button"
+              className="circ-btn"
+              disabled={loading || busy}
+              onClick={() => void Promise.all([load(), loadStats()])}
+            >
+              {loading ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />}
+              {loading ? 'Đang tải...' : 'Làm mới'}
+            </button>
           </div>
         </div>
-        {!items.length ? <p className="circ-empty">Chưa có khoản phạt.</p> : (
+        {loading ? (
+          <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải danh sách phí phạt...</p>
+        ) : !items.length ? <p className="circ-empty">Chưa có khoản phạt.</p> : (
           <div className="circ-table-wrap">
             <table className="circ-table">
               <thead>
                 <tr>
-                  <th>Mã</th><th>Độc giả</th><th>Sách</th><th>Lý do</th><th>Số tiền</th><th>Ngày</th><th>Trạng thái</th><th>Thao tác</th>
+                  <th>Mã</th><th>Độc giả</th><th>Sách</th><th>Lý do</th><th>Số tiền</th><th>Ngày</th><th>Phương thức</th><th>Trạng thái</th><th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -954,13 +2295,18 @@ function FinesView() {
                     <td>{formatMoney(fine.amount)}</td>
                     <td>{formatDate(fine.createdAt)}</td>
                     <td>
+                      {fine.paymentMethod === 'Cash' ? 'Tiền mặt' : fine.paymentMethod === 'PayOS' ? 'PayOS' : '—'}
+                      {fine.paymentReference && <small className="circ-payment-reference">{fine.paymentReference}</small>}
+                    </td>
+                    <td>
                       <span className={`circ-badge is-${fine.status.toLowerCase()}`}>
                         {fine.status === 'Pending' ? 'Chưa thanh toán' : (STATUS_LABELS[fine.status] ?? fine.status)}
                       </span>
+                      {fine.reconciliationRequired && <small className="circ-reconciliation-warning">Cần đối soát giao dịch</small>}
                     </td>
                     <td>
                       {fine.status === 'Pending' ? (
-                        <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void pay(fine.id)}>Ghi nhận thanh toán</button>
+                        <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => { setSelectedFine(fine); setPaymentCheckout(null); }}>Ghi nhận thanh toán</button>
                       ) : '—'}
                     </td>
                   </tr>
@@ -970,6 +2316,54 @@ function FinesView() {
           </div>
         )}
       </div>
+      {selectedFine && !paymentConfirmed && (
+        <div className="circ-payment-backdrop" role="presentation" onClick={() => { setSelectedFine(null); setCashConfirmation(null); setPaymentCheckout(null); }}>
+          <section
+            className="circ-payment-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="circ-payment-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button type="button" className="circ-payment-close" aria-label="Đóng" onClick={() => { setSelectedFine(null); setCashConfirmation(null); setPaymentCheckout(null); }}>×</button>
+            <p>GHI NHẬN THANH TOÁN · {selectedFine.code}</p>
+            <h2 id="circ-payment-title">{selectedFine.readerName}</h2>
+            <strong className="circ-payment-amount">{formatMoney(selectedFine.amount)}</strong>
+            {!paymentCheckout ? (
+              <div className="circ-payment-options">
+                <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void createPayOSCheckout(selectedFine)}>
+                  Tạo mã QR PayOS
+                </button>
+                <button type="button" className="circ-btn" disabled={busy} onClick={() => setCashConfirmation('cash')}>
+                  Xác nhận đã nhận tiền mặt
+                </button>
+              </div>
+            ) : (
+              <>
+                <QRCodeCanvas value={paymentCheckout.qrCode} size={220} level="M" includeMargin />
+                <span>Đợi PayOS xác nhận trước khi hoàn tất. Không xác nhận tiền mặt cho cùng khoản này.</span>
+                <a href={paymentCheckout.checkoutUrl} target="_blank" rel="noreferrer">Mở trang thanh toán PayOS</a>
+                <button type="button" className="circ-btn" disabled={busy} onClick={() => setCashConfirmation('cancel-payos')}>
+                  Hủy link PayOS và ghi nhận tiền mặt
+                </button>
+              </>
+            )}
+          </section>
+        </div>
+      )}
+      {selectedFine && cashConfirmation && (
+        <CirculationConfirmDialog
+          eyebrow={cashConfirmation === 'cancel-payos' ? 'CHUYỂN SANG TIỀN MẶT' : 'THU TIỀN MẶT TẠI QUẦY'}
+          title={`Xác nhận ${formatMoney(selectedFine.amount)}?`}
+          message={cashConfirmation === 'cancel-payos'
+            ? 'Chỉ xác nhận nếu đã nhận đủ tiền mặt. Hệ thống sẽ yêu cầu PayOS hủy liên kết đang chờ trước khi ghi nhận thanh toán tiền mặt.'
+            : 'Chỉ tiếp tục sau khi đã nhận đủ tiền mặt từ độc giả. Giao dịch sẽ được lưu riêng với phương thức Tiền mặt trong báo cáo.'}
+          confirmLabel={cashConfirmation === 'cancel-payos' ? 'Hủy PayOS và ghi nhận' : 'Đã nhận tiền mặt'}
+          busy={busy}
+          onConfirm={() => void payCash(selectedFine.id)}
+          onCancel={() => setCashConfirmation(null)}
+        />
+      )}
     </section>
   );
 }
@@ -977,6 +2371,7 @@ function FinesView() {
 const VIEWS = {
   loans: LoansView,
   return: ReturnView,
+  reservations: ReservationsView,
   overdue: OverdueView,
   fines: FinesView,
 };

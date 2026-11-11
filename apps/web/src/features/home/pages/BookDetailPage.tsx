@@ -1,27 +1,44 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BookOpen, CalendarDays, CheckCircle2, Globe2, MessageSquareText, Star, UserRound } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, CheckCircle2, Globe2, MapPin, MessageSquareText, Star, UserRound, X } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useToast } from '../../../components/ui/useToast';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { BookCover } from '../components/BookCover';
+import FavoriteBookButton from '../components/FavoriteBookButton';
+import HomeFooter from '../components/HomeFooter';
 import HomeNavbar from '../components/HomeNavbar';
 import { useBookAvailability, useBookReviews, useHomeBook, type BookReview } from '../hooks/useHomeData';
 import './HomePage.css';
 import './BookDetailPage.css';
+import '../components/FavoriteBookButton.css';
 
 interface ApiEnvelope<T> {
   success?: boolean;
   data?: T;
   error?: string;
+  meta?: { message?: string };
 }
 
 interface ReviewDraft {
   reviewId: string;
   rating: number;
   comment: string;
+}
+
+interface PickupSlot {
+  pickupAt: string;
+  remainingCapacity: number;
+  capacity: number;
+}
+
+interface MyBookReservation {
+  id: string;
+  bookId: string;
+  status: string;
+  expiresAt: string | null;
 }
 
 const BookDetailPage = () => {
@@ -31,11 +48,34 @@ const BookDetailPage = () => {
   const user = useAuthStore((state) => state.user);
   const accessToken = useAuthStore((state) => state.accessToken);
   const { showToast } = useToast();
+  const isReader = user?.role === 'Reader';
   const bookQuery = useHomeBook(bookId);
   const availabilityQuery = useBookAvailability(bookId);
   const reviewsQuery = useBookReviews(bookId, accessToken);
+  const reservationQuery = useQuery({
+    queryKey: ['my-book-reservations', accessToken],
+    enabled: isReader && Boolean(accessToken),
+    staleTime: 15_000,
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`${API_BASE_URL}/api/v1/me/circulation/reservations`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal,
+      });
+      const result = await parseApiResponse<ApiEnvelope<MyBookReservation[]>>(response);
+      if (!response.ok || !result?.success || !Array.isArray(result.data)) {
+        throw new Error(result?.error || 'Không tải được đặt trước của bạn.');
+      }
+      return result.data;
+    },
+  });
   const [draft, setDraft] = useState<ReviewDraft>({ reviewId: '', rating: 5, comment: '' });
+  const [pickupSlots, setPickupSlots] = useState<PickupSlot[]>([]);
+  const [selectedPickupAt, setSelectedPickupAt] = useState('');
+  const [borrowSuccessOpen, setBorrowSuccessOpen] = useState(false);
+  const [pickupSlotsError, setPickupSlotsError] = useState<string | null>(null);
+  const [loadingPickupSlots, setLoadingPickupSlots] = useState(false);
   const book = bookQuery.data;
+  const [bookFieldLabels, setBookFieldLabels] = useState<Record<string, string>>({});
   const reviews = reviewsQuery.data ?? [];
   const myReview = reviews.find((review) => review.isMine);
   const draftSource = myReview?.id ?? 'new';
@@ -44,7 +84,66 @@ const BookDetailPage = () => {
   const averageRating = reviews.length
     ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
     : book?.averageRating ?? 0;
-  const isReader = user?.role === 'Reader';
+  const myReservation = reservationQuery.data?.find((item) => item.bookId === bookId);
+  const hasPendingReservation = myReservation?.status.toLowerCase() === 'pending';
+  const hasReadyReservation = myReservation?.status.toLowerCase() === 'ready';
+
+  useEffect(() => {
+    const loadFieldLabels = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/books/field-config`);
+        const result = await parseApiResponse<ApiEnvelope<{ fields: Array<{ key: string; label: string; visible: boolean }> }>>(response);
+        if (response.ok && result?.success && Array.isArray(result.data?.fields)) {
+          setBookFieldLabels(Object.fromEntries(result.data.fields.map((field) => [field.key, field.visible ? field.label : ''])));
+        }
+      } catch { /* book details remain available if field labels cannot load */ }
+    };
+    void loadFieldLabels();
+  }, []);
+
+  useEffect(() => {
+    const handleReservationReady = (event: Event) => {
+      const payload = (event as CustomEvent<{ bookId?: string }>).detail;
+      if (payload?.bookId !== bookId) return;
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['my-book-reservations', accessToken] }),
+        queryClient.invalidateQueries({ queryKey: ['public-book-availability', bookId] }),
+      ]);
+    };
+    window.addEventListener('reader-reservation-ready', handleReservationReady);
+    return () => window.removeEventListener('reader-reservation-ready', handleReservationReady);
+  }, [accessToken, bookId, queryClient]);
+
+  useEffect(() => {
+    if (!isReader || !accessToken) return undefined;
+    const controller = new AbortController();
+    const loadPickupSlots = async () => {
+      setLoadingPickupSlots(true);
+      setPickupSlotsError(null);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/me/circulation/pickup-slots`, {
+          headers: { Authorization: ['Bearer', accessToken].join(' ') },
+          signal: controller.signal,
+        });
+        const result = await parseApiResponse<ApiEnvelope<PickupSlot[]>>(response);
+        if (!response.ok || !result?.success || !Array.isArray(result.data)) {
+          throw new Error(result?.error || 'Không tải được lịch nhận sách.');
+        }
+        setPickupSlots(result.data);
+        setSelectedPickupAt((current) => result.data?.some((slot) => slot.pickupAt === current)
+          ? current
+          : result.data?.[0]?.pickupAt ?? '');
+      } catch (caught) {
+        if (!controller.signal.aborted) {
+          setPickupSlotsError(caught instanceof Error ? caught.message : 'Không tải được lịch nhận sách.');
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoadingPickupSlots(false);
+      }
+    };
+    void loadPickupSlots();
+    return () => controller.abort();
+  }, [accessToken, isReader]);
 
   const invalidateBookData = async () => {
     await Promise.all([
@@ -54,24 +153,67 @@ const BookDetailPage = () => {
     ]);
   };
 
+  useEffect(() => {
+    if (!borrowSuccessOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setBorrowSuccessOpen(false);
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [borrowSuccessOpen]);
+
   const borrowMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (pickupAt: string) => {
       if (!accessToken) throw new Error('Vui lòng đăng nhập bằng tài khoản độc giả để mượn sách.');
       const response = await fetch(`${API_BASE_URL}/api/v1/me/circulation/book-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ bookId }),
+        body: JSON.stringify({ bookId, pickupAt }),
       });
       const result = await parseApiResponse<ApiEnvelope<unknown>>(response);
       if (!response.ok || !result?.success) {
         throw new Error(result?.error || `Không gửi được yêu cầu mượn (HTTP ${response.status}).`);
       }
     },
-    onSuccess: async () => {
-      showToast({ type: 'success', title: 'Đã gửi yêu cầu mượn', message: 'Yêu cầu đang chờ thủ thư xác nhận.' });
+    onSuccess: async (_data, pickupAt) => {
+      setBorrowSuccessOpen(true);
       await queryClient.invalidateQueries({ queryKey: ['public-book-availability', bookId] });
+      await queryClient.invalidateQueries({ queryKey: ['my-book-reservations', accessToken] });
+      setPickupSlots((slots) => slots
+        .map((slot) => slot.pickupAt === pickupAt ? { ...slot, remainingCapacity: slot.remainingCapacity - 1 } : slot)
+        .filter((slot) => slot.remainingCapacity > 0));
     },
     onError: (error) => showToast({ type: 'error', title: 'Không thể mượn sách', message: error.message }),
+  });
+
+  const reservationMutation = useMutation({
+    mutationFn: async () => {
+      if (!accessToken) throw new Error('Vui lòng đăng nhập bằng tài khoản độc giả để đặt trước sách.');
+      const response = await fetch(`${API_BASE_URL}/api/v1/me/circulation/book-reservations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ bookId }),
+      });
+      const result = await parseApiResponse<ApiEnvelope<unknown>>(response);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || `Không đặt trước được sách (HTTP ${response.status}).`);
+      }
+      return result;
+    },
+    onSuccess: async (result) => {
+      showToast({
+        type: 'success',
+        title: 'Đã đặt trước sách',
+        message: result.meta?.message || 'Bạn sẽ nhận thông báo khi có bản sao sẵn sàng.',
+      });
+      await queryClient.invalidateQueries({ queryKey: ['my-book-reservations', accessToken] });
+    },
+    onError: (error) => showToast({ type: 'error', title: 'Không thể đặt trước sách', message: error.message }),
   });
 
   const reviewMutation = useMutation({
@@ -141,6 +283,7 @@ const BookDetailPage = () => {
           <div className="book-detail-cover-skeleton" />
           <div className="book-detail-copy-skeleton"><span /><span /><span /><span /></div>
         </main>
+        <HomeFooter />
       </div>
     );
   }
@@ -154,6 +297,7 @@ const BookDetailPage = () => {
           <p>{bookQuery.error?.message || 'Không tìm thấy đầu sách này.'}</p>
           <Link to="/books"><ArrowLeft size={16} /> Trở về khám phá sách</Link>
         </main>
+        <HomeFooter />
       </div>
     );
   }
@@ -198,20 +342,73 @@ const BookDetailPage = () => {
                 <span className="is-unavailable">Không kiểm tra được trạng thái bản sao. {availabilityQuery.error.message}</span>
               ) : availabilityQuery.data?.canBorrow ? (
                 <span className="is-available"><CheckCircle2 size={17} /> Sẵn sàng cho mượn · {availabilityQuery.data.availableCopies} bản</span>
+              ) : hasReadyReservation ? (
+                <span className="is-available"><CheckCircle2 size={17} /> Bản sao đã sẵn sàng cho bạn</span>
               ) : (
                 <span className="is-unavailable">Hiện không có bản sao sẵn sàng · {availabilityQuery.data?.totalCopies ?? 0} bản trong thư viện</span>
               )}
             </div>
 
             {isReader ? (
-              <button
-                type="button"
-                className="book-detail-borrow"
-                disabled={!availabilityQuery.data?.canBorrow || availabilityQuery.isPending || availabilityQuery.isError || borrowMutation.isPending}
-                onClick={() => borrowMutation.mutate()}
-              >
-                {borrowMutation.isPending ? 'Đang gửi yêu cầu…' : 'Mượn sách'}
-              </button>
+              <>
+                <FavoriteBookButton bookId={book.id} title={book.title} variant="detail" />
+                {(availabilityQuery.data?.canBorrow || hasReadyReservation) && (
+                  <>
+                    <label className="book-detail-pickup-label" htmlFor="book-detail-pickup-time">Chọn giờ đến nhận sách</label>
+                    <select
+                      id="book-detail-pickup-time"
+                      className="book-detail-pickup-select"
+                      value={selectedPickupAt}
+                      disabled={loadingPickupSlots || pickupSlots.length === 0}
+                      onChange={(event) => setSelectedPickupAt(event.target.value)}
+                    >
+                      {pickupSlots.length === 0
+                        ? <option value="">{loadingPickupSlots ? 'Đang tải khung giờ…' : 'Không còn khung giờ khả dụng'}</option>
+                        : pickupSlots.map((slot) => (
+                          <option key={slot.pickupAt} value={slot.pickupAt}>
+                            {new Date(slot.pickupAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })} · còn {slot.remainingCapacity}/{slot.capacity} lượt
+                          </option>
+                        ))}
+                    </select>
+                    {pickupSlotsError && <p className="book-detail-pickup-error" role="alert">{pickupSlotsError}</p>}
+                    <p className="book-detail-pickup-note">Thứ 2–6: 09:00–17:00 · Thứ 7: 09:00–15:00 · Khung 30 phút. Nếu không đến trong 30 phút sau lịch hẹn, yêu cầu và bản sao sẽ tự hủy.</p>
+                  </>
+                )}
+                <div className="book-detail-circulation-actions">
+                  <button
+                    type="button"
+                    className={`book-detail-borrow${!availabilityQuery.data?.canBorrow && !hasReadyReservation ? ' is-unavailable' : ''}`}
+                    disabled={!availabilityQuery.data?.canBorrow && !hasReadyReservation
+                      || availabilityQuery.isPending
+                      || availabilityQuery.isError
+                      || borrowMutation.isPending
+                      || !selectedPickupAt}
+                    onClick={() => borrowMutation.mutate(selectedPickupAt)}
+                  >
+                    {borrowMutation.isPending ? 'Đang gửi yêu cầu…' : 'Mượn sách'}
+                  </button>
+                  {!availabilityQuery.data?.canBorrow && (
+                    <button
+                      type="button"
+                      className="book-detail-reserve"
+                      disabled={hasPendingReservation || hasReadyReservation || availabilityQuery.isPending || availabilityQuery.isError || reservationMutation.isPending || reservationQuery.isPending}
+                      onClick={() => reservationMutation.mutate()}
+                    >
+                      {reservationMutation.isPending
+                        ? 'Đang đặt trước…'
+                        : hasPendingReservation
+                          ? 'Đã đặt trước · đang chờ'
+                          : hasReadyReservation
+                            ? 'Đã sẵn sàng · hãy mượn'
+                            : 'Đặt trước sách'}
+                    </button>
+                  )}
+                </div>
+                {hasReadyReservation && myReservation?.expiresAt && (
+                  <p className="book-detail-pickup-note">Bản sao đang được giữ cho bạn đến {new Date(myReservation.expiresAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}.</p>
+                )}
+                {reservationQuery.isError && <p className="book-detail-pickup-error" role="alert">{reservationQuery.error.message}</p>}
+              </>
             ) : user ? (
               <p className="book-detail-role-note">Tính năng mượn sách dành cho tài khoản độc giả.</p>
             ) : (
@@ -219,27 +416,25 @@ const BookDetailPage = () => {
             )}
 
             <dl className="book-detail-facts">
-              <div><dt><BookOpen size={16} /> Mã sách</dt><dd>{book.code || 'Chưa cập nhật'}</dd></div>
-              <div><dt><UserRound size={16} /> Tác giả</dt><dd>{book.authorNames.join(', ') || 'Chưa cập nhật'}</dd></div>
-              <div><dt><CalendarDays size={16} /> Năm xuất bản</dt><dd>{book.publishedYear || 'Chưa cập nhật'}</dd></div>
-              <div><dt><Globe2 size={16} /> Ngôn ngữ</dt><dd>{book.language || 'Chưa cập nhật'}</dd></div>
-              <div><dt><BookOpen size={16} /> ISBN</dt><dd>{book.isbn || 'Chưa cập nhật'}</dd></div>
+              {bookFieldLabels.code !== '' && <div><dt><BookOpen size={16} /> {bookFieldLabels.code || 'Mã sách'}</dt><dd>{book.code || 'Chưa cập nhật'}</dd></div>}
+              {bookFieldLabels.author !== '' && <div><dt><UserRound size={16} /> {bookFieldLabels.author || 'Tác giả'}</dt><dd>{book.authorNames.join(', ') || 'Chưa cập nhật'}</dd></div>}
+              {bookFieldLabels.year !== '' && <div><dt><CalendarDays size={16} /> {bookFieldLabels.year || 'Năm xuất bản'}</dt><dd>{book.publishedYear || 'Chưa cập nhật'}</dd></div>}
+              {bookFieldLabels.language !== '' && <div><dt><Globe2 size={16} /> {bookFieldLabels.language || 'Ngôn ngữ'}</dt><dd>{book.language || 'Chưa cập nhật'}</dd></div>}
+              {bookFieldLabels.isbn !== '' && <div><dt><BookOpen size={16} /> {bookFieldLabels.isbn || 'ISBN'}</dt><dd>{book.isbn || 'Chưa cập nhật'}</dd></div>}
               <div><dt><CheckCircle2 size={16} /> Tổng bản sao</dt><dd>{availabilityQuery.data?.totalCopies ?? book.totalCopies}</dd></div>
+              {bookFieldLabels.location !== '' && book.copyLocations !== undefined && (
+                <div className="book-detail-fact-location">
+                  <dt><MapPin size={16} /> {bookFieldLabels.location || 'Vị trí kệ'}</dt>
+                  <dd>{book.copyLocations.join(' · ') || 'Chưa xếp kệ'}</dd>
+                </div>
+              )}
+              {Object.entries(book.customFields ?? {}).filter((entry) => Boolean(entry[1]?.trim()) && bookFieldLabels[entry[0]] !== '').map(([key, value]) => (
+                <div className="book-detail-custom-fact" key={key}>
+                  <dt>{bookFieldLabels[key] || 'Thông tin bổ sung'}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
             </dl>
-          </div>
-        </section>
-
-        <section className="book-detail-description">
-          <div className="book-detail-description-title">
-            <h2>Về cuốn sách</h2>
-            <span aria-hidden="true">“</span>
-          </div>
-          <div className="book-detail-description-copy">
-            <p>{book.description?.trim() || 'Chưa có phần mô tả cho đầu sách này.'}</p>
-            <div className="book-detail-description-meta">
-              <span>Tác giả <strong>{book.authorNames.join(', ') || 'Chưa cập nhật'}</strong></span>
-              <span>Danh mục <strong>{book.categoryNames.join(' · ') || 'Tài liệu thư viện'}</strong></span>
-            </div>
           </div>
         </section>
 
@@ -338,6 +533,25 @@ const BookDetailPage = () => {
           )}
         </section>
       </main>
+      <HomeFooter />
+      {borrowSuccessOpen && (
+        <div className="book-borrow-success-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setBorrowSuccessOpen(false);
+        }}>
+          <section className="book-borrow-success" role="dialog" aria-modal="true" aria-labelledby="borrow-success-title" aria-describedby="borrow-success-description" data-ui="dialog">
+            <button type="button" className="book-borrow-success-close" onClick={() => setBorrowSuccessOpen(false)} aria-label="Đóng thông báo">
+              <X size={19} />
+            </button>
+            <div className="book-borrow-success-mark" aria-hidden="true"><CheckCircle2 size={34} /></div>
+            <h2 id="borrow-success-title">Đã gửi yêu cầu mượn sách</h2>
+            <p id="borrow-success-description">Yêu cầu của bạn đã được gửi thành công. Thư viện sẽ thông báo khi thủ thư tiếp nhận.</p>
+            <div className="book-borrow-success-actions">
+              <button type="button" onClick={() => setBorrowSuccessOpen(false)}>Ở lại trang này</button>
+              <button type="button" autoFocus onClick={() => navigate('/books')}>Tiếp tục khám phá sách <ArrowRight size={17} /></button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 };

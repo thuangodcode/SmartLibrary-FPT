@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Interfaces;
+using SmartLibrary.Application.Features.Circulation;
 using SmartLibrary.Domain.Exceptions;
 
 namespace SmartLibrary.Api.Controllers;
@@ -16,10 +17,21 @@ public sealed class LibrarianUsersController : ControllerBase
 {
     private const long MaximumImportFileSize = 2 * 1024 * 1024;
     private readonly IAdminUserManagementService _userManagementService;
+    private readonly CirculationService _circulation;
 
-    public LibrarianUsersController(IAdminUserManagementService userManagementService)
+    public LibrarianUsersController(IAdminUserManagementService userManagementService, CirculationService circulation)
     {
         _userManagementService = userManagementService;
+        _circulation = circulation;
+    }
+
+    [HttpGet("{userId:guid}/history")]
+    public async Task<IActionResult> GetReaderHistory(Guid userId, CancellationToken cancellationToken)
+    {
+        var reader = await _userManagementService.GetReaderByIdAsync(userId, cancellationToken);
+        return reader is null
+            ? NotFound(ApiResponse<object>.Fail("Không tìm thấy độc giả."))
+            : Ok(ApiResponse<object>.Ok(await _circulation.GetReaderHistoryAsync(userId, cancellationToken)));
     }
 
     [HttpGet("{userId:guid}")]
@@ -29,6 +41,20 @@ public sealed class LibrarianUsersController : ControllerBase
         return reader is null
             ? NotFound(ApiResponse<object>.Fail("Không tìm thấy độc giả."))
             : Ok(ApiResponse<object>.Ok(reader));
+    }
+
+    [HttpGet("{userId:guid}/registrations/{registrationId:guid}/documents/{documentId:guid}/url")]
+    public async Task<IActionResult> GetIdentityDocumentUrl(
+        Guid userId,
+        Guid registrationId,
+        Guid documentId,
+        CancellationToken cancellationToken)
+    {
+        var url = await _userManagementService.GetUserIdentityDocumentUrlAsync(
+            userId, registrationId, documentId, cancellationToken);
+        return url is null
+            ? NotFound(ApiResponse<object>.Fail("Không tìm thấy giấy tờ xác minh của tài khoản này."))
+            : Ok(ApiResponse<object>.Ok(new { url }));
     }
 
     [HttpPost("import")]

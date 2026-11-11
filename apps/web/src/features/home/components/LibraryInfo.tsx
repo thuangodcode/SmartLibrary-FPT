@@ -78,8 +78,8 @@ export const LibraryInfo: React.FC = () => {
             </div>
 
             <ul className="space-y-3 text-xs text-slate-300 leading-relaxed list-disc list-inside">
-              <li>Mượn tối đa 5 cuốn sách/lần (8 cuốn đối với sinh viên Đồ án).</li>
-              <li>Thời gian giữ sách mượn là 14 ngày, gia hạn tối đa 2 lần.</li>
+              <li>Hạn mức mượn, thời hạn và số lần gia hạn theo chính sách hiện hành do Admin cấu hình.</li>
+              <li>Hạn trả và phí phạt hiển thị đúng số liệu trên phiếu mượn / phiếu phạt của hệ thống.</li>
               <li>Bảo quản sách cẩn thận, không gạch chân hoặc làm rách trang.</li>
               <li>Xuất trình thẻ sinh viên hoặc ứng dụng Mobile khi qua cửa soát vé.</li>
             </ul>

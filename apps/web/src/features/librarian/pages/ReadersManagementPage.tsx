@@ -124,6 +124,56 @@ const ReadersManagementPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState<Array<{ id: string; label: string; studentId?: string; email?: string }>>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const searchWrapRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target as Node)) {
+        setSearchFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (!trimmed) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSuggestionsLoading(true);
+      try {
+        const token = useAuthStore.getState().accessToken;
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(
+          `${API_BASE_URL}/api/v1/circulation/reservation-reader-options?search=${encodeURIComponent(trimmed)}`,
+          { headers, signal: controller.signal }
+        );
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            setSuggestions(json.data.slice(0, 6));
+          }
+        }
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          // ignore
+        }
+      } finally {
+        setSuggestionsLoading(false);
+      }
+    }, 180);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [search]);
 
   const fetchReaders = useCallback(async () => {
     setLoading(true);
@@ -183,7 +233,10 @@ const ReadersManagementPage: React.FC = () => {
       {/* ─── Page Heading ─── */}
       <header className="lib-readers-heading">
         <div>
-          <p className="lib-readers-eyebrow">THỦ THƯ / QUẢN LÝ ĐỘC GIẢ</p>
+          <div className="lib-readers-eyebrow">
+            <Users size={14} />
+            <span>KHÔNG GIAN THỦ THƯ • QUẢN LÝ ĐỘC GIẢ</span>
+          </div>
           <h1>Quản Lý Thông Tin Bạn Đọc</h1>
           <p className="lib-readers-description">
             Tra cứu, theo dõi hồ sơ thông tin và trạng thái thẻ của toàn bộ bạn đọc trong hệ thống thư viện.
@@ -281,18 +334,80 @@ const ReadersManagementPage: React.FC = () => {
           </div>
 
           <div className="lib-readers-filters">
-            <label className="lib-readers-search">
-              <Search size={14} />
-              <input
-                type="text"
-                placeholder="Tìm theo họ tên, email, MSSV, SĐT..."
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </label>
+            <div className="lib-readers-search-wrapper" ref={searchWrapRef}>
+              <label className="lib-readers-search">
+                <Search size={14} />
+                <input
+                  type="text"
+                  placeholder="Tìm theo họ tên, email, MSSV, SĐT..."
+                  value={search}
+                  onChange={(e) => {
+                    const nextSearch = e.target.value;
+                    setSearch(nextSearch);
+                    if (!nextSearch.trim()) {
+                      setSuggestions([]);
+                      setSuggestionsLoading(false);
+                    }
+                    setPage(1);
+                    setSearchFocused(true);
+                  }}
+                  onFocus={() => setSearchFocused(true)}
+                />
+              </label>
+
+              {search.trim().length > 0 && searchFocused && (
+                <div className="lib-readers-search-dropdown" role="listbox">
+                  {suggestionsLoading && (
+                    <div className="lib-readers-search-hint">
+                      <LoaderCircle className="lib-readers-spin" size={14} />
+                      <span>Đang tìm kiếm gợi ý...</span>
+                    </div>
+                  )}
+
+                  {!suggestionsLoading && suggestions.length === 0 && (
+                    <div className="lib-readers-search-hint">
+                      Không tìm thấy độc giả khớp với "<strong>{search}</strong>"
+                    </div>
+                  )}
+
+                  {suggestions.map((r) => (
+                    <div
+                      key={r.id}
+                      role="option"
+                      aria-selected={false}
+                      className="lib-readers-search-item"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setSearch(r.studentId || r.label);
+                        setPage(1);
+                        setSearchFocused(false);
+                      }}
+                    >
+                      <div className="lib-readers-search-item-info">
+                        <div className="lib-readers-search-item-primary">
+                          <span className="lib-readers-search-item-name">{r.label}</span>
+                          {r.studentId && <span className="lib-readers-search-badge">{r.studentId}</span>}
+                        </div>
+                        {r.email && <span className="lib-readers-search-item-email">{r.email}</span>}
+                      </div>
+                      <button
+                        type="button"
+                        className="lib-readers-search-quick-btn"
+                        title="Xem hồ sơ bạn đọc"
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setSearchFocused(false);
+                          navigate(`/librarian/readers/${r.id}`);
+                        }}
+                      >
+                        <Eye size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <select
               value={statusFilter}

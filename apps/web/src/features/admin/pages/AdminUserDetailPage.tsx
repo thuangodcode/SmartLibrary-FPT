@@ -4,6 +4,8 @@ import {
   AlertCircle,
   ArrowLeft,
   Ban,
+  BookOpen,
+  Bookmark,
   CalendarDays,
   Check,
   Clock3,
@@ -11,6 +13,7 @@ import {
   FileText,
   Image as ImageIcon,
   LoaderCircle,
+  History,
   Mail,
   MapPin,
   Pencil,
@@ -19,6 +22,7 @@ import {
   Save,
   UserRound,
   X,
+  Wallet,
   ZoomIn,
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
@@ -51,7 +55,10 @@ interface ManagedUserDetail {
     id: string;
     documentType: string;
     status: string;
-    documents: Array<{ id: string; side: 'Front' | 'Back' | 'Selfie'; documentLast4: string | null }>;
+    frontDocUrl?: string | null;
+    backDocUrl?: string | null;
+    selfieDocUrl?: string | null;
+    documents: Array<{ id: string; side: 'Front' | 'Back' | 'Selfie'; documentLast4: string | null; storagePath?: string | null }>;
   } | null;
 }
 
@@ -59,6 +66,13 @@ interface ApiResult<T> {
   success?: boolean;
   data?: T;
   error?: string;
+}
+
+interface ReaderHistoryData {
+  loans: Array<{ id: string; readerId: string; bookTitle: string; barcode: string; status: string; displayStatus: string; borrowDate: string | null; dueDate: string | null; returnDate: string | null; overdueDays: number; hasFine: boolean }>;
+  loanTotalCount: number;
+  fines: Array<{ id: string; readerId: string; code: string; bookTitle: string; amount: number; reason: string; status: string; createdAt: string; paidAt: string | null }>;
+  reservations: Array<{ id: string; readerId: string; bookTitle: string; status: string; reservedAt: string; expiresAt: string | null }>;
 }
 
 const readerTypeLabels: Record<ReaderType, string> = {
@@ -103,6 +117,60 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
   const [identityDocumentsError, setIdentityDocumentsError] = useState<string | null>(null);
   const [identityDocumentUrls, setIdentityDocumentUrls] = useState<Record<string, string>>({});
   const [lightboxDocument, setLightboxDocument] = useState<{ url: string; label: string } | null>(null);
+  const [showReaderHistory, setShowReaderHistory] = useState(false);
+  const [readerHistory, setReaderHistory] = useState<ReaderHistoryData | null>(null);
+  const [readerHistoryLoading, setReaderHistoryLoading] = useState(false);
+  const [readerHistoryError, setReaderHistoryError] = useState<string | null>(null);
+
+  const loadReaderHistory = async () => {
+    if (readerHistoryLoading || !userId || !accessToken) return;
+    setReaderHistoryLoading(true);
+    setReaderHistoryError(null);
+    try {
+      const headers = { Authorization: `Bearer ${accessToken}` };
+      const response = await fetch(`${API_BASE_URL}/api/v1/librarian/users/${userId}/history`, { headers });
+      if (response.status === 404) {
+        // Older deployed APIs may not have the aggregate history endpoint yet.
+        const params = new URLSearchParams({ search: user?.fullName || '', page: '1', pageSize: '50' });
+        const [loansResponse, finesResponse, reservationsResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/v1/circulation/loans?${params}`, { headers }),
+          fetch(`${API_BASE_URL}/api/v1/circulation/fines?search=${encodeURIComponent(user?.fullName || '')}`, { headers }),
+          fetch(`${API_BASE_URL}/api/v1/circulation/reservations`, { headers }),
+        ]);
+        const [loansResult, finesResult, reservationsResult] = await Promise.all([
+          parseApiResponse<ApiResult<{ items?: ReaderHistoryData['loans']; totalCount?: number }>>(loansResponse),
+          parseApiResponse<ApiResult<ReaderHistoryData['fines']>>(finesResponse),
+          parseApiResponse<ApiResult<ReaderHistoryData['reservations']>>(reservationsResponse),
+        ]);
+        if (!loansResponse.ok || !loansResult?.success || !finesResponse.ok || !finesResult?.success || !reservationsResponse.ok || !reservationsResult?.success) {
+          throw new Error('Không tải được lịch sử qua các mục lưu thông hiện có.');
+        }
+        setReaderHistory({
+          loans: (loansResult.data?.items ?? []).filter((item) => item.readerId === userId),
+          loanTotalCount: loansResult.data?.totalCount ?? 0,
+          fines: (finesResult.data ?? []).filter((item) => item.readerId === userId),
+          reservations: (reservationsResult.data ?? []).filter((item) => item.readerId === userId),
+        });
+        return;
+      }
+      const result = await parseApiResponse<ApiResult<ReaderHistoryData>>(response);
+      if (!response.ok || !result?.success || !result.data) throw new Error(result?.error || 'Không tải được lịch sử độc giả.');
+      setReaderHistory(result.data);
+    } catch (error) {
+      setReaderHistoryError(error instanceof Error ? error.message : 'Không tải được lịch sử độc giả.');
+    } finally {
+      setReaderHistoryLoading(false);
+    }
+  };
+
+  const toggleReaderHistory = () => {
+    if (showReaderHistory) {
+      setShowReaderHistory(false);
+      return;
+    }
+    setShowReaderHistory(true);
+    if (!readerHistory || readerHistoryError) void loadReaderHistory();
+  };
 
   const loadUser = useCallback(async (signal?: AbortSignal) => {
     if (!userId || !accessToken) {
@@ -124,6 +192,22 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
         throw new Error(result?.error || 'Không thể tải thông tin người dùng.');
       }
       setUser(result.data);
+      if (result.data.registration) {
+        const initialUrls: Record<string, string> = {};
+        if (result.data.registration.frontDocUrl) initialUrls['Front'] = result.data.registration.frontDocUrl;
+        if (result.data.registration.backDocUrl) initialUrls['Back'] = result.data.registration.backDocUrl;
+        if (result.data.registration.selfieDocUrl) initialUrls['Selfie'] = result.data.registration.selfieDocUrl;
+        result.data.registration.documents.forEach((d) => {
+          if (d.storagePath) {
+            initialUrls[d.id] = d.storagePath;
+            initialUrls[d.side] = d.storagePath;
+          }
+        });
+        setIdentityDocumentUrls((prev) => ({ ...initialUrls, ...prev }));
+        if (isLibrarianView && (result.data.registration.documents.length > 0 || result.data.registration.frontDocUrl)) {
+          setShowIdentityDocuments(true);
+        }
+      }
     } catch (error) {
       if (signal?.aborted) return;
       setLoadError(error instanceof Error ? error.message : 'Không thể tải thông tin người dùng.');
@@ -239,9 +323,10 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
     setIdentityDocumentsBusy(true);
     setIdentityDocumentsError(null);
     try {
+      const endpoint = isLibrarianView ? 'librarian/users' : 'admin/users';
       const results = await Promise.all(missingDocuments.map(async (document) => {
         const response = await fetch(
-          `${API_BASE_URL}/api/v1/admin/users/${user.id}/registrations/${user.registration!.id}/documents/${document.id}/url`,
+          `${API_BASE_URL}/api/v1/${endpoint}/${user.id}/registrations/${user.registration!.id}/documents/${document.id}/url`,
           { headers: { Authorization: `Bearer ${accessToken}` } },
         );
         const result = await parseApiResponse<ApiResult<{ url: string }>>(response);
@@ -324,54 +409,145 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
             <h2>{user.fullName}</h2>
             <p>{isReader ? (user.studentId || 'Chưa có mã độc giả') : user.email.split('@')[0]} <span>·</span> {user.email}</p>
           </div>
-          {!isLibrarianView && <div className="admin-user-profile-actions">
-            {isAccountEnabled ? (
-              <button className="admin-user-detail-button admin-user-detail-button--danger" disabled={busy} onClick={() => { setFormError(null); setEditing(false); setDeactivating(true); }} type="button">
-                <Ban size={15} /> Ngừng hoạt động
-              </button>
-            ) : (
-              <button className="admin-user-detail-button admin-user-detail-button--success" disabled={busy} onClick={() => void reactivate()} type="button">
-                {busy ? <LoaderCircle className="admin-users-spin" size={15} /> : <RotateCcw size={15} />} Kích hoạt tài khoản
+          <div className="admin-user-profile-actions">
+            {isLibrarianView && isReader && (
+              <button className="admin-user-detail-button admin-user-detail-button--history" onClick={() => void toggleReaderHistory()} type="button" aria-expanded={showReaderHistory}>
+                {readerHistoryLoading ? <LoaderCircle className="admin-users-spin" size={18} /> : <History size={19} />}
+                {showReaderHistory ? 'Ẩn lịch sử hoạt động' : 'Xem lịch sử hoạt động'}
               </button>
             )}
-            {isReader && (user.registration?.documents.length ?? 0) > 0 && (
+            {!isLibrarianView && (
+              isAccountEnabled ? (
+                <button className="admin-user-detail-button admin-user-detail-button--danger" disabled={busy} onClick={() => { setFormError(null); setEditing(false); setDeactivating(true); }} type="button">
+                  <Ban size={15} /> Ngừng hoạt động
+                </button>
+              ) : (
+                <button className="admin-user-detail-button admin-user-detail-button--success" disabled={busy} onClick={() => void reactivate()} type="button">
+                  {busy ? <LoaderCircle className="admin-users-spin" size={15} /> : <RotateCcw size={15} />} Kích hoạt tài khoản
+                </button>
+              )
+            )}
+            {isReader && (
               <button className="admin-user-detail-button admin-user-detail-button--secondary" disabled={identityDocumentsBusy} onClick={() => void toggleIdentityDocuments()} type="button">
                 {identityDocumentsBusy ? <LoaderCircle className="admin-users-spin" size={15} /> : <FileText size={15} />}
-                Giấy tờ xác minh danh tính
+                {showIdentityDocuments ? 'Ẩn giấy tờ tùy thân' : 'Giấy tờ tùy thân'}
               </button>
             )}
-            <button className="admin-user-detail-button admin-user-detail-button--primary" disabled={busy} onClick={() => { setEditing((current) => !current); setFormError(null); setDeactivating(false); }} type="button">
-              {editing ? <X size={15} /> : <Pencil size={15} />}{editing ? 'Hủy chỉnh sửa' : 'Chỉnh sửa'}
-            </button>
-          </div>}
+            {!isLibrarianView && (
+              <button className="admin-user-detail-button admin-user-detail-button--primary" disabled={busy} onClick={() => { setEditing((current) => !current); setFormError(null); setDeactivating(false); }} type="button">
+                {editing ? <X size={15} /> : <Pencil size={15} />}{editing ? 'Hủy chỉnh sửa' : 'Chỉnh sửa'}
+              </button>
+            )}
+          </div>
         </header>
 
         {!isAccountEnabled && user.statusReason && (
           <div className="admin-user-reason-note"><Ban size={16} /><div><strong>Lý do ngừng hoạt động</strong><p>{user.statusReason}</p></div></div>
         )}
 
-        {!isLibrarianView && (showIdentityDocuments || identityDocumentsError) && (
+        {(showIdentityDocuments || identityDocumentsError) && (
           <section className="admin-user-documents-section" aria-label="Giấy tờ xác minh danh tính">
             <div className="admin-user-section-heading">
-              <div><span>HỒ SƠ XÁC MINH</span><h3>Giấy tờ xác minh danh tính</h3></div>
+              <div><span>HỒ SƠ XÁC MINH</span><h3>Giấy tờ xác minh danh tính (Bấm vào ảnh để phóng to)</h3></div>
               <ImageIcon size={18} />
             </div>
             {identityDocumentsError && <div className="admin-user-form-error" role="alert"><AlertCircle size={15} />{identityDocumentsError}</div>}
             <div className="admin-user-documents-grid">
-              {user.registration?.documents.map((document) => {
-                const label = document.side === 'Front' ? 'Mặt trước giấy tờ' : document.side === 'Back' ? 'Mặt sau giấy tờ' : 'Ảnh chân dung / Selfie';
-                const imageUrl = identityDocumentUrls[document.id];
-                return (
-                  <article className="admin-user-document-card" key={document.id}>
-                    <h4>{label}</h4>
-                    <button className="admin-user-document-preview" disabled={!imageUrl} onClick={() => imageUrl && setLightboxDocument({ url: imageUrl, label })} type="button">
-                      {imageUrl ? <><img src={imageUrl} alt={label} /><span><ZoomIn size={18} /> Phóng to</span></> : identityDocumentsBusy ? <LoaderCircle className="admin-users-spin" size={20} /> : <span>Không có ảnh để hiển thị</span>}
-                    </button>
-                    {document.documentLast4 && <p>Ký tự cuối giấy tờ: ···· {document.documentLast4}</p>}
-                  </article>
-                );
-              })}
+              {[
+                {
+                  id: 'front',
+                  title: 'MẶT TRƯỚC GIẤY TỜ',
+                  url: identityDocumentUrls['Front'] || (user.registration?.documents.find((d) => d.side === 'Front') ? identityDocumentUrls[user.registration.documents.find((d) => d.side === 'Front')!.id] : '') || user.registration?.frontDocUrl || '',
+                  doc: user.registration?.documents.find((d) => d.side === 'Front'),
+                },
+                {
+                  id: 'back',
+                  title: 'MẶT SAU GIẤY TỜ',
+                  url: identityDocumentUrls['Back'] || (user.registration?.documents.find((d) => d.side === 'Back') ? identityDocumentUrls[user.registration.documents.find((d) => d.side === 'Back')!.id] : '') || user.registration?.backDocUrl || '',
+                  doc: user.registration?.documents.find((d) => d.side === 'Back'),
+                },
+                {
+                  id: 'selfie',
+                  title: 'ẢNH CHÂN DUNG / SELFIE',
+                  url: identityDocumentUrls['Selfie'] || (user.registration?.documents.find((d) => d.side === 'Selfie') ? identityDocumentUrls[user.registration.documents.find((d) => d.side === 'Selfie')!.id] : '') || user.registration?.selfieDocUrl || '',
+                  doc: user.registration?.documents.find((d) => d.side === 'Selfie'),
+                },
+              ].map((slot) => (
+                <article className="admin-user-document-card" key={slot.id}>
+                  <h4>{slot.title}</h4>
+                  <button
+                    className="admin-user-document-preview"
+                    disabled={!slot.url}
+                    onClick={() => slot.url && setLightboxDocument({ url: slot.url, label: slot.title })}
+                    type="button"
+                  >
+                    {slot.url ? (
+                      <>
+                        <img src={slot.url} alt={slot.title} />
+                        <span className="admin-user-document-preview-overlay"><ZoomIn size={18} /> Phóng to</span>
+                      </>
+                    ) : identityDocumentsBusy ? (
+                      <LoaderCircle className="admin-users-spin" size={20} />
+                    ) : (
+                      <span className="admin-user-document-empty">Không có ảnh</span>
+                    )}
+                  </button>
+                  {slot.doc?.documentLast4 && <p>Ký tự cuối giấy tờ: ···· {slot.doc.documentLast4}</p>}
+                </article>
+              ))}
             </div>
+          </section>
+        )}
+
+        {isLibrarianView && isReader && showReaderHistory && (
+          <section className="admin-user-history-section" aria-labelledby="admin-user-history-title">
+            <div className="admin-user-section-heading">
+              <div><span>HOẠT ĐỘNG THƯ VIỆN</span><h3 id="admin-user-history-title">Lịch sử mượn, trả và phí phạt</h3></div>
+              <History size={20} />
+            </div>
+            {readerHistoryLoading ? (
+              <div className="admin-user-history-state"><LoaderCircle className="admin-users-spin" size={22} /> Đang tải lịch sử hoạt động...</div>
+            ) : readerHistoryError ? (
+              <div className="admin-user-form-error" role="alert"><AlertCircle size={17} />{readerHistoryError}<button type="button" onClick={() => { setReaderHistory(null); void loadReaderHistory(); }}>Thử lại</button></div>
+            ) : readerHistory ? (
+              <>
+                <div className="admin-user-history-summary">
+                  <div><BookOpen size={19} /><span>Tổng lượt mượn/trả</span><strong>{readerHistory.loanTotalCount}</strong></div>
+                  <div><Wallet size={19} /><span>Khoản phí</span><strong>{readerHistory.fines.length}</strong></div>
+                  <div><Bookmark size={19} /><span>Lượt đặt trước</span><strong>{readerHistory.reservations.length}</strong></div>
+                </div>
+                <div className="admin-user-history-grid">
+                  <section className="admin-user-history-panel">
+                    <h4><BookOpen size={17} /> Mượn và trả sách</h4>
+                    {readerHistory.loans.length ? readerHistory.loans.map((loan) => (
+                      <article className="admin-user-history-item" key={loan.id}>
+                        <div><strong>{loan.bookTitle}</strong><span>{loan.barcode} · {loan.displayStatus || loan.status}</span></div>
+                        <div><span>Mượn: {formatDate(loan.borrowDate, true)}</span><span>{loan.returnDate ? `Trả: ${formatDate(loan.returnDate, true)}` : `Hạn trả: ${formatDate(loan.dueDate, true)}`}</span></div>
+                        {loan.overdueDays > 0 && <small className="admin-user-history-warning">Trễ hạn {loan.overdueDays} ngày</small>}
+                      </article>
+                    )) : <p className="admin-user-history-empty">Chưa có lịch sử mượn hoặc trả sách.</p>}
+                  </section>
+                  <section className="admin-user-history-panel">
+                    <h4><Wallet size={17} /> Phí phạt</h4>
+                    {readerHistory.fines.length ? readerHistory.fines.map((fine) => (
+                      <article className="admin-user-history-item" key={fine.id}>
+                        <div><strong>{fine.reason || fine.bookTitle}</strong><span>{fine.code} · {fine.bookTitle}</span></div>
+                        <div><strong>{fine.amount.toLocaleString('vi-VN')} ₫</strong><span>{fine.status}{fine.paidAt ? ` · Đã thanh toán ${formatDate(fine.paidAt, true)}` : ` · ${formatDate(fine.createdAt, true)}`}</span></div>
+                      </article>
+                    )) : <p className="admin-user-history-empty">Không có khoản phí phạt.</p>}
+                  </section>
+                  <section className="admin-user-history-panel admin-user-history-panel--wide">
+                    <h4><Bookmark size={17} /> Đặt trước sách</h4>
+                    {readerHistory.reservations.length ? readerHistory.reservations.map((reservation) => (
+                      <article className="admin-user-history-item" key={reservation.id}>
+                        <div><strong>{reservation.bookTitle}</strong><span>Đặt lúc {formatDate(reservation.reservedAt, true)}</span></div>
+                        <div><span className="admin-user-history-status">{reservation.status}</span>{reservation.expiresAt && <span>Hết hạn {formatDate(reservation.expiresAt, true)}</span>}</div>
+                      </article>
+                    )) : <p className="admin-user-history-empty">Chưa có lịch sử đặt trước.</p>}
+                  </section>
+                </div>
+              </>
+            ) : null}
           </section>
         )}
 
@@ -415,8 +591,6 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
               {isReader && <InfoItem icon={<CalendarDays size={15} />} label="Ngày sinh" value={formatDate(user.dateOfBirth)} />}
               {isReader && <InfoItem icon={<MapPin size={15} />} label="Địa chỉ thường trú" value={user.address} wide />}
               <InfoItem icon={<Clock3 size={15} />} label="Ngày tạo tài khoản" value={formatDate(user.createdAt, true)} />
-              <InfoItem icon={<Clock3 size={15} />} label="Đăng nhập gần nhất" value={formatDate(user.lastLoginAt, true)} />
-              {isReader && <InfoItem icon={<CalendarDays size={15} />} label="Thẻ thành viên hết hạn" value={formatDate(user.membershipExpiresAt)} />}
             </div>
           )}
         </section>

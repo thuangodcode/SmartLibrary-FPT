@@ -8,6 +8,8 @@ using SmartLibrary.Application.Features.Policies;
 using SmartLibrary.Application.Features.Circulation;
 using SmartLibrary.Application.Features.Reports;
 using SmartLibrary.Application.Features.Users;
+using SmartLibrary.Application.Features.Ai;
+using SmartLibrary.Application.Features.Rag;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Infrastructure.Persistence;
 using SmartLibrary.Infrastructure.Persistence.Repositories;
@@ -24,11 +26,13 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         // Database
-        services.AddDbContext<AppDbContext>(options =>
+        services.AddScoped<NotificationDispatchInterceptor>();
+        services.AddDbContext<AppDbContext>((provider, options) =>
             options.UseNpgsql(
                 configuration.GetConnectionString("DefaultConnection"),
                 npgsqlOptions => npgsqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)
             ).UseSnakeCaseNamingConvention()
+             .AddInterceptors(provider.GetRequiredService<NotificationDispatchInterceptor>())
         );
 
         // Repositories
@@ -42,15 +46,39 @@ public static class DependencyInjection
         services.AddScoped<IPolicyRuleRepository, PolicyRuleRepository>();
         services.AddScoped<IReportRepository, ReportRepository>();
         services.AddScoped<ICirculationRepository, CirculationRepository>();
+        services.AddScoped<IAiSettingsRepository, AiSettingsRepository>();
+        services.AddScoped<IAiWorkspaceRepository, AiWorkspaceRepository>();
+        services.AddScoped<IRagDocumentRepository, RagDocumentRepository>();
+        services.AddScoped<IRagIndexer, RagIndexer>();
+        services.AddHostedService<RagWarmupHostedService>();
+        services.AddSingleton<RagReindexJobService>();
+        services.AddSingleton<IRagReindexJobQueue>(provider => provider.GetRequiredService<RagReindexJobService>());
+        services.AddHostedService(provider => provider.GetRequiredService<RagReindexJobService>());
+        services.AddSingleton<PolicyRagSyncQueue>();
+        services.AddSingleton<IPolicyRagSyncQueue>(provider => provider.GetRequiredService<PolicyRagSyncQueue>());
+        services.AddHostedService(provider => provider.GetRequiredService<PolicyRagSyncQueue>());
 
         // Services
-        services.AddScoped<IAiEmbeddingService, AiEmbeddingService>();
+        services.AddSingleton<ISecretProtector, SecretProtector>();
+        services.AddMemoryCache();
+        services.AddScoped<IBookCatalogCache, BookCatalogCache>();
+        services.AddHttpClient("LocalAiModel", client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(5);
+        });
+        services.AddSingleton<ILocalEmbeddingClient, LocalE5EmbeddingClient>();
+        services.AddHttpClient<IGeminiClient, GeminiClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(2);
+        });
         services.AddScoped<IAiRecommendationService, AiRecommendationService>();
         services.AddHttpClient<IEmailService, EmailService>();
         services.AddHttpClient();
+        services.AddScoped<IPayOSPaymentGateway, PayOSPaymentGateway>();
         services.AddScoped<IAdminUserManagementService, AdminUserManagementService>();
         services.AddScoped<IUserProfileService, UserProfileService>();
         services.AddScoped<IStorageService, StorageService>();
+        services.AddScoped<SmartLibrary.Application.Features.Books.IBookCodeGenerator, BookCodeGenerator>();
         services.AddScoped<IReportExportService, ReportExportService>();
 
         // Supabase

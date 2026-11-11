@@ -33,6 +33,12 @@ public static class CirculationRules
         return TimeZoneInfo.ConvertTimeToUtc(localMidnight, LibraryTimeZone());
     }
 
+    public static DateTime StartOfLibraryDateUtc(DateOnly date)
+    {
+        var localMidnight = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.MinValue), DateTimeKind.Unspecified);
+        return TimeZoneInfo.ConvertTimeToUtc(localMidnight, LibraryTimeZone());
+    }
+
     public static bool IsPastDueOnLibraryCalendar(DateTime? dueUtc, DateTime nowUtc)
         => CalendarOverdueDays(dueUtc, nowUtc) > 0;
 
@@ -44,7 +50,7 @@ public static class CirculationRules
     }
 
     public static bool OccupiesCopy(BorrowStatus status)
-        => status is BorrowStatus.Approved or BorrowStatus.Borrowed or BorrowStatus.Overdue;
+        => status is BorrowStatus.Pending or BorrowStatus.Approved or BorrowStatus.Borrowed or BorrowStatus.Overdue;
 
     public static bool IsUnexpiredReadyHold(string? status, DateTime? expiresAt, DateTime nowUtc)
         => status == ReservationReady && (expiresAt == null || expiresAt >= nowUtc);
@@ -71,11 +77,36 @@ public static class CirculationRules
             name.Contains("textbook", StringComparison.OrdinalIgnoreCase));
     }
 
-    public static int RenewalDays(CirculationSettings settings, string? language)
-        => IsVietnamese(language) ? settings.RenewalDaysVi : settings.RenewalDaysForeign;
-
     public static int BorrowDays(CirculationSettings settings, string? language)
-        => IsVietnamese(language) ? settings.BorrowDaysVi : settings.BorrowDaysForeign;
+    {
+        if (settings.BorrowDays > 0)
+            return settings.BorrowDays;
+        var specific = IsVietnamese(language) ? settings.BorrowDaysVi : settings.BorrowDaysForeign;
+        return specific > 0 ? specific : 0;
+    }
+
+    public static int RenewalDays(CirculationSettings settings, string? language)
+    {
+        if (settings.RenewalDays > 0)
+            return settings.RenewalDays;
+        var specific = IsVietnamese(language) ? settings.RenewalDaysVi : settings.RenewalDaysForeign;
+        if (specific > 0)
+            return specific;
+        return BorrowDays(settings, language);
+    }
+
+    public static string? MissingBorrowDays(int days)
+        => days <= 0
+            ? "Chưa cấu hình thời hạn mượn. Admin hãy vào Chính sách > Thời hạn mượn và đặt số ngày."
+            : null;
+
+    public static string? MissingRenewalDays(int days)
+        => days <= 0
+            ? "Chưa cấu hình số ngày gia hạn. Admin hãy vào Chính sách > Gia hạn."
+            : null;
+
+    public static int PolicyFee(CirculationSettings settings, BookIncidentSeverity severity)
+        => severity == BookIncidentSeverity.Light ? settings.DamageFee : settings.LostFee;
 
     public static int? MaxBooksFor(CirculationSettings settings, ReaderType? readerType)
         => readerType == ReaderType.Lecturer
@@ -86,6 +117,35 @@ public static class CirculationRules
         => settings.PickupDeadlineHours > 0
             ? settings.PickupDeadlineHours
             : settings.HoldHours is > 0 ? settings.HoldHours.Value : 24;
+
+    public static IReadOnlyList<PickupSlotDto> PickupSlots(CirculationSettings settings, DateTimeOffset now)
+    {
+        var zone = LibraryTimeZone();
+        var today = TimeZoneInfo.ConvertTime(now, zone).Date;
+        var slotMinutes = Math.Max(1, settings.PickupSlotMinutes);
+        var capacity = Math.Max(1, settings.PickupCapacityPerSlot);
+        var slots = new List<DateTimeOffset>();
+
+        for (var offset = 0; offset < Math.Max(1, settings.PickupDaysAhead); offset++)
+        {
+            var date = today.AddDays(offset);
+            if (date.DayOfWeek == DayOfWeek.Sunday) continue;
+            var start = date.AddHours(9);
+            var end = date.AddHours(date.DayOfWeek == DayOfWeek.Saturday ? 15 : 17);
+            for (var local = start; local.AddMinutes(slotMinutes) <= end; local = local.AddMinutes(slotMinutes))
+            {
+                var localTime = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+                var pickupAt = new DateTimeOffset(localTime, zone.GetUtcOffset(localTime));
+                if (pickupAt <= now) continue;
+                slots.Add(pickupAt);
+            }
+        }
+
+        return slots.Select(pickupAt => new PickupSlotDto(pickupAt, capacity, capacity)).ToList();
+    }
+
+    public static bool IsPickupSlot(CirculationSettings settings, DateTimeOffset pickupAt, DateTimeOffset now)
+        => PickupSlots(settings, now).Any(slot => slot.PickupAt == pickupAt);
 
     public static bool IsOpenReservation(string? status)
         => status is ReservationPending or ReservationReady;
@@ -108,8 +168,11 @@ public static class CirculationRules
         bool byLibrarian,
         bool isOverdue,
         bool hasReservation,
-        bool isTextbook)
+        bool isTextbook,
+        bool hasUnpaidFines = false)
     {
+        if (!byLibrarian && settings.RestrictIfUnpaid && hasUnpaidFines)
+            return "Còn phí chưa thanh toán nên chưa được tự gia hạn.";
         if (settings.MaxRenewals is null)
             return "Chưa cấu hình chính sách gia hạn. Vào Quản trị > Chính sách để thiết lập số lần gia hạn.";
         if (renewalCount >= settings.MaxRenewals.Value)
@@ -157,8 +220,8 @@ public static class CirculationRules
         BookIncidentKind kind,
         BookIncidentStatus status,
         BookIncidentSeverity severity,
-        decimal? replacementValue,
-        decimal? assessedFee)
+        int damageFee,
+        int lostFee)
     {
         if (status != BookIncidentStatus.PendingReview)
             return "Hồ sơ này không còn chờ xác nhận.";
@@ -166,12 +229,12 @@ public static class CirculationRules
             return "Hồ sơ thất lạc: xác nhận mất sách sau khi đối chiếu bản sao và phiếu mượn, hoặc từ chối nếu tìm thấy sách.";
         return severity switch
         {
-            BookIncidentSeverity.Light when assessedFee is null or <= 0
-                => "Hư hỏng nhẹ cần nhập mức phí theo mức độ. Không mặc định đền nguyên giá sách.",
-            BookIncidentSeverity.Severe when replacementValue is null or <= 0
-                => "Hư hỏng nặng không sửa được: nhập giá mua đền do thủ thư xác minh. Hệ thống không có giá sách mặc định.",
-            BookIncidentSeverity.Lost when replacementValue is null or <= 0
-                => "Mất sách: nhập giá trị tài liệu do thủ thư xác minh. Không tự lấy giá từ catalog.",
+            BookIncidentSeverity.Light when damageFee <= 0
+                => "Chưa cấu hình phí phạt sách hỏng. Admin hãy vào Chính sách > Phí phạt và đặt damage_fee.",
+            BookIncidentSeverity.Severe when lostFee <= 0
+                => "Chưa cấu hình phí phạt sách mất/hư nặng. Admin hãy vào Chính sách > Phí phạt và đặt lost_book_fee.",
+            BookIncidentSeverity.Lost when lostFee <= 0
+                => "Chưa cấu hình phí phạt sách mất. Admin hãy vào Chính sách > Phí phạt và đặt lost_book_fee.",
             BookIncidentSeverity.Unknown
                 => "Chọn mức độ: hư hỏng nhẹ, hư hỏng nặng hoặc mất sách.",
             _ => null
@@ -185,7 +248,7 @@ public static class CirculationRules
         => severity == BookIncidentSeverity.Lost ? CompensationLostPrefix : CompensationDamagePrefix;
 
     public static BookCondition CopyConditionAfterConfirm(BookIncidentSeverity severity)
-        => severity == BookIncidentSeverity.Lost ? BookCondition.Lost : BookCondition.Damaged;
+        => severity switch { BookIncidentSeverity.Lost => BookCondition.Lost, BookIncidentSeverity.Light => BookCondition.LightDamaged, _ => BookCondition.Damaged };
 
     public static bool CopyAvailableAfterConfirm(BookIncidentSeverity severity)
         => severity == BookIncidentSeverity.Light;

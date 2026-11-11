@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -40,6 +41,31 @@ public sealed class SupportController(
             return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
         var rows = await GetChatMessagesAsync(readerId, ct);
         return Ok(ApiResponse<IReadOnlyList<SupportChatMessageDto>>.Ok(rows));
+    }
+
+    [HttpGet("chat/unread-count")]
+    [Authorize(Roles = "Reader")]
+    public async Task<IActionResult> GetMyUnreadChatCount(CancellationToken ct)
+    {
+        if (!TryGetUserId(out var readerId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
+        var count = await db.SupportChatMessages.AsNoTracking()
+            .CountAsync(x => x.ReaderId == readerId && x.SenderId != readerId && !x.IsReadByReader, ct);
+        return Ok(ApiResponse<object>.Ok(new { unreadCount = count }));
+    }
+
+    [HttpPost("chat/read")]
+    [Authorize(Roles = "Reader")]
+    public async Task<IActionResult> MarkMyChatRead(CancellationToken ct)
+    {
+        if (!TryGetUserId(out var readerId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
+        await db.SupportChatMessages
+            .Where(x => x.ReaderId == readerId && x.SenderId != readerId && !x.IsReadByReader)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.IsReadByReader, true)
+                .SetProperty(x => x.UpdatedAt, DateTime.UtcNow), ct);
+        return Ok(ApiResponse<object>.Ok(new { unreadCount = 0 }));
     }
 
     [HttpGet("complaints/mine")]
@@ -126,6 +152,7 @@ public sealed class SupportController(
             return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
         var loans = await db.BorrowRecords.AsNoTracking()
             .Include(x => x.BookCopy).ThenInclude(x => x.Book)
+            .Include(x => x.Librarian)
             .Where(x => x.ReaderId == readerId)
             .OrderByDescending(x => x.BorrowDate ?? x.CreatedAt)
             .Take(200)
@@ -137,6 +164,9 @@ public sealed class SupportController(
                 status = x.Status.ToString(),
                 borrowDate = x.BorrowDate,
                 dueDate = x.DueDate,
+                pickupAt = x.PickupAt,
+                acceptedAt = x.AcceptedAt,
+                librarianName = x.Librarian == null ? null : x.Librarian.FullName,
                 returnDate = x.ReturnDate,
                 renewalCount = x.RenewalCount
             })
@@ -233,6 +263,12 @@ public sealed class SupportController(
         }
 
         var complaint = await GetComplaintForDtoAsync(id, ct);
+        db.Notifications.Add(SupportNotification(
+            complaint.ReaderId,
+            "Đơn hỗ trợ đã được tiếp nhận",
+            $"{complaint.AcceptedBy?.FullName ?? "Thủ thư"} đang xử lý đơn “{complaint.RequestType.Name}”.",
+            complaint.Id));
+        await db.SaveChangesAsync(ct);
         var dto = MapComplaint(complaint);
         await BroadcastComplaintUpdateAsync(dto, complaint.ReaderId, ct);
         return Ok(ApiResponse<SupportComplaintDto>.Ok(dto));
@@ -257,6 +293,13 @@ public sealed class SupportController(
             return Forbid();
 
         complaint.DueAt = request.DueAt;
+        db.Notifications.Add(SupportNotification(
+            complaint.ReaderId,
+            "Đã cập nhật lịch xử lý hỗ trợ",
+            request.DueAt is null
+                ? "Thư viện đã bỏ hạn xử lý dự kiến của đơn hỗ trợ."
+                : $"Đơn hỗ trợ dự kiến được xử lý trước {request.DueAt.Value:dd/MM/yyyy HH:mm}.",
+            complaint.Id));
         await db.SaveChangesAsync(ct);
 
         var updated = await GetComplaintForDtoAsync(id, ct);
@@ -275,46 +318,61 @@ public sealed class SupportController(
         if (message.Length is < 1 or > 3000)
             return BadRequest(ApiResponse<object>.Fail("Phản hồi phải có từ 1 đến 3000 ký tự."));
 
-        var complaint = await db.SupportComplaints
-            .Include(x => x.Reader)
-            .Include(x => x.RequestType)
-            .Include(x => x.Replies).ThenInclude(x => x.Sender).ThenInclude(x => x.Role)
-            .FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (complaint is null)
+        var readerId = await db.SupportComplaints.AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => (Guid?)x.ReaderId)
+            .FirstOrDefaultAsync(ct);
+        if (readerId is null)
             return NotFound(ApiResponse<object>.Fail("Không tìm thấy đơn hỗ trợ."));
-        if (complaint.AcceptedById is not null &&
-            complaint.AcceptedById != senderId &&
-            !User.IsInRole("Admin"))
-            return Conflict(ApiResponse<object>.Fail("Đơn này đã được tiếp nhận bởi thủ thư khác."));
 
+        var isAdmin = User.IsInRole("Admin");
         var respondedAt = DateTime.UtcNow;
-        var reply = new SupportComplaintReply
+        var replyId = Guid.NewGuid();
+        await using (var transaction = await db.Database.BeginTransactionAsync(ct))
         {
-            ComplaintId = complaint.Id,
-            SenderId = senderId,
-            Message = message,
-            CreatedAt = respondedAt
-        };
-        complaint.Replies.Add(reply);
-        complaint.AcceptedById ??= senderId;
-        complaint.AcceptedAt ??= respondedAt;
-        complaint.FirstRespondedAt ??= respondedAt;
-        if (complaint.Status == "Pending")
-            complaint.Status = "InProgress";
-        await db.SaveChangesAsync(ct);
+            var complaintQuery = db.SupportComplaints.Where(x => x.Id == id);
+            if (!isAdmin)
+                complaintQuery = complaintQuery.Where(x => x.AcceptedById == null || x.AcceptedById == senderId);
+
+            var updatedCount = await complaintQuery.ExecuteUpdateAsync(update => update
+                .SetProperty(x => x.AcceptedById, x => x.AcceptedById ?? senderId)
+                .SetProperty(x => x.AcceptedAt, x => x.AcceptedAt ?? respondedAt)
+                .SetProperty(x => x.FirstRespondedAt, x => x.FirstRespondedAt ?? respondedAt)
+                .SetProperty(x => x.Status, x => x.Status == "Pending" ? "InProgress" : x.Status)
+                .SetProperty(x => x.UpdatedAt, respondedAt), ct);
+            if (updatedCount == 0)
+            {
+                var exists = await db.SupportComplaints.AnyAsync(x => x.Id == id, ct);
+                if (!exists)
+                    return NotFound(ApiResponse<object>.Fail("Không tìm thấy đơn hỗ trợ."));
+                return Conflict(ApiResponse<object>.Fail("Đơn này đã được tiếp nhận bởi thủ thư khác."));
+            }
+
+            var reply = new SupportComplaintReply
+            {
+                Id = replyId,
+                ComplaintId = id,
+                SenderId = senderId,
+                Message = message,
+                CreatedAt = respondedAt
+            };
+            db.SupportComplaintReplies.Add(reply);
+            db.Notifications.Add(SupportNotification(
+                readerId.Value,
+                "Bạn có phản hồi hỗ trợ mới",
+                message.Length > 180 ? $"{message[..180]}…" : message,
+                id));
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
 
         var saved = await db.SupportComplaintReplies.AsNoTracking()
             .Include(x => x.Sender).ThenInclude(x => x.Role)
-            .FirstAsync(x => x.Id == reply.Id, ct);
+            .FirstAsync(x => x.Id == replyId, ct);
         var dto = MapReply(saved);
-        var updated = await db.SupportComplaints.AsNoTracking()
-            .Include(x => x.Reader)
-            .Include(x => x.RequestType)
-            .Include(x => x.AcceptedBy)
-            .Include(x => x.Replies).ThenInclude(x => x.Sender).ThenInclude(x => x.Role)
-            .FirstAsync(x => x.Id == complaint.Id, ct);
+        var updated = await GetComplaintForDtoAsync(id, ct);
         var updatedComplaint = MapComplaint(updated);
-        await chatHub.Clients.Group(SupportChatHub.ReaderGroup(complaint.ReaderId))
+        await chatHub.Clients.Group(SupportChatHub.ReaderGroup(readerId.Value))
             .SendAsync("ComplaintReplied", updatedComplaint, ct);
         await chatHub.Clients.Group(SupportChatHub.LibrarianGroup)
             .SendAsync("ComplaintUpdated", updatedComplaint, ct);
@@ -336,6 +394,16 @@ public sealed class SupportController(
         await chatHub.Clients.Group(SupportChatHub.LibrarianGroup)
             .SendAsync("ComplaintUpdated", dto, ct);
     }
+
+    private static Notification SupportNotification(Guid readerId, string title, string message, Guid complaintId)
+        => new()
+        {
+            UserId = readerId,
+            Title = title,
+            Message = message,
+            Type = "support",
+            Metadata = JsonSerializer.Serialize(new { href = "/support", entityId = complaintId })
+        };
 
     [HttpGet("chat/conversations")]
     [Authorize(Roles = "Librarian,Admin")]
@@ -372,15 +440,44 @@ public sealed class SupportController(
                 x.Message,
                 x.CreatedAt))
             .ToListAsync(ct);
+        var unreadCounts = await db.SupportChatMessages.AsNoTracking()
+            .Where(x => ids.Contains(x.ReaderId) && x.SenderId == x.ReaderId && !x.IsReadByLibrarian)
+            .GroupBy(x => x.ReaderId)
+            .Select(group => new { ReaderId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(x => x.ReaderId, x => x.Count, ct);
         var rows = latest.Select(x =>
         {
             var reader = readers.FirstOrDefault(r => r.Id == x.ReaderId);
             var lastMessage = lastMessages.FirstOrDefault(m => m.ReaderId == x.ReaderId);
             return reader is null || lastMessage is null
                 ? null
-                : new SupportConversationDto(reader.Id, reader.FullName, reader.AvatarUrl, reader.StudentId, lastMessage);
+                : new SupportConversationDto(
+                    reader.Id,
+                    reader.FullName,
+                    reader.AvatarUrl,
+                    reader.StudentId,
+                    lastMessage,
+                    unreadCounts.GetValueOrDefault(reader.Id));
         }).OfType<SupportConversationDto>().ToList();
         return Ok(ApiResponse<IReadOnlyList<SupportConversationDto>>.Ok(rows));
+    }
+
+    [HttpPost("chat/conversations/{readerId:guid}/read")]
+    [Authorize(Roles = "Librarian,Admin")]
+    public async Task<IActionResult> MarkConversationRead(Guid readerId, CancellationToken ct)
+    {
+        if (!await db.UserProfiles.AnyAsync(x => x.Id == readerId && x.Role.Name == "Reader", ct))
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy độc giả."));
+
+        await db.SupportChatMessages
+            .Where(x => x.ReaderId == readerId && x.SenderId == readerId && !x.IsReadByLibrarian)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.IsReadByLibrarian, true)
+                .SetProperty(x => x.UpdatedAt, DateTime.UtcNow), ct);
+
+        await chatHub.Clients.Group(SupportChatHub.LibrarianGroup)
+            .SendAsync("ConversationRead", new { readerId }, ct);
+        return Ok(ApiResponse<object>.Ok(new { readerId }));
     }
 
     [HttpGet("chat/conversations/{readerId:guid}/messages")]
@@ -498,4 +595,5 @@ public sealed record SupportConversationDto(
     string ReaderName,
     string? AvatarUrl,
     string? StudentId,
-    SupportChatMessageDto LastMessage);
+    SupportChatMessageDto LastMessage,
+    int UnreadCount);

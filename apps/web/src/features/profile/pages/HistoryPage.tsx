@@ -1,163 +1,660 @@
-import { useEffect, useState } from 'react';
-import { AlertCircle, BookOpen, Clock3, LoaderCircle, Wallet } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { QRCodeCanvas } from 'qrcode.react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  LoaderCircle,
+  RefreshCw,
+  Wallet,
+} from 'lucide-react';
 import HomeNavbar from '../../home/components/HomeNavbar';
+import HomeFooter from '../../home/components/HomeFooter';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
+import { useToast } from '../../../components/ui/useToast';
 import './HistoryPage.css';
 
-interface LoanHistoryItem {
+interface CirculationLoan {
   id: string;
+  code: string;
   bookTitle: string;
+  coverImageUrl: string | null;
   barcode: string;
   status: string;
+  displayStatus: string;
   borrowDate: string | null;
   dueDate: string | null;
+  pickupAt: string | null;
+  acceptedAt: string | null;
+  librarianName: string | null;
   returnDate: string | null;
   renewalCount: number;
+  canRenew: boolean;
+  renewalUnavailableReason?: string | null;
+  hasOpenFine: boolean;
+  suggestedFine: number | null;
 }
 
-interface FineHistoryItem {
+interface CirculationFine {
   id: string;
+  code: string;
+  borrowRecordId: string;
   bookTitle: string;
+  coverImageUrl: string | null;
   barcode: string;
   amount: number;
   reason: string;
   status: string;
   createdAt: string;
   paidAt: string | null;
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
+  pendingPaymentStatus?: string | null;
+  checkoutUrl?: string | null;
+  qrCode?: string | null;
+  paymentExpiresAt?: string | null;
 }
 
-interface HistoryData {
-  loans: LoanHistoryItem[];
-  fines: FineHistoryItem[];
+interface FinePaymentCheckout {
+  fineId: string;
+  amount: number;
+  checkoutUrl: string;
+  qrCode: string;
+  expiresAt: string | null;
+}
+
+interface LoanList {
+  items: CirculationLoan[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 interface ApiEnvelope<T> {
   success?: boolean;
   data?: T;
   error?: string;
+  meta?: { message?: string };
 }
 
 type HistoryTab = 'loans' | 'fines';
+type LoanFilter = 'all' | 'Pending' | 'Approved' | 'Borrowed' | 'Overdue' | 'Returned' | 'Rejected' | 'Cancelled';
+type FineFilter = 'all' | 'Pending' | 'Paid' | 'Waived';
+
+const PAGE_SIZE = 20;
 
 const formatDate = (value: string | null) => value
-  ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium' }).format(new Date(value))
+  ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(value))
   : '—';
 
-const loanStatus: Record<string, string> = {
-  Pending: 'Chờ xác nhận',
-  Approved: 'Đã duyệt',
+const formatDateTime = (value: string | null) => value
+  ? new Intl.DateTimeFormat('vi-VN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'Asia/Ho_Chi_Minh',
+  }).format(new Date(value))
+  : '—';
+
+const statusLabel: Record<string, string> = {
+  Pending: 'Chờ tiếp nhận',
+  Approved: 'Đã tiếp nhận',
   Borrowed: 'Đang mượn',
   Overdue: 'Quá hạn',
   Returned: 'Đã trả',
   Rejected: 'Từ chối',
   Cancelled: 'Đã hủy',
+  PendingPayment: 'Chưa thanh toán',
+  Paid: 'Đã thanh toán',
+  Waived: 'Đã miễn',
 };
 
+const LOAN_FILTERS: Array<{ value: LoanFilter; label: string }> = [
+  { value: 'all', label: 'Tất cả phiếu' },
+  { value: 'Pending', label: 'Đang tiếp nhận' },
+  { value: 'Approved', label: 'Đã tiếp nhận' },
+  { value: 'Borrowed', label: 'Đang mượn' },
+  { value: 'Overdue', label: 'Quá hạn' },
+  { value: 'Returned', label: 'Đã trả' },
+  { value: 'Rejected', label: 'Từ chối' },
+  { value: 'Cancelled', label: 'Đã hủy' },
+];
+
 const HistoryPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const returnFineId = searchParams.get('fineId');
+  const paymentRedirect = searchParams.get('payment');
   const token = useAuthStore((state) => state.accessToken);
-  const [data, setData] = useState<HistoryData | null>(null);
-  const [tab, setTab] = useState<HistoryTab>('loans');
+  const { showToast } = useToast();
+  const [loans, setLoans] = useState<LoanList | null>(null);
+  const [fines, setFines] = useState<CirculationFine[]>([]);
+  const tab: HistoryTab = searchParams.get('tab') === 'fines' ? 'fines' : 'loans';
+  const [loanFilter, setLoanFilter] = useState<LoanFilter>('all');
+  const [fineFilter, setFineFilter] = useState<FineFilter>('all');
+  const [darkTheme, setDarkTheme] = useState(() => window.localStorage.getItem('smartlibrary.reader-theme') === 'dark');
+  const [page, setPage] = useState(1);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const selectTab = (nextTab: HistoryTab) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', nextTab);
+    setSearchParams(next, { replace: true });
+  };
+  const [renewingId, setRenewingId] = useState<string | null>(null);
+  const [paymentCheckout, setPaymentCheckout] = useState<FinePaymentCheckout | null>(null);
+  const [paymentBusy, setPaymentBusy] = useState<string | null>(null);
+  const renewalRequestInFlight = useRef(false);
+  const quietRefreshRef = useRef(false);
+  const paymentConfirmationNotified = useRef<string | null>(null);
+  const paymentRedirectInfoShown = useRef(false);
+  const paymentRedirectHandled = useRef(false);
+  const paymentRedirectKey = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    window.localStorage.setItem('smartlibrary.reader-theme', darkTheme ? 'dark' : 'light');
+  }, [darkTheme]);
+
+  useEffect(() => {
+    const syncTheme = (event: Event) => {
+      const customEvent = event as CustomEvent<{ darkTheme?: boolean }>;
+      if (typeof customEvent.detail?.darkTheme === 'boolean') setDarkTheme(customEvent.detail.darkTheme);
+    };
+    window.addEventListener('smartlibrary-reader-theme-change', syncTheme);
+    return () => window.removeEventListener('smartlibrary-reader-theme-change', syncTheme);
+  }, []);
+
+  useEffect(() => {
+    const refreshFromRealtime = () => setRefreshKey((current) => current + 1);
+    window.addEventListener('reader-circulation-updated', refreshFromRealtime);
+    return () => window.removeEventListener('reader-circulation-updated', refreshFromRealtime);
+  }, []);
+
+  useEffect(() => {
     if (!token) return undefined;
+
     let cancelled = false;
     const load = async () => {
-      setLoading(true);
-      setError(null);
+      const quiet = quietRefreshRef.current;
+      quietRefreshRef.current = false;
+      if (!quiet) {
+        setLoading(true);
+        setError(null);
+      }
       try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/support/history`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const result = await parseApiResponse<ApiEnvelope<HistoryData>>(response);
-        if (!response.ok || !result?.success || !result.data) {
-          throw new Error(result?.error || 'Không thể tải lịch sử hoạt động.');
+        const headers = { Authorization: `Bearer ${token}` };
+        const [loanResponse, fineResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/v1/me/circulation/loans?page=${page}&pageSize=${PAGE_SIZE}`, { headers }),
+          fetch(`${API_BASE_URL}/api/v1/me/circulation/fines`, { headers }),
+        ]);
+        const [loanResult, fineResult] = await Promise.all([
+          parseApiResponse<ApiEnvelope<LoanList>>(loanResponse),
+          parseApiResponse<ApiEnvelope<CirculationFine[]>>(fineResponse),
+        ]);
+        if (!loanResponse.ok || !loanResult?.success || !loanResult.data) {
+          throw new Error(loanResult?.error || 'Không thể tải danh sách phiếu mượn.');
         }
-        if (!cancelled) setData(result.data);
+        if (!fineResponse.ok || !fineResult?.success || !fineResult.data) {
+          throw new Error(fineResult?.error || 'Không thể tải danh sách phí phạt.');
+        }
+        if (!cancelled) {
+          setLoans(loanResult.data);
+          setFines(fineResult.data);
+        }
       } catch (caught) {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : 'Không thể tải lịch sử hoạt động.');
+        if (!cancelled && !quiet) {
+          const message = caught instanceof Error ? caught.message : 'Không thể tải dữ liệu mượn trả.';
+          setError(message);
+          showToast({ type: 'error', title: 'Không thể tải lịch sử mượn trả', message });
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !quiet) setLoading(false);
       }
     };
+
     void load();
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [page, refreshKey, showToast, token]);
+
+  const visibleLoans = useMemo(() => {
+    const records = loans?.items ?? [];
+    if (loanFilter !== 'all') return records.filter((loan) => loan.displayStatus === loanFilter);
+    return records;
+  }, [loanFilter, loans]);
+
+  const visibleFines = useMemo(() => {
+    if (fineFilter !== 'all') return fines.filter((fine) => fine.status === fineFilter);
+    return fines;
+  }, [fineFilter, fines]);
+
+  const unpaidTotal = fines
+    .filter((fine) => fine.status === 'Pending')
+    .reduce((total, fine) => total + fine.amount, 0);
+  const checkoutPaid = paymentCheckout !== null && fines.some((fine) =>
+    fine.id === paymentCheckout.fineId
+    && fine.status === 'Paid'
+    && fine.paymentMethod === 'PayOS');
+
+  const pendingFinesByLoan = useMemo(() => {
+    const grouped = new Map<string, CirculationFine[]>();
+    fines.filter((fine) => fine.status === 'Pending').forEach((fine) => {
+      const loanFines = grouped.get(fine.borrowRecordId) ?? [];
+      loanFines.push(fine);
+      grouped.set(fine.borrowRecordId, loanFines);
+    });
+    return grouped;
+  }, [fines]);
+
+  const renewLoan = async (loan: CirculationLoan) => {
+    if (!token || renewalRequestInFlight.current) return;
+    renewalRequestInFlight.current = true;
+    setRenewingId(loan.id);
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/me/circulation/loans/${loan.id}/renew`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await parseApiResponse<ApiEnvelope<CirculationLoan>>(response);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || 'Không thể gia hạn phiếu mượn.');
+      }
+      if (!result.data || result.data.id !== loan.id || !result.data.dueDate) {
+        throw new Error('Máy chủ không trả về hạn trả mới. Hãy tải lại danh sách phiếu mượn.');
+      }
+      showToast({
+        type: 'success',
+        title: 'Gia hạn thành công',
+        message: `Hạn trả mới: ${formatDateTime(result.data.dueDate)}.`,
+      });
+      setRefreshKey((current) => current + 1);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Vui lòng thử lại sau.';
+      setError(message);
+      showToast({
+        type: 'error',
+        title: 'Không thể gia hạn',
+        message,
+      });
+    } finally {
+      renewalRequestInFlight.current = false;
+      setRenewingId(null);
+    }
+  };
+
+  const createPayOSCheckout = async (fine: CirculationFine) => {
+    if (!token || paymentBusy) return;
+    setPaymentBusy(fine.id);
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/me/circulation/fines/${fine.id}/pay/payos`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await parseApiResponse<ApiEnvelope<FinePaymentCheckout>>(response);
+      if (!response.ok || !result?.success || !result.data) {
+        throw new Error(result?.error || 'Không thể tạo thanh toán PayOS.');
+      }
+      setPaymentCheckout(result.data);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Không thể tạo thanh toán PayOS.';
+      setError(message);
+      showToast({ type: 'error', title: 'Không thể thanh toán', message });
+    } finally {
+      setPaymentBusy(null);
+    }
+  };
+
+  useEffect(() => {
+    const shouldPoll = Boolean((paymentCheckout && !checkoutPaid) || (paymentRedirect === 'return' && returnFineId));
+    if (!shouldPoll) return undefined;
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      quietRefreshRef.current = true;
+      setRefreshKey((current) => current + 1);
+      if (attempts >= 24) window.clearInterval(timer);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [checkoutPaid, paymentCheckout, paymentRedirect, returnFineId]);
+
+  useEffect(() => {
+    if (!paymentCheckout) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPaymentCheckout(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [paymentCheckout]);
+
+  useEffect(() => {
+    if (!paymentCheckout || !checkoutPaid
+      || paymentConfirmationNotified.current === paymentCheckout.fineId) return;
+    paymentConfirmationNotified.current = paymentCheckout.fineId;
+    showToast({
+      type: 'success',
+      title: 'Đã xác nhận thanh toán',
+      message: 'PayOS đã xác nhận giao dịch. Khoản phí đã được cập nhật.',
+    });
+  }, [checkoutPaid, paymentCheckout, showToast]);
+
+  useEffect(() => {
+    const key = returnFineId && paymentRedirect ? `${paymentRedirect}:${returnFineId}` : null;
+    if (paymentRedirectKey.current !== key) {
+      paymentRedirectKey.current = key;
+      paymentRedirectInfoShown.current = false;
+      paymentRedirectHandled.current = false;
+    }
+    if (!returnFineId || !paymentRedirect || loading || paymentRedirectHandled.current) return;
+    const next = new URLSearchParams(searchParams);
+    if (paymentRedirect === 'cancel') {
+      paymentRedirectHandled.current = true;
+      showToast({
+        type: 'info',
+        title: 'Thanh toán chưa hoàn tất',
+        message: 'Khoản phí vẫn đang chờ thanh toán; hệ thống chưa ghi nhận đã thu.',
+      });
+      next.delete('payment');
+      next.delete('fineId');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+    if (paymentRedirect !== 'return') return;
+
+    const fine = fines.find((item) => item.id === returnFineId);
+    if (fine?.status === 'Paid' && fine.paymentMethod === 'PayOS') {
+      paymentRedirectHandled.current = true;
+      showToast({
+        type: 'success',
+        title: 'Đã xác nhận thanh toán',
+        message: 'PayOS đã xác nhận giao dịch.',
+      });
+      next.delete('payment');
+      next.delete('fineId');
+      setSearchParams(next, { replace: true });
+    } else if (!paymentRedirectInfoShown.current) {
+      paymentRedirectInfoShown.current = true;
+      showToast({
+        type: 'info',
+        title: 'Đang xác minh thanh toán',
+        message: 'Hệ thống đang chờ PayOS xác nhận. Trạng thái sẽ tự cập nhật; chưa ghi nhận giao dịch chỉ dựa trên trang chuyển hướng.',
+      });
+    }
+  }, [fines, loading, paymentRedirect, returnFineId, searchParams, setSearchParams, showToast]);
 
   return (
-    <div className="annual-home history-page">
+    <div className={`annual-home history-page${darkTheme ? ' theme-dark' : ''}`} data-theme={darkTheme ? 'dark' : 'light'}>
       <HomeNavbar />
       <main className="history-main">
         <header className="history-heading">
-          <p>SMARTLIBRARY · TÀI KHOẢN</p>
-          <h1>Lịch sử</h1>
-          <span>Theo dõi mượn, trả, gia hạn, quá hạn và phí phạt của bạn.</span>
+          <div className="history-heading-copy">
+            <p>SMARTLIBRARY · DỊCH VỤ BẠN ĐỌC</p>
+            <h1>Mượn & trả</h1>
+            <span>Theo dõi phiếu mượn, hạn trả và các khoản phí trong một nơi.</span>
+          </div>
         </header>
 
-        <div className="history-tabs" role="tablist" aria-label="Lịch sử hoạt động">
-          <button className={tab === 'loans' ? 'is-active' : ''} onClick={() => setTab('loans')} role="tab" aria-selected={tab === 'loans'}>
-            <BookOpen size={17} /> Mượn & trả <span>{data?.loans.length ?? 0}</span>
+        <section className="history-summary" aria-label="Tổng quan mượn trả">
+          <article>
+            <span>Phiếu mượn</span>
+            <strong>{loans?.totalCount ?? '—'}</strong>
+            <BookOpen size={19} aria-hidden="true" />
+          </article>
+          <article>
+            <span>Đang mượn · trang này</span>
+            <strong>{loans?.items.filter((loan) => loan.status === 'Borrowed').length ?? '—'}</strong>
+            <Clock3 size={19} aria-hidden="true" />
+          </article>
+          <article>
+            <span>Quá hạn · trang này</span>
+            <strong>{loans?.items.filter((loan) => loan.displayStatus === 'Overdue').length ?? '—'}</strong>
+            <CalendarDays size={19} aria-hidden="true" />
+          </article>
+          <article>
+            <span>Phí chưa thanh toán</span>
+            <strong>{unpaidTotal.toLocaleString('vi-VN')}đ</strong>
+            <Wallet size={19} aria-hidden="true" />
+          </article>
+        </section>
+
+        <div className="history-tabs" role="tablist" aria-label="Quản lý mượn trả">
+          <button
+            className={tab === 'loans' ? 'is-active' : ''}
+            onClick={() => selectTab('loans')}
+            role="tab"
+            aria-selected={tab === 'loans'}
+          >
+            <BookOpen size={17} /> Mượn & trả <span>{loans?.totalCount ?? 0}</span>
           </button>
-          <button className={tab === 'fines' ? 'is-active' : ''} onClick={() => setTab('fines')} role="tab" aria-selected={tab === 'fines'}>
-            <Wallet size={17} /> Phí phạt <span>{data?.fines.length ?? 0}</span>
+          <button
+            className={tab === 'fines' ? 'is-active' : ''}
+            onClick={() => selectTab('fines')}
+            role="tab"
+            aria-selected={tab === 'fines'}
+          >
+            <Wallet size={17} /> Phí phạt <span>{fines.length}</span>
           </button>
         </div>
 
+        <div className="history-toolbar">
+          <div>
+            <strong>{tab === 'loans' ? 'Danh sách phiếu mượn' : 'Danh sách phí phạt'}</strong>
+            <span>Dữ liệu được cập nhật trực tiếp từ hồ sơ thư viện của bạn.</span>
+          </div>
+        </div>
+
+        <nav className="history-filter-bar" aria-label={tab === 'loans' ? 'Lọc trạng thái phiếu mượn' : 'Lọc trạng thái phí phạt'}>
+          {tab === 'loans' ? LOAN_FILTERS.map((filter) => {
+            const count = filter.value === 'all'
+              ? loans?.items.length ?? 0
+              : (loans?.items ?? []).filter((loan) => loan.displayStatus === filter.value).length;
+            return (
+              <button
+                type="button"
+                key={filter.value}
+                className={loanFilter === filter.value ? 'is-active' : ''}
+                aria-pressed={loanFilter === filter.value}
+                onClick={() => setLoanFilter(filter.value)}
+              >
+                {filter.label}<span>{count}</span>
+              </button>
+            );
+          }) : ([
+            { value: 'all', label: 'Tất cả phí phạt' },
+            { value: 'Pending', label: 'Chưa thanh toán' },
+            { value: 'Paid', label: 'Đã thanh toán' },
+            { value: 'Waived', label: 'Đã miễn' },
+          ] as Array<{ value: FineFilter; label: string }>).map((filter) => (
+            <button
+              type="button"
+              key={filter.value}
+              className={fineFilter === filter.value ? 'is-active' : ''}
+              aria-pressed={fineFilter === filter.value}
+              onClick={() => setFineFilter(filter.value)}
+            >
+              {filter.label}<span>{filter.value === 'all' ? fines.length : fines.filter((fine) => fine.status === filter.value).length}</span>
+            </button>
+          ))}
+        </nav>
+
         {error && <div className="history-alert" role="alert"><AlertCircle size={17} />{error}</div>}
         {loading ? (
-          <div className="history-empty"><LoaderCircle className="history-spinner" size={22} /> Đang tải lịch sử...</div>
+          <div className="history-empty"><LoaderCircle className="history-spinner" size={22} /> Đang tải dữ liệu...</div>
         ) : tab === 'loans' ? (
-          <section className="history-list" aria-label="Lịch sử mượn trả">
-            {data?.loans.length ? data.loans.map((loan) => (
+          <section className="history-list" aria-label="Danh sách mượn và trả">
+            {visibleLoans.length ? visibleLoans.map((loan) => (
               <article className="history-record" key={loan.id}>
-                <div className="history-record-icon"><BookOpen size={19} /></div>
+                <div className="history-record-cover">
+                  {loan.coverImageUrl ? <img src={loan.coverImageUrl} alt={`Bìa sách ${loan.bookTitle}`} loading="lazy" /> : <BookOpen size={24} />}
+                </div>
                 <div className="history-record-main">
-                  <strong>{loan.bookTitle}</strong>
+                  <div className="history-record-title">
+                    <strong>{loan.bookTitle}</strong>
+                    <span>{loan.code}</span>
+                  </div>
                   <span>Mã bản sao: {loan.barcode}</span>
+                  {loan.pickupAt && <span>Lịch đến nhận: {formatDateTime(loan.pickupAt)}</span>}
+                  {loan.acceptedAt && (
+                    <span>
+                      Tiếp nhận bởi {loan.librarianName || 'thủ thư'} lúc {formatDateTime(loan.acceptedAt)}
+                    </span>
+                  )}
                   <div className="history-record-dates">
-                    <span>Mượn: {formatDate(loan.borrowDate)}</span>
-                    <span>Hạn trả: {formatDate(loan.dueDate)}</span>
+                    <span>Mượn: {formatDateTime(loan.borrowDate)}</span>
+                    <span>Hạn trả: {formatDateTime(loan.dueDate)}</span>
                     <span>Đã trả: {formatDate(loan.returnDate)}</span>
                     <span>Gia hạn: {loan.renewalCount} lần</span>
                   </div>
+                  {loan.hasOpenFine && <span className="history-record-warning">Phiếu này đang có phí chưa thanh toán.</span>}
+                  {loan.suggestedFine != null && (
+                    <span className="history-record-warning">
+                      Phí quá hạn tạm tính: {loan.suggestedFine.toLocaleString('vi-VN')}đ
+                    </span>
+                  )}
                 </div>
-                <span className={`history-status history-status--${loan.status.toLowerCase()}`}>
-                  {loan.status === 'Borrowed' && loan.dueDate && new Date(loan.dueDate) < new Date()
-                    ? 'Quá hạn'
-                    : loanStatus[loan.status] ?? loan.status}
-                </span>
+                <div className="history-record-actions">
+                  <span className={`history-status history-status--${loan.displayStatus.toLowerCase()}`}>
+                    {statusLabel[loan.displayStatus] ?? loan.displayStatus}
+                  </span>
+                  {['Borrowed', 'Overdue'].includes(loan.status) && !loan.canRenew && loan.renewalUnavailableReason && (
+                    <span className="history-renew-note">{loan.renewalUnavailableReason}</span>
+                  )}
+                  {loan.canRenew && (
+                    <button
+                      type="button"
+                      className="history-renew-button"
+                      onClick={() => void renewLoan(loan)}
+                      disabled={renewingId !== null}
+                    >
+                      {renewingId === loan.id
+                        ? <LoaderCircle className="history-spinner" size={14} />
+                        : <RefreshCw size={14} />}
+                      Gia hạn
+                    </button>
+                  )}
+                  {(pendingFinesByLoan.get(loan.id) ?? []).map((fine) => (
+                    <button
+                      key={fine.id}
+                      type="button"
+                      className="history-pay-button"
+                      onClick={() => void createPayOSCheckout(fine)}
+                      disabled={paymentBusy !== null}
+                    >
+                      {paymentBusy === fine.id
+                        ? <LoaderCircle className="history-spinner" size={14} />
+                        : <Wallet size={14} />}
+                      Thanh toán khoản phạt · {fine.amount.toLocaleString('vi-VN')}đ
+                    </button>
+                  ))}
+                </div>
               </article>
-            )) : <div className="history-empty"><Clock3 size={22} />Chưa có lịch sử mượn sách.</div>}
+            )) : (
+              <div className="history-empty"><Clock3 size={22} />Không có phiếu mượn phù hợp với bộ lọc.</div>
+            )}
           </section>
         ) : (
-          <section className="history-list" aria-label="Lịch sử phí phạt">
-            {data?.fines.length ? data.fines.map((fine) => (
+          <section className="history-list" aria-label="Danh sách phí phạt">
+            {visibleFines.length ? visibleFines.map((fine) => (
               <article className="history-record" key={fine.id}>
-                <div className="history-record-icon history-record-icon--fine"><Wallet size={19} /></div>
+                <div className="history-record-cover history-record-cover--fine">
+                  {fine.coverImageUrl ? <img src={fine.coverImageUrl} alt={`Bìa sách ${fine.bookTitle}`} loading="lazy" /> : (fine.status === 'Paid' ? <CheckCircle2 size={24} /> : <Wallet size={24} />)}
+                </div>
                 <div className="history-record-main">
-                  <strong>{fine.reason}</strong>
-                  <span>{fine.bookTitle} · {fine.barcode}</span>
+                  <div className="history-record-title">
+                    <strong>{fine.reason}</strong>
+                    <span>{fine.code}</span>
+                  </div>
+                  <span>Sách: {fine.bookTitle}</span>
+                  <span>Mã bản sao: {fine.barcode}</span>
                   <div className="history-record-dates">
                     <span>Ghi nhận: {formatDate(fine.createdAt)}</span>
                     <span>Thanh toán: {formatDate(fine.paidAt)}</span>
                   </div>
+                  {fine.paymentMethod && (
+                    <span className="history-record-payment-method">
+                      Phương thức: {fine.paymentMethod === 'Cash' ? 'Tiền mặt tại quầy' : 'PayOS'}
+                      {fine.paymentReference ? ` · Mã giao dịch: ${fine.paymentReference}` : ''}
+                    </span>
+                  )}
                 </div>
                 <div className="history-fine-total">
                   <strong>{fine.amount.toLocaleString('vi-VN')}đ</strong>
                   <span className={`history-status history-status--${fine.status.toLowerCase()}`}>
-                    {fine.status === 'Paid' ? 'Đã thanh toán' : fine.status === 'Pending' ? 'Chưa thanh toán' : fine.status}
+                    {statusLabel[fine.status] ?? fine.status}
                   </span>
+                  {fine.status === 'Pending' && (
+                    <button
+                      type="button"
+                      className="history-pay-button"
+                      disabled={paymentBusy !== null}
+                      onClick={() => void createPayOSCheckout(fine)}
+                    >
+                      {paymentBusy === fine.id ? <LoaderCircle className="history-spinner" size={14} /> : <Wallet size={14} />}
+                      Thanh toán PayOS
+                    </button>
+                  )}
                 </div>
               </article>
-            )) : <div className="history-empty"><Wallet size={22} />Bạn chưa có khoản phí phạt nào.</div>}
+            )) : (
+              <div className="history-empty"><Wallet size={22} />Không có khoản phí phù hợp với bộ lọc.</div>
+            )}
           </section>
         )}
+
+        {tab === 'loans' && (loans?.totalPages ?? 0) > 1 && (
+          <nav className="history-pagination" aria-label="Phân trang phiếu mượn">
+            <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1}>
+              <ArrowLeft size={15} /> Trước
+            </button>
+            <span>Trang {loans?.page ?? page} / {loans?.totalPages}</span>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(loans?.totalPages ?? current, current + 1))}
+              disabled={page >= (loans?.totalPages ?? 1)}
+            >
+              Sau <ArrowRight size={15} />
+            </button>
+          </nav>
+        )}
       </main>
+      {paymentCheckout && !checkoutPaid && (
+        <div className="history-payment-backdrop" role="presentation" onClick={() => setPaymentCheckout(null)}>
+          <section
+            className="history-payment-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="history-payment-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button type="button" className="history-payment-close" aria-label="Đóng" onClick={() => setPaymentCheckout(null)}>×</button>
+            <p>THANH TOÁN PHÍ PHẠT</p>
+            <h2 id="history-payment-title">
+              {fines.find((fine) => fine.id === paymentCheckout.fineId)?.reason ?? 'Quét mã QR PayOS'}
+            </h2>
+            {fines.find((fine) => fine.id === paymentCheckout.fineId)?.code && (
+              <span className="history-payment-reference">
+                Mã khoản phạt: {fines.find((fine) => fine.id === paymentCheckout.fineId)?.code}
+              </span>
+            )}
+            <strong className="history-payment-amount">{paymentCheckout.amount.toLocaleString('vi-VN')}đ</strong>
+            <QRCodeCanvas value={paymentCheckout.qrCode} size={220} level="M" includeMargin />
+            <span>Quét mã bằng ứng dụng ngân hàng hoặc mở trang thanh toán PayOS.</span>
+            <a href={paymentCheckout.checkoutUrl} target="_blank" rel="noreferrer">Mở trang thanh toán</a>
+            <small>Trang sẽ tự cập nhật sau khi PayOS xác nhận giao dịch. Đóng cửa sổ này không hủy giao dịch; trạng thái chỉ được cập nhật khi webhook PayOS hợp lệ đến máy chủ.</small>
+          </section>
+        </div>
+      )}
+      <HomeFooter />
     </div>
   );
 };

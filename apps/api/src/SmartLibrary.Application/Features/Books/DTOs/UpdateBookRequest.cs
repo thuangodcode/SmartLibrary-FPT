@@ -5,6 +5,7 @@ public class UpdateBookRequest
     public string Title { get; set; } = string.Empty;
     public string? Isbn { get; set; }
     public string? Description { get; set; }
+    public Dictionary<string, string> CustomFields { get; set; } = new();
     public string? CoverImageUrl { get; set; }
     public Guid? PublisherId { get; set; }
     public int? PublishedYear { get; set; }

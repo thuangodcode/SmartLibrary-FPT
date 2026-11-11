@@ -3,12 +3,19 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev:api": "dotnet run --project apps/api/src/SmartLibrary.Api",
+    "dev:api": "node scripts/dev-api.mjs",
+    "dev:api:lan": "node scripts/dev-api.mjs --lan",
+    "dev:api:stop": "node scripts/dev-api.mjs --stop",
     "build:api": "dotnet build apps/api/SmartLibrary.slnx",
     "test:api": "dotnet test apps/api/SmartLibrary.slnx",
     "dev:web": "npm --prefix apps/web run dev",
     "dev:mobile": "npm --prefix apps/mobile start",
-    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:mobile\""
+    "build:mobile": "npm --prefix apps/mobile run typecheck",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:mobile\"",
+    "dev:lan": "concurrently \"npm run dev:api:lan\" \"npm run dev:web\" \"npm run dev:mobile\"",
+    "demo:seed": "dotnet run --project tools/SmartLibrary.Demo -- .env",
+    "demo:repair-auth": "dotnet run --project tools/SmartLibrary.Demo -- .env --repair-auth",
+    "demo:overdue": "dotnet run --project tools/SmartLibrary.Demo -- .env --overdue"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

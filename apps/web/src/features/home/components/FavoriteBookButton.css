@@ -1,0 +1,68 @@
+.favorite-book-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid #d7e0da;
+  background: #fff;
+  color: #31533f;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.favorite-book-button:hover:not(:disabled) {
+  border-color: #d84f53;
+  color: #c53f48;
+  transform: translateY(-1px);
+}
+
+.favorite-book-button:focus-visible {
+  outline: 3px solid rgb(197 63 72 / 25%);
+  outline-offset: 2px;
+}
+
+.favorite-book-button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.favorite-book-button.is-favorite {
+  border-color: #f1c7ca;
+  background: #fff4f4;
+  color: #c53f48;
+}
+
+.favorite-book-button svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.favorite-book-button--card {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  left: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  box-shadow: 0 3px 12px rgb(23 35 29 / 12%);
+}
+
+.favorite-book-button--detail {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 12px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.favorite-book-button--detail svg {
+  width: 19px;
+  height: 19px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .favorite-book-button { transition-duration: .01ms; }
+}

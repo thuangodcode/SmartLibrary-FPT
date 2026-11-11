@@ -34,6 +34,7 @@ interface Conversation {
   avatarUrl: string | null;
   studentId: string | null;
   lastMessage: ChatMessage;
+  unreadCount: number;
 }
 
 interface ComplaintReply {
@@ -150,6 +151,14 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
     setConversations(result);
   }, [token]);
 
+  const markConversationRead = useCallback(async (readerId: string) => {
+    if (!token) return;
+    setConversations((current) => current.map((conversation) => conversation.readerId === readerId
+      ? { ...conversation, unreadCount: 0 }
+      : conversation));
+    await fetchData<{ readerId: string }>(`/api/v1/support/chat/conversations/${readerId}/read`, token, { method: 'POST' });
+  }, [token]);
+
   useEffect(() => {
     if (!token) return undefined;
     let active = true;
@@ -164,11 +173,20 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
       setChatMessages((current) => current.some((item) => item.id === message.id)
         ? current
         : [...current, message].sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+      if (message.senderRole === 'Reader') {
+        void markConversationRead(message.readerId).catch(() => undefined);
+      }
     });
     hub.on('ConversationUpdated', () => {
       if (active) void loadConversations().catch((caught: unknown) => {
         if (active) setError(caught instanceof Error ? caught.message : 'Không thể cập nhật danh sách trò chuyện.');
       });
+    });
+    hub.on('ConversationRead', (update: { readerId: string }) => {
+      if (!active) return;
+      setConversations((current) => current.map((conversation) => conversation.readerId === update.readerId
+        ? { ...conversation, unreadCount: 0 }
+        : conversation));
     });
     hub.on('NewComplaint', (complaint: Complaint) => {
       if (active) setComplaints((current) => current.some((item) => item.id === complaint.id)
@@ -211,7 +229,7 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
       setConnection(null);
       void hub.stop();
     };
-  }, [token, loadTypes, loadComplaints, loadConversations]);
+  }, [token, loadTypes, loadComplaints, loadConversations, markConversationRead]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -223,6 +241,7 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
     ?? selectableComplaints[0]
     ?? null;
   const pendingComplaints = openComplaints.filter((item) => !item.acceptedAt);
+  const totalUnreadMessages = conversations.reduce((total, conversation) => total + conversation.unreadCount, 0);
 
   const acceptComplaint = async (complaintId: string) => {
     if (!token || complaintActionBusy) return;
@@ -333,6 +352,9 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
     setSelectedReaderId(conversation.readerId);
     setChatMessages([]);
     setError(null);
+    void markConversationRead(conversation.readerId).catch((caught: unknown) => {
+      setError(caught instanceof Error ? caught.message : 'Không thể đánh dấu cuộc trò chuyện đã đọc.');
+    });
     try {
       if (connection && previousReaderId && previousReaderId !== conversation.readerId) {
         await connection.invoke('LeaveConversation', previousReaderId);
@@ -436,7 +458,10 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
     <div className="librarian-support">
       <header className="librarian-support-heading">
         <div>
-          <p>HỖ TRỢ ĐỘC GIẢ</p>
+          <div className="lib-support-eyebrow">
+            <CircleHelp size={14} />
+            <span>KHÔNG GIAN THỦ THƯ • HỖ TRỢ ĐỘC GIẢ</span>
+          </div>
           <h1>{view === 'requests' ? 'Đơn tiếp nhận' : 'Phản hồi đơn'}</h1>
           <span>{view === 'requests'
             ? 'Quản lý loại đơn và tiếp nhận yêu cầu từ độc giả.'
@@ -545,6 +570,11 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
             </button>
             <button type="button" className={responseTab === 'chat' ? 'is-active' : ''} onClick={() => setResponseTab('chat')}>
               <MessageCircle size={15} />Chat realtime
+              {totalUnreadMessages > 0 && (
+                <span className="librarian-support-unread-total" aria-label={`${totalUnreadMessages} tin nhắn chưa đọc`}>
+                  {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
+                </span>
+              )}
             </button>
           </nav>
           {responseTab === 'complaints' ? (
@@ -624,12 +654,19 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
             <header><strong>Cuộc trò chuyện</strong><span className={connection?.state === 'Connected' ? 'is-online' : ''}>{connection?.state === 'Connected' ? 'Đang trực tuyến' : 'Đang kết nối'}</span></header>
             {loading ? <div className="librarian-support-empty"><LoaderCircle size={18} className="librarian-support-spinner" /></div> :
               conversations.length ? conversations.map((conversation) => (
-                <button type="button" className={`librarian-support-conversation${selectedReaderId === conversation.readerId ? ' is-selected' : ''}`} key={conversation.readerId} onClick={() => void openConversation(conversation)}>
+                <button type="button" className={`librarian-support-conversation${selectedReaderId === conversation.readerId ? ' is-selected' : ''}${conversation.unreadCount > 0 ? ' has-unread' : ''}`} key={conversation.readerId} onClick={() => void openConversation(conversation)}>
                   <div className="librarian-support-reader-avatar">
                     {conversation.avatarUrl ? <img src={conversation.avatarUrl} alt="" /> : <UserRound size={17} />}
                   </div>
                   <div><strong>{conversation.readerName}</strong><span>{conversation.lastMessage.message}</span></div>
-                  <time>{dateTime(conversation.lastMessage.createdAt)}</time>
+                  <div className="librarian-support-conversation-meta">
+                    <time>{dateTime(conversation.lastMessage.createdAt)}</time>
+                    {conversation.unreadCount > 0 && (
+                      <span className="librarian-support-unread-count" aria-label={`${conversation.unreadCount} tin nhắn chưa đọc`}>
+                        {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
+                      </span>
+                    )}
+                  </div>
                 </button>
               )) : <div className="librarian-support-empty"><MessageCircle size={22} />Chưa có cuộc trò chuyện.</div>}
           </aside>

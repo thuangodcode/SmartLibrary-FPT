@@ -1,4 +1,5 @@
 using SmartLibrary.Domain.Common;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SmartLibrary.Domain.Entities;
 
@@ -9,9 +10,11 @@ namespace SmartLibrary.Domain.Entities;
 public class Book : AuditableEntity, ISoftDeletable
 {
     public string Code { get; set; } = string.Empty;
+    public Guid? CodeCategoryId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Isbn { get; set; }
     public string? Description { get; set; }
+    public string CustomFieldsJson { get; set; } = "{}";
     public string? CoverImageUrl { get; set; }
     public Guid? PublisherId { get; set; }
     public int? PublishedYear { get; set; }
@@ -22,8 +25,15 @@ public class Book : AuditableEntity, ISoftDeletable
     public decimal AverageRating { get; set; }
     public bool IsDeleted { get; set; }
 
+    [NotMapped]
+    public int ReviewCount { get; set; }
+
+    [NotMapped]
+    public int? BorrowCount { get; set; }
+
     // Navigation properties
     public Publisher? Publisher { get; set; }
+    public Category? CodeCategory { get; set; }
     public ICollection<Author> Authors { get; set; } = new List<Author>();
     public ICollection<Category> Categories { get; set; } = new List<Category>();
     public ICollection<Major> Majors { get; set; } = new List<Major>();
