@@ -120,14 +120,14 @@ public class CirculationRepository : ICirculationRepository
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
-        return (await MapLoansAsync(rows, finePerDay, ct), total);
+        return (await MapStaffLoansAsync(rows, finePerDay, ct), total);
     }
 
     public async Task<CirculationLoanDto?> GetLoanAsync(Guid id, int finePerDay, CancellationToken ct)
     {
         var row = await LoanQuery().FirstOrDefaultAsync(x => x.Id == id, ct);
         if (row is null) return null;
-        var mapped = await MapLoansAsync([row], finePerDay, ct);
+        var mapped = await MapStaffLoansAsync([row], finePerDay, ct);
         return mapped[0];
     }
 
@@ -364,7 +364,7 @@ public class CirculationRepository : ICirculationRepository
                         || (x.Status == BorrowStatus.Borrowed && x.DueDate != null && x.DueDate < cutoff))
             .OrderBy(x => x.DueDate)
             .ToListAsync(ct);
-        return await MapLoansAsync(rows, finePerDay, ct);
+        return await MapStaffLoansAsync(rows, finePerDay, ct);
     }
 
     public async Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct, DateTime? from = null, DateTime? to = null)
@@ -1083,6 +1083,34 @@ public class CirculationRepository : ICirculationRepository
             BorrowStatus.Rejected => query.Where(x => x.Status == BorrowStatus.Rejected),
             _ => query
         };
+    }
+
+    private async Task<IReadOnlyList<CirculationLoanDto>> MapStaffLoansAsync(
+        List<BorrowRecord> rows, int finePerDay, CancellationToken ct)
+    {
+        var mapped = (await MapLoansAsync(rows, finePerDay, ct)).ToList();
+        var active = rows.Where(item => item.Status is BorrowStatus.Borrowed or BorrowStatus.Overdue).ToList();
+        if (active.Count == 0) return mapped;
+        var settings = await GetSettingsAsync(ct);
+        var now = DateTime.UtcNow;
+        var bookIds = active.Select(item => item.BookCopy.BookId).Distinct().ToList();
+        var reservations = settings.BlockRenewIfReserved
+            ? await _db.Reservations.AsNoTracking().Where(item => bookIds.Contains(item.BookId))
+                .Select(item => new { item.BookId, item.ReaderId, item.Status, item.ExpiresAt }).ToListAsync(ct)
+            : [];
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            if (row.Status is not (BorrowStatus.Borrowed or BorrowStatus.Overdue)) continue;
+            var reserved = reservations.Any(item => item.BookId == row.BookCopy.BookId && item.ReaderId != row.ReaderId
+                && (item.Status == CirculationRules.ReservationPending || CirculationRules.IsUnexpiredReadyHold(item.Status, item.ExpiresAt, now)));
+            var reason = CirculationRules.ValidateRenewal(settings, row.RenewalCount, row.DueDate, now,
+                byLibrarian: true, CirculationRules.CalendarOverdueDays(row.DueDate, now) > 0, reserved,
+                CirculationRules.IsTextbook(row.BookCopy.Book.Categories?.Select(item => item.Name)));
+            reason ??= CirculationRules.MissingRenewalDays(CirculationRules.RenewalDays(settings, row.BookCopy.Book.Language));
+            mapped[index] = mapped[index] with { CanRenew = reason is null, RenewalUnavailableReason = reason };
+        }
+        return mapped;
     }
 
     private async Task<IReadOnlyList<CirculationLoanDto>> MapLoansAsync(

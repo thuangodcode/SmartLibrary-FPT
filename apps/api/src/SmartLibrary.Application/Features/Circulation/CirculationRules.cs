@@ -171,20 +171,24 @@ public static class CirculationRules
         bool isTextbook,
         bool hasUnpaidFines = false)
     {
+        if (settings.BlockRenewIfOverdue && isOverdue)
+            return $"Sách đã quá hạn {Math.Max(1, CalendarOverdueDays(dueUtc, nowUtc))} ngày. Cần nhận trả để chốt phí quá hạn.";
         if (!byLibrarian && settings.RestrictIfUnpaid && hasUnpaidFines)
             return "Còn phí chưa thanh toán nên chưa được tự gia hạn.";
         if (settings.MaxRenewals is null)
             return "Chưa cấu hình chính sách gia hạn. Vào Quản trị > Chính sách để thiết lập số lần gia hạn.";
         if (renewalCount >= settings.MaxRenewals.Value)
             return $"Đã hết số lần gia hạn ({settings.MaxRenewals.Value}).";
-        if (settings.BlockRenewIfOverdue && isOverdue)
-            return "Không gia hạn khi sách đang quá hạn (theo chính sách).";
         if (settings.BlockRenewIfReserved && hasReservation)
             return "Không gia hạn vì đang có độc giả khác đặt trước (theo chính sách).";
         if (isTextbook && settings.TextbookRequiresApproval && !byLibrarian)
             return "Giáo trình theo học kỳ cần thủ thư phê duyệt gia hạn.";
         if (!byLibrarian && !InSelfRenewWindow(dueUtc, nowUtc, settings))
-            return "Ngoài cửa sổ tự gia hạn (mặc định 1 ngày trước hạn đến 1 ngày sau hạn, có thể cấu hình).";
+            return settings.BlockRenewIfOverdue
+                ? settings.SelfRenewBeforeDays <= 0
+                    ? "Ngoài cửa sổ tự gia hạn. Chỉ tự gia hạn trong ngày hạn trả; quá hạn cần nhận trả để chốt phí."
+                    : $"Ngoài cửa sổ tự gia hạn. Chỉ tự gia hạn từ {settings.SelfRenewBeforeDays} ngày trước hạn đến hết ngày hạn trả."
+                : $"Ngoài cửa sổ tự gia hạn: từ {Math.Max(0, settings.SelfRenewBeforeDays)} ngày trước đến {Math.Max(0, settings.SelfRenewAfterDays)} ngày sau hạn trả (theo chính sách).";
         return null;
     }
 

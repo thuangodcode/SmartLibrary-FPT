@@ -12,6 +12,60 @@ namespace SmartLibrary.IntegrationTests;
 public sealed partial class CopyLifecycleTests
 {
     [BookCodePostgresFact]
+    public async Task OverdueRenewalPolicyIsReportedAndEnforcedForReaderAndStaff()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await using var db = fixture.Context();
+        db.BookIncidents.RemoveRange(db.BookIncidents);
+        var loan = await db.BorrowRecords.SingleAsync(); loan.Status = BorrowStatus.Overdue; loan.ReturnDate = null; loan.DueDate = DateTime.UtcNow.AddDays(-3);
+        db.Add(new PolicyRule { Code = "READ-RENEW", Name = "Gia hạn trước hạn", PolicyType = PolicyRuleType.Renewal, Status = PolicyRuleStatus.Active, Parameters = [new() { ParamKey = "max_renewals", ParamValue = "2" }, new() { ParamKey = "renewal_days", ParamValue = "7" }, new() { ParamKey = "block_if_overdue", ParamValue = "true" }] });
+        await db.SaveChangesAsync();
+        var service = Service(db); var repository = new CirculationRepository(db);
+        var settings = await repository.GetSettingsAsync(CancellationToken.None);
+        var staffDetail = await service.GetLoanDetailAsync(loan.Id);
+        var staffList = await service.GetLoansAsync(null, "Overdue", null, null, 1, 10);
+        var overdueList = await service.GetOverdueAsync();
+        var readerList = await repository.GetLoansForReaderAsync(loan.ReaderId, 1, 10, settings, CancellationToken.None);
+        foreach (var item in new[] { staffDetail!.Loan, staffList.Items.Single(), overdueList.Single(), readerList.Items.Single() })
+        {
+            Assert.False(item.CanRenew);
+            Assert.Contains("quá hạn 3 ngày", item.RenewalUnavailableReason);
+            Assert.Contains("nhận trả", item.RenewalUnavailableReason);
+        }
+        var oldDue = loan.DueDate;
+        Assert.False((await service.RenewAsync(loan.Id, fixture.StaffId, byLibrarian: true)).IsSuccess);
+        Assert.False((await service.RenewAsync(loan.Id, loan.ReaderId, byLibrarian: false)).IsSuccess);
+        Assert.Equal(oldDue, loan.DueDate); Assert.Equal(0, loan.RenewalCount);
+    }
+
+    [BookCodePostgresFact]
+    public async Task ChangingFeePolicyOnlyAffectsNewAssessmentsAndPreservesExistingFine()
+    {
+        await using var fixture = await Fixture.CreateAsync(); Guid firstFineId;
+        await using (var db = fixture.Context())
+        {
+            Assert.True((await Service(db).ConfirmIncidentAsync(fixture.IncidentId, new() { Severity = "Light", Notes = "Xước bìa, tính phí theo chính sách lúc xác minh." }, fixture.StaffId)).IsSuccess);
+            var fine = await db.Fines.SingleAsync(); firstFineId = fine.Id; Assert.Equal(10000m, fine.Amount);
+            var policy = await db.PolicyRules.Include(item => item.Parameters).SingleAsync();
+            policy.Parameters.Single(item => item.ParamKey == "damage_fee").ParamValue = "20000";
+            policy.Parameters.Single(item => item.ParamKey == "lost_book_fee").ParamValue = "100000";
+            var firstLoan = await db.BorrowRecords.SingleAsync();
+            var copy = new BookCopy { Book = new Book { Code = "NEWFEE001", Title = "Sách cho chính sách mới" }, Barcode = "NEWFEE001-01", Condition = BookCondition.Damaged, IsAvailable = false };
+            var secondLoan = new BorrowRecord { ReaderId = firstLoan.ReaderId, BookCopy = copy, Status = BorrowStatus.Returned, ReturnDate = DateTime.UtcNow };
+            db.Add(new BookIncident { BorrowRecord = secondLoan, BookCopy = copy, ReaderId = firstLoan.ReaderId, Kind = BookIncidentKind.Damage });
+            await db.SaveChangesAsync();
+        }
+        await using (var db = fixture.Context())
+        {
+            var service = Service(db); var second = await db.BookIncidents.SingleAsync(item => item.Id != fixture.IncidentId);
+            var assessed = await service.ConfirmIncidentAsync(second.Id, new() { Severity = "Severe", Notes = "Hư nặng, áp dụng mức cố định mới." }, fixture.StaffId);
+            Assert.True(assessed.IsSuccess, assessed.Error); Assert.Equal(100000m, assessed.Data!.CompensationAmount);
+            Assert.Equal(10000m, (await db.Fines.SingleAsync(item => item.Id == firstFineId)).Amount);
+            Assert.Equal(10000m, (await service.GetIncidentAsync(fixture.IncidentId))!.CompensationAmount);
+        }
+    }
+
+    [BookCodePostgresFact]
     public async Task UnreturnedOverdueLoanCannotFinalizeAFine()
     {
         await using var fixture = await Fixture.CreateAsync();

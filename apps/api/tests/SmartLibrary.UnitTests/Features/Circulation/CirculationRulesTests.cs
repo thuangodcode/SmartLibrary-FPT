@@ -8,6 +8,22 @@ namespace SmartLibrary.UnitTests.Features.Circulation;
 public class CirculationRulesTests
 {
     [Fact]
+    public void OverdueRenewalStartsAfterTheDueDateEndsInVietnamForBothRoles()
+    {
+        var settings = new CirculationSettings { MaxRenewals = 2, BlockRenewIfOverdue = true, SelfRenewBeforeDays = 1, SelfRenewAfterDays = 1 };
+        var due = new DateTime(2026, 11, 11, 18, 0, 0, DateTimeKind.Utc); // 01:00 on Nov 12 in Vietnam.
+        var endOfDay = new DateTime(2026, 11, 12, 16, 59, 59, DateTimeKind.Utc);
+        foreach (var byLibrarian in new[] { false, true })
+        {
+            CirculationRules.ValidateRenewal(settings, 0, due, endOfDay, byLibrarian,
+                CirculationRules.CalendarOverdueDays(due, endOfDay) > 0, false, false).Should().BeNull();
+            CirculationRules.ValidateRenewal(settings, 0, due, endOfDay.AddSeconds(1), byLibrarian,
+                CirculationRules.CalendarOverdueDays(due, endOfDay.AddSeconds(1)) > 0, false, false)
+                .Should().Contain("quá hạn 1 ngày").And.Contain("nhận trả");
+        }
+    }
+
+    [Fact]
     public void CalendarOverdueDays_OnTimeOrEarly_IsZero()
     {
         var due = new DateTime(2026, 10, 22, 10, 0, 0, DateTimeKind.Utc);
