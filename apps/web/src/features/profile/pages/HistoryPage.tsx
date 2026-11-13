@@ -19,6 +19,7 @@ import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
+import ReaderReservations from './ReaderReservations';
 import './HistoryPage.css';
 
 interface CirculationLoan {
@@ -38,6 +39,7 @@ interface CirculationLoan {
   renewalCount: number;
   canRenew: boolean;
   renewalUnavailableReason?: string | null;
+  rejectionReason?: string | null;
   hasOpenFine: boolean;
   hasFine?: boolean;
   copyCondition?: string;
@@ -87,7 +89,7 @@ interface ApiEnvelope<T> {
   meta?: { message?: string };
 }
 
-type HistoryTab = 'loans' | 'fines';
+type HistoryTab = 'loans' | 'fines' | 'reservations';
 type LoanFilter = 'all' | 'Pending' | 'Approved' | 'Borrowed' | 'Overdue' | 'Returned' | 'Rejected' | 'Cancelled';
 type FineFilter = 'all' | 'Pending' | 'Paid' | 'Waived';
 
@@ -137,7 +139,28 @@ const HistoryPage = () => {
   const { showToast } = useToast();
   const [loans, setLoans] = useState<LoanList | null>(null);
   const [fines, setFines] = useState<CirculationFine[]>([]);
-  const tab: HistoryTab = searchParams.get('tab') === 'fines' ? 'fines' : 'loans';
+  const tab: HistoryTab = searchParams.get('tab') === 'reservations' ? 'reservations' : searchParams.get('tab') === 'fines' ? 'fines' : 'loans';
+  // A notification is a one-time selection. Consume its URL parameters so a
+  // browser refresh opens the ordinary list, without a special 'notification mode'.
+  const [selection, setSelection] = useState<{ loanId?: string; fineId?: string }>({});
+  const focusLoanId = tab === 'loans' ? selection.loanId : undefined;
+  const focusFineId = tab === 'fines' ? (selection.fineId || (paymentRedirect ? returnFineId : undefined)) : undefined;
+  useEffect(() => {
+    if (paymentRedirect) return;
+    const loanId = searchParams.get('loanId') || undefined;
+    const fineId = searchParams.get('fineId') || undefined;
+    if (!loanId && !fineId) return;
+    const consumeSelection = () => {
+      setSelection({ loanId, fineId });
+      const next = new URLSearchParams(searchParams);
+      next.delete('loanId'); next.delete('fineId');
+      setSearchParams(next, { replace: true });
+    };
+    consumeSelection();
+  }, [searchParams, setSearchParams, paymentRedirect]);
+  const [focusedLoan, setFocusedLoan] = useState<CirculationLoan | null>(null);
+  const [focusLoading, setFocusLoading] = useState(false);
+  const [focusError, setFocusError] = useState('');
   const [loanFilter, setLoanFilter] = useState<LoanFilter>('all');
   const [fineFilter, setFineFilter] = useState<FineFilter>('all');
   const [darkTheme, setDarkTheme] = useState(() => window.localStorage.getItem('smartlibrary.reader-theme') === 'dark');
@@ -147,6 +170,9 @@ const HistoryPage = () => {
   const selectTab = (nextTab: HistoryTab) => {
     const next = new URLSearchParams(searchParams);
     next.set('tab', nextTab);
+    next.delete('loanId'); next.delete('fineId');
+    setSelection({});
+    setLoanFilter('all'); setFineFilter('all');
     setSearchParams(next, { replace: true });
   };
   const [renewingId, setRenewingId] = useState<string | null>(null);
@@ -228,16 +254,35 @@ const HistoryPage = () => {
     };
   }, [page, refreshKey, showToast, token]);
 
+  useEffect(() => {
+    let active = true;
+    const loadFocused = async () => {
+      setFocusedLoan(null); setFocusError(''); setFocusLoading(!!focusLoanId);
+      if (!focusLoanId || !token) { setFocusLoading(false); return; }
+      await fetch(`${API_BASE_URL}/api/v1/me/circulation/loans/${encodeURIComponent(focusLoanId)}`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(async response => {
+          const result = await parseApiResponse<ApiEnvelope<CirculationLoan>>(response);
+          if (!response.ok || !result?.success || !result.data) throw new Error(result?.error || 'Không tìm thấy phiếu trong tài khoản của bạn.');
+          if (active) setFocusedLoan(result.data);
+        }).catch((caught: unknown) => { if (active) setFocusError(caught instanceof Error ? caught.message : 'Không tải được phiếu.'); })
+        .finally(() => { if (active) setFocusLoading(false); });
+    };
+    void loadFocused();
+    return () => { active = false; };
+  }, [focusLoanId, token, refreshKey]);
+
   const visibleLoans = useMemo(() => {
+    if (focusLoanId) return focusedLoan?.id === focusLoanId ? [focusedLoan] : [];
     const records = loans?.items ?? [];
     if (loanFilter !== 'all') return records.filter((loan) => loan.displayStatus === loanFilter);
     return records;
-  }, [loanFilter, loans]);
+  }, [loanFilter, loans, focusLoanId, focusedLoan]);
 
   const visibleFines = useMemo(() => {
+    if (focusFineId) return fines.filter(fine => fine.id === focusFineId);
     if (fineFilter !== 'all') return fines.filter((fine) => fine.status === fineFilter);
     return fines;
-  }, [fineFilter, fines]);
+  }, [fineFilter, fines, focusFineId]);
 
   const unpaidTotal = fines
     .filter((fine) => fine.status === 'Pending')
@@ -446,16 +491,17 @@ const HistoryPage = () => {
           >
             <Wallet size={17} /> Phí phạt <span>{fines.length}</span>
           </button>
+          <button className={tab === 'reservations' ? 'is-active' : ''} onClick={() => selectTab('reservations')} role="tab" aria-selected={tab === 'reservations'}><BookOpen size={17} /> Đặt trước</button>
         </div>
 
         <div className="history-toolbar">
           <div>
-            <strong>{tab === 'loans' ? 'Danh sách phiếu mượn' : 'Danh sách phí phạt'}</strong>
-            <span>Dữ liệu được cập nhật trực tiếp từ hồ sơ thư viện của bạn.</span>
+            <strong>{tab === 'loans' ? 'Danh sách phiếu mượn' : tab === 'fines' ? 'Danh sách phí phạt' : 'Đặt trước của tôi'}</strong>
+            {tab === 'reservations' && <span>Theo dõi hàng chờ và lịch nhận sách.</span>}
           </div>
         </div>
 
-        <nav className="history-filter-bar" aria-label={tab === 'loans' ? 'Lọc trạng thái phiếu mượn' : 'Lọc trạng thái phí phạt'}>
+        {tab !== 'reservations' && !focusLoanId && !focusFineId && <nav className="history-filter-bar" aria-label={tab === 'loans' ? 'Lọc trạng thái phiếu mượn' : 'Lọc trạng thái phí phạt'}>
           {tab === 'loans' ? LOAN_FILTERS.map((filter) => {
             const count = filter.value === 'all'
               ? loans?.items.length ?? 0
@@ -487,10 +533,11 @@ const HistoryPage = () => {
               {filter.label}<span>{filter.value === 'all' ? fines.length : fines.filter((fine) => fine.status === filter.value).length}</span>
             </button>
           ))}
-        </nav>
+        </nav>}
+        {focusError && <div className="history-alert" role="alert">{focusError}<button type="button" className="history-renew-button" onClick={() => setRefreshKey(value => value + 1)}>Thử lại</button></div>}
 
         {error && <div className="history-alert" role="alert"><AlertCircle size={17} />{error}</div>}
-        {loading ? (
+        {tab === 'reservations' ? <ReaderReservations token={token} revision={refreshKey} /> : loading || focusLoading ? (
           <div className="history-empty"><LoaderCircle className="history-spinner" size={22} /> Đang tải dữ liệu...</div>
         ) : tab === 'loans' ? (
           <section className="history-list" aria-label="Danh sách mượn và trả">
@@ -505,6 +552,7 @@ const HistoryPage = () => {
                     <span>{loan.code}</span>
                   </div>
                   <span>Mã bản sao: {loan.barcode}</span>
+                  {['Rejected', 'Cancelled'].includes(loan.status) && <span className="history-record-warning">Lý do từ chối / hủy: {loan.rejectionReason || 'Chưa có lý do được ghi nhận.'}</span>}
                   {loan.pickupAt && <span>Lịch đến nhận: {formatDateTime(loan.pickupAt)}</span>}
                   {loan.acceptedAt && (
                     <span>
@@ -514,7 +562,7 @@ const HistoryPage = () => {
                   <div className="history-record-dates">
                     <span>Mượn: {formatDateTime(loan.borrowDate)}</span>
                     <span>Hạn trả (hết ngày): {formatDate(loan.dueDate)}</span>
-                    <span>Đã trả: {formatDate(loan.returnDate)}</span>
+                    <span>Đã trả: {formatDateTime(loan.returnDate)}</span>
                     <span>Gia hạn: {loan.renewalCount} lần</span>
                   </div>
                   <span>Bản sao hiện tại: {({ LightDamaged: 'Hư nhẹ · còn sử dụng được', Damaged: 'Hư hỏng · chưa đủ điều kiện sử dụng', Lost: 'Thất lạc · chưa tìm thấy', New: 'Mới', Good: 'Tốt', Fair: 'Cũ, còn sử dụng được' } as Record<string, string>)[loan.copyCondition || ''] || 'Chưa xác định'}</span>
@@ -615,7 +663,7 @@ const HistoryPage = () => {
           </section>
         )}
 
-        {tab === 'loans' && (loans?.totalPages ?? 0) > 1 && (
+        {tab === 'loans' && !focusLoanId && (loans?.totalPages ?? 0) > 1 && (
           <nav className="history-pagination" aria-label="Phân trang phiếu mượn">
             <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1}>
               <ArrowLeft size={15} /> Trước

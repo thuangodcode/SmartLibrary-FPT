@@ -5,7 +5,7 @@ import HomeNavbar from '../../home/components/HomeNavbar';
 import HomeFooter from '../../home/components/HomeFooter';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
-import { useAuthStore } from '../../auth/store/useAuthStore';
+import { recoverRealtimeSession, useAuthStore } from '../../auth/store/useAuthStore';
 import './SupportPage.css';
 
 interface ApiEnvelope<T> {
@@ -137,7 +137,7 @@ const SupportPage = () => {
       }
     };
     const hub = new HubConnectionBuilder()
-      .withUrl(`${API_BASE_URL}/hubs/support-chat`, { accessTokenFactory: () => token })
+      .withUrl(`${API_BASE_URL}/hubs/support-chat`, { accessTokenFactory: () => useAuthStore.getState().getAccessToken() })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
       .build();
@@ -206,6 +206,7 @@ const SupportPage = () => {
         setConnection(hub);
         setRealtimeStatus('connected');
       } catch (caught: unknown) {
+        if (active && await recoverRealtimeSession(caught)) return;
         if (active) {
           setRealtimeStatus('disconnected');
           setError(caught instanceof Error ? `Không thể kết nối chat realtime: ${caught.message}` : 'Không thể kết nối chat realtime.');

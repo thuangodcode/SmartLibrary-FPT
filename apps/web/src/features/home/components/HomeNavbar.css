@@ -188,8 +188,10 @@ html.dark .annual-theme-toggle:hover { border-color: #526b59; background: #26372
   right: 0;
   z-index: 80;
   width: min(380px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
   max-height: min(70vh, 520px);
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid #e5e9e5;
   border-radius: 12px;
   background: #fff;
@@ -197,8 +199,7 @@ html.dark .annual-theme-toggle:hover { border-color: #526b59; background: #26372
 }
 
 .annual-reader-notifications-popover > header {
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   padding: 13px 15px;
@@ -288,8 +289,8 @@ html.dark .annual-theme-toggle:hover { border-color: #526b59; background: #26372
 .annual-reader-notifications-error { color: #a33b31; }
 
 .annual-reader-notifications-pagination {
-  position: sticky;
-  bottom: 0;
+  flex-shrink: 0;
+  border-top: 1px solid #edf0ed;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -299,6 +300,9 @@ html.dark .annual-theme-toggle:hover { border-color: #526b59; background: #26372
 }
 
 .annual-reader-notifications-pagination button {
+  min-height: 40px;
+  min-width: 54px;
+  border-radius: 8px;
   border: 0;
   background: #eef4ef;
   padding: 7px 10px;
@@ -516,3 +520,5 @@ html.dark .annual-home .annual-reader-notifications-pagination span { color: #9e
     left: 0;
   }
 }
+
+.annual-reader-notifications-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }

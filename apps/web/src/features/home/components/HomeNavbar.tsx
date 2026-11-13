@@ -7,7 +7,7 @@ import smartLibraryLogo from '../../../assets/figma/smartlibrary-logo.png';
 import { useToast } from '../../../components/ui/useToast';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
-import { useAuthStore } from '../../auth/store/useAuthStore';
+import { recoverRealtimeSession, useAuthStore } from '../../auth/store/useAuthStore';
 import {
   listInboxNoticePage,
   markAllInboxNoticesRead,
@@ -288,7 +288,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
     const clearSupportUnreadCount = () => setSupportUnreadCount(0);
     const supportHub = new HubConnectionBuilder()
       .withUrl(`${API_BASE_URL}/hubs/support-chat`, {
-        accessTokenFactory: () => accessToken,
+        accessTokenFactory: () => useAuthStore.getState().getAccessToken(),
       })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
@@ -300,7 +300,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
     });
     const notificationHub = new HubConnectionBuilder()
       .withUrl(`${API_BASE_URL}/hubs/notifications`, {
-        accessTokenFactory: () => accessToken,
+        accessTokenFactory: () => useAuthStore.getState().getAccessToken(),
       })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
@@ -385,6 +385,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
         }
         await loadSupportUnreadCount();
       } catch (caught: unknown) {
+        if (active && await recoverRealtimeSession(caught)) return;
         if (active && attempt === 0) {
           showToast({
             type: 'error',
@@ -468,6 +469,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
                       <strong>{t('header.notifications')}</strong>
                       <span>{t('header.recentUpdates')}</span>
                     </header>
+                    <div className="annual-reader-notifications-list">
                     {notificationError && <p className="annual-reader-notifications-error" role="alert">{notificationError}</p>}
                     {notificationsLoading && !readerNotifications.length ? (
                       <p className="annual-reader-notifications-empty">{t('header.loadingNotifications')}</p>
@@ -500,6 +502,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
                         </article>
                       );
                     })}
+                    </div>
                     {notificationTotalPages > 1 && (
                       <footer className="annual-reader-notifications-pagination">
                         <button type="button" disabled={notificationPage <= 1} onClick={() => setNotificationPage((page) => page - 1)}>{t('header.previous')}</button>

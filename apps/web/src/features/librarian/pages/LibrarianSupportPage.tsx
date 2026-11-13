@@ -4,7 +4,7 @@ import { AlertCircle, CalendarClock, Check, CircleHelp, Image as ImageIcon, Load
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
-import { useAuthStore } from '../../auth/store/useAuthStore';
+import { recoverRealtimeSession, useAuthStore } from '../../auth/store/useAuthStore';
 import './LibrarianSupportPage.css';
 
 interface ApiEnvelope<T> {
@@ -162,7 +162,7 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
     if (!token) return undefined;
     let active = true;
     const hub = new HubConnectionBuilder()
-      .withUrl(`${API_BASE_URL}/hubs/support-chat`, { accessTokenFactory: () => token })
+      .withUrl(`${API_BASE_URL}/hubs/support-chat`, { accessTokenFactory: () => useAuthStore.getState().getAccessToken() })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
       .build();
@@ -219,7 +219,8 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
         const readerId = activeReaderRef.current;
         if (readerId) await hub.invoke('JoinConversation', readerId);
       })
-      .catch((caught: unknown) => {
+      .catch(async (caught: unknown) => {
+        if (active && await recoverRealtimeSession(caught)) return;
         if (active) setError(caught instanceof Error ? `Không thể kết nối chat realtime: ${caught.message}` : 'Không thể kết nối chat realtime.');
       });
     return () => {
