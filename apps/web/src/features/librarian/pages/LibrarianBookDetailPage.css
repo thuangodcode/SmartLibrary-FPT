@@ -809,3 +809,6 @@
 .lib-book-edit-category-picker input { accent-color: #e9621b; }
 .lib-book-edit-category-picker > small { display: block; margin-top: 8px; color: #b42318; font-size: 11px; }
 @media (max-width: 560px) { .lib-book-edit-category-picker > div { grid-template-columns: 1fr; } }
+
+.lib-book-qr-button { min-height: 40px; padding: 8px 14px; border: 1px solid #fed7aa; border-radius: 8px; color: #c2410c; background: #fff7ed; font-weight: 600; cursor: pointer; }
+.lib-book-qr-button:focus-visible { outline: 2px solid #ea580c; outline-offset: 3px; }

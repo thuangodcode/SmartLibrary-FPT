@@ -23,6 +23,7 @@ import { useAuthStore } from '../../auth/store/useAuthStore';
 import { useToast } from '../../../components/ui/useToast';
 import { parseApiResponse } from '../../../lib/api';
 import type { CategoryItem } from './LibrarianCategoriesPage';
+import { CopyQrDialog, type CopyQrLabel } from '../components/CopyQrDialog';
 import './LibrarianBookDetailPage.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5278';
@@ -88,6 +89,7 @@ const LibrarianBookDetailPage: React.FC = () => {
   const { showToast } = useToast();
 
   const [book, setBook] = useState<BookDetailData | null>(null);
+  const [qrCopy, setQrCopy] = useState<CopyQrLabel | null>(null);
   const [copies, setCopies] = useState<BookCopyItem[]>([]);
   const [copiesLoading, setCopiesLoading] = useState(true);
   const [copiesError, setCopiesError] = useState<string | null>(null);
@@ -496,7 +498,7 @@ const LibrarianBookDetailPage: React.FC = () => {
                 {book.availableCopies > 0
                   ? `${book.availableCopies} / ${book.totalCopies} cuốn sẵn sàng cho mượn`
                   : book.totalCopies > 0
-                    ? 'Hiện đang mượn hết'
+                    ? 'Chưa có bản sẵn sàng trên kệ'
                     : 'Chưa có bản sao'}
               </span>
             </span>
@@ -571,6 +573,7 @@ const LibrarianBookDetailPage: React.FC = () => {
         )}
       </section>
 
+      <CopyQrDialog copy={qrCopy} onClose={() => setQrCopy(null)} />
       <section className="lib-book-copies-panel">
         <div className="lib-book-copies-heading">
           <div>
@@ -593,7 +596,7 @@ const LibrarianBookDetailPage: React.FC = () => {
             <div className="lib-book-copies-table-wrap">
               <table className="lib-book-copies-table">
                 <thead>
-                  <tr><th>ID bản sao sách</th><th>Trạng thái</th><th>Vị trí kệ</th></tr>
+                  <tr><th>ID bản sao sách</th><th>Trạng thái</th><th>Vị trí kệ</th><th>Mã QR</th></tr>
                 </thead>
                 <tbody>
                   {copies.map((copy) => {
@@ -603,6 +606,7 @@ const LibrarianBookDetailPage: React.FC = () => {
                         <td><code>{copy.barcode}</code></td>
                         <td><span className={`lib-book-copy-status ${status.className}`}>{status.label}</span></td>
                         <td>{copy.location || <span className="lib-book-copy-unassigned">Chưa xếp kệ</span>}</td>
+                        <td><button type="button" className="lib-book-qr-button" onClick={() => setQrCopy({ barcode: copy.barcode, bookTitle: book.title })} aria-label={`Xem mã QR ${copy.barcode}`}>Xem QR</button></td>
                       </tr>
                     );
                   })}
