@@ -84,10 +84,14 @@ public class CategoryService
                 var safeFileName = $"{Guid.NewGuid():N}{extension}";
                 imageUrl = await _storageService.UploadFileAsync(stream, safeFileName, "categories", ct);
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to upload category image to Cloudinary.");
-                return Result<CategoryDto>.Failure($"Không thể tải hình ảnh lên Cloudinary: {ex.Message}");
+                _logger.LogWarning(ex, "Failed to upload category image to Cloudinary.");
+                return Result<CategoryDto>.Failure("Không tải được ảnh danh mục. Vui lòng thử lại hoặc bỏ ảnh để lưu; kiểm tra cấu hình Cloudinary nếu lỗi tiếp diễn.");
             }
         }
 
@@ -177,10 +181,14 @@ public class CategoryService
                 var safeFileName = $"{Guid.NewGuid():N}{extension}";
                 category.ImageUrl = await _storageService.UploadFileAsync(stream, safeFileName, "categories", ct);
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to upload category image to Cloudinary.");
-                return Result<CategoryDto>.Failure($"Không thể tải hình ảnh lên Cloudinary: {ex.Message}");
+                _logger.LogWarning(ex, "Failed to upload category image to Cloudinary.");
+                return Result<CategoryDto>.Failure("Không tải được ảnh danh mục. Vui lòng thử lại hoặc bỏ ảnh để lưu; kiểm tra cấu hình Cloudinary nếu lỗi tiếp diễn.");
             }
         }
 

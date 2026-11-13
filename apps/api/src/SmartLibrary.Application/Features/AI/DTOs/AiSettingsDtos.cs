@@ -219,3 +219,5 @@ public class AiOverdueRiskItemDto
     public int OverdueDays { get; set; }
     public string Risk { get; set; } = "trung bình";
 }
+
+public sealed record AcquisitionSuggestionsRequest(string? Category);

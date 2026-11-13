@@ -67,7 +67,7 @@ public sealed class GeminiClient : IGeminiClient
 
     private Task<string> GeminiGenerateAsync(string apiKey, string model, string prompt, CancellationToken ct)
         => FirstWorkingAsync(
-            [ResolveGeminiChatModel(model), "gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash"],
+            [ResolveGeminiChatModel(model), "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"],
             candidate => GeminiGenerateOnceAsync(apiKey, candidate, prompt, ct),
             "Gemini không tạo được câu trả lời.");
 
@@ -324,16 +324,12 @@ public sealed class GeminiClient : IGeminiClient
 
     private static string ResolveGeminiChatModel(string? model)
     {
-        var value = string.IsNullOrWhiteSpace(model) ? "gemini-3.8-flash" : model.Trim();
+        var value = string.IsNullOrWhiteSpace(model) ? "gemini-2.5-flash" : model.Trim();
         if (value.StartsWith("models/", StringComparison.OrdinalIgnoreCase))
             value = value["models/".Length..];
-        return value switch
-        {
-            "gemini-2.0-flash" or "gemini-2.0-flash-001" or "gemini-2.0-flash-lite"
-                or "gemini-2.0-flash-lite-001" or "gemini-1.5-flash" or "gemini-1.5-pro"
-                => "gemini-3.8-flash",
-            _ => value
-        };
+        if (value.StartsWith("gemini-3.", StringComparison.OrdinalIgnoreCase))
+            return "gemini-2.5-flash";
+        return value;
     }
 
     private static string ResolveGeminiEmbeddingModel(string? model)

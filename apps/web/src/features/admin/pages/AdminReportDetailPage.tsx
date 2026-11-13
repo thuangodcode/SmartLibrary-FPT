@@ -86,15 +86,7 @@ const AdminReportDetailPage: React.FC = () => {
   const [editName, setEditName] = useState('');
   const [editStatus, setEditStatus] = useState('Ready');
 
-  // Edit Template Modal
-  const [editTemplateModal, setEditTemplateModal] = useState(false);
-  const [tmplName, setTmplName] = useState('');
-  const [tmplType, setTmplType] = useState('Activity');
-  const [tmplDesc, setTmplDesc] = useState('');
-  const [tmplPeriod, setTmplPeriod] = useState('Month');
-  const [tmplGroupBy, setTmplGroupBy] = useState('Day');
-  const [tmplMetrics, setTmplMetrics] = useState<string[]>(['Borrowed', 'Returned']);
-  const [tmplEnabled, setTmplEnabled] = useState(true);
+    // Edit Template Modal state removed since template editing is handled in AdminReportTemplateDetailPage
 
   const total = useMemo(
     () =>
@@ -185,61 +177,6 @@ const AdminReportDetailPage: React.FC = () => {
       await load();
     } catch (caught) {
       setNotice(caught instanceof Error ? caught.message : 'Không lưu được phản hồi.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const openTemplateEdit = () => {
-    if (!report) return;
-    setTmplName(report.templateName || '');
-    setTmplType(report.templateReportType || 'Activity');
-    setTmplDesc(report.templateDescription || '');
-    if (parsedTemplateConfig) {
-      setTmplPeriod(parsedTemplateConfig.period || 'Month');
-      setTmplGroupBy(parsedTemplateConfig.groupBy || 'Day');
-      setTmplMetrics(templateMetrics);
-    }
-    setEditTemplateModal(true);
-  };
-
-  const saveTemplateChanges = async () => {
-    if (!token || !report?.templateId) {
-      setNotice('Không tìm thấy thông tin mẫu báo cáo để cập nhật.');
-      return;
-    }
-    if (!tmplName.trim()) {
-      setNotice('Vui lòng nhập tên mẫu báo cáo.');
-      return;
-    }
-    setBusy(true);
-    try {
-      const configuration = JSON.stringify({
-        period: tmplPeriod,
-        groupBy: tmplGroupBy,
-        metrics: tmplMetrics,
-        formats: ['CSV'],
-      });
-      const response = await fetch(`${API_BASE_URL}/api/admin/reports/templates/${report.templateId}`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: tmplName.trim(),
-          reportType: tmplType,
-          description: tmplDesc,
-          configuration,
-          isEnabled: tmplEnabled,
-        }),
-      });
-      const result = await parseApiResponse<Envelope<unknown>>(response);
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.error || 'Không cập nhật được mẫu báo cáo.');
-      }
-      setNotice('Đã cập nhật mẫu báo cáo thành công!');
-      setEditTemplateModal(false);
-      await load();
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : 'Lỗi khi cập nhật mẫu.');
     } finally {
       setBusy(false);
     }
@@ -357,9 +294,6 @@ const AdminReportDetailPage: React.FC = () => {
                   <p>{report.templateDescription || 'Mẫu cấu hình chuẩn dành cho thủ thư nộp báo cáo định kỳ cho Quản trị viên.'}</p>
                 </div>
                 <div className="template-spec-actions">
-                  <button type="button" className="btn-edit-template" onClick={openTemplateEdit}>
-                    <Pencil size={15} /> Chỉnh sửa mẫu này
-                  </button>
                   {report.templateId && (
                     <Link to={`/admin/reports/templates/${report.templateId}`} className="btn-view-all-templates">
                       <FileText size={15} /> Xem chi tiết mẫu
@@ -573,105 +507,6 @@ const AdminReportDetailPage: React.FC = () => {
                 <button type="button" onClick={() => setEditReportModal(false)}>Hủy</button>
                 <button type="submit" className="save" disabled={busy}>
                   <Save size={15} /> Lưu thay đổi
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── Modal Chỉnh sửa Mẫu Báo Cáo ── */}
-      {editTemplateModal && (
-        <div className="report-modal-backdrop" role="dialog" aria-modal="true">
-          <div className="report-modal-card modal-lg">
-            <div className="report-modal-header">
-              <div>
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#e8783e', textTransform: 'uppercase' }}>Cấu hình mẫu quy định</span>
-                <h3>Chỉnh sửa mẫu: {report?.templateName}</h3>
-              </div>
-              <button type="button" onClick={() => setEditTemplateModal(false)}><X size={18} /></button>
-            </div>
-            <form onSubmit={(e) => { e.preventDefault(); void saveTemplateChanges(); }}>
-              <div className="report-modal-body">
-                <div className="form-row-2">
-                  <label>
-                    Tên mẫu quy định <b>*</b>
-                    <input
-                      type="text"
-                      value={tmplName}
-                      onChange={(e) => setTmplName(e.target.value)}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Loại báo cáo
-                    <select value={tmplType} onChange={(e) => setTmplType(e.target.value)}>
-                      <option value="Activity">Hoạt động mượn trả</option>
-                      <option value="Finance">Tài chính &amp; Phạt</option>
-                      <option value="Collection">Kho sách &amp; Lưu hành</option>
-                      <option value="Periodic">Báo cáo định kỳ</option>
-                    </select>
-                  </label>
-                </div>
-                <label>
-                  Mô tả mục đích mẫu
-                  <textarea
-                    rows={2}
-                    value={tmplDesc}
-                    onChange={(e) => setTmplDesc(e.target.value)}
-                    placeholder="Mô tả tiêu chuẩn và yêu cầu dành cho thủ thư khi gửi báo cáo theo mẫu này..."
-                  />
-                </label>
-                <div className="form-row-2">
-                  <label>
-                    Chu kỳ báo cáo
-                    <select value={tmplPeriod} onChange={(e) => setTmplPeriod(e.target.value)}>
-                      <option value="Day">Ngày</option>
-                      <option value="Week">Tuần</option>
-                      <option value="Month">Tháng</option>
-                      <option value="Quarter">Quý</option>
-                    </select>
-                  </label>
-                  <label>
-                    Gom nhóm số liệu
-                    <select value={tmplGroupBy} onChange={(e) => setTmplGroupBy(e.target.value)}>
-                      <option value="Day">Theo từng ngày</option>
-                      <option value="Category">Theo nhóm sách</option>
-                    </select>
-                  </label>
-                </div>
-                <div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#455166', display: 'block', marginBottom: 6 }}>
-                    Chỉ số bắt buộc theo dõi:
-                  </span>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: 11 }}>
-                    {[['Borrowed', 'Lượt mượn'], ['Returned', 'Lượt trả']].map(([key, label]) => (
-                      <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={tmplMetrics.includes(key)}
-                          onChange={(e) =>
-                            setTmplMetrics(e.target.checked ? [...tmplMetrics, key] : tmplMetrics.filter((x) => x !== key))
-                          }
-                        />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 8, fontSize: 11, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={tmplEnabled}
-                    onChange={(e) => setTmplEnabled(e.target.checked)}
-                  />
-                  Cho phép thủ thư tiếp tục sử dụng mẫu này
-                </label>
-              </div>
-              <div className="report-modal-actions">
-                <button type="button" onClick={() => setEditTemplateModal(false)}>Hủy</button>
-                <button type="submit" className="save" disabled={busy}>
-                  <Save size={15} /> Lưu cập nhật mẫu
                 </button>
               </div>
             </form>

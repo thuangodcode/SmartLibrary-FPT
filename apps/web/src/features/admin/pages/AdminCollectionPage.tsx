@@ -6,11 +6,17 @@ import {
   BookCopy,
   BookOpen,
   Boxes,
+  Calendar,
   ChevronLeft,
   ChevronRight,
+  Globe,
+  Hash,
   LibraryBig,
   LoaderCircle,
+  MapPin,
   Search,
+  Star,
+  X,
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
@@ -43,12 +49,20 @@ interface Book {
   id: string;
   code: string;
   title: string;
+  isbn?: string | null;
+  description?: string | null;
   coverImageUrl?: string | null;
   publishedYear?: number | null;
   language?: string;
+  pageCount?: number | null;
   totalCopies: number;
   availableCopies: number;
+  averageRating?: number;
+  reviewCount?: number;
   authorNames: string[];
+  categoryNames?: string[];
+  copyLocations?: string[];
+  createdAt?: string;
 }
 
 const PAGE_SIZE = 12;
@@ -69,6 +83,28 @@ const AdminCollectionPage: React.FC = () => {
   const [totalBooks, setTotalBooks] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [booksDataKey, setBooksDataKey] = useState('');
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailData, setDetailData] = useState<Book | null>(null);
+
+  const openBookDetail = useCallback(async (book: Book) => {
+    setSelectedBook(book);
+    setDetailData(book);
+    setLoadingDetail(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/books/${book.id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      const result = await parseApiResponse<ApiEnvelope<Book>>(response);
+      if (response.ok && result?.success && result.data) {
+        setDetailData(result.data);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch rich book detail, using list snapshot:', err);
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, [token]);
 
   const selectedCategory = categories.find((category) => category.id === categoryId) ?? null;
   const filteredCategories = useMemo(() => {
@@ -283,7 +319,19 @@ const AdminCollectionPage: React.FC = () => {
             <>
               <div className="admin-collection-book-list">
                 {books.map((book) => (
-                  <article className="admin-collection-book-row" key={book.id}>
+                  <article
+                    className="admin-collection-book-row admin-collection-book-row--clickable"
+                    key={book.id}
+                    onClick={() => void openBookDetail(book)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        void openBookDetail(book);
+                      }
+                    }}
+                  >
                     {book.coverImageUrl
                       ? <img className="admin-collection-book-cover" src={book.coverImageUrl} alt="" loading="lazy" />
                       : <span className="admin-collection-book-cover admin-collection-book-placeholder"><BookOpen size={22} /></span>}
@@ -318,6 +366,135 @@ const AdminCollectionPage: React.FC = () => {
             </div>
           )}
         </section>
+      )}
+
+      {selectedBook && (
+        <div
+          className="admin-book-modal-backdrop"
+          onClick={() => { setSelectedBook(null); setDetailData(null); }}
+          role="presentation"
+        >
+          <div
+            className="admin-book-modal-dialog"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-book-modal-title"
+          >
+            <button
+              type="button"
+              className="admin-book-modal-close"
+              onClick={() => { setSelectedBook(null); setDetailData(null); }}
+              aria-label="Đóng chi tiết sách"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="admin-book-modal-body">
+              <div className="admin-book-modal-cover-col">
+                {(detailData?.coverImageUrl || selectedBook.coverImageUrl) ? (
+                  <img
+                    className="admin-book-modal-cover"
+                    src={(detailData?.coverImageUrl || selectedBook.coverImageUrl)!}
+                    alt={detailData?.title || selectedBook.title}
+                  />
+                ) : (
+                  <div className="admin-book-modal-cover admin-book-modal-cover--placeholder">
+                    <BookOpen size={48} />
+                  </div>
+                )}
+                <div className="admin-book-modal-stock">
+                  <div className="stock-item">
+                    <BookCopy size={16} />
+                    <span>Tổng bản sao: <strong>{number(detailData?.totalCopies ?? selectedBook.totalCopies)}</strong></span>
+                  </div>
+                  <div className="stock-item ready">
+                    <LibraryBig size={16} />
+                    <span>Sẵn sàng: <strong>{number(detailData?.availableCopies ?? selectedBook.availableCopies)}</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="admin-book-modal-info-col">
+                <span className="admin-book-modal-badge">{selectedCategory?.name || 'Sách thư viện'}</span>
+                <h2 id="admin-book-modal-title" className="admin-book-modal-title">
+                  {detailData?.title || selectedBook.title}
+                </h2>
+                <p className="admin-book-modal-author">
+                  Tác giả: <strong>{(detailData?.authorNames || selectedBook.authorNames || []).join(', ') || 'Chưa rõ tác giả'}</strong>
+                </p>
+
+                {loadingDetail && (
+                  <div className="admin-book-modal-loading">
+                    <LoaderCircle size={15} className="spin" /> Đang cập nhật thêm thông tin chi tiết...
+                  </div>
+                )}
+
+                <div className="admin-book-modal-grid">
+                  <div className="info-cell">
+                    <Hash size={14} />
+                    <span>Mã sách</span>
+                    <strong>{detailData?.code || selectedBook.code}</strong>
+                  </div>
+                  {detailData?.isbn && (
+                    <div className="info-cell">
+                      <Hash size={14} />
+                      <span>ISBN</span>
+                      <strong>{detailData.isbn}</strong>
+                    </div>
+                  )}
+                  <div className="info-cell">
+                    <Calendar size={14} />
+                    <span>Năm xuất bản</span>
+                    <strong>{detailData?.publishedYear || selectedBook.publishedYear || '—'}</strong>
+                  </div>
+                  <div className="info-cell">
+                    <Globe size={14} />
+                    <span>Ngôn ngữ</span>
+                    <strong>{detailData?.language || selectedBook.language || 'Tiếng Việt'}</strong>
+                  </div>
+                  {detailData?.pageCount ? (
+                    <div className="info-cell">
+                      <BookOpen size={14} />
+                      <span>Số trang</span>
+                      <strong>{detailData.pageCount} trang</strong>
+                    </div>
+                  ) : null}
+                  {detailData?.averageRating !== undefined && detailData.averageRating > 0 ? (
+                    <div className="info-cell">
+                      <Star size={14} />
+                      <span>Đánh giá</span>
+                      <strong>{detailData.averageRating.toFixed(1)} / 5 ({detailData.reviewCount || 0} lượt)</strong>
+                    </div>
+                  ) : null}
+                </div>
+
+                {detailData?.copyLocations && detailData.copyLocations.length > 0 && (
+                  <div className="admin-book-modal-locations">
+                    <MapPin size={14} />
+                    <span>Vị trí trên kệ:</span>
+                    <strong>{detailData.copyLocations.join(', ')}</strong>
+                  </div>
+                )}
+
+                <div className="admin-book-modal-desc">
+                  <h3>Mô tả & Tóm tắt nội dung</h3>
+                  <p>{detailData?.description || 'Chưa có tóm tắt mô tả cho đầu sách này.'}</p>
+                </div>
+              </div>
+            </div>
+
+            <footer className="admin-book-modal-footer">
+              <button
+                type="button"
+                className="admin-book-modal-btn"
+                onClick={() => { setSelectedBook(null); setDetailData(null); }}
+              >
+                Đóng
+              </button>
+            </footer>
+          </div>
+        </div>
       )}
     </main>
   );

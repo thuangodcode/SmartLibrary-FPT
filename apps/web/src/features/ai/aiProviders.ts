@@ -32,9 +32,10 @@ export const AI_PROVIDERS: AiProviderDef[] = [
     keyPlaceholder: 'AIza…',
     needsBaseUrl: false,
     chatModels: [
-      { id: 'gemini-3.8-flash', label: 'gemini-3.8-flash' },
-      { id: 'gemini-3.5-flash', label: 'gemini-3.5-flash' },
       { id: 'gemini-2.5-flash', label: 'gemini-2.5-flash' },
+      { id: 'gemini-2.0-flash', label: 'gemini-2.0-flash' },
+      { id: 'gemini-1.5-flash', label: 'gemini-1.5-flash' },
+      { id: 'gemini-1.5-pro', label: 'gemini-1.5-pro' },
     ],
     embeddingModels: [
       { id: 'gemini-embedding-001', label: 'gemini-embedding-001' },

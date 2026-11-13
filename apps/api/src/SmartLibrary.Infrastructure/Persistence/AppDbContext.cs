@@ -339,7 +339,7 @@ public class AppDbContext : DbContext
             entity.ToTable("circulation_reminder_settings");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.IsEnabled).HasColumnName("is_enabled").HasDefaultValue(false);
-            entity.Property(x => x.ReminderDays).HasColumnName("reminder_days").HasDefaultValue(7);
+            entity.Property(x => x.ReminderDays).HasColumnName("reminder_days").HasDefaultValue(4);
             entity.Property(x => x.UpdatedBy).HasColumnName("updated_by");
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
         });

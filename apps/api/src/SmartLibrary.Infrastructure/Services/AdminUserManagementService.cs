@@ -90,6 +90,7 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
                 user.FullName.ToLower().Contains(term) ||
                 user.Email.ToLower().Contains(term) ||
                 (user.StudentId != null && user.StudentId.ToLower().Contains(term)) ||
+                (user.TeacherId != null && user.TeacherId.ToLower().Contains(term)) ||
                 (user.EmployeeId != null && user.EmployeeId.ToLower().Contains(term)) ||
                 (user.Phone != null && user.Phone.Contains(term)));
         }
@@ -130,16 +131,7 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
             if (!Enum.TryParse<ReaderType>(readerType, true, out var parsedReaderType))
                 throw new ValidationException("Loại độc giả không hợp lệ.");
 
-            users = users.Where(user =>
-                _dbContext.RegistrationRequests.Any(registration =>
-                    registration.UserId == user.Id &&
-                    registration.Status == RegistrationRequestStatus.Approved)
-                    ? parsedReaderType == ReaderType.External
-                    : user.TeacherId != null
-                        ? parsedReaderType == ReaderType.Lecturer
-                        : user.StudentId != null || user.Email.ToLower().EndsWith("@fpt.edu.vn")
-                            ? parsedReaderType == ReaderType.Student
-                            : parsedReaderType == ReaderType.External);
+            users = users.Where(user => (user.ReaderType ?? ReaderType.External) == parsedReaderType);
         }
 
         var totalCount = await users.CountAsync(cancellationToken);
@@ -157,15 +149,17 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
                 user.TeacherId,
                 user.EmployeeId,
                 user.Phone,
-                ReaderType = _dbContext.RegistrationRequests.Any(registration =>
-                        registration.UserId == user.Id &&
-                        registration.Status == RegistrationRequestStatus.Approved)
-                    ? ReaderType.External
-                    : user.TeacherId != null
-                        ? ReaderType.Lecturer
-                        : user.StudentId != null || user.Email.ToLower().EndsWith("@fpt.edu.vn")
-                            ? ReaderType.Student
-                            : ReaderType.External,
+                user.ReaderType,
+                user.MembershipExpiresAt,
+                user.Address,
+                user.DateOfBirth,
+                user.LastLoginAt,
+                BorrowingCount = _dbContext.BorrowRecords.Count(loan => loan.ReaderId == user.Id
+                    && !loan.IsDeleted && (loan.Status == BorrowStatus.Borrowed || loan.Status == BorrowStatus.Overdue)),
+                OverdueCount = _dbContext.BorrowRecords.Count(loan => loan.ReaderId == user.Id
+                    && !loan.IsDeleted && loan.Status == BorrowStatus.Overdue),
+                UnpaidFines = _dbContext.Fines.Where(fine => fine.ReaderId == user.Id
+                    && !fine.IsDeleted && fine.Status == FineStatus.Pending).Sum(fine => (decimal?)fine.Amount) ?? 0,
                 Status = user.Status.ToString(),
                 user.IsActive,
                 user.CreatedAt,
@@ -176,16 +170,7 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
         var readerStats = await _dbContext.UserProfiles
             .IgnoreQueryFilters()
             .Where(user => !user.IsDeleted && user.Role.Name == "Reader")
-            .GroupBy(user =>
-                _dbContext.RegistrationRequests.Any(registration =>
-                    registration.UserId == user.Id &&
-                    registration.Status == RegistrationRequestStatus.Approved)
-                    ? ReaderType.External
-                    : user.TeacherId != null
-                        ? ReaderType.Lecturer
-                        : user.StudentId != null || user.Email.ToLower().EndsWith("@fpt.edu.vn")
-                            ? ReaderType.Student
-                            : ReaderType.External)
+            .GroupBy(user => user.ReaderType ?? ReaderType.External)
             .Select(group => new { ReaderType = group.Key, Count = group.Count() })
             .ToListAsync(cancellationToken);
 
@@ -227,20 +212,31 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
         var username = request.Username?.Trim() ?? string.Empty;
         if (fullName.Length is < 2 or > 255)
             throw new ValidationException("Họ và tên phải có từ 2 đến 255 ký tự.");
-        if (!System.Text.RegularExpressions.Regex.IsMatch(employeeId, "^[a-zA-Z0-9._-]{2,50}$"))
+        if (employeeId.Length is < 2 or > 50 || !System.Text.RegularExpressions.Regex.IsMatch(employeeId, "^[a-zA-Z0-9._-]+$"))
             throw new ValidationException("Mã nhân viên chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang (2-50 ký tự).");
-        if (!System.Text.RegularExpressions.Regex.IsMatch(username, "^[a-zA-Z0-9._-]{3,50}$"))
-            throw new ValidationException("Tên tài khoản chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang (3-50 ký tự).");
+
+        var isEmail = username.Contains('@');
+        if (isEmail)
+        {
+            var emailChecker = new EmailAddressAttribute();
+            if (!emailChecker.IsValid(username) || username.Length > 100)
+                throw new ValidationException("Email đăng nhập không hợp lệ (tối đa 100 ký tự).");
+        }
+        else if (username.Length is < 3 or > 50 || !System.Text.RegularExpressions.Regex.IsMatch(username, "^[a-zA-Z0-9._-]+$"))
+        {
+            throw new ValidationException("Tên tài khoản chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang (3-50 ký tự) hoặc là email hợp lệ.");
+        }
+
         var password = request.Password ?? string.Empty;
         if (password.Length < 8)
             throw new ValidationException("Mật khẩu Thủ thư phải có ít nhất 8 ký tự.");
 
-        var email = $"{username}@smartlibrary.local";
+        var email = isEmail ? username : $"{username}@smartlibrary.local";
         var duplicate = await _dbContext.UserProfiles
             .IgnoreQueryFilters()
             .AnyAsync(user => user.Email.ToLower() == email.ToLower(), cancellationToken);
         if (duplicate)
-            throw new ValidationException("Tên tài khoản này đã được sử dụng.");
+            throw new ValidationException("Tên tài khoản hoặc email này đã được sử dụng.");
 
         var duplicateEmployeeId = await _dbContext.UserProfiles
             .IgnoreQueryFilters()
@@ -471,17 +467,28 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
             user.StudentId = studentId;
             user.TeacherId = teacherId;
             user.DateOfBirth = dateOfBirth;
-            var hasApprovedRegistration = await _dbContext.RegistrationRequests.AnyAsync(
-                registration => registration.UserId == userId &&
-                    registration.Status == RegistrationRequestStatus.Approved,
-                cancellationToken);
-            user.ReaderType = hasApprovedRegistration
-                ? ReaderType.External
-                : teacherId is not null
-                    ? ReaderType.Lecturer
-                    : studentId is not null || user.Email.EndsWith("@fpt.edu.vn", StringComparison.OrdinalIgnoreCase)
+
+            // Nếu người dùng có nhập/đổi TeacherId hoặc StudentId thì tự động chuyển đúng phân loại
+            if (!string.IsNullOrWhiteSpace(teacherId))
+            {
+                user.ReaderType = ReaderType.Lecturer;
+            }
+            else if (!string.IsNullOrWhiteSpace(studentId))
+            {
+                user.ReaderType = ReaderType.Student;
+            }
+            else
+            {
+                var hasApprovedRegistration = await _dbContext.RegistrationRequests.AnyAsync(
+                    registration => registration.UserId == userId &&
+                        registration.Status == RegistrationRequestStatus.Approved,
+                    cancellationToken);
+                user.ReaderType = hasApprovedRegistration
+                    ? ReaderType.External
+                    : user.Email.EndsWith("@fpt.edu.vn", StringComparison.OrdinalIgnoreCase)
                         ? ReaderType.Student
                         : ReaderType.External;
+            }
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);

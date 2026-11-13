@@ -165,10 +165,10 @@ public class AiSettingsController : ControllerBase
     }
 
     [HttpPost("acquisition-suggestions")]
-    public async Task<IActionResult> AcquisitionSuggestions(CancellationToken ct)
+    public async Task<IActionResult> AcquisitionSuggestions([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] AcquisitionSuggestionsRequest? request, CancellationToken ct)
     {
         TryGetCurrentUserId(out var actorId);
-        var result = await _rag.SuggestAcquisitionsAsync(CurrentRole(), actorId, ct);
+        var result = await _rag.SuggestAcquisitionsAsync(CurrentRole(), actorId, request?.Category, ct);
         if (!result.IsSuccess)
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
 

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.AspNetCore.Http;
 using Moq;
 using SmartLibrary.Application.Features.Categories;
 using SmartLibrary.Application.Features.Categories.DTOs;
@@ -48,5 +49,27 @@ public class CategoryCodeTests
         var result = await Service().UpdateAsync(category.Id, new UpdateCategoryForm { Name = "New name" });
         Assert.True(result.IsSuccess);
         Assert.Equal("KHTN", category.Code);
+    }
+
+    [Fact]
+    public async Task FailedCategoryImageUploadDoesNotReportSuccessOrPersistAnInlineImage()
+    {
+        var storage = new Mock<IStorageService>();
+        storage.Setup(item => item.UploadFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), "categories", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Storage unavailable"));
+        var service = new CategoryService(_repository.Object, _unit.Object, storage.Object, NullLogger<CategoryService>.Instance);
+        using var stream = new MemoryStream(new byte[] { 1, 2, 3 });
+        var image = new FormFile(stream, 0, stream.Length, "Image", "cover.png");
+        var create = await service.CreateAsync(new() { Code = "KH", Name = "Science", Image = image });
+        Assert.False(create.IsSuccess);
+        Assert.Contains("bỏ ảnh", create.Error);
+        _repository.Verify(repo => repo.AddAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        var category = new Category { Code = "KH", Name = "Science", ImageUrl = "https://example.test/old.png" };
+        _repository.Setup(repo => repo.GetByIdAsync(category.Id, It.IsAny<CancellationToken>())).ReturnsAsync(category);
+        var update = await service.UpdateAsync(category.Id, new() { Name = "Science", Image = image });
+        Assert.False(update.IsSuccess);
+        Assert.Equal("https://example.test/old.png", category.ImageUrl);
+        _unit.Verify(unit => unit.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }

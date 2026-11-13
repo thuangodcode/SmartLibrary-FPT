@@ -384,6 +384,298 @@
 }
 .admin-collection-pagination button:disabled { opacity: .4; cursor: not-allowed; }
 
+.admin-collection-book-row--clickable {
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+  border-radius: 8px;
+  padding: 11px 8px;
+}
+
+.admin-collection-book-row--clickable:hover {
+  background: #f8fafc;
+  transform: translateX(2px);
+}
+
+.admin-collection-book-row--clickable:focus-visible {
+  outline: 2px solid #e8783e;
+  outline-offset: 2px;
+}
+
+/* Modal chi tiết sách */
+.admin-book-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.admin-book-modal-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: adminBookModalIn 0.2s ease-out;
+}
+
+@keyframes adminBookModalIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.admin-book-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-book-modal-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.admin-book-modal-body {
+  display: flex;
+  gap: 24px;
+  padding: 28px;
+  overflow-y: auto;
+}
+
+.admin-book-modal-cover-col {
+  flex: 0 0 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-book-modal-cover {
+  width: 170px;
+  height: 235px;
+  object-fit: cover;
+  border-radius: 10px;
+  box-shadow: 0 8px 20px -4px rgba(15, 23, 42, 0.2);
+  border: 1px solid #e2e8f0;
+}
+
+.admin-book-modal-cover--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.admin-book-modal-stock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.admin-book-modal-stock .stock-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.admin-book-modal-stock .stock-item.ready {
+  color: #166534;
+}
+
+.admin-book-modal-info-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-book-modal-badge {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 3px 10px;
+  background: #ffedd5;
+  color: #c2410c;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-book-modal-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 750;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.admin-book-modal-author {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.admin-book-modal-author strong {
+  color: #1e293b;
+}
+
+.admin-book-modal-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #ea580c;
+  background: #fff7ed;
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+
+.admin-book-modal-loading .spin {
+  animation: admin-collection-spin 1s linear infinite;
+}
+
+.admin-book-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.admin-book-modal-grid .info-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.admin-book-modal-grid .info-cell svg {
+  color: #ea580c;
+  margin-bottom: 2px;
+}
+
+.admin-book-modal-grid .info-cell strong {
+  font-size: 13.5px;
+  color: #0f172a;
+}
+
+.admin-book-modal-locations {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #475569;
+  padding: 10px 12px;
+  background: #eff6ff;
+  border-radius: 8px;
+  border: 1px solid #bfdbfe;
+}
+
+.admin-book-modal-locations svg {
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.admin-book-modal-locations strong {
+  color: #1e40af;
+}
+
+.admin-book-modal-desc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.admin-book-modal-desc h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+
+.admin-book-modal-desc p {
+  margin: 0;
+  font-size: 13.5px;
+  color: #334155;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.admin-book-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 28px;
+  border-top: 1px solid #f1f5f9;
+  background: #f8fafc;
+}
+
+.admin-book-modal-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-book-modal-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+@media (max-width: 620px) {
+  .admin-book-modal-body {
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  .admin-book-modal-cover-col {
+    align-items: center;
+    flex: 0 0 auto;
+  }
+  .admin-book-modal-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @keyframes admin-collection-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 900px) {

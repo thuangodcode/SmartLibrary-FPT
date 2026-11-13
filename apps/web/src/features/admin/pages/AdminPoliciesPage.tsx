@@ -24,7 +24,6 @@ import {
   formFromDetail,
   formatDateTime,
   orderedChips,
-  paramHint,
   paramKind,
   paramLimits,
   isVisiblePolicyParameter,
@@ -642,13 +641,13 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
               <h1>{mode === 'edit' ? 'Chỉnh sửa chính sách' : 'Thêm chính sách'}</h1>
               <p>{mode === 'edit' ? `Sửa số ngày, mức phí rồi bấm Lưu thay đổi. Dữ liệu được ghi vào database và dùng cho lượt mượn mới.` : 'Nhập số ngày mượn, mức phí hoặc hạn mức tương ứng danh mục đã chọn.'}</p>
             </div>
-            <button type="button" className="pol-btn" onClick={cancel} disabled={saving}><ArrowLeft size={16} /> Hủy</button>
+            <button type="button" className="pol-btn" onClick={cancel} disabled={saving}><ArrowLeft size={16} /> Quay lại</button>
           </header>
           <div className="pol-form-grid">
             <label>Tên chính sách<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
             <label>
               Danh mục chính sách
-              <select value={form.policyType} disabled={mode === 'edit'} onChange={(e) => onTypeChange(e.target.value as PolicyType)}>
+              <select value={form.policyType} onChange={(e) => onTypeChange(e.target.value as PolicyType)}>
                 {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </label>
@@ -671,7 +670,6 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
               const kind = paramKind(p.key);
               const isMoney = isMoneyPolicyParameter(p.key);
               const limits = paramLimits(p.key);
-              const hint = paramHint(p.key);
               return (
                 <label key={p.key}>
                   {policyParameterLabel(form.policyType, p.key, p.label)}
@@ -695,7 +693,6 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
                   ) : (
                     <input value={p.value} onChange={(e) => setParam(idx, e.target.value)} />
                   )}
-                  {hint ? <span className="pol-field-hint">{hint}</span> : null}
                 </label>
               );
             })}

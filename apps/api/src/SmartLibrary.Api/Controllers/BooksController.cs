@@ -283,6 +283,7 @@ public class BooksController : ControllerBase
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UpdateFromForm(Guid id, [FromForm] UpdateBookForm form, CancellationToken ct = default)
     {
+        // Serialize metadata/copy-count edits with shelf and circulation updates for this title.
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
         var currentBook = await _db.Books.FromSqlInterpolated($"SELECT * FROM books WHERE id = {id} AND is_deleted = FALSE FOR UPDATE").FirstOrDefaultAsync(ct);
         if (currentBook is null) return NotFound(ApiResponse<object>.Fail("Không tìm thấy đầu sách."));

@@ -37,6 +37,22 @@ public class RagServiceTests
     }
 
     [Fact]
+    public async Task AcquisitionCategoryDoesNotFallBackToBooksFromAnUnrelatedCategory()
+    {
+        _settingsRepository.Setup(item => item.GetOrCreateAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AiSetting { IsEnabled = true, LibrarianAiEnabled = true,
+                EncryptedApiKey = "enc:AIzaSyDummyKeyForUnitTest12345" });
+        _documents.Setup(item => item.SearchCatalogAsync("Khoa học", 50, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { new RagSearchHit { Title = "Khoa học máy tính", Categories = new[] { "CNTT" } } });
+        var result = await _sut.SuggestAcquisitionsAsync("Admin", category: "Khoa học");
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Empty(result.Data!.Sources);
+        Assert.Contains("chưa có đầu sách", result.Data.Answer);
+        _gemini.Verify(item => item.GenerateAsync(It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task AskAsync_WhenReaderAiDisabled_ReturnsFailure()
     {
         _settingsRepository.Setup(item => item.GetOrCreateAsync(It.IsAny<CancellationToken>()))

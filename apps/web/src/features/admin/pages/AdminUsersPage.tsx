@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -82,23 +82,54 @@ const statusLabels: Record<string, string> = {
 };
 
 const readerTypeLabels: Record<ReaderType, string> = {
-  Student: 'Sinh viên trong trường',
-  Lecturer: 'Giảng viên trong trường',
-  External: 'Người bên ngoài trường',
+  Student: 'Sinh viên',
+  Lecturer: 'Giảng viên',
+  External: 'Độc giả ngoài trường',
 };
 
 const AdminUsersPage: React.FC = () => {
   const accessToken = useAuthStore((state) => state.accessToken);
   const location = useLocation();
-  const [role, setRole] = useState<UserRole>(() => (location.state as { role?: UserRole } | null)?.role ?? 'Reader');
-  const [readerType, setReaderType] = useState<'All' | ReaderType>('All');
-  const [status, setStatus] = useState('All');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const roleParam = searchParams.get('role');
+  const role: UserRole = roleParam === 'Librarian' ? 'Librarian' : ((location.state as { role?: UserRole } | null)?.role ?? 'Reader');
+  const readerType = (searchParams.get('readerType') as ReaderType | null) ?? 'All';
+  const status = searchParams.get('status') ?? 'All';
+  const search = searchParams.get('q') ?? '';
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+
   const [data, setData] = useState<UserListData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const updateFilters = useCallback((updates: Partial<{ role: UserRole; readerType: 'All' | ReaderType; status: string; q: string; page: number }>) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (updates.role !== undefined) {
+        if (updates.role === 'Reader') next.delete('role');
+        else next.set('role', updates.role);
+      }
+      if (updates.readerType !== undefined) {
+        if (updates.readerType === 'All') next.delete('readerType');
+        else next.set('readerType', updates.readerType);
+      }
+      if (updates.status !== undefined) {
+        if (updates.status === 'All') next.delete('status');
+        else next.set('status', updates.status);
+      }
+      if (updates.q !== undefined) {
+        if (!updates.q.trim()) next.delete('q');
+        else next.set('q', updates.q.trim());
+      }
+      if (updates.page !== undefined) {
+        if (updates.page <= 1) next.delete('page');
+        else next.set('page', String(updates.page));
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const loadUsers = useCallback(async (signal?: AbortSignal) => {
     if (signal?.aborted) return;
@@ -156,17 +187,14 @@ const AdminUsersPage: React.FC = () => {
     }
     return [
       { label: 'Tổng số độc giả', value: stats.totalReaders, icon: Users, tone: 'orange' },
-      { label: 'Sinh viên trong trường', value: stats.studentReaders, icon: UserRoundCheck, tone: 'green' },
+      { label: 'Sinh viên', value: stats.studentReaders, icon: UserRoundCheck, tone: 'green' },
       { label: 'Giảng viên', value: stats.lecturerReaders, icon: UserRound, tone: 'blue' },
-      { label: 'Người bên ngoài trường', value: stats.externalReaders, icon: Users, tone: 'purple' },
+      { label: 'Độc giả ngoài trường', value: stats.externalReaders, icon: Users, tone: 'purple' },
     ];
   }, [data?.stats, role]);
 
   const setRoleTab = (nextRole: UserRole) => {
-    setRole(nextRole);
-    setPage(1);
-    setStatus('All');
-    setReaderType('All');
+    updateFilters({ role: nextRole, page: 1, status: 'All', readerType: 'All' });
   };
 
   return (
@@ -222,14 +250,14 @@ const AdminUsersPage: React.FC = () => {
           <nav className="admin-users-reader-tabs" aria-label="Loại độc giả">
             {([
               ['All', 'Tất cả độc giả'],
-              ['Student', 'Sinh viên trong trường'],
+              ['Student', 'Sinh viên'],
               ['Lecturer', 'Giảng viên'],
-              ['External', 'Người bên ngoài trường'],
+              ['External', 'Độc giả ngoài trường'],
             ] as const).map(([type, label]) => (
               <button
                 className={readerType === type ? 'is-active' : ''}
                 key={type}
-                onClick={() => { setReaderType(type); setPage(1); }}
+                onClick={() => updateFilters({ readerType: type, page: 1 })}
                 type="button"
               >
                 {label}
@@ -248,12 +276,12 @@ const AdminUsersPage: React.FC = () => {
               <Search size={15} />
               <input
                 aria-label="Tìm kiếm người dùng"
-                onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+                onChange={(event) => updateFilters({ q: event.target.value, page: 1 })}
                 placeholder={role === 'Reader' ? 'Tìm theo mã, họ tên hoặc email...' : 'Tìm theo họ tên hoặc tài khoản...'}
                 value={search}
               />
             </label>
-            <select aria-label="Lọc theo trạng thái" onChange={(event) => { setStatus(event.target.value); setPage(1); }} value={status}>
+            <select aria-label="Lọc theo trạng thái" onChange={(event) => updateFilters({ status: event.target.value, page: 1 })} value={status}>
               <option value="All">Tất cả trạng thái</option>
               <option value="Active">Hoạt động</option>
               <option value="Inactive">Không hoạt động</option>
@@ -279,7 +307,7 @@ const AdminUsersPage: React.FC = () => {
             <thead>
               <tr>
                 <th className="admin-users-check-cell"><input aria-label="Chọn tất cả người dùng" type="checkbox" disabled /></th>
-                <th>{role === 'Reader' ? 'MSSV / Teacher ID' : 'Mã nhân viên'}</th>
+                <th>{role === 'Reader' ? 'Mã độc giả / MSSV' : 'Mã nhân viên'}</th>
                 <th>Họ và tên</th>
                 <th>Email</th>
                 {role === 'Reader' && <th>Loại độc giả</th>}
@@ -295,17 +323,17 @@ const AdminUsersPage: React.FC = () => {
                 <tr
                   className="admin-users-row"
                   key={user.id}
-                  onClick={() => navigate(`/admin/users/${user.id}`)}
+                  onClick={() => navigate(`/admin/users/${user.id}${location.search ? `${location.search}` : ''}`)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
-                      navigate(`/admin/users/${user.id}`);
+                      navigate(`/admin/users/${user.id}${location.search ? `${location.search}` : ''}`);
                     }
                   }}
                   tabIndex={0}
                 >
                   <td className="admin-users-check-cell"><input aria-label={`Chọn ${user.fullName}`} type="checkbox" disabled /></td>
-                  <td className="admin-users-id">{role === 'Reader' ? user.teacherId || user.studentId || '—' : user.employeeId || '—'}</td>
+                  <td className="admin-users-id">{role === 'Reader' ? user.teacherId || user.studentId || `#${user.id.slice(0, 8).toUpperCase()}` : user.employeeId || '—'}</td>
                   <td className="admin-users-name">
                     <span className="admin-users-name-content">
                       {user.avatarUrl
@@ -318,7 +346,7 @@ const AdminUsersPage: React.FC = () => {
                   {role === 'Reader' && <td>{user.readerType ? readerTypeLabels[user.readerType] : user.teacherId ? readerTypeLabels.Lecturer : user.studentId || user.email.toLowerCase().endsWith('@fpt.edu.vn') ? readerTypeLabels.Student : readerTypeLabels.External}</td>}
                   <td>{new Date(user.createdAt).toLocaleDateString('vi-VN')}</td>
                   <td><span className={`admin-users-status admin-users-status--${user.isActive ? user.status.toLowerCase() : 'inactive'}`}>{user.isActive ? statusLabels[user.status] || user.status : 'Không hoạt động'}</span></td>
-                  <td><button className="admin-users-icon-button" aria-label={`Xem ${user.fullName}`} onClick={(event) => { event.stopPropagation(); navigate(`/admin/users/${user.id}`); }} type="button"><Eye size={16} /></button></td>
+                  <td><button className="admin-users-icon-button" aria-label={`Xem ${user.fullName}`} onClick={(event) => { event.stopPropagation(); navigate(`/admin/users/${user.id}${location.search ? `${location.search}` : ''}`); }} type="button"><Eye size={16} /></button></td>
                 </tr>
               )) : (
                 <tr><td className="admin-users-empty" colSpan={role === 'Reader' ? 8 : 7}>
@@ -336,9 +364,9 @@ const AdminUsersPage: React.FC = () => {
             {data?.totalCount ? `Hiển thị ${(page - 1) * 10 + 1}–${Math.min(page * 10, data.totalCount)} trong ${new Intl.NumberFormat('vi-VN').format(data.totalCount)} người dùng` : 'Không có dữ liệu'}
           </span>
           <div>
-            <button aria-label="Trang trước" disabled={page <= 1 || loading} onClick={() => setPage((current) => current - 1)} type="button"><ArrowLeft size={15} /></button>
+            <button aria-label="Trang trước" disabled={page <= 1 || loading} onClick={() => updateFilters({ page: page - 1 })} type="button"><ArrowLeft size={15} /></button>
             <span>Trang {page} / {Math.max(1, data?.totalPages ?? 1)}</span>
-            <button aria-label="Trang sau" disabled={loading || page >= (data?.totalPages ?? 1)} onClick={() => setPage((current) => current + 1)} type="button"><ArrowRight size={15} /></button>
+            <button aria-label="Trang sau" disabled={loading || page >= (data?.totalPages ?? 1)} onClick={() => updateFilters({ page: page + 1 })} type="button"><ArrowRight size={15} /></button>
           </div>
         </footer>
       </section>

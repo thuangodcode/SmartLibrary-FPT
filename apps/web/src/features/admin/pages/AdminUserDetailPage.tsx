@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -102,8 +102,10 @@ const formatDate = (value: string | null, includeTime = false) => {
 const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ audience = 'admin' }) => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const isLibrarianView = audience === 'librarian';
-  const usersPath = isLibrarianView ? '/librarian/readers' : '/admin/users';
+  const baseUsersPath = isLibrarianView ? '/librarian/readers' : '/admin/users';
+  const usersPath = `${baseUsersPath}${location.search || ''}`;
   const accessToken = useAuthStore((state) => state.accessToken);
   const [user, setUser] = useState<ManagedUserDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -357,16 +359,13 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
   }
 
   const isReader = user.roleName === 'Reader';
-  const approvedByLibrarian = user.registration?.status === 'Approved';
   const readerType: ReaderType | null = !isReader
     ? null
-    : approvedByLibrarian
-      ? 'External'
-      : user.teacherId
-        ? 'Lecturer'
-        : user.studentId || user.email.toLowerCase().endsWith('@fpt.edu.vn')
-          ? 'Student'
-          : 'External';
+    : user.teacherId
+      ? 'Lecturer'
+      : user.studentId || user.email.toLowerCase().endsWith('@fpt.edu.vn')
+        ? 'Student'
+        : user.readerType ?? 'External';
   const isAccountEnabled = user.isActive && user.status !== 'Suspended';
   const isAccountActive = isAccountEnabled && user.status === 'Active';
   const accountStatusLabel = !user.isActive
@@ -407,7 +406,7 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
               <i />{accountStatusLabel}
             </span>
             <h2>{user.fullName}</h2>
-            <p>{isReader ? (user.studentId || 'Chưa có mã độc giả') : user.email.split('@')[0]} <span>·</span> {user.email}</p>
+            <p>{isReader ? (user.teacherId || user.studentId || `#${user.id.slice(0, 8).toUpperCase()}`) : user.email.split('@')[0]} <span>·</span> {user.email}</p>
           </div>
           <div className="admin-user-profile-actions">
             {isLibrarianView && isReader && (
@@ -585,7 +584,7 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
               <InfoItem icon={<Mail size={15} />} label="Email / Tài khoản" value={user.email} />
               <InfoItem icon={<Phone size={15} />} label="Số điện thoại" value={user.phone} />
               {!isReader && <InfoItem icon={<UserRound size={15} />} label="Mã nhân viên" value={user.employeeId} />}
-              <InfoItem icon={<UserRound size={15} />} label={isReader ? user.teacherId ? 'Teacher ID' : user.studentId ? 'MSSV' : 'Tên đăng nhập' : 'Tên đăng nhập'} value={isReader ? user.teacherId || user.studentId || user.email.split('@')[0] : user.email.split('@')[0]} />
+              <InfoItem icon={<UserRound size={15} />} label={isReader ? user.teacherId ? 'Teacher ID' : user.studentId ? 'MSSV' : 'Mã độc giả' : 'Tên đăng nhập'} value={isReader ? user.teacherId || user.studentId || `#${user.id.slice(0, 8).toUpperCase()}` : user.email.split('@')[0]} />
               {isReader && <InfoItem icon={<UserRound size={15} />} label="Phân loại độc giả" value={readerType ? readerTypeLabels[readerType] : null} />}
               {isReader && user.teacherId && <InfoItem icon={<UserRound size={15} />} label="MSSV" value={user.studentId} />}
               {isReader && <InfoItem icon={<CalendarDays size={15} />} label="Ngày sinh" value={formatDate(user.dateOfBirth)} />}

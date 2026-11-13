@@ -16,7 +16,10 @@
     "demo:seed": "dotnet run --project tools/SmartLibrary.Demo -- .env",
     "demo:repair-auth": "dotnet run --project tools/SmartLibrary.Demo -- .env --repair-auth",
     "demo:align": "dotnet run --project tools/SmartLibrary.Demo -- .env --align-workflow",
-    "demo:overdue": "dotnet run --project tools/SmartLibrary.Demo -- .env --overdue"
+    "demo:overdue": "dotnet run --project tools/SmartLibrary.Demo -- .env --overdue",
+    "demo:prepare-tests": "dotnet run --project tools/SmartLibrary.Demo -- --prepare-tests",
+    "demo:test-status": "dotnet run --project tools/SmartLibrary.Demo -- --test-status",
+    "demo:test-overdue": "dotnet run --project tools/SmartLibrary.Demo -- --test-overdue"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

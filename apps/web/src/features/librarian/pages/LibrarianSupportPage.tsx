@@ -112,9 +112,9 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [selectedComplaintId, setSelectedComplaintId] = useState('');
   const [responseTab, setResponseTab] = useState<ResponseTab>('complaints');
-  const [replyDraft, setReplyDraft] = useState('');
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [replyBusy, setReplyBusy] = useState(false);
-  const [scheduleDraft, setScheduleDraft] = useState('');
+  const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, string>>({});
   const [complaintActionBusy, setComplaintActionBusy] = useState('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedReaderId, setSelectedReaderId] = useState('');
@@ -142,7 +142,6 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
     setSelectedComplaintId((current) => visibleComplaints.some((item) => item.id === current)
       ? current
       : visibleComplaints[0]?.id ?? '');
-    setScheduleDraft((current) => current || dateTimeLocalValue(visibleComplaints[0]?.dueAt ?? null));
   }, [token, view]);
 
   const loadConversations = useCallback(async () => {
@@ -251,7 +250,7 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
     try {
       const updated = await fetchData<Complaint>(`/api/v1/support/complaints/${complaintId}/accept`, token, { method: 'POST' });
       setComplaints((current) => current.map((item) => item.id === updated.id ? updated : item));
-      if (selectedComplaint?.id === updated.id) setScheduleDraft(dateTimeLocalValue(updated.dueAt));
+      if (selectedComplaint?.id === updated.id) setScheduleDrafts((prev) => ({ ...prev, [updated.id]: dateTimeLocalValue(updated.dueAt) }));
       setNotice('Đơn đã được tiếp nhận và ghi nhận thời gian xử lý.');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Không thể tiếp nhận đơn.');
@@ -262,11 +261,13 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
 
   const saveComplaintSchedule = async (complaintId: string, clear = false) => {
     if (!token || complaintActionBusy) return;
-    if (!clear && !scheduleDraft) {
+    const targetComplaint = complaints.find((item) => item.id === complaintId);
+    const draftValue = scheduleDrafts[complaintId] ?? dateTimeLocalValue(targetComplaint?.dueAt ?? null);
+    if (!clear && !draftValue) {
       setError('Hãy chọn thời hạn xử lý.');
       return;
     }
-    const scheduledDate = scheduleDraft ? new Date(scheduleDraft) : null;
+    const scheduledDate = draftValue ? new Date(draftValue) : null;
     if (!clear && (!scheduledDate || Number.isNaN(scheduledDate.getTime()))) {
       setError('Thời hạn xử lý không hợp lệ.');
       return;
@@ -285,7 +286,7 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
         body: JSON.stringify({ dueAt }),
       });
       setComplaints((current) => current.map((item) => item.id === updated.id ? updated : item));
-      if (selectedComplaint?.id === updated.id) setScheduleDraft(dateTimeLocalValue(updated.dueAt));
+      setScheduleDrafts((prev) => ({ ...prev, [complaintId]: dateTimeLocalValue(updated.dueAt) }));
       setNotice(clear ? 'Đã xóa hạn xử lý.' : 'Đã cập nhật hạn xử lý.');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Không thể cập nhật hạn xử lý.');
@@ -326,16 +327,18 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
 
   const sendComplaintReply = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!token || !selectedComplaint || !replyDraft.trim()) return;
+    if (!token || !selectedComplaint) return;
+    const currentReply = replyDrafts[selectedComplaint.id]?.trim() ?? '';
+    if (!currentReply) return;
     setReplyBusy(true);
     setError(null);
     setNotice(null);
     try {
       await fetchData<ComplaintReply>(`/api/v1/support/complaints/${selectedComplaint.id}/replies`, token, {
         method: 'POST',
-        body: JSON.stringify({ message: replyDraft.trim() }),
+        body: JSON.stringify({ message: currentReply }),
       });
-      setReplyDraft('');
+      setReplyDrafts((prev) => ({ ...prev, [selectedComplaint.id]: '' }));
       await loadComplaints();
       setNotice('Phản hồi đã được gửi đến độc giả.');
     } catch (caught) {
@@ -423,13 +426,13 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
             <input
               type="datetime-local"
               min={dateTimeLocalValue(new Date().toISOString())}
-              value={selectedComplaintId === complaint.id ? scheduleDraft : dateTimeLocalValue(complaint.dueAt)}
+              value={scheduleDrafts[complaint.id] ?? dateTimeLocalValue(complaint.dueAt)}
               disabled={complaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin'}
-              onChange={(event) => setScheduleDraft(event.target.value)}
+              onChange={(event) => setScheduleDrafts((prev) => ({ ...prev, [complaint.id]: event.target.value }))}
             />
           </label>
           <div>
-            <button type="submit" disabled={!scheduleDraft || Boolean(complaintActionBusy) || (complaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin')}>
+            <button type="submit" disabled={!(scheduleDrafts[complaint.id] ?? dateTimeLocalValue(complaint.dueAt)) || Boolean(complaintActionBusy) || (complaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin')}>
               {complaintActionBusy === complaint.id ? <LoaderCircle size={14} className="librarian-support-spinner" /> : <Check size={14} />}
               Lưu hạn
             </button>
@@ -517,8 +520,6 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
                     key={complaint.id}
                     onClick={() => {
                       setSelectedComplaintId(complaint.id);
-                      setScheduleDraft(dateTimeLocalValue(complaint.dueAt));
-                      setReplyDraft('');
                     }}
                   >
                     <span className={`librarian-support-status librarian-support-status--${complaint.status.toLowerCase()}`}>{complaintStatus[complaint.status] ?? complaint.status}</span>
@@ -592,8 +593,6 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
                         key={complaint.id}
                         onClick={() => {
                           setSelectedComplaintId(complaint.id);
-                          setScheduleDraft(dateTimeLocalValue(complaint.dueAt));
-                          setReplyDraft('');
                         }}
                       >
                         <span className={`librarian-support-status librarian-support-status--${complaint.status.toLowerCase()}`}>{complaintStatus[complaint.status] ?? complaint.status}</span>
@@ -632,10 +631,17 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
                         ))}
                       </div>
                       <form className="librarian-support-reply-form" onSubmit={(event) => void sendComplaintReply(event)}>
-                        <textarea maxLength={3000} required rows={3} placeholder="Nhập phản hồi cho đơn này..." value={replyDraft} onChange={(event) => setReplyDraft(event.target.value)} />
+                        <textarea
+                          maxLength={3000}
+                          required
+                          rows={3}
+                          placeholder="Nhập phản hồi cho đơn này..."
+                          value={replyDrafts[selectedComplaint.id] ?? ''}
+                          onChange={(event) => setReplyDrafts((prev) => ({ ...prev, [selectedComplaint.id]: event.target.value }))}
+                        />
                         <button
                           type="submit"
-                          disabled={!replyDraft.trim() || replyBusy || (Boolean(selectedComplaint.acceptedById) && selectedComplaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin')}
+                          disabled={!(replyDrafts[selectedComplaint.id]?.trim()) || replyBusy || (Boolean(selectedComplaint.acceptedById) && selectedComplaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin')}
                         >
                           {replyBusy ? <LoaderCircle size={16} className="librarian-support-spinner" /> : <Send size={16} />}Gửi phản hồi
                         </button>

@@ -471,7 +471,10 @@ function RegulationView() {
               {detail.histories.length === 0 ? <p className="reg-muted">Chưa có lịch sử thay đổi.</p> : detail.histories.map((h) => (
                 <div key={h.id} className="reg-history-row">
                   <History size={16} />
-                  <div><strong>{h.changeSummary}</strong><small>{h.changedByName || 'Hệ thống'} · {formatDateTime(h.createdAt)}</small></div>
+                  <div className="reg-history-content">
+                    <strong className="reg-history-summary">{h.changeSummary}</strong>
+                    <small className="reg-history-meta">{h.changedByName || 'Hệ thống'} · {formatDateTime(h.createdAt)}</small>
+                  </div>
                 </div>
               ))}
             </div>
@@ -622,13 +625,13 @@ function RegulationForm({ mode }: { mode: 'create' | 'edit' }) {
               <h1>{mode === 'edit' ? 'Chỉnh sửa quy định' : 'Thêm quy định'}</h1>
               <p>{mode === 'edit' ? 'Chỉnh sửa nội dung tham khảo. Chỉ công bố sau khi Admin xác nhận tại FPT TP.HCM.' : 'Nhập nội quy tham khảo. Bản mới được lưu ở trạng thái bản nháp, chưa công bố tại FPT TP.HCM.'}</p>
             </div>
-            <button type="button" className="reg-btn" onClick={cancel} disabled={saving}><ArrowLeft size={16} /> Hủy</button>
+            <button type="button" className="reg-btn" onClick={cancel} disabled={saving}><ArrowLeft size={16} /> Quay lại</button>
           </header>
           <div className="reg-form-grid">
             <label>Tên quy định<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
             <label>
               Danh mục
-              <select value={form.policyType} disabled={mode === 'edit'} onChange={(e) => onTypeChange(e.target.value as RegulationType)}>
+              <select value={form.policyType} onChange={(e) => onTypeChange(e.target.value as RegulationType)}>
                 {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </label>

@@ -35,14 +35,15 @@ public class ReaderRepository : IReaderRepository
                 u.FullName.ToLower().Contains(lowerQ) ||
                 u.Email.ToLower().Contains(lowerQ) ||
                 (u.Phone != null && u.Phone.Contains(lowerQ)) ||
-                (u.StudentId != null && u.StudentId.ToLower().Contains(lowerQ)));
+                (u.StudentId != null && u.StudentId.ToLower().Contains(lowerQ)) ||
+                (u.TeacherId != null && u.TeacherId.ToLower().Contains(lowerQ)));
         }
 
         if (status.HasValue)
             q = q.Where(u => u.Status == status.Value);
 
         if (readerType.HasValue)
-            q = q.Where(u => u.ReaderType == readerType.Value);
+            q = q.Where(u => (u.ReaderType ?? ReaderType.External) == readerType.Value);
 
         var total = await q.CountAsync(ct);
 
@@ -57,6 +58,7 @@ public class ReaderRepository : IReaderRepository
                 Email = u.Email,
                 Phone = u.Phone,
                 StudentId = u.StudentId,
+                TeacherId = u.TeacherId,
                 Address = u.Address,
                 DateOfBirth = u.DateOfBirth,
                 AvatarUrl = u.AvatarUrl,
@@ -68,7 +70,7 @@ public class ReaderRepository : IReaderRepository
                 LastLoginAt = u.LastLoginAt,
                 CreatedAt = u.CreatedAt,
                 BorrowingCount = _context.BorrowRecords.Count(b =>
-                    b.ReaderId == u.Id && b.Status == BorrowStatus.Borrowed && !b.IsDeleted),
+                    b.ReaderId == u.Id && (b.Status == BorrowStatus.Borrowed || b.Status == BorrowStatus.Overdue) && !b.IsDeleted),
                 OverdueCount = _context.BorrowRecords.Count(b =>
                     b.ReaderId == u.Id && b.Status == BorrowStatus.Overdue && !b.IsDeleted),
                 UnpaidFines = _context.Fines
@@ -89,12 +91,21 @@ public class ReaderRepository : IReaderRepository
         var totalSuspended = await CountReadersByStatusAsync("Suspended", ct);
         var totalReaders = await _context.UserProfiles.CountAsync(u => !u.IsDeleted && u.Role.Name == "Reader", ct);
 
+        var readerStats = await _context.UserProfiles
+            .Where(u => !u.IsDeleted && u.Role.Name == "Reader")
+            .GroupBy(u => u.ReaderType ?? ReaderType.External)
+            .Select(g => new { Type = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
         return new ReaderStatsDto
         {
             TotalReaders = totalReaders,
             ActiveReaders = totalActive,
             PendingReaders = totalPending,
-            SuspendedReaders = totalSuspended
+            SuspendedReaders = totalSuspended,
+            StudentReaders = readerStats.Where(x => x.Type == ReaderType.Student).Sum(x => x.Count),
+            LecturerReaders = readerStats.Where(x => x.Type == ReaderType.Lecturer).Sum(x => x.Count),
+            ExternalReaders = readerStats.Where(x => x.Type == ReaderType.External).Sum(x => x.Count),
         };
     }
 
@@ -127,7 +138,7 @@ public class ReaderRepository : IReaderRepository
                 CreatedAt = u.CreatedAt,
                 BorrowCount = _context.BorrowRecords.Count(b => b.ReaderId == u.Id && !b.IsDeleted),
                 ActiveBorrowCount = _context.BorrowRecords.Count(b =>
-                    b.ReaderId == u.Id && b.Status == BorrowStatus.Borrowed && !b.IsDeleted),
+                    b.ReaderId == u.Id && (b.Status == BorrowStatus.Borrowed || b.Status == BorrowStatus.Overdue) && !b.IsDeleted),
                 OverdueCount = _context.BorrowRecords.Count(b =>
                     b.ReaderId == u.Id && b.Status == BorrowStatus.Overdue && !b.IsDeleted),
                 TotalFines = _context.Fines.Where(f => f.ReaderId == u.Id && !f.IsDeleted).Sum(f => (decimal?)f.Amount) ?? 0,

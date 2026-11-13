@@ -299,6 +299,7 @@ public class CirculationService
             var incidentOpened = false;
             Guid? incidentId = null;
             decimal? createdFine = null;
+            var cashPaymentRecorded = false;
             Reservation? readyReservation = null;
             if (isLostOrDamaged)
             {
@@ -323,6 +324,21 @@ public class CirculationService
                 && createdFine is null
                 && settings.FinePerDay > 0
                 && await _repository.HasOverdueFineAsync(loan.Id, ct);
+
+            if (!isLostOrDamaged && request.PaidNow && (createdFine is > 0 || overdueFineAlreadyExists))
+            {
+                // Persist a newly assessed fine within the return transaction before querying it.
+                // Any later failure rolls back both the return and the cash receipt.
+                await _unitOfWork.SaveChangesAsync(ct);
+                var fineToPay = await _repository.GetOverdueFineAsync(loan.Id, ct);
+                if (fineToPay is not null && fineToPay.Status == FineStatus.Pending)
+                {
+                    var payment = await PayFineWithinTransactionAsync(fineToPay.Id, librarianId, ct);
+                    if (!payment.IsSuccess)
+                        throw new InvalidOperationException(payment.Error);
+                    cashPaymentRecorded = true;
+                }
+            }
 
             if (loan.BookCopy is { IsAvailable: true, Location: not null })
             {
@@ -358,6 +374,7 @@ public class CirculationService
             return Result<CirculationLoanDto>.Success(saved with
             {
                 CreatedFineAmount = createdFine,
+                CashPaymentRecorded = cashPaymentRecorded,
                 OverdueFineAlreadyExists = overdueFineAlreadyExists,
                 OverdueDays = overdueDays,
                 IncidentOpened = incidentOpened,
@@ -660,51 +677,54 @@ public class CirculationService
     public Task<Result<CirculationFineDto>> PayFineAsync(Guid id, CancellationToken ct = default)
         => PayFineAsync(id, Guid.Empty, ct);
 
-    public async Task<Result<CirculationFineDto>> PayFineAsync(
+    public Task<Result<CirculationFineDto>> PayFineAsync(
         Guid id, Guid librarianId, CancellationToken ct = default)
-        => await _repository.InTransactionAsync(async () =>
-        {
-            await _repository.LockFineAsync(id, ct);
-            var fine = await _repository.GetTrackedFineAsync(id, ct);
-            if (fine is null)
-                return Result<CirculationFineDto>.Failure("Không tìm thấy khoản phạt.");
-            if (fine.Status == FineStatus.Paid)
-                return Result<CirculationFineDto>.Success((await _repository.GetFineDtoAsync(id, ct))!);
-            if (fine.Status != FineStatus.Pending)
-                return Result<CirculationFineDto>.Failure("Khoản phạt này không còn chờ thanh toán.");
+        => _repository.InTransactionAsync(() => PayFineWithinTransactionAsync(id, librarianId, ct), ct);
 
-            var pendingPayment = await _repository.GetPendingPayOSPaymentAsync(id, ct);
-            if (pendingPayment is not null)
-            {
-                var isExpired = pendingPayment.ExpiresAt.HasValue && pendingPayment.ExpiresAt <= DateTime.UtcNow;
-                if (!isExpired && pendingPayment.OrderCode.HasValue)
-                    await _payOS.CancelCheckoutAsync(pendingPayment.OrderCode.Value, "Thanh toán tiền mặt tại quầy", ct);
-                pendingPayment.Status = isExpired ? FinePaymentStatus.Expired : FinePaymentStatus.Cancelled;
-            }
-
-            var now = DateTime.UtcNow;
-            fine.Status = FineStatus.Paid;
-            fine.PaidAt = now;
-            fine.PaymentMethod = "Cash";
-            fine.PaymentReference = null;
-            fine.RecordedById = librarianId == Guid.Empty ? null : librarianId;
-            await _repository.AddFinePaymentAsync(new FinePayment
-            {
-                FineId = fine.Id,
-                Method = "Cash",
-                Status = FinePaymentStatus.Paid,
-                Amount = fine.Amount,
-                InitiatedById = librarianId == Guid.Empty ? null : librarianId,
-                RecordedById = librarianId == Guid.Empty ? null : librarianId,
-                PaidAt = now
-            }, ct);
-            await TryResolveIncidentAfterPaymentAsync(fine.Id, ct);
-            await NotifyAsync(fine.ReaderId, "Đã thanh toán khoản phí",
-                $"Khoản phí {fine.Amount:0}đ đã được ghi nhận thanh toán bằng tiền mặt.",
-                "fine_paid", ct, entityId: fine.Id);
-            await _unitOfWork.SaveChangesAsync(ct);
+    private async Task<Result<CirculationFineDto>> PayFineWithinTransactionAsync(
+        Guid id, Guid librarianId, CancellationToken ct)
+    {
+        await _repository.LockFineAsync(id, ct);
+        var fine = await _repository.GetTrackedFineAsync(id, ct);
+        if (fine is null)
+            return Result<CirculationFineDto>.Failure("Không tìm thấy khoản phạt.");
+        if (fine.Status == FineStatus.Paid)
             return Result<CirculationFineDto>.Success((await _repository.GetFineDtoAsync(id, ct))!);
+        if (fine.Status != FineStatus.Pending)
+            return Result<CirculationFineDto>.Failure("Khoản phạt này không còn chờ thanh toán.");
+
+        var pendingPayment = await _repository.GetPendingPayOSPaymentAsync(id, ct);
+        if (pendingPayment is not null)
+        {
+            var isExpired = pendingPayment.ExpiresAt.HasValue && pendingPayment.ExpiresAt <= DateTime.UtcNow;
+            if (!isExpired && pendingPayment.OrderCode.HasValue)
+                await _payOS.CancelCheckoutAsync(pendingPayment.OrderCode.Value, "Thanh toán tiền mặt tại quầy", ct);
+            pendingPayment.Status = isExpired ? FinePaymentStatus.Expired : FinePaymentStatus.Cancelled;
+        }
+
+        var now = DateTime.UtcNow;
+        fine.Status = FineStatus.Paid;
+        fine.PaidAt = now;
+        fine.PaymentMethod = "Cash";
+        fine.PaymentReference = null;
+        fine.RecordedById = librarianId == Guid.Empty ? null : librarianId;
+        await _repository.AddFinePaymentAsync(new FinePayment
+        {
+            FineId = fine.Id,
+            Method = "Cash",
+            Status = FinePaymentStatus.Paid,
+            Amount = fine.Amount,
+            InitiatedById = librarianId == Guid.Empty ? null : librarianId,
+            RecordedById = librarianId == Guid.Empty ? null : librarianId,
+            PaidAt = now
         }, ct);
+        await TryResolveIncidentAfterPaymentAsync(fine.Id, ct);
+        await NotifyAsync(fine.ReaderId, "Đã thanh toán khoản phí",
+            $"Khoản phí {fine.Amount:0}đ đã được ghi nhận thanh toán bằng tiền mặt.",
+            "fine_paid", ct, entityId: fine.Id);
+        await _unitOfWork.SaveChangesAsync(ct);
+        return Result<CirculationFineDto>.Success((await _repository.GetFineDtoAsync(id, ct))!);
+    }
 
     public async Task<Result<FinePaymentCheckoutDto>> CreatePayOSCheckoutAsync(
         Guid fineId, Guid initiatedById, Guid? readerId, CancellationToken ct = default)
@@ -1605,7 +1625,7 @@ public class CirculationService
     {
         copy.Condition = condition;
         copy.IsAvailable = !keepUnavailable;
-        // Returned copies go to the warehouse first; shelf placement is a separate librarian workflow.
+        // A returned copy is not available to borrow until physically placed on a shelf.
         copy.Location = null;
     }
 

@@ -25,6 +25,7 @@ interface ReaderItem {
   email: string;
   phone?: string | null;
   studentId?: string | null;
+  teacherId?: string | null;
   address?: string | null;
   dateOfBirth?: string | null;
   avatarUrl?: string | null;
@@ -42,6 +43,9 @@ interface ReaderItem {
 
 interface ReaderStats {
   totalReaders: number;
+  studentReaders?: number;
+  lecturerReaders?: number;
+  externalReaders?: number;
   activeReaders: number;
   pendingReaders: number;
   suspendedReaders: number;
@@ -65,7 +69,7 @@ interface ApiResult<T> {
 const readerTypeLabels: Record<string, string> = {
   Student: 'Sinh viên',
   Lecturer: 'Giảng viên',
-  External: 'Người bên ngoài trường',
+  External: 'Độc giả ngoài trường',
 };
 
 const normalizeReaderType = (type?: string | null): string => {
@@ -192,7 +196,7 @@ const ReadersManagementPage: React.FC = () => {
       const headers: Record<string, string> = {};
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-      const res = await fetch(`${API_BASE_URL}/api/v1/readers?${params}`, { headers });
+      const res = await fetch(`${API_BASE_URL}/api/v1/librarian/users?${params}`, { headers });
       const result = await parseApiResponse<ApiResult<ReadersResponse>>(res);
 
       if (!res.ok || !result?.data) {
@@ -266,8 +270,8 @@ const ReadersManagementPage: React.FC = () => {
             <UserCheck size={18} />
           </span>
           <div>
-            <p>Đang hoạt động</p>
-            <strong>{stats.activeReaders}</strong>
+            <p>Sinh viên</p>
+            <strong>{stats.studentReaders ?? 0}</strong>
           </div>
         </article>
 
@@ -276,8 +280,8 @@ const ReadersManagementPage: React.FC = () => {
             <Clock size={18} />
           </span>
           <div>
-            <p>Chờ duyệt thẻ</p>
-            <strong>{stats.pendingReaders}</strong>
+            <p>Giảng viên</p>
+            <strong>{stats.lecturerReaders ?? 0}</strong>
           </div>
         </article>
 
@@ -286,8 +290,8 @@ const ReadersManagementPage: React.FC = () => {
             <UserX size={18} />
           </span>
           <div>
-            <p>Bị tạm khóa</p>
-            <strong>{stats.suspendedReaders}</strong>
+            <p>Độc giả ngoài trường</p>
+            <strong>{stats.externalReaders ?? 0}</strong>
           </div>
         </article>
       </div>
@@ -479,7 +483,7 @@ const ReadersManagementPage: React.FC = () => {
                       aria-label={`Xem chi tiết độc giả ${reader.fullName}`}
                     >
                       <td className="lib-readers-id">
-                        {reader.studentId || `#${reader.id.slice(0, 8).toUpperCase()}`}
+                        {reader.teacherId || reader.studentId || `#${reader.id.slice(0, 8).toUpperCase()}`}
                       </td>
                       <td>
                         <div className="lib-readers-user-cell">

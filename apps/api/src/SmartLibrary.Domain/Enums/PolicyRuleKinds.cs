@@ -9,7 +9,8 @@ public static class PolicyRuleKinds
         PolicyRuleType.Renewal,
         PolicyRuleType.Reservation,
         PolicyRuleType.FineFee,
-        PolicyRuleType.CategoryOverride
+        PolicyRuleType.CategoryOverride,
+        PolicyRuleType.Other
     };
 
     public static readonly PolicyRuleType[] RegulationTypes =
