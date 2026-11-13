@@ -307,7 +307,7 @@ const AdminUsersPage: React.FC = () => {
             <thead>
               <tr>
                 <th className="admin-users-check-cell"><input aria-label="Chọn tất cả người dùng" type="checkbox" disabled /></th>
-                <th>{role === 'Reader' ? 'MSSV / Teacher ID' : 'Mã nhân viên'}</th>
+                <th>{role === 'Reader' ? 'Mã độc giả / MSSV' : 'Mã nhân viên'}</th>
                 <th>Họ và tên</th>
                 <th>Email</th>
                 {role === 'Reader' && <th>Loại độc giả</th>}
@@ -333,7 +333,7 @@ const AdminUsersPage: React.FC = () => {
                   tabIndex={0}
                 >
                   <td className="admin-users-check-cell"><input aria-label={`Chọn ${user.fullName}`} type="checkbox" disabled /></td>
-                  <td className="admin-users-id">{role === 'Reader' ? user.teacherId || user.studentId || '—' : user.employeeId || '—'}</td>
+                  <td className="admin-users-id">{role === 'Reader' ? user.teacherId || user.studentId || `#${user.id.slice(0, 8).toUpperCase()}` : user.employeeId || '—'}</td>
                   <td className="admin-users-name">
                     <span className="admin-users-name-content">
                       {user.avatarUrl

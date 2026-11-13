@@ -45,11 +45,13 @@ public class ReaderRepository : IReaderRepository
         {
             var targetType = readerType.Value;
             q = q.Where(u =>
-                u.TeacherId != null
-                    ? targetType == ReaderType.Lecturer
-                    : u.StudentId != null || u.Email.ToLower().EndsWith("@fpt.edu.vn")
-                        ? targetType == ReaderType.Student
-                        : targetType == ReaderType.External);
+                _context.RegistrationRequests.Any(r => r.UserId == u.Id && r.Status == RegistrationRequestStatus.Approved)
+                    ? targetType == ReaderType.External
+                    : u.TeacherId != null
+                        ? targetType == ReaderType.Lecturer
+                        : u.StudentId != null || u.Email.ToLower().EndsWith("@fpt.edu.vn")
+                            ? targetType == ReaderType.Student
+                            : targetType == ReaderType.External);
         }
 
         var total = await q.CountAsync(ct);
@@ -71,11 +73,13 @@ public class ReaderRepository : IReaderRepository
                 AvatarUrl = u.AvatarUrl,
                 RoleName = u.Role != null ? u.Role.Name : "Reader",
                 Status = u.Status,
-                ReaderType = u.TeacherId != null
-                    ? ReaderType.Lecturer
-                    : u.StudentId != null || u.Email.ToLower().EndsWith("@fpt.edu.vn")
-                        ? ReaderType.Student
-                        : ReaderType.External,
+                ReaderType = _context.RegistrationRequests.Any(r => r.UserId == u.Id && r.Status == RegistrationRequestStatus.Approved)
+                    ? ReaderType.External
+                    : u.TeacherId != null
+                        ? ReaderType.Lecturer
+                        : u.StudentId != null || u.Email.ToLower().EndsWith("@fpt.edu.vn")
+                            ? ReaderType.Student
+                            : ReaderType.External,
                 MembershipExpiresAt = u.MembershipExpiresAt,
                 IsActive = u.IsActive,
                 LastLoginAt = u.LastLoginAt,
@@ -105,11 +109,13 @@ public class ReaderRepository : IReaderRepository
         var readerStats = await _context.UserProfiles
             .Where(u => !u.IsDeleted && u.Role.Name == "Reader")
             .GroupBy(u =>
-                u.TeacherId != null
-                    ? ReaderType.Lecturer
-                    : u.StudentId != null || u.Email.ToLower().EndsWith("@fpt.edu.vn")
-                        ? ReaderType.Student
-                        : ReaderType.External)
+                _context.RegistrationRequests.Any(r => r.UserId == u.Id && r.Status == RegistrationRequestStatus.Approved)
+                    ? ReaderType.External
+                    : u.TeacherId != null
+                        ? ReaderType.Lecturer
+                        : u.StudentId != null || u.Email.ToLower().EndsWith("@fpt.edu.vn")
+                            ? ReaderType.Student
+                            : ReaderType.External)
             .Select(g => new { Type = g.Key, Count = g.Count() })
             .ToListAsync(ct);
 

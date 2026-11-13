@@ -131,11 +131,15 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
                 throw new ValidationException("Loại độc giả không hợp lệ.");
 
             users = users.Where(user =>
-                user.TeacherId != null
-                    ? parsedReaderType == ReaderType.Lecturer
-                    : user.StudentId != null || user.Email.ToLower().EndsWith("@fpt.edu.vn")
-                        ? parsedReaderType == ReaderType.Student
-                        : parsedReaderType == ReaderType.External);
+                _dbContext.RegistrationRequests.Any(registration =>
+                    registration.UserId == user.Id &&
+                    registration.Status == RegistrationRequestStatus.Approved)
+                    ? parsedReaderType == ReaderType.External
+                    : user.TeacherId != null
+                        ? parsedReaderType == ReaderType.Lecturer
+                        : user.StudentId != null || user.Email.ToLower().EndsWith("@fpt.edu.vn")
+                            ? parsedReaderType == ReaderType.Student
+                            : parsedReaderType == ReaderType.External);
         }
 
         var totalCount = await users.CountAsync(cancellationToken);
@@ -153,11 +157,15 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
                 user.TeacherId,
                 user.EmployeeId,
                 user.Phone,
-                ReaderType = user.TeacherId != null
-                    ? ReaderType.Lecturer
-                    : user.StudentId != null || user.Email.ToLower().EndsWith("@fpt.edu.vn")
-                        ? ReaderType.Student
-                        : ReaderType.External,
+                ReaderType = _dbContext.RegistrationRequests.Any(registration =>
+                        registration.UserId == user.Id &&
+                        registration.Status == RegistrationRequestStatus.Approved)
+                    ? ReaderType.External
+                    : user.TeacherId != null
+                        ? ReaderType.Lecturer
+                        : user.StudentId != null || user.Email.ToLower().EndsWith("@fpt.edu.vn")
+                            ? ReaderType.Student
+                            : ReaderType.External,
                 Status = user.Status.ToString(),
                 user.IsActive,
                 user.CreatedAt,
@@ -169,11 +177,15 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
             .IgnoreQueryFilters()
             .Where(user => !user.IsDeleted && user.Role.Name == "Reader")
             .GroupBy(user =>
-                user.TeacherId != null
-                    ? ReaderType.Lecturer
-                    : user.StudentId != null || user.Email.ToLower().EndsWith("@fpt.edu.vn")
-                        ? ReaderType.Student
-                        : ReaderType.External)
+                _dbContext.RegistrationRequests.Any(registration =>
+                    registration.UserId == user.Id &&
+                    registration.Status == RegistrationRequestStatus.Approved)
+                    ? ReaderType.External
+                    : user.TeacherId != null
+                        ? ReaderType.Lecturer
+                        : user.StudentId != null || user.Email.ToLower().EndsWith("@fpt.edu.vn")
+                            ? ReaderType.Student
+                            : ReaderType.External)
             .Select(group => new { ReaderType = group.Key, Count = group.Count() })
             .ToListAsync(cancellationToken);
 
@@ -476,13 +488,21 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
             {
                 user.ReaderType = ReaderType.Lecturer;
             }
-            else if (!string.IsNullOrWhiteSpace(studentId) || user.Email.EndsWith("@fpt.edu.vn", StringComparison.OrdinalIgnoreCase))
+            else if (!string.IsNullOrWhiteSpace(studentId))
             {
                 user.ReaderType = ReaderType.Student;
             }
             else
             {
-                user.ReaderType = ReaderType.External;
+                var hasApprovedRegistration = await _dbContext.RegistrationRequests.AnyAsync(
+                    registration => registration.UserId == userId &&
+                        registration.Status == RegistrationRequestStatus.Approved,
+                    cancellationToken);
+                user.ReaderType = hasApprovedRegistration
+                    ? ReaderType.External
+                    : user.Email.EndsWith("@fpt.edu.vn", StringComparison.OrdinalIgnoreCase)
+                        ? ReaderType.Student
+                        : ReaderType.External;
             }
         }
 
