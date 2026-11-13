@@ -155,7 +155,8 @@ public sealed class BorrowPickupExpirationWorker(
             .Select(item => new { item.UserId, item.Type, item.Metadata })
             .ToListAsync(ct);
         var existingKeys = existing
-            .Select(item => $"{item.UserId:N}|{item.Type}|{item.Metadata}")
+            .Select(item => ReminderKey(item.UserId, item.Type, item.Metadata))
+            .Where(key => key is not null)
             .ToHashSet(StringComparer.Ordinal);
 
         foreach (var loan in dueSoon)
@@ -165,7 +166,7 @@ public sealed class BorrowPickupExpirationWorker(
                 href = "/history?tab=loans",
                 entityId = loan.Id
             });
-            if (!existingKeys.Add($"{loan.ReaderId:N}|due_soon|{metadata}")) continue;
+            if (!existingKeys.Add(ReminderKey(loan.ReaderId, "due_soon", metadata))) continue;
             db.Notifications.Add(new Notification
             {
                 UserId = loan.ReaderId,
@@ -183,7 +184,7 @@ public sealed class BorrowPickupExpirationWorker(
                 href = "/profile",
                 expiresAt = membership.MembershipExpiresAt
             });
-            if (!existingKeys.Add($"{membership.Id:N}|membership_expiring|{metadata}")) continue;
+            if (!existingKeys.Add(ReminderKey(membership.Id, "membership_expiring", metadata))) continue;
             db.Notifications.Add(new Notification
             {
                 UserId = membership.Id,
@@ -196,5 +197,29 @@ public sealed class BorrowPickupExpirationWorker(
 
         if (db.ChangeTracker.Entries<Notification>().Any(entry => entry.State == EntityState.Added))
             await db.SaveChangesAsync(ct);
+    }
+
+    // PostgreSQL jsonb normalizes whitespace and property order. A reminder's
+    // identity is its loan/card expiry, not the serialized JSON representation.
+    private static string? ReminderKey(Guid userId, string type, string? metadata)
+    {
+        if (string.IsNullOrWhiteSpace(metadata)) return null;
+        try
+        {
+            using var document = JsonDocument.Parse(metadata);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return null;
+            if (type == "due_soon" && root.TryGetProperty("entityId", out var entity)
+                && entity.ValueKind == JsonValueKind.String && entity.TryGetGuid(out var loanId))
+                return $"{userId:N}|due_soon|{loanId:N}";
+            if (type == "membership_expiring" && root.TryGetProperty("expiresAt", out var expiry)
+                && expiry.ValueKind == JsonValueKind.String && expiry.TryGetDateTimeOffset(out var expiresAt))
+                return $"{userId:N}|membership_expiring|{expiresAt.UtcDateTime.Ticks}";
+        }
+        catch (JsonException)
+        {
+            // Old metadata must not prevent other readers from receiving reminders.
+        }
+        return null;
     }
 }
