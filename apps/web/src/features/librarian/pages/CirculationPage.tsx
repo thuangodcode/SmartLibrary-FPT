@@ -23,7 +23,7 @@ import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useToast } from '../../../components/ui/useToast';
 import { AnimatedCalendar } from '../../../components/ui/AnimatedCalendar';
-import { useAuthStore } from '../../auth/store/useAuthStore';
+import { recoverRealtimeSession, useAuthStore } from '../../auth/store/useAuthStore';
 import {
   STATUS_LABELS,
   TABS,
@@ -500,6 +500,9 @@ function LoansView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<CirculationLoan | null>(null);
+  const [rejecting, setRejecting] = useState<CirculationLoan | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [renewConfirm, setRenewConfirm] = useState(false);
   const [loansView, setLoansView] = useState<'pending' | 'list' | 'due'>('pending');
   const [dueLoans, setDueLoans] = useState<CirculationLoan[]>([]);
   const [dueLoading, setDueLoading] = useState(false);
@@ -639,7 +642,7 @@ function LoansView() {
     if (!accessToken) return undefined;
     let active = true;
     const hub = new HubConnectionBuilder()
-      .withUrl(`${API_BASE_URL}/hubs/notifications`, { accessTokenFactory: () => accessToken })
+      .withUrl(`${API_BASE_URL}/hubs/notifications`, { accessTokenFactory: () => useAuthStore.getState().getAccessToken() })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
       .build();
@@ -649,7 +652,8 @@ function LoansView() {
     hub.onreconnected(() => {
       if (active) refreshRef.current();
     });
-    void hub.start().catch((caught: unknown) => {
+    void hub.start().catch(async (caught: unknown) => {
+      if (active && await recoverRealtimeSession(caught)) return;
       if (active) {
         const message = errorMessage(caught, 'Không kết nối được cập nhật mượn sách thời gian thực.');
         setError(message);
@@ -679,6 +683,14 @@ function LoansView() {
       showToast({ type: 'success', title: 'Thao tác thành công', message });
       await load();
       await loadDashboard();
+      setRejecting(null);
+      setRenewConfirm(false);
+      if (detail && url.endsWith('/renew')) {
+        const detailRes = await fetch(`${API_BASE_URL}/api/v1/circulation/loans/${detail.id}`, { headers });
+        const detailJson = await parseApiResponse<ApiResult<CirculationLoan>>(detailRes);
+        if (detailRes.ok && detailJson?.data) setDetail(detailJson.data);
+        else setDetail(null);
+      }
     } catch (err) {
       const message = errorMessage(err, 'Thao tác thất bại.');
       setError(message);
@@ -838,7 +850,7 @@ function LoansView() {
                         <span>{daysLeft === 0 ? 'Đến hạn hôm nay' : `Còn ${daysLeft} ngày`}</span>
                         <strong>{formatDate(loan.dueDate)}</strong>
                       </div>
-                      <button type="button" className="circ-btn" onClick={() => setDetail(loan)}>
+                      <button type="button" className="circ-btn" onClick={() => { setDetail(loan); setRenewConfirm(false); }}>
                         <Eye size={14} /> Xem phiếu
                       </button>
                     </article>
@@ -920,7 +932,7 @@ function LoansView() {
                         ) : (
                           <button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${item.id}/checkout`)}>Giao sách</button>
                         )}
-                        <button type="button" className="circ-btn circ-btn--quiet" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${item.id}/reject`)}>Từ chối</button>
+                        <button type="button" className="circ-btn circ-btn--quiet" disabled={busy} onClick={() => { setRejecting(item); setRejectReason(''); }}>Từ chối</button>
                       </div>
                     </td>
                   </tr>
@@ -980,7 +992,7 @@ function LoansView() {
                         </td>
                         <td>
                           <div className="circ-actions">
-                            <button type="button" className="circ-btn" onClick={() => setDetail(loan)}><Eye size={14} /> Xem</button>
+                            <button type="button" className="circ-btn" onClick={() => { setDetail(loan); setRenewConfirm(false); }}><Eye size={14} /> Xem</button>
                           </div>
                         </td>
                       </tr>
@@ -1009,6 +1021,23 @@ function LoansView() {
         </div>
       </div>}
 
+      {rejecting && (
+        <div className="circ-modal">
+          <section className="circ-card circ-loan-detail-modal" role="dialog" aria-modal="true" aria-labelledby="reject-loan-title">
+            <h2 id="reject-loan-title">Từ chối yêu cầu mượn</h2>
+            <p>{rejecting.bookTitle} · {rejecting.readerName}</p>
+            <label className="circ-field">Lý do từ chối
+              <textarea autoFocus maxLength={2000} rows={4} value={rejectReason} onChange={event => setRejectReason(event.target.value)} placeholder="Lý do này sẽ được gửi cho độc giả." disabled={busy} />
+            </label>
+            {error && <p role="alert" className="circ-alert">{error}</p>}
+            <div className="circ-actions">
+              <button type="button" className="circ-btn" disabled={busy} onClick={() => setRejecting(null)}>Quay lại</button>
+              <button type="button" className="circ-btn circ-btn--primary" disabled={busy || !rejectReason.trim()} onClick={() => void post(`/api/v1/circulation/loans/${rejecting.id}/reject`, { notes: rejectReason.trim() })}>{busy ? 'Đang xử lý...' : 'Xác nhận từ chối'}</button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {detail && (
         <div className="circ-modal" role="presentation" onClick={() => setDetail(null)}>
           <section className="circ-card circ-loan-detail-modal" role="dialog" aria-modal="true" aria-labelledby="loan-detail-title" onClick={(event) => event.stopPropagation()}>
@@ -1035,12 +1064,17 @@ function LoansView() {
               <div><span>Phiếu mượn</span><strong>{STATUS_LABELS[detail.displayStatus] || detail.status}</strong></div>
               <div><span>Bản sao hiện tại</span><strong>{({ LightDamaged: 'Hư nhẹ · còn sử dụng được', Damaged: 'Hư hỏng · chưa đủ điều kiện sử dụng', Lost: 'Thất lạc · chưa tìm thấy', New: 'Mới', Good: 'Tốt', Fair: 'Cũ, còn sử dụng được' } as Record<string, string>)[detail.copyCondition || ''] || 'Chưa xác định'}</strong></div>
               <div><span>Khoản phí</span><strong>{detail.hasOpenFine ? 'Còn khoản chưa thanh toán' : detail.hasFine ? 'Đã thanh toán hoặc miễn' : 'Chưa lập khoản phí'}</strong></div>
-              <div><span>Ngày mượn</span><strong>{formatDate(detail.borrowDate)}</strong></div>
+              <div><span>Ngày mượn</span><strong>{formatDateTime(detail.borrowDate)}</strong></div>
               <div><span>Hạn trả</span><strong>{formatDate(detail.dueDate)}</strong></div>
+              {detail.returnDate && <div><span>Ngày ghi nhận trả</span><strong>{formatDateTime(detail.returnDate)}</strong></div>}
+              <div><span>Số lần gia hạn</span><strong>{detail.renewalCount ?? 0}</strong></div>
             </div>
             {['Borrowed', 'Overdue'].includes(detail.status) && detail.canRenew === false && detail.renewalUnavailableReason && <p className="circ-hint">{detail.renewalUnavailableReason}</p>}
+            {renewConfirm && <div className="circ-alert" role="status"><p>Gia hạn “{detail.bookTitle}” cho {detail.readerName}? Hệ thống sẽ kiểm tra lại chính sách khi xác nhận.</p><button type="button" className="circ-btn circ-btn--primary" disabled={busy} onClick={() => void post(`/api/v1/circulation/loans/${detail.id}/renew`)}>{busy ? 'Đang gia hạn...' : 'Xác nhận gia hạn'}</button><button type="button" className="circ-btn" disabled={busy} onClick={() => setRenewConfirm(false)}>Quay lại</button></div>}
+            {error && <p role="alert" className="circ-alert">{error}</p>}
             <div className="circ-loan-detail-actions">
-              {detail.displayStatus !== 'Returned' && (
+              {detail.canRenew && ['Borrowed', 'Overdue'].includes(detail.status) && !renewConfirm && <button type="button" className="circ-btn" disabled={busy} onClick={() => setRenewConfirm(true)}><RefreshCw size={16} /> Gia hạn</button>}
+              {['Borrowed', 'Overdue'].includes(detail.status) && (
                 <Link className="circ-btn circ-btn--primary" to={`${tabPath('return')}?barcode=${encodeURIComponent(detail.barcode)}`}>Trả sách</Link>
               )}
               <button type="button" className="circ-btn" onClick={() => setDetail(null)}>Đóng</button>
