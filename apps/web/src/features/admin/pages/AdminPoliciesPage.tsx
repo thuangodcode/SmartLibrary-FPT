@@ -710,7 +710,7 @@ function PolicyForm({ mode }: { mode: 'create' | 'edit' }) {
             </>
           )}
           <footer className="pol-form-actions">
-            <button type="button" className="pol-btn" disabled={saving} onClick={cancel}>Quay lại</button>
+            <button type="button" className="pol-btn" disabled={saving} onClick={cancel}>Hủy</button>
             {mode === 'create' ? (
               <>
                 <button type="button" className="pol-btn" disabled={saving} onClick={() => void persist('Draft')}>{saving ? 'Đang lưu...' : 'Lưu bản nháp'}</button>

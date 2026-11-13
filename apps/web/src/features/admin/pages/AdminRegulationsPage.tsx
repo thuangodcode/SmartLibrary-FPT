@@ -665,7 +665,7 @@ function RegulationForm({ mode }: { mode: 'create' | 'edit' }) {
             </div>
           ))}
           <footer className="reg-form-actions">
-            <button type="button" className="reg-btn" disabled={saving} onClick={cancel}>Quay lại</button>
+            <button type="button" className="reg-btn" disabled={saving} onClick={cancel}>Hủy</button>
             {mode === 'create'
               ? <button type="button" className="reg-btn reg-btn--primary" disabled={saving} onClick={() => void persist('Draft')}>{saving ? 'Đang lưu...' : 'Lưu bản nháp'}</button>
               : <button type="button" className="reg-btn reg-btn--primary" disabled={saving} onClick={() => void persist(form.status)}>{saving ? 'Đang lưu...' : 'Lưu thay đổi'}</button>}

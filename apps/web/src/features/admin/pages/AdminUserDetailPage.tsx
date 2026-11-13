@@ -361,17 +361,11 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
   const isReader = user.roleName === 'Reader';
   const readerType: ReaderType | null = !isReader
     ? null
-    : user.readerType ?? (
-      user.teacherId
-        ? 'Lecturer'
-        : user.studentId
-          ? 'Student'
-          : user.registration?.status === 'Approved'
-            ? 'External'
-            : user.email.toLowerCase().endsWith('@fpt.edu.vn')
-              ? 'Student'
-              : 'External'
-    );
+    : user.teacherId
+      ? 'Lecturer'
+      : user.studentId || user.email.toLowerCase().endsWith('@fpt.edu.vn')
+        ? 'Student'
+        : user.readerType ?? 'External';
   const isAccountEnabled = user.isActive && user.status !== 'Suspended';
   const isAccountActive = isAccountEnabled && user.status === 'Active';
   const accountStatusLabel = !user.isActive
