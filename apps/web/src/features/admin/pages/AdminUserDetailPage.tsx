@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -102,8 +102,10 @@ const formatDate = (value: string | null, includeTime = false) => {
 const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ audience = 'admin' }) => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const isLibrarianView = audience === 'librarian';
-  const usersPath = isLibrarianView ? '/librarian/readers' : '/admin/users';
+  const baseUsersPath = isLibrarianView ? '/librarian/readers' : '/admin/users';
+  const usersPath = `${baseUsersPath}${location.search || ''}`;
   const accessToken = useAuthStore((state) => state.accessToken);
   const [user, setUser] = useState<ManagedUserDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -357,16 +359,19 @@ const AdminUserDetailPage: React.FC<{ audience?: 'admin' | 'librarian' }> = ({ a
   }
 
   const isReader = user.roleName === 'Reader';
-  const approvedByLibrarian = user.registration?.status === 'Approved';
   const readerType: ReaderType | null = !isReader
     ? null
-    : approvedByLibrarian
-      ? 'External'
-      : user.teacherId
+    : user.readerType ?? (
+      user.teacherId
         ? 'Lecturer'
-        : user.studentId || user.email.toLowerCase().endsWith('@fpt.edu.vn')
+        : user.studentId
           ? 'Student'
-          : 'External';
+          : user.registration?.status === 'Approved'
+            ? 'External'
+            : user.email.toLowerCase().endsWith('@fpt.edu.vn')
+              ? 'Student'
+              : 'External'
+    );
   const isAccountEnabled = user.isActive && user.status !== 'Suspended';
   const isAccountActive = isAccountEnabled && user.status === 'Active';
   const accountStatusLabel = !user.isActive

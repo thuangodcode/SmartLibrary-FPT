@@ -227,9 +227,9 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
         var username = request.Username?.Trim() ?? string.Empty;
         if (fullName.Length is < 2 or > 255)
             throw new ValidationException("Họ và tên phải có từ 2 đến 255 ký tự.");
-        if (!System.Text.RegularExpressions.Regex.IsMatch(employeeId, "^[a-zA-Z0-9._-]{2,50}$"))
+        if (employeeId.Length is < 2 or > 50 || !System.Text.RegularExpressions.Regex.IsMatch(employeeId, "^[a-zA-Z0-9._-]+$"))
             throw new ValidationException("Mã nhân viên chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang (2-50 ký tự).");
-        if (!System.Text.RegularExpressions.Regex.IsMatch(username, "^[a-zA-Z0-9._-]{3,50}$"))
+        if (username.Length is < 3 or > 50 || !System.Text.RegularExpressions.Regex.IsMatch(username, "^[a-zA-Z0-9._-]+$"))
             throw new ValidationException("Tên tài khoản chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang (3-50 ký tự).");
         var password = request.Password ?? string.Empty;
         if (password.Length < 8)
@@ -471,17 +471,28 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
             user.StudentId = studentId;
             user.TeacherId = teacherId;
             user.DateOfBirth = dateOfBirth;
-            var hasApprovedRegistration = await _dbContext.RegistrationRequests.AnyAsync(
-                registration => registration.UserId == userId &&
-                    registration.Status == RegistrationRequestStatus.Approved,
-                cancellationToken);
-            user.ReaderType = hasApprovedRegistration
-                ? ReaderType.External
-                : teacherId is not null
-                    ? ReaderType.Lecturer
-                    : studentId is not null || user.Email.EndsWith("@fpt.edu.vn", StringComparison.OrdinalIgnoreCase)
+
+            // Nếu người dùng có nhập/đổi TeacherId hoặc StudentId thì tự động chuyển đúng phân loại
+            if (!string.IsNullOrWhiteSpace(teacherId))
+            {
+                user.ReaderType = ReaderType.Lecturer;
+            }
+            else if (!string.IsNullOrWhiteSpace(studentId))
+            {
+                user.ReaderType = ReaderType.Student;
+            }
+            else
+            {
+                var hasApprovedRegistration = await _dbContext.RegistrationRequests.AnyAsync(
+                    registration => registration.UserId == userId &&
+                        registration.Status == RegistrationRequestStatus.Approved,
+                    cancellationToken);
+                user.ReaderType = hasApprovedRegistration
+                    ? ReaderType.External
+                    : user.Email.EndsWith("@fpt.edu.vn", StringComparison.OrdinalIgnoreCase)
                         ? ReaderType.Student
                         : ReaderType.External;
+            }
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
