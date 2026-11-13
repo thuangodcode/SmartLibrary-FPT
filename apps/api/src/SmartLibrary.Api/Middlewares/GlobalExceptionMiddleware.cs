@@ -59,7 +59,7 @@ public class GlobalExceptionMiddleware
             DbUpdateConcurrencyException => (
                 HttpStatusCode.Conflict,
                 Errors.InternalError,
-                "Không lưu được quy định vì dữ liệu đã thay đổi. Tải lại trang rồi thử lại."),
+                "Dữ liệu đã bị thay đổi bởi thao tác khác. Vui lòng tải lại trang rồi thử lại."),
             _ => (HttpStatusCode.InternalServerError, Errors.InternalError, exception.Message)
         };
 

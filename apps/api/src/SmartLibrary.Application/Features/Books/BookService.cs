@@ -281,49 +281,53 @@ public class BookService
         }
 
         var activeCopies = book.Copies.Where(copy => !copy.IsDeleted).ToList();
-        var copyCountDifference = requestedTotalCopies - activeCopies.Count;
-        if (copyCountDifference < 0)
+        if (form.TotalCopies.HasValue && form.TotalCopies.Value != book.TotalCopies)
         {
-            var removableCopies = activeCopies
-                .Where(copy => copy.IsAvailable)
-                .OrderByDescending(copy => copy.CreatedAt)
-                .Take(-copyCountDifference)
-                .ToList();
-            if (removableCopies.Count != -copyCountDifference)
+            var copyCountDifference = requestedTotalCopies - activeCopies.Count;
+            if (copyCountDifference < 0)
             {
-                return Result<BookDto>.Failure(
-                    "Không thể giảm số lượng xuống dưới số bản sao hiện có thể thu hồi. Kiểm tra các bản sao đang mượn hoặc không khả dụng.");
-            }
-
-            foreach (var copy in removableCopies)
-            {
-                copy.IsDeleted = true;
-            }
-        }
-        else if (copyCountDifference > 0)
-        {
-            var nextCopyNumber = await _bookRepository.GetNextCopyNumberAsync(id, book.Code, ct);
-            // Newly added copies enter the warehouse; shelf placement is managed per copy.
-            const string? locationForNewCopies = null;
-
-            for (var index = 0; index < copyCountDifference; index++)
-            {
-                var copy = new BookCopy
+                var removableCopies = activeCopies
+                    .Where(copy => copy.IsAvailable)
+                    .OrderByDescending(copy => copy.CreatedAt)
+                    .Take(-copyCountDifference)
+                    .ToList();
+                if (removableCopies.Count != -copyCountDifference)
                 {
-                    Id = Guid.NewGuid(),
-                    BookId = book.Id,
-                    Barcode = $"{book.Code}-{nextCopyNumber + index:D2}",
-                    Condition = BookCondition.New,
-                    Location = locationForNewCopies,
-                    IsAvailable = true,
-                    IsDeleted = false
-                };
-                book.Copies.Add(copy);
-                activeCopies.Add(copy);
+                    return Result<BookDto>.Failure(
+                        "Không thể giảm số lượng xuống dưới số bản sao hiện có thể thu hồi. Kiểm tra các bản sao đang mượn hoặc không khả dụng.");
+                }
+
+                foreach (var copy in removableCopies)
+                {
+                    copy.IsDeleted = true;
+                }
             }
+            else if (copyCountDifference > 0)
+            {
+                var nextCopyNumber = await _bookRepository.GetNextCopyNumberAsync(id, book.Code, ct);
+                // Newly added copies enter the warehouse; shelf placement is managed per copy.
+                const string? locationForNewCopies = null;
+
+                for (var index = 0; index < copyCountDifference; index++)
+                {
+                    var copy = new BookCopy
+                    {
+                        Id = Guid.NewGuid(),
+                        BookId = book.Id,
+                        Barcode = $"{book.Code}-{nextCopyNumber + index:D2}",
+                        Condition = BookCondition.New,
+                        Location = locationForNewCopies,
+                        IsAvailable = true,
+                        IsDeleted = false
+                    };
+                    book.Copies.Add(copy);
+                    activeCopies.Add(copy);
+                }
+            }
+
+            book.TotalCopies = requestedTotalCopies;
         }
 
-        book.TotalCopies = requestedTotalCopies;
         book.AvailableCopies = activeCopies.Count(copy => !copy.IsDeleted && copy.IsAvailable && copy.Location is not null && copy.Condition is not (SmartLibrary.Domain.Enums.BookCondition.Damaged or SmartLibrary.Domain.Enums.BookCondition.Lost));
 
         book.Title = form.Title.Trim();

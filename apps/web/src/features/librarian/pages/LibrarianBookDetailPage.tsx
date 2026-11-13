@@ -495,7 +495,9 @@ const LibrarianBookDetailPage: React.FC = () => {
               <span>
                 {book.availableCopies > 0
                   ? `${book.availableCopies} / ${book.totalCopies} cuốn sẵn sàng cho mượn`
-                  : 'Hiện đang mượn hết'}
+                  : book.totalCopies > 0
+                    ? 'Hiện đang mượn hết'
+                    : 'Chưa có bản sao'}
               </span>
             </span>
           </div>
