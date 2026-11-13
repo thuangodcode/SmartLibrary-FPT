@@ -47,12 +47,13 @@ public sealed class NotificationInbox : INotificationInbox
     {
         var rows = await _uow.Repository<Notification>()
             .FindAsync(item => item.UserId == userId, ct);
-        return rows
+        var selected = rows
             .OrderBy(item => item.IsRead)
             .ThenByDescending(item => item.CreatedAt)
-            .Take(20)
-            .Select(Map)
-            .ToList();
+            .Take(20).ToList();
+        var items = selected.Select(Map).ToList();
+        await LegacyNotificationTargets.FillAsync(_uow, userId, selected, items, ct);
+        return items;
     }
 
     public async Task<InboxNotificationPageDto> ListMineAsync(
@@ -72,9 +73,11 @@ public sealed class NotificationInbox : INotificationInbox
             .Take(safePageSize)
             .ToListAsync(ct);
 
+        var mapped = items.Select(Map).ToList();
+        await LegacyNotificationTargets.FillAsync(_uow, userId, items, mapped, ct);
         return new InboxNotificationPageDto
         {
-            Items = items.Select(Map).ToList(),
+            Items = mapped,
             Page = safePage,
             PageSize = safePageSize,
             TotalCount = totalCount,
@@ -129,31 +132,59 @@ public sealed class NotificationInbox : INotificationInbox
 
     private static string? ResolveHref(Notification item)
     {
+        string? explicitHref = null;
+        Guid? entityId = null;
+        Guid? bookId = null;
         if (!string.IsNullOrWhiteSpace(item.Metadata))
         {
             try
             {
                 using var document = JsonDocument.Parse(item.Metadata);
-                if (document.RootElement.TryGetProperty("href", out var href)
-                    && href.ValueKind == JsonValueKind.String)
-                    return href.GetString();
+                var root = document.RootElement;
+                if (root.ValueKind == JsonValueKind.Object)
+                {
+                    if (root.TryGetProperty("href", out var href) && href.ValueKind == JsonValueKind.String)
+                    {
+                        var value = href.GetString();
+                        if (value?.StartsWith('/') == true && !value.StartsWith("//") && !value.Contains('\\'))
+                            explicitHref = value;
+                    }
+                    entityId = ReadId(root, "entityId") ?? ReadId(root, "loanId") ?? ReadId(root, "borrowRecordId") ?? ReadId(root, "fineId");
+                    bookId = ReadId(root, "bookId");
+                }
             }
             catch (JsonException)
             {
-                // Older rows may contain malformed metadata; fall back to the type route.
+                // Legacy metadata must not prevent the inbox from opening.
             }
         }
 
-        if (item.Type is AiCredentialAlert.KeyType or AiCredentialAlert.QuotaType)
-            return "/librarian/ai-settings";
-        return item.Type switch
+        var fallback = item.Type switch
         {
-            "borrow" or "return" or "renewal" or "due_soon" or "overdue" => "/history?tab=loans",
-            "fine" or "fine_paid" => "/history?tab=fines",
+            AiCredentialAlert.KeyType or AiCredentialAlert.QuotaType => "/librarian/ai-settings",
+            "borrow" or "return" or "renewal" or "due_soon" or "overdue" or "due_date_email_reminder" => "/history?tab=loans",
+            "fine" or "fine_paid" or "fine_payment_reconciliation" => "/history?tab=fines",
             "reservation" => "/books",
             "support" => "/support",
             "membership_expiring" => "/profile",
             _ => null
         };
+        // Upgrade old generic links only when the producer stored a known entity ID.
+        if (explicitHref is not null && explicitHref is not ("/history?tab=loans" or "/history?tab=fines" or "/books")) return explicitHref;
+        if (entityId.HasValue && fallback == "/history?tab=loans")
+            return $"{fallback}&loanId={entityId:D}";
+        if (entityId.HasValue && fallback == "/history?tab=fines")
+            return $"{fallback}&fineId={entityId:D}";
+        // A reservation entityId is a reservation ID, not a book ID.
+        if (bookId.HasValue && item.Type == "reservation") return $"/books/{bookId:D}";
+        // A generic list is not a valid substitute for an unknown circulation
+        // target. Legacy rows are resolved against owned records when listed;
+        // notices about a failed request with no record remain informational.
+        if (fallback is "/history?tab=loans" or "/history?tab=fines" or "/books") return null;
+        return explicitHref ?? fallback;
     }
+
+    private static Guid? ReadId(JsonElement root, string key)
+        => root.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String
+           && Guid.TryParse(value.GetString(), out var id) && id != Guid.Empty ? id : null;
 }

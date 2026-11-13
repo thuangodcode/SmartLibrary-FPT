@@ -9,6 +9,20 @@ namespace SmartLibrary.Application.Features.Circulation;
 /// </summary>
 public static class CirculationRules
 {
+    public static string RejectionReason(string? notes)
+    {
+        const string marker = "Yêu cầu bị từ chối/hủy bởi thủ thư.";
+        var index = notes?.LastIndexOf(marker, StringComparison.Ordinal) ?? -1;
+        if (index >= 0)
+        {
+            var reason = notes![(index + marker.Length)..].Trim();
+            return string.IsNullOrWhiteSpace(reason) ? "Thủ thư chưa ghi lý do." : reason;
+        }
+        if (notes?.Contains("Tự hủy vì độc giả không đến", StringComparison.Ordinal) == true)
+            return "Đã hết thời gian nhận sách theo lịch hẹn.";
+        return "Chưa có lý do được ghi nhận.";
+    }
+
     public const string OverdueReasonPrefix = "Phạt quá hạn";
     public const string CompensationLostPrefix = "Bồi thường mất sách";
     public const string CompensationDamagePrefix = "Bồi thường hư hỏng";

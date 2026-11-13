@@ -37,6 +37,17 @@ public class CirculationMeController : ControllerBase
             : Unauthorized(ApiResponse<object>.Fail(result.Error!));
     }
 
+    [HttpGet("loans/{id:guid}")]
+    public async Task<IActionResult> MyLoan(Guid id, CancellationToken ct)
+    {
+        var readerId = CirculationService.ReadUserId(User);
+        if (readerId == Guid.Empty) return Unauthorized();
+        var result = await _circulation.GetMyLoanAsync(readerId, id, ct);
+        return result.IsSuccess
+            ? Ok(ApiResponse<CirculationLoanDto>.Ok(result.Data!))
+            : NotFound(ApiResponse<object>.Fail(result.Error!));
+    }
+
     [HttpGet("fines")]
     public async Task<IActionResult> MyFines(CancellationToken ct)
     {

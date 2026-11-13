@@ -116,7 +116,8 @@ public class CirculationRepository : ICirculationRepository
             query = query.Where(x => x.BorrowDate < borrowedBeforeUtc.Value);
         var total = await query.CountAsync(ct);
         var rows = await query
-            .OrderByDescending(x => x.BorrowDate ?? x.CreatedAt)
+            .OrderByDescending(x => x.Status == BorrowStatus.Rejected ? x.UpdatedAt : x.ReturnDate ?? x.BorrowDate ?? x.CreatedAt)
+            .ThenByDescending(x => x.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
@@ -519,13 +520,27 @@ public class CirculationRepository : ICirculationRepository
         var query = LoanQuery().Where(x => x.ReaderId == readerId);
         var total = await query.CountAsync(ct);
         var rows = await query
-            .OrderByDescending(x => x.BorrowDate ?? x.CreatedAt)
+            .OrderByDescending(x => x.Status == BorrowStatus.Rejected ? x.UpdatedAt : x.ReturnDate ?? x.BorrowDate ?? x.CreatedAt)
+            .ThenByDescending(x => x.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
+        return (await MapReaderLoansAsync(rows, readerId, settings, ct), total);
+    }
+
+    public async Task<CirculationLoanDto?> GetLoanForReaderAsync(Guid readerId, Guid id, CirculationSettings settings, CancellationToken ct)
+    {
+        var row = await LoanQuery().FirstOrDefaultAsync(x => x.ReaderId == readerId && x.Id == id, ct);
+        if (row is null) return null;
+        return (await MapReaderLoansAsync([row], readerId, settings, ct))[0];
+    }
+
+    private async Task<IReadOnlyList<CirculationLoanDto>> MapReaderLoansAsync(
+        List<BorrowRecord> rows, Guid readerId, CirculationSettings settings, CancellationToken ct)
+    {
         var loans = (await MapLoansAsync(rows, settings.FinePerDay, ct)).ToList();
         if (loans.Count == 0)
-            return (loans, total);
+            return loans;
 
         var now = DateTime.UtcNow;
         var hasUnpaidFines = settings.RestrictIfUnpaid
@@ -576,7 +591,7 @@ public class CirculationRepository : ICirculationRepository
             };
         }
 
-        return (loans, total);
+        return loans;
     }
 
     public async Task<CirculationFineDto?> GetFineDtoAsync(Guid id, CancellationToken ct)
@@ -650,7 +665,7 @@ public class CirculationRepository : ICirculationRepository
                 .Include(x => x.Book)
                 .Where(x => x.ReaderId == readerId)
                 .OrderByDescending(x => x.ReservedAt)
-                .Take(20),
+                .ThenByDescending(x => x.Id),
             ct);
 
     public Task<Reservation?> GetTrackedReservationAsync(Guid id, CancellationToken ct)
@@ -1174,6 +1189,7 @@ public class CirculationRepository : ICirculationRepository
             CopyCondition = loan.BookCopy.Condition.ToString(),
             ReturnCondition = loan.ReturnCondition?.ToString(),
             Notes = loan.Notes,
+            RejectionReason = loan.Status == BorrowStatus.Rejected ? CirculationRules.RejectionReason(loan.Notes) : null,
             SuggestedFine = overdueDays > 0 && finePerDay > 0 ? CirculationRules.OverdueFineAmount(overdueDays, finePerDay) : null,
             HasOpenFine = hasOpenFine,
             HasFine = hasFine,

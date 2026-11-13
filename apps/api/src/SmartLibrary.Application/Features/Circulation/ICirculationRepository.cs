@@ -11,6 +11,7 @@ public interface ICirculationRepository
     Task<(IReadOnlyList<CirculationLoanDto> Items, int Total)> GetLoansAsync(
         string? search, string? status, DateTime? borrowedFromUtc, DateTime? borrowedBeforeUtc,
         int page, int pageSize, int finePerDay, CancellationToken ct);
+    Task<CirculationLoanDto?> GetLoanForReaderAsync(Guid readerId, Guid id, CirculationSettings settings, CancellationToken ct);
     Task<CirculationLoanDto?> GetLoanAsync(Guid id, int finePerDay, CancellationToken ct);
     Task<UserProfile?> FindReaderAsync(string key, CancellationToken ct);
     Task<UserProfile?> FindReaderAccountAsync(Guid readerId, CancellationToken ct);

@@ -52,6 +52,7 @@ public record CirculationLoanDto
     public string? CoverImageUrl { get; init; }
     public string? CopyCondition { get; init; }
     public string? ReturnCondition { get; init; }
+    public string? RejectionReason { get; init; }
     public string? Notes { get; init; }
     public decimal? SuggestedFine { get; init; }
     public bool HasOpenFine { get; init; }
