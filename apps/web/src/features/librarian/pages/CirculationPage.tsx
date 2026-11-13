@@ -703,7 +703,7 @@ function LoansView() {
     const dueDay = dayStart(loan.dueDate);
     if (dueDay === null) return false;
     const daysRemaining = Math.ceil((dueDay - todayStart.getTime()) / 86_400_000);
-    return daysRemaining >= 0 && (dueRange.length > 0 ? daysRemaining <= 30 : daysRemaining <= dueHorizon);
+    return daysRemaining >= 0 && (dueRange.length > 0 || daysRemaining <= dueHorizon);
   });
   const dueMilestones = ([4, 2] as const).map((days) => ({
     days,
@@ -771,7 +771,7 @@ function LoansView() {
             <div className="circ-reminder-settings__copy">
               <strong>Nhắc hạn trả qua email</strong>
               <p>{reminderSettings.isEnabled
-                ? `Hệ thống sẽ tự gửi email trước hạn ${reminderSettings.reminderDays === 2 ? 2 : 4} ngày.`
+                ? `Hệ thống sẽ tự gửi email trước hạn ${reminderSettings.reminderDays} ngày.`
                 : 'Đang tắt. Bật để hệ thống tự gửi email nhắc độc giả.'}</p>
             </div>
             <label className="circ-reminder-days">
@@ -782,6 +782,8 @@ function LoansView() {
               >
                 <option value={4}>4 ngày</option>
                 <option value={2}>2 ngày</option>
+                <option value={7}>7 ngày</option>
+                <option value={14}>14 ngày</option>
               </select>
             </label>
             <label className="circ-reminder-toggle">
@@ -1220,7 +1222,7 @@ function ReturnView() {
   const [defaultCondition, setDefaultCondition] = useState('Good');
   const [manualBarcode, setManualBarcode] = useState(params.get('barcode') ?? '');
   const [manualCondition, setManualCondition] = useState('Good');
-  const [manualPaidNow, setManualPaidNow] = useState(true);
+  const [manualPaidNow, setManualPaidNow] = useState(false);
   const [paidNowState, setPaidNowState] = useState<Record<string, boolean>>({});
   const [returnNotes, setReturnNotes] = useState<Record<string, string>>({});
   const [manualNotes, setManualNotes] = useState('');
@@ -1282,7 +1284,7 @@ function ReturnView() {
     setLoansError(null);
   };
 
-  const returnBook = async (barcode: string, condition: string, notes: string, loanId?: string, paidNow = true) => {
+  const returnBook = async (barcode: string, condition: string, notes: string, loanId?: string, paidNow = false) => {
     if (['Damaged', 'Lost'].includes(condition) && !notes.trim()) {
       showToast({ type: 'error', title: 'Thiếu mô tả tình trạng', message: 'Ghi rõ hư hỏng hoặc lý do thất lạc trước khi nhận trả.' });
       return;
@@ -1295,7 +1297,7 @@ function ReturnView() {
       const res = await fetch(`${API_BASE_URL}/api/v1/circulation/return`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ barcode, condition, notes: notes.trim(), loanId, paidNow }),
+        body: JSON.stringify({ barcode, condition, notes: notes.trim(), loanId, paidNow: paidNow && !['Damaged', 'Lost'].includes(condition) }),
       });
       const json = await parseApiResponse<ApiResult<ReturnResult>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Thao tác trả sách thất bại.');
@@ -1311,7 +1313,7 @@ function ReturnView() {
       if (selectedReader) {
         await fetchReaderLoans(selectedReader.id);
       }
-      setManualBarcode(''); setManualNotes('');
+      setManualBarcode(''); setManualNotes(''); setManualPaidNow(false);
     } catch (err) {
       const msg = errorMessage(err, 'Thao tác trả sách thất bại.');
       setError(msg);
@@ -1492,7 +1494,6 @@ function ReturnView() {
                                 onChange={(e) => setConditions((prev) => ({ ...prev, [loan.id]: e.target.value }))}
                               >
                                 <option value="Good">Bình thường (Đạt tiêu chuẩn)</option>
-                                <option value="Overdue">Quá hạn trả sách</option>
                                 {loan.copyCondition === 'LightDamaged' && <option value="LightDamaged">Hư nhẹ đã xác minh, không có hư hỏng mới</option>}
                                 <option value="Fair">Hơi cũ</option>
                                 <option value="Damaged">Hư hỏng</option>
@@ -1503,16 +1504,17 @@ function ReturnView() {
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.825rem', color: '#4b5563', cursor: 'pointer' }}>
                               <input
                                 type="checkbox"
-                                checked={paidNowState[loan.id] ?? true}
+                                disabled={busy || ['Damaged', 'Lost'].includes(cond)}
+                                checked={!['Damaged', 'Lost'].includes(cond) && (paidNowState[loan.id] ?? false)}
                                 onChange={(e) => setPaidNowState(prev => ({ ...prev, [loan.id]: e.target.checked }))}
                               />
-                              <span>Thu tiền phạt quá hạn ngay tại quầy (Đã thanh toán)</span>
+                              <span>Tôi đã nhận tiền mặt cho phí quá hạn (không gồm bồi thường)</span>
                             </label>
                             <button
                               type="button"
                               className="circ-btn circ-btn--primary"
                               disabled={busy}
-                              onClick={() => void returnBook(loan.barcode, cond, returnNotes[loan.id] || '', loan.id, paidNowState[loan.id] ?? true)}
+                              onClick={() => void returnBook(loan.barcode, cond, returnNotes[loan.id] || '', loan.id, paidNowState[loan.id] ?? false)}
                             >
                               {isProcessing ? <LoaderCircle className="spin" size={14} /> : <RotateCcw size={14} />}
                               {isProcessing ? 'Đang ghi nhận...' : 'Ghi nhận trả sách'}
@@ -1549,7 +1551,6 @@ function ReturnView() {
                 <span>Tình trạng khi trả</span>
                 <select value={manualCondition} onChange={(e) => setManualCondition(e.target.value)}>
                   <option value="Good">Bình thường (Đạt tiêu chuẩn)</option>
-                  <option value="Overdue">Quá hạn trả sách</option>
                   <option value="Fair">Hơi cũ (Còn nguyên vẹn)</option>
                   <option value="LightDamaged">Hư nhẹ đã xác minh, không có hư hỏng mới</option>
                   <option value="Damaged">Hư hỏng (Chờ xác minh bồi thường)</option>
@@ -1572,10 +1573,11 @@ function ReturnView() {
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#4b5563', cursor: 'pointer', marginBottom: '1rem' }}>
               <input
                 type="checkbox"
-                checked={manualPaidNow}
+                disabled={busy || ['Damaged', 'Lost'].includes(manualCondition)}
+                checked={!['Damaged', 'Lost'].includes(manualCondition) && manualPaidNow}
                 onChange={(e) => setManualPaidNow(e.target.checked)}
               />
-              <span>Thu tiền phạt quá hạn ngay tại quầy (Đã thanh toán)</span>
+              <span>Tôi đã nhận tiền mặt cho phí quá hạn (không gồm bồi thường)</span>
             </label>
             <div className="circ-return-actions-row">
               <button

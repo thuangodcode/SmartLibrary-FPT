@@ -84,29 +84,14 @@ public class CategoryService
                 var safeFileName = $"{Guid.NewGuid():N}{extension}";
                 imageUrl = await _storageService.UploadFileAsync(stream, safeFileName, "categories", ct);
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to upload category image to Cloudinary; falling back to inline or null.");
-                if (form.Image.Length <= 2 * 1024 * 1024)
-                {
-                    try
-                    {
-                        using var ms = new MemoryStream();
-                        form.Image.OpenReadStream().CopyTo(ms);
-                        var mime = extension switch
-                        {
-                            ".png" => "image/png",
-                            ".webp" => "image/webp",
-                            ".gif" => "image/gif",
-                            _ => "image/jpeg"
-                        };
-                        imageUrl = $"data:{mime};base64,{Convert.ToBase64String(ms.ToArray())}";
-                    }
-                    catch
-                    {
-                        imageUrl = null;
-                    }
-                }
+                _logger.LogWarning(ex, "Failed to upload category image to Cloudinary.");
+                return Result<CategoryDto>.Failure("Không tải được ảnh danh mục. Vui lòng thử lại hoặc bỏ ảnh để lưu; kiểm tra cấu hình Cloudinary nếu lỗi tiếp diễn.");
             }
         }
 
@@ -196,29 +181,14 @@ public class CategoryService
                 var safeFileName = $"{Guid.NewGuid():N}{extension}";
                 category.ImageUrl = await _storageService.UploadFileAsync(stream, safeFileName, "categories", ct);
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to upload category image to Cloudinary; falling back to inline or keeping current.");
-                if (form.Image.Length <= 2 * 1024 * 1024)
-                {
-                    try
-                    {
-                        using var ms = new MemoryStream();
-                        form.Image.OpenReadStream().CopyTo(ms);
-                        var mime = extension switch
-                        {
-                            ".png" => "image/png",
-                            ".webp" => "image/webp",
-                            ".gif" => "image/gif",
-                            _ => "image/jpeg"
-                        };
-                        category.ImageUrl = $"data:{mime};base64,{Convert.ToBase64String(ms.ToArray())}";
-                    }
-                    catch
-                    {
-                        // keep current
-                    }
-                }
+                _logger.LogWarning(ex, "Failed to upload category image to Cloudinary.");
+                return Result<CategoryDto>.Failure("Không tải được ảnh danh mục. Vui lòng thử lại hoặc bỏ ảnh để lưu; kiểm tra cấu hình Cloudinary nếu lỗi tiếp diễn.");
             }
         }
 

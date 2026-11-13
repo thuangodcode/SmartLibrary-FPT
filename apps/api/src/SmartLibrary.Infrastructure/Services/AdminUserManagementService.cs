@@ -90,6 +90,7 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
                 user.FullName.ToLower().Contains(term) ||
                 user.Email.ToLower().Contains(term) ||
                 (user.StudentId != null && user.StudentId.ToLower().Contains(term)) ||
+                (user.TeacherId != null && user.TeacherId.ToLower().Contains(term)) ||
                 (user.EmployeeId != null && user.EmployeeId.ToLower().Contains(term)) ||
                 (user.Phone != null && user.Phone.Contains(term)));
         }
@@ -130,16 +131,7 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
             if (!Enum.TryParse<ReaderType>(readerType, true, out var parsedReaderType))
                 throw new ValidationException("Loại độc giả không hợp lệ.");
 
-            users = users.Where(user =>
-                _dbContext.RegistrationRequests.Any(registration =>
-                    registration.UserId == user.Id &&
-                    registration.Status == RegistrationRequestStatus.Approved)
-                    ? parsedReaderType == ReaderType.External
-                    : user.TeacherId != null
-                        ? parsedReaderType == ReaderType.Lecturer
-                        : user.StudentId != null || user.Email.ToLower().EndsWith("@fpt.edu.vn")
-                            ? parsedReaderType == ReaderType.Student
-                            : parsedReaderType == ReaderType.External);
+            users = users.Where(user => (user.ReaderType ?? ReaderType.External) == parsedReaderType);
         }
 
         var totalCount = await users.CountAsync(cancellationToken);
@@ -157,15 +149,17 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
                 user.TeacherId,
                 user.EmployeeId,
                 user.Phone,
-                ReaderType = _dbContext.RegistrationRequests.Any(registration =>
-                        registration.UserId == user.Id &&
-                        registration.Status == RegistrationRequestStatus.Approved)
-                    ? ReaderType.External
-                    : user.TeacherId != null
-                        ? ReaderType.Lecturer
-                        : user.StudentId != null || user.Email.ToLower().EndsWith("@fpt.edu.vn")
-                            ? ReaderType.Student
-                            : ReaderType.External,
+                user.ReaderType,
+                user.MembershipExpiresAt,
+                user.Address,
+                user.DateOfBirth,
+                user.LastLoginAt,
+                BorrowingCount = _dbContext.BorrowRecords.Count(loan => loan.ReaderId == user.Id
+                    && !loan.IsDeleted && (loan.Status == BorrowStatus.Borrowed || loan.Status == BorrowStatus.Overdue)),
+                OverdueCount = _dbContext.BorrowRecords.Count(loan => loan.ReaderId == user.Id
+                    && !loan.IsDeleted && loan.Status == BorrowStatus.Overdue),
+                UnpaidFines = _dbContext.Fines.Where(fine => fine.ReaderId == user.Id
+                    && !fine.IsDeleted && fine.Status == FineStatus.Pending).Sum(fine => (decimal?)fine.Amount) ?? 0,
                 Status = user.Status.ToString(),
                 user.IsActive,
                 user.CreatedAt,
@@ -176,16 +170,7 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
         var readerStats = await _dbContext.UserProfiles
             .IgnoreQueryFilters()
             .Where(user => !user.IsDeleted && user.Role.Name == "Reader")
-            .GroupBy(user =>
-                _dbContext.RegistrationRequests.Any(registration =>
-                    registration.UserId == user.Id &&
-                    registration.Status == RegistrationRequestStatus.Approved)
-                    ? ReaderType.External
-                    : user.TeacherId != null
-                        ? ReaderType.Lecturer
-                        : user.StudentId != null || user.Email.ToLower().EndsWith("@fpt.edu.vn")
-                            ? ReaderType.Student
-                            : ReaderType.External)
+            .GroupBy(user => user.ReaderType ?? ReaderType.External)
             .Select(group => new { ReaderType = group.Key, Count = group.Count() })
             .ToListAsync(cancellationToken);
 

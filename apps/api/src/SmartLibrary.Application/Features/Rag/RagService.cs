@@ -164,20 +164,9 @@ public class RagService
                 return Result<RagAskResultDto>.Failure(credential.Error ?? "Chưa cấu hình nhà cung cấp AI.");
 
             var catalogHits = await _documents.SearchCatalogAsync(trimmedCat, 50, ct);
-            var categoryHits = catalogHits
-                .Where(h => h.Categories.Any(c => c.Contains(trimmedCat, StringComparison.OrdinalIgnoreCase)) ||
-                            h.Title.Contains(trimmedCat, StringComparison.OrdinalIgnoreCase) ||
-                            (h.Content != null && h.Content.Contains(trimmedCat, StringComparison.OrdinalIgnoreCase)))
+            var hitsToUse = catalogHits
+                .Where(h => h.Categories.Any(c => c.Equals(trimmedCat, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
-
-            var hitsToUse = categoryHits.Count > 0
-                ? categoryHits
-                : catalogHits.Where(h => h.Categories.Any(c => c.Contains(trimmedCat, StringComparison.OrdinalIgnoreCase))).ToList();
-
-            if (hitsToUse.Count == 0 && catalogHits.Count > 0)
-            {
-                hitsToUse = catalogHits.Take(15).ToList();
-            }
 
             if (hitsToUse.Count == 0)
             {

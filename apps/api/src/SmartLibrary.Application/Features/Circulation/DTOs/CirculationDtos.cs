@@ -62,6 +62,7 @@ public record CirculationLoanDto
     public bool RequiresApproval { get; init; }
     public string? Language { get; init; }
     public decimal? CreatedFineAmount { get; init; }
+    public bool CashPaymentRecorded { get; init; }
     public bool OverdueFineAlreadyExists { get; init; }
     public bool IncidentOpened { get; init; }
     public Guid? IncidentId { get; init; }

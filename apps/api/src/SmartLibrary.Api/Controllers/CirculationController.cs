@@ -79,22 +79,12 @@ public class CirculationController : ControllerBase
     [HttpGet("due-reminder-settings")]
     public async Task<IActionResult> GetDueReminderSettings(CancellationToken ct)
     {
-        var settings = await _db.CirculationReminderSettings
+        var settings = await _db.CirculationReminderSettings.AsNoTracking()
             .OrderBy(item => item.UpdatedAt)
             .FirstOrDefaultAsync(ct);
-        var days = settings?.ReminderDays ?? 4;
-        if (days != 2 && days != 4)
-        {
-            days = 4;
-            if (settings != null)
-            {
-                settings.ReminderDays = 4;
-                await _db.SaveChangesAsync(ct);
-            }
-        }
         return Ok(ApiResponse<CirculationDueReminderSettingsDto>.Ok(new(
             settings?.IsEnabled ?? false,
-            days,
+            settings?.ReminderDays ?? 4,
             settings?.UpdatedAt ?? DateTime.UtcNow)));
     }
 
@@ -103,8 +93,8 @@ public class CirculationController : ControllerBase
         [FromBody] UpdateCirculationDueReminderSettingsRequest request,
         CancellationToken ct)
     {
-        if (request.ReminderDays is not (2 or 4))
-            return BadRequest(ApiResponse<object>.Fail("Chỉ hỗ trợ nhắc trước 4 hoặc 2 ngày."));
+        if (request.ReminderDays is not (2 or 4 or 7 or 14))
+            return BadRequest(ApiResponse<object>.Fail("Chỉ hỗ trợ nhắc trước 2, 4, 7 hoặc 14 ngày."));
 
         var settings = await _db.CirculationReminderSettings
             .OrderBy(item => item.UpdatedAt)
@@ -170,6 +160,8 @@ public class CirculationController : ControllerBase
                 : loan.OverdueDays > 0
                     ? $"Đã trả sách quá hạn {loan.OverdueDays} ngày. Chưa lập phí vì chưa cấu hình mức phạt quá hạn."
                     : "Đã ghi nhận trả sách.";
+        if (loan.CashPaymentRecorded)
+            message += " Đã ghi nhận thanh toán phí quá hạn bằng tiền mặt.";
         return Ok(ApiResponse<CirculationLoanDto>.Ok(loan, new { message }));
     }
 

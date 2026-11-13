@@ -321,6 +321,8 @@ public class BookService
                         IsDeleted = false
                     };
                     book.Copies.Add(copy);
+                    // The assigned GUID must be tracked as an INSERT, not an UPDATE of an existing copy.
+                    await _unitOfWork.Repository<BookCopy>().AddAsync(copy, ct);
                     activeCopies.Add(copy);
                 }
             }

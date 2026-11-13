@@ -596,10 +596,15 @@ public class CirculationRepository : ICirculationRepository
         => _db.Fines.FirstOrDefaultAsync(x => x.Id == id, ct);
 
     public async Task LockFineAsync(Guid id, CancellationToken ct)
-        => await _db.Fines
+    {
+        var fine = await _db.Fines
             .FromSqlInterpolated($"SELECT * FROM fines WHERE id = {id} FOR UPDATE")
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(ct);
+        // The return workflow may already track this fine before waiting for its lock.
+        if (fine is not null)
+            await _db.Entry(fine).ReloadAsync(ct);
+    }
 
     public Task<FinePayment?> GetPendingPayOSPaymentAsync(Guid fineId, CancellationToken ct)
         => _db.FinePayments.FirstOrDefaultAsync(payment =>

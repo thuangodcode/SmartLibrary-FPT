@@ -35,24 +35,15 @@ public class ReaderRepository : IReaderRepository
                 u.FullName.ToLower().Contains(lowerQ) ||
                 u.Email.ToLower().Contains(lowerQ) ||
                 (u.Phone != null && u.Phone.Contains(lowerQ)) ||
-                (u.StudentId != null && u.StudentId.ToLower().Contains(lowerQ)));
+                (u.StudentId != null && u.StudentId.ToLower().Contains(lowerQ)) ||
+                (u.TeacherId != null && u.TeacherId.ToLower().Contains(lowerQ)));
         }
 
         if (status.HasValue)
             q = q.Where(u => u.Status == status.Value);
 
         if (readerType.HasValue)
-        {
-            var targetType = readerType.Value;
-            q = q.Where(u =>
-                _context.RegistrationRequests.Any(r => r.UserId == u.Id && r.Status == RegistrationRequestStatus.Approved)
-                    ? targetType == ReaderType.External
-                    : u.TeacherId != null
-                        ? targetType == ReaderType.Lecturer
-                        : u.StudentId != null || u.Email.ToLower().EndsWith("@fpt.edu.vn")
-                            ? targetType == ReaderType.Student
-                            : targetType == ReaderType.External);
-        }
+            q = q.Where(u => (u.ReaderType ?? ReaderType.External) == readerType.Value);
 
         var total = await q.CountAsync(ct);
 
@@ -73,19 +64,13 @@ public class ReaderRepository : IReaderRepository
                 AvatarUrl = u.AvatarUrl,
                 RoleName = u.Role != null ? u.Role.Name : "Reader",
                 Status = u.Status,
-                ReaderType = _context.RegistrationRequests.Any(r => r.UserId == u.Id && r.Status == RegistrationRequestStatus.Approved)
-                    ? ReaderType.External
-                    : u.TeacherId != null
-                        ? ReaderType.Lecturer
-                        : u.StudentId != null || u.Email.ToLower().EndsWith("@fpt.edu.vn")
-                            ? ReaderType.Student
-                            : ReaderType.External,
+                ReaderType = u.ReaderType,
                 MembershipExpiresAt = u.MembershipExpiresAt,
                 IsActive = u.IsActive,
                 LastLoginAt = u.LastLoginAt,
                 CreatedAt = u.CreatedAt,
                 BorrowingCount = _context.BorrowRecords.Count(b =>
-                    b.ReaderId == u.Id && b.Status == BorrowStatus.Borrowed && !b.IsDeleted),
+                    b.ReaderId == u.Id && (b.Status == BorrowStatus.Borrowed || b.Status == BorrowStatus.Overdue) && !b.IsDeleted),
                 OverdueCount = _context.BorrowRecords.Count(b =>
                     b.ReaderId == u.Id && b.Status == BorrowStatus.Overdue && !b.IsDeleted),
                 UnpaidFines = _context.Fines
@@ -108,14 +93,7 @@ public class ReaderRepository : IReaderRepository
 
         var readerStats = await _context.UserProfiles
             .Where(u => !u.IsDeleted && u.Role.Name == "Reader")
-            .GroupBy(u =>
-                _context.RegistrationRequests.Any(r => r.UserId == u.Id && r.Status == RegistrationRequestStatus.Approved)
-                    ? ReaderType.External
-                    : u.TeacherId != null
-                        ? ReaderType.Lecturer
-                        : u.StudentId != null || u.Email.ToLower().EndsWith("@fpt.edu.vn")
-                            ? ReaderType.Student
-                            : ReaderType.External)
+            .GroupBy(u => u.ReaderType ?? ReaderType.External)
             .Select(g => new { Type = g.Key, Count = g.Count() })
             .ToListAsync(ct);
 
@@ -160,7 +138,7 @@ public class ReaderRepository : IReaderRepository
                 CreatedAt = u.CreatedAt,
                 BorrowCount = _context.BorrowRecords.Count(b => b.ReaderId == u.Id && !b.IsDeleted),
                 ActiveBorrowCount = _context.BorrowRecords.Count(b =>
-                    b.ReaderId == u.Id && b.Status == BorrowStatus.Borrowed && !b.IsDeleted),
+                    b.ReaderId == u.Id && (b.Status == BorrowStatus.Borrowed || b.Status == BorrowStatus.Overdue) && !b.IsDeleted),
                 OverdueCount = _context.BorrowRecords.Count(b =>
                     b.ReaderId == u.Id && b.Status == BorrowStatus.Overdue && !b.IsDeleted),
                 TotalFines = _context.Fines.Where(f => f.ReaderId == u.Id && !f.IsDeleted).Sum(f => (decimal?)f.Amount) ?? 0,
