@@ -511,3 +511,11 @@
   .lib-copies-shelf-detail-header { padding: 12px; }
   .lib-copies-shelf-detail-header h2 { font-size: 17px; }
 }
+
+.lib-copies-bulk-shelf { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px; border: 1px solid #fed7aa; border-radius: 12px; background: #fffaf5; margin-bottom: 16px; }
+.lib-copies-bulk-shelf label { font-weight: 600; color: #334155; }
+.lib-copies-bulk-shelf select { min-height: 44px; min-width: 230px; max-width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; color: #334155; }
+.lib-copies-bulk-shelf button { min-height: 44px; border: 0; border-radius: 8px; padding: 10px 16px; background: #c2410c; color: #fff; font-weight: 600; cursor: pointer; }
+.lib-copies-bulk-shelf button:disabled { opacity: .5; cursor: not-allowed; }
+.lib-copies-bulk-shelf :is(small,p) { flex-basis: 100%; margin: 0; color: #64748b; }
+.lib-copies-bulk-shelf p { color: #b45309; }

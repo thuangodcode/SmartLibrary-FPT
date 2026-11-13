@@ -185,6 +185,7 @@ const LibrarianCopiesPage: React.FC = () => {
   const [selectedCopyIds, setSelectedCopyIds] = useState<string[]>([]);
   const [transferLocations, setTransferLocations] = useState<Record<string, string>>({});
   const [transferOpen, setTransferOpen] = useState(false);
+  const [commonShelf, setCommonShelf] = useState('');
   const [sortingSearch, setSortingSearch] = useState('');
   const [sortingBooks, setSortingBooks] = useState<SortingBookOption[]>([]);
   const [sortingBooksLoading, setSortingBooksLoading] = useState(false);
@@ -624,6 +625,12 @@ const LibrarianCopiesPage: React.FC = () => {
   const handleSaveSorting = async () => {
     if (!sortingSelected.length) return;
     const assignments = sortingSelected.map(copyId => ({ copyId, location: sortingDestinations[copyId] ?? '' }));
+    const invalid = assignments.find(item => item.location && !locations.some(shelf => shelf.name === item.location));
+    if (invalid) { showToast({ type: 'error', title: 'Kệ không còn khả dụng', message: 'Hãy tải lại danh sách và chọn kệ khác.' }); return; }
+    const full = locations.find(shelf => assignments.filter(item => item.location === shelf.name).length > shelf.availableCapacity);
+    if (full) { showToast({ type: 'error', title: 'Kệ không đủ chỗ', message: `${full.name} chỉ còn ${full.availableCapacity} chỗ. Hãy giảm số bản sao hoặc chọn kệ khác.` }); return; }
+    if (assignments.length > 500) { showToast({ type: 'error', title: 'Chọn tối đa 500 bản sao mỗi lần', message: 'Hãy chia thành các đợt xếp kệ nhỏ hơn.' }); return; }
+    if (!window.confirm(`Xác nhận cập nhật ${assignments.length} bản sao? ${assignments.filter(item => !item.location).length} bản tiếp tục ở kho.`)) return;
     setSaving(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/copies/locations/transfer`, {
@@ -777,7 +784,7 @@ const LibrarianCopiesPage: React.FC = () => {
         ) : tab === 'sorting' ? (
           <div className="lib-copies-sorting">
             <header className="lib-copies-sorting-heading">
-              <div><strong>Quản lý kho sách</strong><p>Theo dõi bản sao đang lưu trong kho. Chọn đầu sách để xếp từng cuốn lên kệ hoặc tiếp tục giữ trong kho.</p><button type="button" className="lib-copies-primary" onClick={() => setNewBookOpen(true)}><Plus size={16} /> Tạo đầu sách mới và nhập kho</button></div>
+              <div><strong>Quản lý kho sách</strong><p>Chọn đầu sách để xếp bản sao lên kệ.</p><button type="button" className="lib-copies-primary" onClick={() => setNewBookOpen(true)}><Plus size={16} /> Tạo đầu sách mới và nhập kho</button></div>
               {!sortingBookId && <label className="lib-copies-search"><Search size={17} /><input value={sortingSearch} onChange={event => { setSortingBooksLoading(true); setSortingSearch(event.target.value); }} placeholder="Tìm đầu sách trong kho theo tên hoặc mã..." /></label>}
             </header>
             {!sortingBookId ? sortingBooksLoading ? (
@@ -801,12 +808,22 @@ const LibrarianCopiesPage: React.FC = () => {
             ) : sortingDetails ? <>
               <div className="lib-copies-warehouse-detail-heading"><button type="button" className="lib-copies-back-books" onClick={() => { setSortingBookId(''); setSortingDetails(null); setSortingSelected([]); setSortingDestinations({}); }}><ChevronLeft size={16} /> Quay lại danh sách kho</button><div><small>ĐẦU SÁCH ĐANG QUẢN LÝ</small><h3>{sortingDetails.title}</h3><span>{sortingDetails.code} · {sortingDetails.inWarehouseCopies} bản trong kho</span></div></div>
               <div className="lib-copies-sorting-stats"><article><span>Đã xếp trên kệ</span><strong>{sortingDetails.onShelfCopies}</strong></article><article><span>Đang trong kho, chờ xếp</span><strong>{sortingDetails.inWarehouseCopies}</strong></article><article><span>Bản trả về đang chờ xếp</span><strong>{sortingDetails.returnedInWarehouseCopies}</strong></article></div>
-              <div className="lib-copies-sorting-toolbar"><span>Chọn các bản sao cần xử lý, sau đó chỉ định kệ hoặc giữ trong kho.</span><div className="lib-copies-sorting-actions"><button type="button" className="is-secondary" disabled={!sortingDetails.copies.length || saving} onClick={() => setSortingSelected(sortingDetails.copies.every(copy => sortingSelected.includes(copy.id)) ? [] : sortingDetails.copies.map(copy => copy.id))}>{sortingDetails.copies.length > 0 && sortingDetails.copies.every(copy => sortingSelected.includes(copy.id)) ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}</button><button type="button" disabled={!sortingSelected.length || saving} onClick={() => void handleSaveSorting()}>{saving ? 'Đang lưu...' : `Lưu thay đổi (${sortingSelected.length})`}</button></div></div>
-              <div className="lib-copies-sorting-list">
+              <div className="lib-copies-sorting-toolbar"><span>Chọn bản sao, áp dụng kệ chung hoặc chọn riêng từng cuốn.</span><div className="lib-copies-sorting-actions"><button type="button" className="is-secondary" disabled={!sortingDetails.copies.length || saving} onClick={() => setSortingSelected(sortingDetails.copies.every(copy => sortingSelected.includes(copy.id)) ? [] : sortingDetails.copies.map(copy => copy.id))}>{sortingDetails.copies.length > 0 && sortingDetails.copies.every(copy => sortingSelected.includes(copy.id)) ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}</button><button type="button" disabled={!sortingSelected.length || saving} onClick={() => void handleSaveSorting()}>{saving ? 'Đang lưu...' : `Lưu thay đổi (${sortingSelected.length})`}</button></div></div>
+              <div className="lib-copies-bulk-shelf">
+                <label htmlFor="sorting-common-shelf">Kệ chung cho {sortingSelected.length} bản đã chọn</label>
+                <select id="sorting-common-shelf" value={commonShelf} disabled={saving} onChange={event => setCommonShelf(event.target.value)}>
+                  <option value="">Chọn kệ...</option>
+                  {locations.filter(location => location.availableCapacity > 0).map(location => <option key={location.id} value={location.name}>{location.name} · còn {location.availableCapacity} chỗ</option>)}
+                </select>
+                <button type="button" disabled={saving || !sortingSelected.length || !commonShelf || sortingSelected.length > (locations.find(location => location.name === commonShelf)?.availableCapacity ?? 0)} onClick={() => setSortingDestinations(current => ({ ...current, ...Object.fromEntries(sortingSelected.map(id => [id, commonShelf])) }))}>Áp dụng kệ cho các bản đã chọn</button>
+                {commonShelf && sortingSelected.length > (locations.find(location => location.name === commonShelf)?.availableCapacity ?? 0) && <p role="status">Kệ không đủ chỗ cho {sortingSelected.length} bản. Chọn kệ khác hoặc giảm số bản đã chọn.</p>}
+                <small>Áp dụng để xem trước; nhấn Lưu thay đổi để xác nhận.</small>
+              </div>
+              <div className="lib-copies-sorting-list" aria-busy={saving}>
                 {sortingDetails.copies.map(copy => <article key={copy.id}>
-                  <label><input type="checkbox" checked={sortingSelected.includes(copy.id)} onChange={event => setSortingSelected(current => event.target.checked ? [...new Set([...current, copy.id])] : current.filter(id => id !== copy.id))} /><span><strong>{copy.barcode}</strong><small>{conditionLabels[copy.condition]} · {copy.hasBeenReturned ? 'Đã trả về' : 'Chưa có lượt mượn'}</small></span></label>
+                  <label><input type="checkbox" disabled={saving} checked={sortingSelected.includes(copy.id)} onChange={event => setSortingSelected(current => event.target.checked ? [...new Set([...current, copy.id])] : current.filter(id => id !== copy.id))} /><span><strong>{copy.barcode}</strong><small>{conditionLabels[copy.condition]} · {copy.hasBeenReturned ? 'Đã trả về' : 'Chưa có lượt mượn'}</small></span></label>
                   <button type="button" className="lib-copy-qr" onClick={() => setQrCopy({ barcode: copy.barcode, bookTitle: sortingDetails.title })} aria-label={`Xem mã QR ${copy.barcode}`}>Xem QR</button>
-                  <select aria-label={`Vị trí của bản sao ${copy.barcode}`} value={sortingDestinations[copy.id] ?? ''} onChange={event => setSortingDestinations(current => ({ ...current, [copy.id]: event.target.value }))}>
+                  <select disabled={saving} aria-label={`Vị trí của bản sao ${copy.barcode}`} value={sortingDestinations[copy.id] ?? ''} onChange={event => setSortingDestinations(current => ({ ...current, [copy.id]: event.target.value }))}>
                     <option value="">Giữ trong kho</option>
                     {locations.filter(location => location.availableCapacity > 0).map(location => <option key={location.id} value={location.name}>{location.name} · còn {location.availableCapacity} chỗ</option>)}
                   </select>
