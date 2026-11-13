@@ -79,12 +79,22 @@ public class CirculationController : ControllerBase
     [HttpGet("due-reminder-settings")]
     public async Task<IActionResult> GetDueReminderSettings(CancellationToken ct)
     {
-        var settings = await _db.CirculationReminderSettings.AsNoTracking()
+        var settings = await _db.CirculationReminderSettings
             .OrderBy(item => item.UpdatedAt)
             .FirstOrDefaultAsync(ct);
+        var days = settings?.ReminderDays ?? 4;
+        if (days != 2 && days != 4)
+        {
+            days = 4;
+            if (settings != null)
+            {
+                settings.ReminderDays = 4;
+                await _db.SaveChangesAsync(ct);
+            }
+        }
         return Ok(ApiResponse<CirculationDueReminderSettingsDto>.Ok(new(
             settings?.IsEnabled ?? false,
-            settings?.ReminderDays ?? 4,
+            days,
             settings?.UpdatedAt ?? DateTime.UtcNow)));
     }
 
@@ -93,7 +103,7 @@ public class CirculationController : ControllerBase
         [FromBody] UpdateCirculationDueReminderSettingsRequest request,
         CancellationToken ct)
     {
-        if (request.ReminderDays is not (2 or 4 or 7 or 14))
+        if (request.ReminderDays is not (2 or 4))
             return BadRequest(ApiResponse<object>.Fail("Chỉ hỗ trợ nhắc trước 4 hoặc 2 ngày."));
 
         var settings = await _db.CirculationReminderSettings

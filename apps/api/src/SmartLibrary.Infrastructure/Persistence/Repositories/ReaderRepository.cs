@@ -42,7 +42,15 @@ public class ReaderRepository : IReaderRepository
             q = q.Where(u => u.Status == status.Value);
 
         if (readerType.HasValue)
-            q = q.Where(u => u.ReaderType == readerType.Value);
+        {
+            var targetType = readerType.Value;
+            q = q.Where(u =>
+                u.TeacherId != null
+                    ? targetType == ReaderType.Lecturer
+                    : u.StudentId != null || u.Email.ToLower().EndsWith("@fpt.edu.vn")
+                        ? targetType == ReaderType.Student
+                        : targetType == ReaderType.External);
+        }
 
         var total = await q.CountAsync(ct);
 
@@ -57,12 +65,17 @@ public class ReaderRepository : IReaderRepository
                 Email = u.Email,
                 Phone = u.Phone,
                 StudentId = u.StudentId,
+                TeacherId = u.TeacherId,
                 Address = u.Address,
                 DateOfBirth = u.DateOfBirth,
                 AvatarUrl = u.AvatarUrl,
                 RoleName = u.Role != null ? u.Role.Name : "Reader",
                 Status = u.Status,
-                ReaderType = u.ReaderType,
+                ReaderType = u.TeacherId != null
+                    ? ReaderType.Lecturer
+                    : u.StudentId != null || u.Email.ToLower().EndsWith("@fpt.edu.vn")
+                        ? ReaderType.Student
+                        : ReaderType.External,
                 MembershipExpiresAt = u.MembershipExpiresAt,
                 IsActive = u.IsActive,
                 LastLoginAt = u.LastLoginAt,
@@ -89,12 +102,26 @@ public class ReaderRepository : IReaderRepository
         var totalSuspended = await CountReadersByStatusAsync("Suspended", ct);
         var totalReaders = await _context.UserProfiles.CountAsync(u => !u.IsDeleted && u.Role.Name == "Reader", ct);
 
+        var readerStats = await _context.UserProfiles
+            .Where(u => !u.IsDeleted && u.Role.Name == "Reader")
+            .GroupBy(u =>
+                u.TeacherId != null
+                    ? ReaderType.Lecturer
+                    : u.StudentId != null || u.Email.ToLower().EndsWith("@fpt.edu.vn")
+                        ? ReaderType.Student
+                        : ReaderType.External)
+            .Select(g => new { Type = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
         return new ReaderStatsDto
         {
             TotalReaders = totalReaders,
             ActiveReaders = totalActive,
             PendingReaders = totalPending,
-            SuspendedReaders = totalSuspended
+            SuspendedReaders = totalSuspended,
+            StudentReaders = readerStats.Where(x => x.Type == ReaderType.Student).Sum(x => x.Count),
+            LecturerReaders = readerStats.Where(x => x.Type == ReaderType.Lecturer).Sum(x => x.Count),
+            ExternalReaders = readerStats.Where(x => x.Type == ReaderType.External).Sum(x => x.Count),
         };
     }
 

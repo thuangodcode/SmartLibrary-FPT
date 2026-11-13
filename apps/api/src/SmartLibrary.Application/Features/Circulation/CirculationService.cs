@@ -252,7 +252,8 @@ public class CirculationService
             return Result<CirculationLoanDto>.Failure("Nhập mã vạch sách cần trả.");
         if (request.Notes?.Length > 2000)
             return Result<CirculationLoanDto>.Failure("Ghi chú tối đa 2000 ký tự.");
-        if (!string.IsNullOrWhiteSpace(request.Condition) &&
+        var isOverdueCondition = string.Equals(request.Condition, "Overdue", StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(request.Condition) && !isOverdueCondition &&
             (!Enum.TryParse<BookCondition>(request.Condition, true, out var validCondition) || !Enum.IsDefined(validCondition)))
             return Result<CirculationLoanDto>.Failure("Tình trạng sách không hợp lệ.");
         if (ParseCondition(request.Condition) is BookCondition.Damaged or BookCondition.Lost && string.IsNullOrWhiteSpace(request.Notes))
@@ -291,6 +292,8 @@ public class CirculationService
             loan.ReturnCondition = condition;
             if (!string.IsNullOrWhiteSpace(request.Notes))
                 loan.Notes = AppendNote(loan.Notes, $"Nhận trả {FormatPickup(now)}: {request.Notes.Trim()}");
+            if (isOverdueCondition && string.IsNullOrWhiteSpace(request.Notes))
+                loan.Notes = AppendNote(loan.Notes, "Ghi nhận trả sách quá hạn.");
             if (librarianId != Guid.Empty)
                 loan.LibrarianId = librarianId;
             if (loan.BookCopy != null)
@@ -1670,7 +1673,11 @@ public class CirculationService
     }
 
     private static BookCondition ParseCondition(string? value)
-        => Enum.TryParse<BookCondition>(value, true, out var parsed) ? parsed : BookCondition.Good;
+    {
+        if (string.Equals(value, "Overdue", StringComparison.OrdinalIgnoreCase))
+            return BookCondition.Good;
+        return Enum.TryParse<BookCondition>(value, true, out var parsed) ? parsed : BookCondition.Good;
+    }
 
     private static string FormatDue(DateTime? value)
         => value.HasValue ? CirculationRules.LibraryDate(value.Value).ToString("dd/MM/yyyy") : "—";

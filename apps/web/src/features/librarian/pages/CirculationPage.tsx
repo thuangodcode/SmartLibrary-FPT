@@ -3,6 +3,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import {
+  ArrowLeft,
   BookOpen,
   Bookmark,
   BellRing,
@@ -770,7 +771,7 @@ function LoansView() {
             <div className="circ-reminder-settings__copy">
               <strong>Nhắc hạn trả qua email</strong>
               <p>{reminderSettings.isEnabled
-                ? `Hệ thống sẽ tự gửi email trước hạn ${reminderSettings.reminderDays} ngày.`
+                ? `Hệ thống sẽ tự gửi email trước hạn ${reminderSettings.reminderDays === 2 ? 2 : 4} ngày.`
                 : 'Đang tắt. Bật để hệ thống tự gửi email nhắc độc giả.'}</p>
             </div>
             <label className="circ-reminder-days">
@@ -1215,7 +1216,7 @@ function ReturnView() {
   const [loansError, setLoansError] = useState<string | null>(null);
   const [conditions, setConditions] = useState<Record<string, string>>({});
   const [returningBarcode, setReturningBarcode] = useState<string | null>(null);
-  const [returnMode, setReturnMode] = useState<'reader' | 'barcode' | 'overdue' | 'activity'>(params.get('barcode') ? 'barcode' : 'reader');
+  const [returnMode, setReturnMode] = useState<'reader' | 'barcode' | 'activity'>(params.get('barcode') ? 'barcode' : 'reader');
   const [defaultCondition, setDefaultCondition] = useState('Good');
   const [manualBarcode, setManualBarcode] = useState(params.get('barcode') ?? '');
   const [manualCondition, setManualCondition] = useState('Good');
@@ -1223,7 +1224,6 @@ function ReturnView() {
   const [paidNowState, setPaidNowState] = useState<Record<string, boolean>>({});
   const [returnNotes, setReturnNotes] = useState<Record<string, string>>({});
   const [manualNotes, setManualNotes] = useState('');
-  const [overdueLoans, setOverdueLoans] = useState<CirculationLoan[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1232,19 +1232,16 @@ function ReturnView() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [statsRes, activityRes, overdueRes] = await Promise.all([
+      const [statsRes, activityRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/circulation/activity`, { headers }),
-        fetch(`${API_BASE_URL}/api/v1/circulation/overdue`, { headers }),
       ]);
       const statsJson = await parseApiResponse<ApiResult<CirculationStats>>(statsRes);
       const activityJson = await parseApiResponse<ApiResult<CirculationActivity[]>>(activityRes);
-      const overdueJson = await parseApiResponse<ApiResult<CirculationLoan[]>>(overdueRes);
       if (!statsRes.ok || !statsJson?.success) throw new Error(statsJson?.error || 'Không tải được thống kê.');
       if (!activityRes.ok || !activityJson?.success) throw new Error(activityJson?.error || 'Không tải được giao dịch.');
       setStats(statsJson?.data ?? null);
       setActivity(activityJson?.data ?? []);
-      setOverdueLoans(overdueJson?.data ?? []);
       setError(null);
     } catch (err) {
       const message = errorMessage(err, 'Không tải được dữ liệu trả sách.');
@@ -1341,76 +1338,15 @@ function ReturnView() {
       <WorkflowTabs
         label="Nội dung trả sách"
         value={returnMode}
-        onChange={(value) => setReturnMode(value as 'reader' | 'barcode' | 'overdue' | 'activity')}
+        onChange={(value) => setReturnMode(value as 'reader' | 'barcode' | 'activity')}
         tabs={[
           { value: 'reader', label: 'Trả theo độc giả' },
           { value: 'barcode', label: 'Trả nhanh theo mã vạch' },
-          { value: 'overdue', label: 'Quá hạn trả sách', count: overdueLoans.length },
           { value: 'activity', label: 'Giao dịch gần đây', count: activity.length },
         ]}
       />
 
-      {returnMode === 'overdue' ? (
-        <section className="circ-card" id="circ-panel-overdue-return" role="tabpanel" tabIndex={0}>
-          <div className="circ-card-head">
-            <div>
-              <h2>Sách quá hạn trả</h2>
-              <p>Danh sách các bản sao sách đã quá hạn cần thu hồi và đối chiếu phí quá hạn.</p>
-            </div>
-            <span className="circ-count">{overdueLoans.length} phiếu quá hạn</span>
-          </div>
-          {!overdueLoans.length ? (
-            <p className="circ-empty">Hiện không có phiếu mượn nào bị quá hạn.</p>
-          ) : (
-            <div className="circ-table-wrap">
-              <table className="circ-table">
-                <thead>
-                  <tr>
-                    <th>Độc giả</th>
-                    <th>Sách</th>
-                    <th>Hạn trả</th>
-                    <th>Quá hạn</th>
-                    <th>Phạt dự kiến</th>
-                    <th>Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overdueLoans.map((loan) => (
-                    <tr key={loan.id}>
-                      <td>
-                        <div>
-                          <strong>{loan.readerName}</strong>
-                          {loan.studentId && <small style={{ display: 'block', color: '#64748b' }}>MSSV/Mã: {loan.studentId}</small>}
-                          {loan.readerEmail && <small style={{ display: 'block', color: '#64748b' }}>{loan.readerEmail}</small>}
-                        </div>
-                      </td>
-                      <td>
-                        <strong>{loan.bookTitle}</strong>
-                        <small style={{ display: 'block', color: '#64748b' }}>Mã vạch: {loan.barcode}</small>
-                      </td>
-                      <td>{formatDate(loan.dueDate)}</td>
-                      <td><span className="circ-badge is-overdue">{loan.overdueDays} ngày</span></td>
-                      <td>{loan.suggestedFine ? formatMoney(loan.suggestedFine) : 'Theo chính sách'}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="circ-btn circ-btn--primary"
-                          onClick={() => {
-                            setManualBarcode(loan.barcode);
-                            setReturnMode('barcode');
-                          }}
-                        >
-                          Xử lý trả sách
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      ) : returnMode === 'activity' ? (
+      {returnMode === 'activity' ? (
       <section className="circ-card" id="circ-panel-activity" role="tabpanel" aria-labelledby="circ-tab-activity" tabIndex={0}>
         <h2>Giao dịch gần đây</h2>
         {loading ? (
@@ -1555,7 +1491,8 @@ function ReturnView() {
                                 disabled={busy}
                                 onChange={(e) => setConditions((prev) => ({ ...prev, [loan.id]: e.target.value }))}
                               >
-                                <option value="Good">Bình thường</option>
+                                <option value="Good">Bình thường (Đạt tiêu chuẩn)</option>
+                                <option value="Overdue">Quá hạn trả sách</option>
                                 {loan.copyCondition === 'LightDamaged' && <option value="LightDamaged">Hư nhẹ đã xác minh, không có hư hỏng mới</option>}
                                 <option value="Fair">Hơi cũ</option>
                                 <option value="Damaged">Hư hỏng</option>
@@ -1612,6 +1549,7 @@ function ReturnView() {
                 <span>Tình trạng khi trả</span>
                 <select value={manualCondition} onChange={(e) => setManualCondition(e.target.value)}>
                   <option value="Good">Bình thường (Đạt tiêu chuẩn)</option>
+                  <option value="Overdue">Quá hạn trả sách</option>
                   <option value="Fair">Hơi cũ (Còn nguyên vẹn)</option>
                   <option value="LightDamaged">Hư nhẹ đã xác minh, không có hư hỏng mới</option>
                   <option value="Damaged">Hư hỏng (Chờ xác minh bồi thường)</option>
@@ -2170,7 +2108,19 @@ export function CirculationIncidentDetailPage() {
     <section className="circ-page circ-page--overdue">
       <Chrome tab="overdue" stats={stats} loading={false} />
       <div className="circ-incident-detail-card circ-card">
-        <div className="circ-card-head"><div><span className="circ-eyebrow">HỒ SƠ TRẢ SÁCH CẦN XÁC MINH</span><h2>{item.bookTitle}</h2><p>{item.barcode} · {item.readerName}</p></div><span className={`circ-badge is-${item.status.toLowerCase()}`}>{STATUS_LABELS[item.status] ?? item.status}</span></div>
+        <div className="circ-card-head">
+          <div>
+            <span className="circ-eyebrow">HỒ SƠ TRẢ SÁCH CẦN XÁC MINH</span>
+            <h2>{item.bookTitle}</h2>
+            <p>{item.barcode} · {item.readerName}</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span className={`circ-badge is-${item.status.toLowerCase()}`}>{STATUS_LABELS[item.status] ?? item.status}</span>
+            <Link className="circ-btn" to="/librarian/circulation/overdue">
+              <ArrowLeft size={15} /> Quay lại danh sách
+            </Link>
+          </div>
+        </div>
         <dl className="circ-incident-detail-grid">
           <div><dt>Phiếu mượn</dt><dd>{STATUS_LABELS[item.loanStatus] || item.loanStatus}</dd></div><div><dt>Loại sự cố</dt><dd>{STATUS_LABELS[item.kind] ?? item.kind}</dd></div>
           <div><dt>Ngày ghi nhận</dt><dd>{formatDateTime(item.createdAt)}</dd></div>
@@ -2191,7 +2141,31 @@ export function CirculationIncidentDetailPage() {
           {item.suggestedOverdueFine && item.suggestedOverdueFine > 0 && <label className="circ-check"><input type="checkbox" checked={applyOverdue} onChange={(event) => setApplyOverdue(event.target.checked)} /> Cộng phí quá hạn {formatMoney(item.suggestedOverdueFine)}</label>}
           <label className="circ-field">Ghi chú xác minh<textarea rows={4} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Ghi nhận kết quả đối chiếu sách và phiếu mượn..." /></label>
           <div className="circ-actions"><button type="button" className="circ-btn circ-btn--primary" disabled={busy || amount <= 0 || !notes.trim() || item.loanStatus !== 'Returned'} onClick={() => void confirm()}>{busy ? 'Đang xác nhận...' : 'Xác nhận hồ sơ'}</button><button type="button" className="circ-btn" disabled={busy || !notes.trim()} onClick={() => void reject()}>Từ chối / tìm thấy sách</button><Link className="circ-btn" to={tabPath('overdue')}>Quay lại danh sách</Link></div>
-        </div> : <><div className="circ-incident-detail-note">Trách nhiệm bồi thường: {STATUS_LABELS[item.status] || item.status}. {item.totalAmount > 0 && <>Khoản phí liên quan: <Link to={tabPath('fines')}>xem danh sách phí phạt</Link>.</>}</div>{item.canRestoreCopy && <div className="circ-incident-detail-form"><h3>Đã sửa / tìm thấy sách — kiểm tra lại</h3>{conditionSelect}<label className="circ-field">Kết quả kiểm tra<textarea rows={3} maxLength={2000} value={notes} onChange={event => setNotes(event.target.value)} placeholder="Mô tả sửa chữa hoặc việc tìm thấy và kiểm tra sách" /></label><button type="button" className="circ-btn circ-btn--primary" disabled={busy || !notes.trim()} onClick={() => void restore()}>Xác nhận đủ điều kiện sử dụng</button></div>}</>}
+        </div> : (
+          <>
+            <div className="circ-incident-detail-note">
+              Trách nhiệm bồi thường: {STATUS_LABELS[item.status] || item.status}. {item.totalAmount > 0 && <>Khoản phí liên quan: <Link to={tabPath('fines')}>xem danh sách phí phạt</Link>.</>}
+            </div>
+            {item.canRestoreCopy && (
+              <div className="circ-incident-detail-form">
+                <h3>Đã sửa / tìm thấy sách — kiểm tra lại</h3>
+                {conditionSelect}
+                <label className="circ-field">
+                  Kết quả kiểm tra
+                  <textarea rows={3} maxLength={2000} value={notes} onChange={event => setNotes(event.target.value)} placeholder="Mô tả sửa chữa hoặc việc tìm thấy và kiểm tra sách" />
+                </label>
+                <button type="button" className="circ-btn circ-btn--primary" disabled={busy || !notes.trim()} onClick={() => void restore()}>
+                  Xác nhận đủ điều kiện sử dụng
+                </button>
+              </div>
+            )}
+            <div className="circ-actions" style={{ marginTop: '1.25rem' }}>
+              <Link className="circ-btn" to="/librarian/circulation/overdue">
+                <ArrowLeft size={15} /> Quay lại danh sách
+              </Link>
+            </div>
+          </>
+        )}
       </div>
     </section>
   );

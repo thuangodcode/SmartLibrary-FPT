@@ -9,6 +9,7 @@ public sealed class ReaderListItemDto
     public string Email { get; init; } = string.Empty;
     public string? Phone { get; init; }
     public string? StudentId { get; init; }
+    public string? TeacherId { get; init; }
     public string? Address { get; init; }
     public DateOnly? DateOfBirth { get; init; }
     public string? AvatarUrl { get; init; }
@@ -30,6 +31,9 @@ public sealed class ReaderStatsDto
     public int ActiveReaders { get; init; }
     public int PendingReaders { get; init; }
     public int SuspendedReaders { get; init; }
+    public int StudentReaders { get; init; }
+    public int LecturerReaders { get; init; }
+    public int ExternalReaders { get; init; }
 }
 
 public sealed class ReaderListResultDto
@@ -60,6 +64,7 @@ public sealed class ReaderDetailDto
     public string Email { get; init; } = string.Empty;
     public string? Phone { get; init; }
     public string? StudentId { get; init; }
+    public string? TeacherId { get; init; }
     public string? Address { get; init; }
     public DateOnly? DateOfBirth { get; init; }
     public string? AvatarUrl { get; init; }

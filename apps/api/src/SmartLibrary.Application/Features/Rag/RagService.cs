@@ -156,23 +156,74 @@ public class RagService
         if (!settings.LibrarianAiEnabled)
             return Result<RagAskResultDto>.Failure("Gợi ý nhập sách AI đang tắt.");
 
-        var prompt = !string.IsNullOrWhiteSpace(category)
-            ? $"""
-            Dựa trên danh mục/chủ đề "{category.Trim()}" và các đầu sách, chính sách hiện có, hãy gợi ý các quyển sách nổi bật nhất thuộc danh mục này mà thư viện đại học FPT HCMC nên có hoặc bổ sung.
-            Ưu tiên các tiêu chí thủ thư đã bật: {await BuildAcquisitionHintAsync(settings, ct)}
-            Nêu rõ lý do và điểm nổi bật cho từng cuốn. Không bịa ISBN.
-            """
-            : $"""
-            Dựa trên sách và chính sách hiện có, hãy gợi ý các đầu sách thư viện đại học FPT HCMC nên bổ sung.
-            Ưu tiên các tiêu chí thủ thư đã bật: {await BuildAcquisitionHintAsync(settings, ct)}
-            Nêu lý do ngắn cho từng gợi ý. Không bịa ISBN.
+        var trimmedCat = category?.Trim();
+        if (!string.IsNullOrWhiteSpace(trimmedCat))
+        {
+            var credential = await _settings.ResolveForAskAsync(role, userId, ct);
+            if (!credential.IsSuccess)
+                return Result<RagAskResultDto>.Failure(credential.Error ?? "Chưa cấu hình nhà cung cấp AI.");
+
+            var catalogHits = await _documents.SearchCatalogAsync(trimmedCat, 50, ct);
+            var categoryHits = catalogHits
+                .Where(h => h.Categories.Any(c => c.Contains(trimmedCat, StringComparison.OrdinalIgnoreCase)) ||
+                            h.Title.Contains(trimmedCat, StringComparison.OrdinalIgnoreCase) ||
+                            (h.Content != null && h.Content.Contains(trimmedCat, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            var hitsToUse = categoryHits.Count > 0
+                ? categoryHits
+                : catalogHits.Where(h => h.Categories.Any(c => c.Contains(trimmedCat, StringComparison.OrdinalIgnoreCase))).ToList();
+
+            if (hitsToUse.Count == 0 && catalogHits.Count > 0)
+            {
+                hitsToUse = catalogHits.Take(15).ToList();
+            }
+
+            if (hitsToUse.Count == 0)
+            {
+                return Ok($"Thư viện hiện chưa có đầu sách nào thuộc danh mục \"{trimmedCat}\". Thủ thư có thể lập kế hoạch bổ sung các đầu sách mới cho danh mục này.", []);
+            }
+
+            var prompt = $"""
+            Dựa trên danh mục "{trimmedCat}" và các đầu sách hiện có thuộc danh mục này trong thư viện, hãy gợi ý và phân tích các quyển sách nổi bật nhất thuộc danh mục "{trimmedCat}".
+            Ưu tiên các tiêu chí: {await BuildAcquisitionHintAsync(settings, ct)}
+            Nêu rõ lý do và điểm nổi bật cho từng cuốn thuộc danh mục "{trimmedCat}". Không bịa ISBN.
             """;
 
+            var listing = ExplainLocallyForCategory(trimmedCat, hitsToUse);
+            var answer = await ExplainWithAiAsync(credential.Data!, prompt, null, hitsToUse, listing, ct);
+            return Ok(string.IsNullOrWhiteSpace(answer) ? listing : answer.Trim(), hitsToUse.Select(MapSource).ToList());
+        }
+
+        var genericPrompt = $"""
+        Dựa trên sách và chính sách hiện có, hãy gợi ý các đầu sách thư viện đại học FPT HCMC nên bổ sung.
+        Ưu tiên các tiêu chí thủ thư đã bật: {await BuildAcquisitionHintAsync(settings, ct)}
+        Nêu lý do ngắn cho từng gợi ý. Không bịa ISBN.
+        """;
+
         return await AskAsync(
-            prompt,
+            genericPrompt,
             role,
             userId,
             ct);
+    }
+
+    private static string ExplainLocallyForCategory(string categoryName, IReadOnlyList<RagSearchHit> books)
+    {
+        var availableBooks = books.Count(book => book.AvailableCopies > 0);
+        var availableCopies = books.Sum(book => Math.Max(0, book.AvailableCopies));
+        var builder = new StringBuilder();
+        builder.Append($"Tìm thấy {books.Count} đầu sách nổi bật thuộc danh mục \"{categoryName}\". ");
+        builder.Append($"Có {availableBooks} đầu sách còn bản có thể mượn, tổng cộng {availableCopies} bản. ");
+        builder.Append("Các đầu sách tiêu biểu: ");
+        foreach (var book in books.Take(5))
+        {
+            builder.Append(book.Title);
+            if (!string.IsNullOrWhiteSpace(book.Author))
+                builder.Append(" · ").Append(book.Author);
+            builder.Append(". ");
+        }
+        return builder.ToString().Trim();
     }
 
     private async Task<(IReadOnlyList<RagSearchHit> Hits, bool Exact)> RetrieveAsync(
