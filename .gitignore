@@ -87,11 +87,5 @@ TestResults/
 .cursor/
 .codacy/
 
-# Local working notes and handoff (kept on disk, not published)
+# Local handoff (updated in place, not published)
 /project_understanding.md
-/docs/category-book-codes.md
-/docs/circulation-policy-clarity.md
-/docs/librarian-flow-audit.md
-/docs/mobile-librarian-phase1.md
-/docs/mobile-librarian-phase2.md
-/docs/mobile-librarian-ui-refresh.md
