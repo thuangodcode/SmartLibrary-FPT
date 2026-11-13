@@ -11,7 +11,7 @@ const string localConnection = "Host=127.0.0.1;Port=55439;Database=smartlibrary_
 var guard = new NpgsqlConnectionStringBuilder(localConnection);
 if (guard.Host != "127.0.0.1" || guard.Database != "smartlibrary_demo") throw new Exception("Demo database guard failed.");
 var envPath = Path.GetFullPath(args.FirstOrDefault(arg => !arg.StartsWith("--")) ?? ".env");
-var sourceConnection = File.ReadLines(envPath).First(line => line.StartsWith("ConnectionStrings__DefaultConnection=")).Split('=', 2)[1].Trim().Trim('"', '\'');
+string SourceConnection() => File.ReadLines(envPath).First(line => line.StartsWith("ConnectionStrings__DefaultConnection=")).Split('=', 2)[1].Trim().Trim('"', '\'');
 AppDbContext Context(string connection) => new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(connection).UseSnakeCaseNamingConvention().Options);
 await using var admin = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(localConnection) { Database = "postgres" }.ConnectionString);
 await admin.OpenAsync();
@@ -19,6 +19,20 @@ await using (var check = new NpgsqlCommand("SELECT count(*) FROM pg_database WHE
     if (Convert.ToInt32(await check.ExecuteScalarAsync()) == 0)
         await new NpgsqlCommand("CREATE DATABASE smartlibrary_demo", admin).ExecuteNonQueryAsync();
 await using var db = Context(localConnection);
+if (args.Any(arg => arg is "--prepare-tests" or "--test-status" or "--test-overdue"))
+{
+    if (!await db.Database.CanConnectAsync() || !await db.Database.SqlQueryRaw<bool>(
+            "SELECT to_regclass('public.profiles') IS NOT NULL AS \"Value\"").SingleAsync())
+        throw new InvalidOperationException("Chạy demo:seed để tạo database local trước; bộ test không tự sao chép dữ liệu nguồn.");
+    if (args.Contains("--prepare-tests"))
+    {
+        await db.Database.MigrateAsync();
+        await DemoTestPack.PrepareAsync(db);
+    }
+    if (args.Contains("--test-overdue")) await DemoTestPack.ActivateOverdueAsync(db);
+    await DemoTestPack.ExportStatusAsync(db);
+    return;
+}
 if (await db.Database.CanConnectAsync() && await db.Database.SqlQueryRaw<int>("SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_schema='public' AND table_name='profiles'").SingleAsync() > 0)
 {
     if (args.Contains("--align-workflow"))
@@ -33,7 +47,7 @@ if (await db.Database.CanConnectAsync() && await db.Database.SqlQueryRaw<int>("S
     if (args.Contains("--repair-auth"))
     {
         // Only the guarded local target is modified; the source transaction cannot write.
-        await using var authSource = Context(sourceConnection);
+        await using var authSource = Context(SourceConnection());
         await using var authRead = await authSource.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
         await authSource.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY");
         var sourceRoles = await authSource.Set<Role>().AsNoTracking().ToListAsync();
@@ -91,7 +105,7 @@ if (await db.Database.CanConnectAsync() && await db.Database.SqlQueryRaw<int>("S
 }
 await db.Database.EnsureCreatedAsync();
 // Snapshot only reference/catalog data and required account identities. Source is read-only at PostgreSQL level.
-await using var source = Context(sourceConnection);
+await using var source = Context(SourceConnection());
 await using var readOnly = await source.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
 await source.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY");
 var profiles = await source.UserProfiles.AsNoTracking().Include(item => item.Role)
