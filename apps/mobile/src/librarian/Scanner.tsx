@@ -24,7 +24,13 @@ export function Scanner({ onCode, paused, purpose = 'lookup' }: { onCode: (code:
     const subscription = AppState.addEventListener('change', state => setForeground(state === 'active'));
     return () => { active = false; subscription.remove(); };
   }, []);
-  useEffect(() => { if (!paused) locked.current = false; }, [paused]);
+  useEffect(() => {
+    if (!paused && foreground) {
+      locked.current = false;
+      setReady(true);
+      setError('');
+    }
+  }, [paused, foreground]);
 
   const accept = (raw: string) => {
     if (paused || locked.current) return;
@@ -44,11 +50,12 @@ export function Scanner({ onCode, paused, purpose = 'lookup' }: { onCode: (code:
         style={StyleSheet.absoluteFill} facing="back" barcodeScannerSettings={{ barcodeTypes: ['qr', 'code128'] }}
         onBarcodeScanned={ready ? ({ data }) => accept(data) : undefined} onMountError={() => setCameraError('Không thể mở camera. Bạn có thể nhập mã bản sao bên dưới.')}>
         <View pointerEvents="none" style={s.viewfinder}><View style={s.frame} />{ready && <Text style={s.cameraText}>Đặt QR của bản sao trong khung</Text>}</View>
-        {!ready && <View style={s.scanAgain}><Action title="Quét mã tiếp theo" onPress={() => { locked.current = false; setReady(true); setError(''); }} /></View>}
+
       </CameraView> : <View style={s.cameraPlaceholder}><Text style={s.cameraTitle}>{available === false ? 'Dùng mã bản sao để tra cứu' : cameraError ? 'Camera chưa sẵn sàng' : 'Quét QR bằng camera'}</Text><Text style={s.cameraHint}>{available === false ? 'Thiết bị này không có camera khả dụng. Chuyển sang Nhập mã để tiếp tục.' : cameraError || 'Cho phép camera để đọc QR digital đang mở trên web.'}</Text>{available && !permission?.granted && <Action title={permission?.canAskAgain === false ? 'Mở cài đặt camera' : 'Cho phép camera'} onPress={() => {
         if (permission?.canAskAgain === false) void Linking.openSettings();
         else void requestPermission().catch(() => setCameraError('Không thể yêu cầu quyền camera. Hãy dùng Nhập mã.'));
       }} />}{(available === false || cameraError) && <Action title="Nhập mã bản sao" onPress={() => setMode('manual')} secondary />}</View>}
+{!ready && <View style={s.scanAgain}><Action title="Quét mã tiếp theo" onPress={() => { locked.current = false; setReady(true); setError(''); }} /></View>}
     </View>}
     {mode === 'manual' && <View style={u.panel}><Text style={u.itemTitle}>Mã bản sao</Text><TextInput accessibilityLabel="Mã bản sao" value={code} onChangeText={text => { setCode(text); locked.current = false; setReady(true); setError(''); }} autoCapitalize="characters" autoCorrect={false} placeholder="Ví dụ: KHTN002-01" placeholderTextColor={C.muted} style={u.input} returnKeyType="search" maxLength={100} onSubmitEditing={() => accept(code)} editable={!paused} /><Action title={purpose === 'checkout' ? 'Đối chiếu mã bản sao' : 'Tra cứu bản sao'} onPress={() => accept(code)} disabled={!code.trim() || paused} /></View>}
     {!!error && <Notice text={error} error />}

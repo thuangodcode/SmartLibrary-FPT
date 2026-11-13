@@ -28,7 +28,7 @@ export interface Incident {
 export interface StaffFine { id: string; code: string; amount: number; reason: string; status: string; paidAt?: string }
 export interface CopyHistory { loans: StaffLoan[]; incidents: Incident[] }
 export interface LoanDetail { loan: StaffLoan; incidents: Incident[]; fines: StaffFine[] }
-export const incidentNames: Record<string, string> = { Damage: 'Hư hỏng', PendingReview: 'Chờ xác minh', CompensationPending: 'Chờ thanh toán', Resolved: 'Đã hoàn tất trách nhiệm bồi thường', Rejected: 'Đã từ chối hồ sơ', Light: 'Hư nhẹ', Severe: 'Hư nặng', Lost: 'Thất lạc', Unknown: 'Chưa xác định' };
+export const incidentNames: Record<string, string> = { Damage: 'Hư hỏng', PendingReview: 'Chờ xác minh', CompensationPending: 'Chờ thanh toán', Resolved: 'Đã xử lý', Rejected: 'Đã từ chối hồ sơ', Light: 'Hư nhẹ', Severe: 'Hư nặng', Lost: 'Thất lạc', Unknown: 'Chưa xác định' };
 export const fineNames: Record<string, string> = { Pending: 'Chưa thanh toán', Paid: 'Đã thanh toán', Waived: 'Đã miễn' };
 export function copyPlace(copy: CopyLookup) {
   if (copy.openLoan) return ['Borrowed', 'Overdue'].includes(copy.openLoan.status) ? 'Độc giả đang giữ sách' : 'Đang giữ cho yêu cầu mượn';

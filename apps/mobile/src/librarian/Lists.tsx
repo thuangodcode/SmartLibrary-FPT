@@ -15,7 +15,7 @@ export function loanTone(status: string): Tone {
 export function LoanCard({ loan, onOpen }: { loan: StaffLoan; onOpen: (id: string) => void }) {
   const status = loan.displayStatus || loan.status;
   const action = loan.status === 'Pending' ? 'Tiếp nhận' : loan.status === 'Approved' ? 'Đối chiếu giao' : ['Borrowed', 'Overdue'].includes(loan.status) ? 'Nhận trả' : 'Xem kết quả';
-  const time = loan.status === 'Returned' ? `Đã trả ${dateOf(loan.returnDate)}` : ['Pending', 'Approved'].includes(loan.status) ? `Lịch nhận ${dateTimeOf(loan.pickupAt)}` : loan.dueDate ? `Hạn ${dateOf(loan.dueDate)}` : 'Chưa có hạn trả';
+  const time = loan.status === 'Returned' ? `Đã trả ${dateTimeOf(loan.returnDate)}` : ['Pending', 'Approved'].includes(loan.status) ? `Lịch nhận ${dateTimeOf(loan.pickupAt)}` : loan.dueDate ? `Hạn ${dateOf(loan.dueDate)}` : 'Chưa có hạn trả';
   return <Pressable accessibilityRole="button" accessibilityLabel={`${action}: ${loan.bookTitle}, ${loan.barcode}, ${loan.readerName}, ${statusNames[status] || status}`} onPress={() => onOpen(loan.id)} style={({ pressed }) => [u.panel, pressed && u.pressed]}>
     <BookIdentity title={loan.bookTitle} code={loan.barcode} cover={loan.coverImageUrl} />
     <View style={u.row}><Text style={[u.itemTitle, u.grow, { fontSize: 14 }]} numberOfLines={1}>{loan.readerName}</Text><Text style={styles.meta}>{loan.code}</Text></View>
@@ -78,7 +78,7 @@ export function Incidents({ token, revision, routeKey, onOpen }: { token: string
     {result.error && <Notice text={result.error} error retry={result.reload} />}
     {result.loading && !result.data ? <Loading /> : result.data && <View style={u.section}>
       <View style={u.row}><Text style={[u.sectionTitle, u.grow]}>{incidentFilters.find(item => item.id === filter)?.label}</Text><Text style={styles.meta}>{rows.length} hồ sơ phù hợp</Text></View>
-      <Text style={styles.meta}>Lọc trong tối đa 50 hồ sơ gần nhất. Đã xử lý trách nhiệm bồi thường không đồng nghĩa sách đã được phục hồi.</Text>
+      <Text style={styles.meta}>50 hồ sơ gần nhất</Text>
       {!rows.length && <Notice text={query ? 'Chưa tìm thấy hồ sơ trong danh sách gần nhất. Thử mã bản sao chính xác hoặc dùng Quét để xem lịch sử cuốn sách.' : 'Không có hồ sơ trong nhóm này ở danh sách gần nhất.'} />}
       {rows.map(item => <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Hồ sơ ${item.barcode}, ${item.bookTitle}, ${incidentNames[item.status]}`} onPress={() => onOpen(item.id)} style={({ pressed }) => [u.panel, pressed && u.pressed]}>
         <View style={u.row}><Text style={[u.itemTitle, u.grow]}>{item.bookTitle}</Text><ChevronRight size={18} color={C.muted} /></View>
