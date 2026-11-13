@@ -261,6 +261,7 @@ public class ReturnLoanRequest
     public string? Condition { get; set; }
     public string? Notes { get; set; }
     public Guid? LoanId { get; set; }
+    public bool PaidNow { get; set; }
 }
 
 public class RecordFineRequest

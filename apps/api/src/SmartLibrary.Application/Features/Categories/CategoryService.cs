@@ -86,8 +86,27 @@ public class CategoryService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to upload category image to Cloudinary.");
-                return Result<CategoryDto>.Failure($"Không thể tải hình ảnh lên Cloudinary: {ex.Message}");
+                _logger.LogWarning(ex, "Failed to upload category image to Cloudinary; falling back to inline or null.");
+                if (form.Image.Length <= 2 * 1024 * 1024)
+                {
+                    try
+                    {
+                        using var ms = new MemoryStream();
+                        form.Image.OpenReadStream().CopyTo(ms);
+                        var mime = extension switch
+                        {
+                            ".png" => "image/png",
+                            ".webp" => "image/webp",
+                            ".gif" => "image/gif",
+                            _ => "image/jpeg"
+                        };
+                        imageUrl = $"data:{mime};base64,{Convert.ToBase64String(ms.ToArray())}";
+                    }
+                    catch
+                    {
+                        imageUrl = null;
+                    }
+                }
             }
         }
 
@@ -179,8 +198,27 @@ public class CategoryService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to upload category image to Cloudinary.");
-                return Result<CategoryDto>.Failure($"Không thể tải hình ảnh lên Cloudinary: {ex.Message}");
+                _logger.LogWarning(ex, "Failed to upload category image to Cloudinary; falling back to inline or keeping current.");
+                if (form.Image.Length <= 2 * 1024 * 1024)
+                {
+                    try
+                    {
+                        using var ms = new MemoryStream();
+                        form.Image.OpenReadStream().CopyTo(ms);
+                        var mime = extension switch
+                        {
+                            ".png" => "image/png",
+                            ".webp" => "image/webp",
+                            ".gif" => "image/gif",
+                            _ => "image/jpeg"
+                        };
+                        category.ImageUrl = $"data:{mime};base64,{Convert.ToBase64String(ms.ToArray())}";
+                    }
+                    catch
+                    {
+                        // keep current
+                    }
+                }
             }
         }
 

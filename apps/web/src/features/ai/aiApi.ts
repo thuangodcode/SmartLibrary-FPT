@@ -269,8 +269,8 @@ export const runRagReindex = async (
   return job.result;
 };
 
-export const getAcquisitionSuggestions = (token: string) =>
-  callApi<RagAskResult>(token, '/api/v1/ai/acquisition-suggestions', { method: 'POST' });
+export const getAcquisitionSuggestions = (token: string, category?: string) =>
+  callApi<RagAskResult>(token, '/api/v1/ai/acquisition-suggestions', json({ category: category?.trim() || null }));
 
 export const getLibrarianWorkspace = (token: string, days = 30) =>
   callApi<AiLibrarianWorkspace>(token, `/api/v1/ai/librarian-workspace?days=${days}`, { method: 'GET' });

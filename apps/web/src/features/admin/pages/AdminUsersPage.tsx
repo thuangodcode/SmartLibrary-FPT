@@ -82,9 +82,9 @@ const statusLabels: Record<string, string> = {
 };
 
 const readerTypeLabels: Record<ReaderType, string> = {
-  Student: 'Sinh viên trong trường',
-  Lecturer: 'Giảng viên trong trường',
-  External: 'Người bên ngoài trường',
+  Student: 'Sinh viên',
+  Lecturer: 'Giảng viên',
+  External: 'Độc giả ngoài trường',
 };
 
 const AdminUsersPage: React.FC = () => {
@@ -187,9 +187,9 @@ const AdminUsersPage: React.FC = () => {
     }
     return [
       { label: 'Tổng số độc giả', value: stats.totalReaders, icon: Users, tone: 'orange' },
-      { label: 'Sinh viên trong trường', value: stats.studentReaders, icon: UserRoundCheck, tone: 'green' },
+      { label: 'Sinh viên', value: stats.studentReaders, icon: UserRoundCheck, tone: 'green' },
       { label: 'Giảng viên', value: stats.lecturerReaders, icon: UserRound, tone: 'blue' },
-      { label: 'Người bên ngoài trường', value: stats.externalReaders, icon: Users, tone: 'purple' },
+      { label: 'Độc giả ngoài trường', value: stats.externalReaders, icon: Users, tone: 'purple' },
     ];
   }, [data?.stats, role]);
 
@@ -250,9 +250,9 @@ const AdminUsersPage: React.FC = () => {
           <nav className="admin-users-reader-tabs" aria-label="Loại độc giả">
             {([
               ['All', 'Tất cả độc giả'],
-              ['Student', 'Sinh viên trong trường'],
+              ['Student', 'Sinh viên'],
               ['Lecturer', 'Giảng viên'],
-              ['External', 'Người bên ngoài trường'],
+              ['External', 'Độc giả ngoài trường'],
             ] as const).map(([type, label]) => (
               <button
                 className={readerType === type ? 'is-active' : ''}

@@ -324,6 +324,28 @@ public class CirculationService
                 && settings.FinePerDay > 0
                 && await _repository.HasOverdueFineAsync(loan.Id, ct);
 
+            if (!isLostOrDamaged && request.PaidNow && (createdFine is > 0 || overdueFineAlreadyExists))
+            {
+                var fineToPay = await _repository.GetOverdueFineAsync(loan.Id, ct);
+                if (fineToPay is not null && fineToPay.Status == FineStatus.Pending)
+                {
+                    fineToPay.Status = FineStatus.Paid;
+                    fineToPay.PaidAt = now;
+                    fineToPay.PaymentMethod = "Cash";
+                    fineToPay.RecordedById = librarianId == Guid.Empty ? null : librarianId;
+                    await _repository.AddFinePaymentAsync(new FinePayment
+                    {
+                        FineId = fineToPay.Id,
+                        Method = "Cash",
+                        Status = FinePaymentStatus.Paid,
+                        Amount = fineToPay.Amount,
+                        InitiatedById = librarianId == Guid.Empty ? null : librarianId,
+                        RecordedById = librarianId == Guid.Empty ? null : librarianId,
+                        PaidAt = now
+                    }, ct);
+                }
+            }
+
             if (loan.BookCopy is { IsAvailable: true, Location: not null })
             {
                 await _unitOfWork.SaveChangesAsync(ct);
@@ -1605,8 +1627,12 @@ public class CirculationService
     {
         copy.Condition = condition;
         copy.IsAvailable = !keepUnavailable;
-        // Returned copies go to the warehouse first; shelf placement is a separate librarian workflow.
         copy.Location = null;
+        if (!keepUnavailable)
+        {
+            if (copy.Book != null)
+                copy.Book.AvailableCopies += 1;
+        }
     }
 
     private static void SetCopyAvailability(BookCopy copy, BookCondition condition, bool available)

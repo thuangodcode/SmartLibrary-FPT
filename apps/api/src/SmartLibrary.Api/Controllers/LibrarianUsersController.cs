@@ -25,6 +25,20 @@ public sealed class LibrarianUsersController : ControllerBase
         _circulation = circulation;
     }
 
+    [HttpGet]
+    [HttpGet("/api/v1/readers")]
+    public async Task<IActionResult> GetReaders(
+        [FromQuery] string? status,
+        [FromQuery] string? readerType,
+        [FromQuery] string? q,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken ct = default)
+    {
+        var result = await _userManagementService.GetUsersAsync("Reader", q, status, readerType, page, pageSize, ct);
+        return Ok(ApiResponse<object>.Ok(result));
+    }
+
     [HttpGet("{userId:guid}/history")]
     public async Task<IActionResult> GetReaderHistory(Guid userId, CancellationToken cancellationToken)
     {

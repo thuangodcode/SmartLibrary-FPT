@@ -264,16 +264,9 @@ export const RegistrationApprovalPage: React.FC = () => {
   };
 
   const downloadTemplate = () => {
-    const csvContent =
-      'fullName,studentId,dateOfBirth,phone,address\n' +
-      'Nguyen Van A,SE180001,2002-01-15,0901234567,TP HCM\n' +
-      'Tran Thi B,SE180002,2002-06-20,0912345678,TP HCM\n';
-
-    const blob = new Blob(['\uFEFF', csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'template_import_readers.csv');
+    link.href = '/template_import_readers.xlsx';
+    link.setAttribute('download', 'template_import_readers.xlsx');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -805,7 +798,7 @@ export const RegistrationApprovalPage: React.FC = () => {
               </button>
             </header>
             <button className="reg-template-link" onClick={downloadTemplate} type="button">
-              <Download size={15} /> Tải tệp mẫu CSV (mở được bằng Excel)
+              <Download size={15} /> Tải tệp mẫu Excel (.xlsx) / CSV
             </button>
             <form onSubmit={handleImport}>
               <label className="reg-file-picker">

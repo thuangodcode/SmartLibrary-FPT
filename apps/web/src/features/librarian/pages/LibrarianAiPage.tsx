@@ -89,6 +89,7 @@ const LibrarianAiPage = () => {
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [preview, setPreview] = useState<RagAskResult | null>(null);
+  const [previewCategory, setPreviewCategory] = useState<string>('');
   const [question, setQuestion] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [searching, setSearching] = useState(false);
@@ -255,7 +256,7 @@ const LibrarianAiPage = () => {
     }
     setPreviewing(true);
     try {
-      setPreview(await getAcquisitionSuggestions(accessToken));
+      setPreview(await getAcquisitionSuggestions(accessToken, previewCategory));
     } catch (previewError) {
       setPreview(null);
       showToast({
@@ -530,6 +531,25 @@ const LibrarianAiPage = () => {
                 </div>
               )}
 
+              <div className="ai-biz-preview-filter" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+                <label htmlFor="preview-category-input" style={{ fontWeight: 500, fontSize: '0.875rem' }}>
+                  Danh mục sách muốn xem nổi bật:
+                </label>
+                <input
+                  id="preview-category-input"
+                  list="library-category-datalist"
+                  value={previewCategory}
+                  onChange={(e) => setPreviewCategory(e.target.value)}
+                  placeholder="Nhập hoặc chọn danh mục (để trống: tất cả danh mục)"
+                  style={{ minWidth: 280, padding: '0.45rem 0.75rem', borderRadius: 6, border: '1px solid #d1d5db', fontSize: '0.875rem' }}
+                />
+                <datalist id="library-category-datalist">
+                  {(categoriesQuery.data ?? []).map((cat) => (
+                    <option key={cat.id} value={cat.name} />
+                  ))}
+                </datalist>
+              </div>
+
               <div className="ai-biz-actions">
                 <button
                   type="button"
@@ -668,7 +688,7 @@ function ReaderAiQuestionsManager({ accessToken }: { accessToken: string }) {
 
   const addQuestion = () => {
     const trimmed = newQuestion.trim();
-    if (trimmed.length < 3 || trimmed.length > 180 || questions.length >= 12) return;
+    if (trimmed.length < 3 || trimmed.length > 180 || questions.length >= 30) return;
     setQuestions((current) => [...current, trimmed]);
     setNewQuestion('');
     setError(null);
@@ -698,7 +718,7 @@ function ReaderAiQuestionsManager({ accessToken }: { accessToken: string }) {
           <h2 id="reader-ai-questions-title"><Sparkles size={17} /> Câu hỏi gợi ý cho độc giả</h2>
           <p>Quản lý các câu hỏi nhanh hiển thị trong trợ lý AI. Câu trả lời được tạo từ dữ liệu thư viện và chính sách đang áp dụng.</p>
         </div>
-        <span>{questions.length} / 12 câu hỏi</span>
+        <span>{questions.length} / 30 câu hỏi</span>
       </div>
       {loading ? <p className="ai-biz-muted">Đang tải danh sách câu hỏi…</p> : (
         <div className="ai-reader-question-list">

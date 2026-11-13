@@ -217,18 +217,29 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
             throw new ValidationException("Họ và tên phải có từ 2 đến 255 ký tự.");
         if (employeeId.Length is < 2 or > 50 || !System.Text.RegularExpressions.Regex.IsMatch(employeeId, "^[a-zA-Z0-9._-]+$"))
             throw new ValidationException("Mã nhân viên chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang (2-50 ký tự).");
-        if (username.Length is < 3 or > 50 || !System.Text.RegularExpressions.Regex.IsMatch(username, "^[a-zA-Z0-9._-]+$"))
-            throw new ValidationException("Tên tài khoản chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang (3-50 ký tự).");
+
+        var isEmail = username.Contains('@');
+        if (isEmail)
+        {
+            var emailChecker = new EmailAddressAttribute();
+            if (!emailChecker.IsValid(username) || username.Length > 100)
+                throw new ValidationException("Email đăng nhập không hợp lệ (tối đa 100 ký tự).");
+        }
+        else if (username.Length is < 3 or > 50 || !System.Text.RegularExpressions.Regex.IsMatch(username, "^[a-zA-Z0-9._-]+$"))
+        {
+            throw new ValidationException("Tên tài khoản chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang (3-50 ký tự) hoặc là email hợp lệ.");
+        }
+
         var password = request.Password ?? string.Empty;
         if (password.Length < 8)
             throw new ValidationException("Mật khẩu Thủ thư phải có ít nhất 8 ký tự.");
 
-        var email = $"{username}@smartlibrary.local";
+        var email = isEmail ? username : $"{username}@smartlibrary.local";
         var duplicate = await _dbContext.UserProfiles
             .IgnoreQueryFilters()
             .AnyAsync(user => user.Email.ToLower() == email.ToLower(), cancellationToken);
         if (duplicate)
-            throw new ValidationException("Tên tài khoản này đã được sử dụng.");
+            throw new ValidationException("Tên tài khoản hoặc email này đã được sử dụng.");
 
         var duplicateEmployeeId = await _dbContext.UserProfiles
             .IgnoreQueryFilters()

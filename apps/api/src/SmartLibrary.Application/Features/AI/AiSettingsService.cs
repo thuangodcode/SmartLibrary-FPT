@@ -84,8 +84,8 @@ public class AiSettingsService
             .Select(question => question.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
-        if (cleaned.Count > 12)
-            return Result<IReadOnlyList<string>>.Failure("Chỉ có thể hiển thị tối đa 12 câu hỏi gợi ý.");
+        if (cleaned.Count > 30)
+            return Result<IReadOnlyList<string>>.Failure("Chỉ có thể hiển thị tối đa 30 câu hỏi gợi ý.");
         if (cleaned.Any(question => question.Length < 3 || question.Length > 180))
             return Result<IReadOnlyList<string>>.Failure("Mỗi câu hỏi cần từ 3 đến 180 ký tự.");
 

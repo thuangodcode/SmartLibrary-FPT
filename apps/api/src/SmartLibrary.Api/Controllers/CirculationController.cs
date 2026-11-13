@@ -57,7 +57,7 @@ public class CirculationController : ControllerBase
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var start = from ?? today;
-        var end = to ?? today.AddDays(30);
+        var end = to ?? today.AddDays(4);
         if (end < start)
             return BadRequest(ApiResponse<object>.Fail("Ngày kết thúc phải sau hoặc bằng ngày bắt đầu."));
 
@@ -84,7 +84,7 @@ public class CirculationController : ControllerBase
             .FirstOrDefaultAsync(ct);
         return Ok(ApiResponse<CirculationDueReminderSettingsDto>.Ok(new(
             settings?.IsEnabled ?? false,
-            settings?.ReminderDays ?? 7,
+            settings?.ReminderDays ?? 4,
             settings?.UpdatedAt ?? DateTime.UtcNow)));
     }
 
@@ -93,8 +93,8 @@ public class CirculationController : ControllerBase
         [FromBody] UpdateCirculationDueReminderSettingsRequest request,
         CancellationToken ct)
     {
-        if (request.ReminderDays is not (7 or 14))
-            return BadRequest(ApiResponse<object>.Fail("Chỉ hỗ trợ nhắc trước 7 hoặc 14 ngày."));
+        if (request.ReminderDays is not (2 or 4 or 7 or 14))
+            return BadRequest(ApiResponse<object>.Fail("Chỉ hỗ trợ nhắc trước 4 hoặc 2 ngày."));
 
         var settings = await _db.CirculationReminderSettings
             .OrderBy(item => item.UpdatedAt)

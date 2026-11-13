@@ -504,8 +504,8 @@ function LoansView() {
   const [dueLoading, setDueLoading] = useState(false);
   const [dueError, setDueError] = useState<string | null>(null);
   const [dueRange, setDueRange] = useState<Date[]>([]);
-  const [dueHorizon, setDueHorizon] = useState<7 | 14 | 30>(30);
-  const [reminderSettings, setReminderSettings] = useState<DueReminderSettings>({ isEnabled: false, reminderDays: 7, updatedAt: '' });
+  const [dueHorizon, setDueHorizon] = useState<4 | 2>(4);
+  const [reminderSettings, setReminderSettings] = useState<DueReminderSettings>({ isEnabled: false, reminderDays: 4, updatedAt: '' });
   const [reminderSaving, setReminderSaving] = useState(false);
   const [reminderMessage, setReminderMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -702,9 +702,9 @@ function LoansView() {
     const dueDay = dayStart(loan.dueDate);
     if (dueDay === null) return false;
     const daysRemaining = Math.ceil((dueDay - todayStart.getTime()) / 86_400_000);
-    return daysRemaining >= 0 && (dueRange.length > 0 || daysRemaining <= dueHorizon);
+    return daysRemaining >= 0 && (dueRange.length > 0 ? daysRemaining <= 30 : daysRemaining <= dueHorizon);
   });
-  const dueMilestones = ([7, 14, 30] as const).map((days) => ({
+  const dueMilestones = ([4, 2] as const).map((days) => ({
     days,
     count: dueLoans.filter((loan) => {
       const dueDay = dayStart(loan.dueDate);
@@ -729,7 +729,7 @@ function LoansView() {
         tabs={[
           { value: 'pending', label: 'Yêu cầu chờ xử lý', count: pending.length },
           { value: 'list', label: 'Danh sách mượn sách', count: list?.totalCount ?? 0 },
-          { value: 'due', label: 'Sắp đến hạn', count: dueLoans.length },
+          { value: 'due', label: 'Sắp đến hạn', count: dueLoans.filter((l) => { const d = dayStart(l.dueDate); if (!d) return false; const r = Math.ceil((d - todayStart.getTime()) / 86400000); return r >= 0 && r <= 4; }).length },
         ]}
       />
 
@@ -779,8 +779,8 @@ function LoansView() {
                 value={reminderSettings.reminderDays}
                 onChange={(event) => setReminderSettings((current) => ({ ...current, reminderDays: Number(event.target.value) }))}
               >
-                <option value={7}>7 ngày</option>
-                <option value={14}>14 ngày</option>
+                <option value={4}>4 ngày</option>
+                <option value={2}>2 ngày</option>
               </select>
             </label>
             <label className="circ-reminder-toggle">
@@ -1215,12 +1215,15 @@ function ReturnView() {
   const [loansError, setLoansError] = useState<string | null>(null);
   const [conditions, setConditions] = useState<Record<string, string>>({});
   const [returningBarcode, setReturningBarcode] = useState<string | null>(null);
-  const [returnMode, setReturnMode] = useState<'reader' | 'barcode' | 'activity'>(params.get('barcode') ? 'barcode' : 'reader');
+  const [returnMode, setReturnMode] = useState<'reader' | 'barcode' | 'overdue' | 'activity'>(params.get('barcode') ? 'barcode' : 'reader');
   const [defaultCondition, setDefaultCondition] = useState('Good');
   const [manualBarcode, setManualBarcode] = useState(params.get('barcode') ?? '');
   const [manualCondition, setManualCondition] = useState('Good');
+  const [manualPaidNow, setManualPaidNow] = useState(true);
+  const [paidNowState, setPaidNowState] = useState<Record<string, boolean>>({});
   const [returnNotes, setReturnNotes] = useState<Record<string, string>>({});
   const [manualNotes, setManualNotes] = useState('');
+  const [overdueLoans, setOverdueLoans] = useState<CirculationLoan[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1229,16 +1232,19 @@ function ReturnView() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [statsRes, activityRes] = await Promise.all([
+      const [statsRes, activityRes, overdueRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/circulation/activity`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/circulation/overdue`, { headers }),
       ]);
       const statsJson = await parseApiResponse<ApiResult<CirculationStats>>(statsRes);
       const activityJson = await parseApiResponse<ApiResult<CirculationActivity[]>>(activityRes);
+      const overdueJson = await parseApiResponse<ApiResult<CirculationLoan[]>>(overdueRes);
       if (!statsRes.ok || !statsJson?.success) throw new Error(statsJson?.error || 'Không tải được thống kê.');
       if (!activityRes.ok || !activityJson?.success) throw new Error(activityJson?.error || 'Không tải được giao dịch.');
       setStats(statsJson?.data ?? null);
       setActivity(activityJson?.data ?? []);
+      setOverdueLoans(overdueJson?.data ?? []);
       setError(null);
     } catch (err) {
       const message = errorMessage(err, 'Không tải được dữ liệu trả sách.');
@@ -1279,7 +1285,7 @@ function ReturnView() {
     setLoansError(null);
   };
 
-  const returnBook = async (barcode: string, condition: string, notes: string, loanId?: string) => {
+  const returnBook = async (barcode: string, condition: string, notes: string, loanId?: string, paidNow = true) => {
     if (['Damaged', 'Lost'].includes(condition) && !notes.trim()) {
       showToast({ type: 'error', title: 'Thiếu mô tả tình trạng', message: 'Ghi rõ hư hỏng hoặc lý do thất lạc trước khi nhận trả.' });
       return;
@@ -1292,7 +1298,7 @@ function ReturnView() {
       const res = await fetch(`${API_BASE_URL}/api/v1/circulation/return`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ barcode, condition, notes: notes.trim(), loanId }),
+        body: JSON.stringify({ barcode, condition, notes: notes.trim(), loanId, paidNow }),
       });
       const json = await parseApiResponse<ApiResult<ReturnResult>>(res);
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Thao tác trả sách thất bại.');
@@ -1335,15 +1341,76 @@ function ReturnView() {
       <WorkflowTabs
         label="Nội dung trả sách"
         value={returnMode}
-        onChange={(value) => setReturnMode(value as 'reader' | 'barcode' | 'activity')}
+        onChange={(value) => setReturnMode(value as 'reader' | 'barcode' | 'overdue' | 'activity')}
         tabs={[
           { value: 'reader', label: 'Trả theo độc giả' },
           { value: 'barcode', label: 'Trả nhanh theo mã vạch' },
+          { value: 'overdue', label: 'Quá hạn trả sách', count: overdueLoans.length },
           { value: 'activity', label: 'Giao dịch gần đây', count: activity.length },
         ]}
       />
 
-      {returnMode === 'activity' ? (
+      {returnMode === 'overdue' ? (
+        <section className="circ-card" id="circ-panel-overdue-return" role="tabpanel" tabIndex={0}>
+          <div className="circ-card-head">
+            <div>
+              <h2>Sách quá hạn trả</h2>
+              <p>Danh sách các bản sao sách đã quá hạn cần thu hồi và đối chiếu phí quá hạn.</p>
+            </div>
+            <span className="circ-count">{overdueLoans.length} phiếu quá hạn</span>
+          </div>
+          {!overdueLoans.length ? (
+            <p className="circ-empty">Hiện không có phiếu mượn nào bị quá hạn.</p>
+          ) : (
+            <div className="circ-table-wrap">
+              <table className="circ-table">
+                <thead>
+                  <tr>
+                    <th>Độc giả</th>
+                    <th>Sách</th>
+                    <th>Hạn trả</th>
+                    <th>Quá hạn</th>
+                    <th>Phạt dự kiến</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {overdueLoans.map((loan) => (
+                    <tr key={loan.id}>
+                      <td>
+                        <div>
+                          <strong>{loan.readerName}</strong>
+                          {loan.studentId && <small style={{ display: 'block', color: '#64748b' }}>MSSV/Mã: {loan.studentId}</small>}
+                          {loan.readerEmail && <small style={{ display: 'block', color: '#64748b' }}>{loan.readerEmail}</small>}
+                        </div>
+                      </td>
+                      <td>
+                        <strong>{loan.bookTitle}</strong>
+                        <small style={{ display: 'block', color: '#64748b' }}>Mã vạch: {loan.barcode}</small>
+                      </td>
+                      <td>{formatDate(loan.dueDate)}</td>
+                      <td><span className="circ-badge is-overdue">{loan.overdueDays} ngày</span></td>
+                      <td>{loan.suggestedFine ? formatMoney(loan.suggestedFine) : 'Theo chính sách'}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="circ-btn circ-btn--primary"
+                          onClick={() => {
+                            setManualBarcode(loan.barcode);
+                            setReturnMode('barcode');
+                          }}
+                        >
+                          Xử lý trả sách
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : returnMode === 'activity' ? (
       <section className="circ-card" id="circ-panel-activity" role="tabpanel" aria-labelledby="circ-tab-activity" tabIndex={0}>
         <h2>Giao dịch gần đây</h2>
         {loading ? (
@@ -1496,11 +1563,19 @@ function ReturnView() {
                               </select>
                             </label>
                             <label className="circ-field">Mô tả tình trạng / ghi chú<textarea rows={2} maxLength={2000} disabled={busy} value={returnNotes[loan.id] || ''} onChange={event => setReturnNotes(previous => ({ ...previous, [loan.id]: event.target.value }))} placeholder={['Damaged', 'Lost'].includes(cond) ? 'Bắt buộc: mô tả hư hỏng hoặc lý do thất lạc' : 'Ghi chú nhận trả (nếu có)'} /></label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.825rem', color: '#4b5563', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={paidNowState[loan.id] ?? true}
+                                onChange={(e) => setPaidNowState(prev => ({ ...prev, [loan.id]: e.target.checked }))}
+                              />
+                              <span>Thu tiền phạt quá hạn ngay tại quầy (Đã thanh toán)</span>
+                            </label>
                             <button
                               type="button"
                               className="circ-btn circ-btn--primary"
                               disabled={busy}
-                              onClick={() => void returnBook(loan.barcode, cond, returnNotes[loan.id] || '', loan.id)}
+                              onClick={() => void returnBook(loan.barcode, cond, returnNotes[loan.id] || '', loan.id, paidNowState[loan.id] ?? true)}
                             >
                               {isProcessing ? <LoaderCircle className="spin" size={14} /> : <RotateCcw size={14} />}
                               {isProcessing ? 'Đang ghi nhận...' : 'Ghi nhận trả sách'}
@@ -1520,7 +1595,7 @@ function ReturnView() {
             className="circ-barcode-return-form"
             onSubmit={(e) => {
               e.preventDefault();
-              if (manualBarcode.trim()) void returnBook(manualBarcode.trim(), manualCondition, manualNotes);
+              if (manualBarcode.trim()) void returnBook(manualBarcode.trim(), manualCondition, manualNotes, undefined, manualPaidNow);
             }}
           >
             <div className="circ-return-reader-grid">
@@ -1556,6 +1631,14 @@ function ReturnView() {
             </div>
 
             <label className="circ-field">Mô tả tình trạng / ghi chú<textarea rows={3} maxLength={2000} value={manualNotes} onChange={event => setManualNotes(event.target.value)} placeholder="Bắt buộc khi báo hỏng hoặc thất lạc" /></label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#4b5563', cursor: 'pointer', marginBottom: '1rem' }}>
+              <input
+                type="checkbox"
+                checked={manualPaidNow}
+                onChange={(e) => setManualPaidNow(e.target.checked)}
+              />
+              <span>Thu tiền phạt quá hạn ngay tại quầy (Đã thanh toán)</span>
+            </label>
             <div className="circ-return-actions-row">
               <button
                 type="submit"

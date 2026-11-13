@@ -146,6 +146,7 @@ public class RagService
     public async Task<Result<RagAskResultDto>> SuggestAcquisitionsAsync(
         string role,
         Guid? userId = null,
+        string? category = null,
         CancellationToken ct = default)
     {
         if (!AiSettingsService.IsStaff(role))
@@ -155,12 +156,20 @@ public class RagService
         if (!settings.LibrarianAiEnabled)
             return Result<RagAskResultDto>.Failure("Gợi ý nhập sách AI đang tắt.");
 
-        return await AskAsync(
-            $"""
+        var prompt = !string.IsNullOrWhiteSpace(category)
+            ? $"""
+            Dựa trên danh mục/chủ đề "{category.Trim()}" và các đầu sách, chính sách hiện có, hãy gợi ý các quyển sách nổi bật nhất thuộc danh mục này mà thư viện đại học FPT HCMC nên có hoặc bổ sung.
+            Ưu tiên các tiêu chí thủ thư đã bật: {await BuildAcquisitionHintAsync(settings, ct)}
+            Nêu rõ lý do và điểm nổi bật cho từng cuốn. Không bịa ISBN.
+            """
+            : $"""
             Dựa trên sách và chính sách hiện có, hãy gợi ý các đầu sách thư viện đại học FPT HCMC nên bổ sung.
             Ưu tiên các tiêu chí thủ thư đã bật: {await BuildAcquisitionHintAsync(settings, ct)}
             Nêu lý do ngắn cho từng gợi ý. Không bịa ISBN.
-            """,
+            """;
+
+        return await AskAsync(
+            prompt,
             role,
             userId,
             ct);

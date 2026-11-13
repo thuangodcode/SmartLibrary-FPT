@@ -1011,8 +1011,8 @@ public class CirculationRepository : ICirculationRepository
     private static CirculationIncidentDto MapIncident(BookIncident incident, int finePerDay, bool hasRecordedOverdueFine)
     {
         var loan = incident.BorrowRecord;
-        var reference = loan.ReturnDate ?? DateTime.UtcNow;
-        var overdueDays = CirculationRules.CalendarOverdueDays(loan.DueDate, reference);
+        var reference = loan?.ReturnDate ?? DateTime.UtcNow;
+        var overdueDays = loan is null ? 0 : CirculationRules.CalendarOverdueDays(loan.DueDate, reference);
         var compensation = incident.CompensationFine?.Amount
             ?? CirculationRules.CompensationAmount(incident.Severity, incident.ReplacementValue, incident.AssessedFee);
         var overdueAmount = incident.OverdueFine?.Amount ?? 0;
@@ -1026,9 +1026,9 @@ public class CirculationRepository : ICirculationRepository
             Kind = incident.Kind.ToString(),
             Severity = incident.Severity.ToString(),
             Status = incident.Status.ToString(),
-            Barcode = incident.BookCopy.Barcode,
-            BookTitle = incident.BookCopy.Book.Title,
-            ReaderName = incident.Reader.FullName,
+            Barcode = incident.BookCopy?.Barcode ?? "",
+            BookTitle = incident.BookCopy?.Book?.Title ?? "Sách",
+            ReaderName = incident.Reader?.FullName ?? "Độc giả",
             OverdueDays = overdueDays,
             HasRecordedOverdueFine = hasRecordedOverdueFine,
             SuggestedOverdueFine = !hasRecordedOverdueFine && overdueDays > 0 && finePerDay > 0
@@ -1044,10 +1044,10 @@ public class CirculationRepository : ICirculationRepository
             Description = incident.Description,
             CreatedAt = incident.CreatedAt,
             ConfirmedAt = incident.ConfirmedAt,
-            CopyCondition = incident.BookCopy.Condition.ToString(),
-            LoanStatus = loan.Status.ToString(),
-            CanRestoreCopy = loan.Status == BorrowStatus.Returned && incident.Status != BookIncidentStatus.PendingReview
-                && incident.BookCopy.Condition is BookCondition.Damaged or BookCondition.Lost
+            CopyCondition = incident.BookCopy?.Condition.ToString() ?? "",
+            LoanStatus = loan?.Status.ToString() ?? "Returned",
+            CanRestoreCopy = (loan is null || loan.Status == BorrowStatus.Returned) && incident.Status != BookIncidentStatus.PendingReview
+                && incident.BookCopy?.Condition is BookCondition.Damaged or BookCondition.Lost
         };
     }
 

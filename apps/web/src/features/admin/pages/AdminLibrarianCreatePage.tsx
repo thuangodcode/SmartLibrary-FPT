@@ -134,8 +134,8 @@ const AdminLibrarianCreatePage: React.FC = () => {
               <input autoComplete="off" maxLength={50} minLength={2} name="employeeId" pattern="[A-Za-z0-9._-]{2,50}" placeholder="Ví dụ: NV001" required />
             </label>
             <label>
-              Tên đăng nhập
-              <input autoComplete="username" maxLength={50} minLength={3} name="username" pattern="[A-Za-z0-9._-]{3,50}" placeholder="thuthu01" required />
+              Tên đăng nhập / Email
+              <input autoComplete="username" maxLength={100} minLength={3} name="username" placeholder="thuthu01 hoặc email@fpt.edu.vn" required />
             </label>
             <label>
               Số điện thoại <span>(không bắt buộc)</span>
