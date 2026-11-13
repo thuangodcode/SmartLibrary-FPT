@@ -196,7 +196,7 @@ const ReadersManagementPage: React.FC = () => {
       const headers: Record<string, string> = {};
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-      const res = await fetch(`${API_BASE_URL}/api/v1/readers?${params}`, { headers });
+      const res = await fetch(`${API_BASE_URL}/api/v1/librarian/users?${params}`, { headers });
       const result = await parseApiResponse<ApiResult<ReadersResponse>>(res);
 
       if (!res.ok || !result?.data) {

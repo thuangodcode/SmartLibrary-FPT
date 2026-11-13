@@ -26,7 +26,6 @@ public sealed class LibrarianUsersController : ControllerBase
     }
 
     [HttpGet]
-    [HttpGet("/api/v1/readers")]
     public async Task<IActionResult> GetReaders(
         [FromQuery] string? status,
         [FromQuery] string? readerType,
