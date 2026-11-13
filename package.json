@@ -19,7 +19,8 @@
     "demo:overdue": "dotnet run --project tools/SmartLibrary.Demo -- .env --overdue",
     "demo:prepare-tests": "dotnet run --project tools/SmartLibrary.Demo -- --prepare-tests",
     "demo:test-status": "dotnet run --project tools/SmartLibrary.Demo -- --test-status",
-    "demo:test-overdue": "dotnet run --project tools/SmartLibrary.Demo -- --test-overdue"
+    "demo:test-overdue": "dotnet run --project tools/SmartLibrary.Demo -- --test-overdue",
+    "test:session": "node --test apps/mobile/tests/session.test.cjs apps/web/tests/session-refresh.test.cjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

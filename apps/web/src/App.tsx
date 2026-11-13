@@ -67,10 +67,30 @@ function LibrarianBooksEntry() {
 function App() {
   const hydrate = useAuthStore((s) => s.hydrate);
   const role = useAuthStore((s) => s.user?.role);
+  const accessToken = useAuthStore((s) => s.accessToken);
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    const refresh = () => {
+      if (document.visibilityState !== 'hidden') void useAuthStore.getState().getAccessToken().catch(() => {});
+    };
+    // Do not wait for an HTTP 401: pages also use plain fetch and may stay open for hours.
+    const timer = window.setInterval(refresh, 30_000);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    refresh();
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [accessToken]);
 
   return (
     <>

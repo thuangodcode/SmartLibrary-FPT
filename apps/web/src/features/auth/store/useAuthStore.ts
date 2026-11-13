@@ -3,6 +3,8 @@ import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 
 let hydrationPromise: Promise<void> | null = null;
+let sessionVersion = 0;
+let refreshFlight: { version: number; promise: Promise<string> } | null = null;
 
 const isAccessTokenExpiring = (token: string, skewSeconds = 60): boolean => {
   try {
@@ -36,6 +38,7 @@ interface AuthState {
   setAccessToken: (token: string) => void;
   logout: () => void;
   hydrate: () => Promise<void>;
+  getAccessToken: (forceRefresh?: boolean) => Promise<string>;
 }
 
 interface AuthApiResponse<T> {
@@ -43,7 +46,7 @@ interface AuthApiResponse<T> {
   data?: T;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   accessToken: null,
   permissions: [],
@@ -51,6 +54,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
 
   setAuth: (user, token, permissions = []) => {
+    sessionVersion++;
     localStorage.setItem('sl_user', JSON.stringify(user));
     localStorage.setItem('sl_token', token);
     localStorage.setItem('sl_perms', JSON.stringify(permissions));
@@ -73,6 +77,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
+    sessionVersion++;
     localStorage.removeItem('sl_user');
     localStorage.removeItem('sl_token');
     localStorage.removeItem('sl_perms');
@@ -84,6 +89,36 @@ export const useAuthStore = create<AuthState>((set) => ({
       isAuthenticated: false,
       isLoading: false,
     });
+  },
+
+  getAccessToken: async (forceRefresh = false) => {
+    const token = get().accessToken || localStorage.getItem('sl_token');
+    if (!token) throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    const version = sessionVersion;
+    if (refreshFlight?.version === version) return refreshFlight.promise;
+    if (!forceRefresh && !isAccessTokenExpiring(token)) return token;
+    const promise = (async () => {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        method: 'POST', credentials: 'include', signal: AbortSignal.timeout(15_000),
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      });
+      if (version === sessionVersion && (response.status === 400 || response.status === 401)) {
+        get().logout();
+        throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      }
+      const result = await parseApiResponse<AuthApiResponse<{ accessToken?: string }>>(response);
+      if (version !== sessionVersion) throw new Error('Phiên đăng nhập đã thay đổi.');
+      const next = result?.data?.accessToken;
+      if (!response.ok || !result?.success || !next) {
+        throw new Error(response.status >= 500 ? 'Tạm thời không thể làm mới phiên.' : 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      }
+      get().setAccessToken(next);
+      localStorage.setItem('sl_refresh_cookie', '1');
+      return next;
+    })();
+    refreshFlight = { version, promise };
+    try { return await promise; }
+    finally { if (refreshFlight?.promise === promise) refreshFlight = null; }
   },
 
   hydrate: () => {
@@ -99,26 +134,8 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
 
-      const refreshAccessToken = async (): Promise<string | null> => {
-        const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        const result = await parseApiResponse<AuthApiResponse<{ accessToken?: string }>>(response);
-        const refreshedToken = result?.data?.accessToken;
-        if (!response.ok || !result?.success || !refreshedToken) {
-          if (response.status === 400 || response.status === 401) {
-            localStorage.removeItem('sl_refresh_cookie');
-          }
-          return null;
-        }
-
-        localStorage.setItem('sl_token', refreshedToken);
-        localStorage.setItem('sl_refresh_cookie', '1');
-        return refreshedToken;
-      };
+      const version = sessionVersion;
+      const refreshAccessToken = async () => get().getAccessToken(true);
 
       try {
         let refreshAttempted = false;
@@ -160,6 +177,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           throw new Error('The saved session is no longer valid.');
         }
 
+        if (version !== sessionVersion) return;
         const { permissions = [], ...verifiedUser } = user;
         localStorage.setItem('sl_user', JSON.stringify(verifiedUser));
         localStorage.setItem('sl_perms', JSON.stringify(permissions));
@@ -171,6 +189,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           isLoading: false,
         });
       } catch {
+        if (version !== sessionVersion) return;
         localStorage.removeItem('sl_user');
         localStorage.removeItem('sl_token');
         localStorage.removeItem('sl_perms');
@@ -186,3 +205,18 @@ export const useAuthStore = create<AuthState>((set) => ({
     return hydration;
   },
 }));
+
+// Handle a rejected negotiate even if the JWT's expiry has not been reached
+// (revoked session/account, or a token rejected after the API restarted).
+export async function recoverRealtimeSession(error: unknown): Promise<boolean> {
+  if (!/\b401\b|unauthorized/i.test(error instanceof Error ? error.message : String(error))) return false;
+  if (!useAuthStore.getState().isAuthenticated) return true;
+  try {
+    const token = await useAuthStore.getState().getAccessToken(true);
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000),
+    });
+    if ((response.status === 401 || response.status === 403) && useAuthStore.getState().accessToken === token) useAuthStore.getState().logout();
+    return response.ok || response.status === 401 || response.status === 403;
+  } catch { return !useAuthStore.getState().isAuthenticated; }
+}
