@@ -43,7 +43,13 @@ public class ReaderRepository : IReaderRepository
             q = q.Where(u => u.Status == status.Value);
 
         if (readerType.HasValue)
-            q = q.Where(u => (u.ReaderType ?? ReaderType.External) == readerType.Value);
+        {
+            // ReaderType is stored as a PostgreSQL enum. EF's string conversion can
+            // otherwise bind the comparison value as text, which PostgreSQL cannot
+            // compare to reader_type on databases without the legacy implicit cast.
+            var readerTypeName = readerType.Value.ToString();
+            q = q.Where(u => (u.ReaderType ?? ReaderType.External).ToString() == readerTypeName);
+        }
 
         var total = await q.CountAsync(ct);
 
