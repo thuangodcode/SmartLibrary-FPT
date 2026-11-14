@@ -131,7 +131,11 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
             if (!Enum.TryParse<ReaderType>(readerType, true, out var parsedReaderType))
                 throw new ValidationException("Loại độc giả không hợp lệ.");
 
-            users = users.Where(user => (user.ReaderType ?? ReaderType.External) == parsedReaderType);
+            // ReaderType is a PostgreSQL enum; compare its textual representation so
+            // this endpoint does not depend on an implicit enum/text cast installed
+            // manually in a particular database.
+            var readerTypeName = parsedReaderType.ToString();
+            users = users.Where(user => (user.ReaderType ?? ReaderType.External).ToString() == readerTypeName);
         }
 
         var totalCount = await users.CountAsync(cancellationToken);
