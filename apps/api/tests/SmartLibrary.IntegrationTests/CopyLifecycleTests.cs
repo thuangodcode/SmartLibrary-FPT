@@ -23,6 +23,59 @@ namespace SmartLibrary.IntegrationTests;
 public sealed partial class CopyLifecycleTests
 {
     [BookCodePostgresFact]
+    public async Task ReaderWithACompletedReturnIsRecognizedAsVerified()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await using var db = fixture.Context();
+        var reader = await db.UserProfiles.SingleAsync(user => user.Id != fixture.StaffId);
+
+        Assert.True(await ReaderVerificationService.IsVerifiedAsync(db, reader.Id, CancellationToken.None));
+        await AssertLoginProfileIsVerifiedAsync(db, reader.Id);
+    }
+
+    [BookCodePostgresFact]
+    public async Task ReaderWithALibrarianApprovedLoanIsRecognizedAsVerified()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await using var db = fixture.Context();
+        var reader = await db.UserProfiles.SingleAsync(user => user.Id != fixture.StaffId);
+        var loan = await db.BorrowRecords.SingleAsync();
+        loan.Status = BorrowStatus.Approved;
+        await db.SaveChangesAsync();
+
+        Assert.True(await ReaderVerificationService.IsVerifiedAsync(db, reader.Id, CancellationToken.None));
+        await AssertLoginProfileIsVerifiedAsync(db, reader.Id);
+    }
+
+    private static async Task AssertLoginProfileIsVerifiedAsync(AppDbContext db, Guid readerId)
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:DefaultConnection"] = db.Database.GetConnectionString()
+        }).Build();
+        using var http = new HttpClient();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var auth = new SupabaseAuthService(http, null!, config, NullLogger<SupabaseAuthService>.Instance, cache);
+        var profile = JsonSerializer.SerializeToElement(
+            await auth.GetUserProfileWithPermissionsAsync(readerId.ToString()));
+        Assert.True(profile.GetProperty("isVerified").GetBoolean());
+    }
+
+    [BookCodePostgresFact]
+    public async Task ActiveLibraryIssuedReaderWithInternalIdIsRecognizedWithoutDocumentUploads()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await using var db = fixture.Context();
+        var reader = await db.UserProfiles.SingleAsync(user => user.Id != fixture.StaffId);
+        reader.StudentId = "SE-ISSUED-001";
+        var loan = await db.BorrowRecords.SingleAsync();
+        loan.Status = BorrowStatus.Rejected;
+        await db.SaveChangesAsync();
+
+        Assert.True(await ReaderVerificationService.IsVerifiedAsync(db, reader.Id, CancellationToken.None));
+    }
+
+    [BookCodePostgresFact]
     public async Task FreshLocalSchemaSupportsLoginProfilesWithRoleScopedPermissions()
     {
         await using var fixture = await Fixture.CreateAsync();
@@ -66,8 +119,7 @@ public sealed partial class CopyLifecycleTests
         {
             Email = "new.google@example.test", FullName = "New Google Reader",
             RoleId = (await db.UserProfiles.FirstAsync(x => x.Id != fixture.StaffId)).RoleId,
-            Status = AccountStatus.Active, Phone = "0900000000", Address = "FPT", DateOfBirth = new DateOnly(2000, 1, 1),
-            StudentId = "SE000001"
+            Status = AccountStatus.Active, Phone = "0900000000", Address = "FPT", DateOfBirth = new DateOnly(2000, 1, 1)
         };
         db.UserProfiles.Add(incomplete);
         var registration = new RegistrationRequest
@@ -81,6 +133,7 @@ public sealed partial class CopyLifecycleTests
         };
         db.RegistrationRequests.Add(registration);
         await db.SaveChangesAsync();
+        Assert.False(await ReaderVerificationService.IsVerifiedAsync(db, incomplete.Id, CancellationToken.None));
 
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -95,6 +148,7 @@ public sealed partial class CopyLifecycleTests
 
         registration.Status = RegistrationRequestStatus.Approved;
         await db.SaveChangesAsync();
+        Assert.True(await ReaderVerificationService.IsVerifiedAsync(db, incomplete.Id, CancellationToken.None));
         var afterApproval = JsonSerializer.SerializeToElement(await auth.GetUserProfileWithPermissionsAsync(incomplete.Id.ToString()));
         Assert.True(afterApproval.GetProperty("isVerified").GetBoolean());
     }

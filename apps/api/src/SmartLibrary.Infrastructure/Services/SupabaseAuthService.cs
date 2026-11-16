@@ -496,9 +496,15 @@ public class SupabaseAuthService : IIdentityProvider
                 role = roleName ?? "Reader",
                 status = status ?? "PendingVerification",
                 phone, studentId, teacherId, employeeId, address, dateOfBirth,
-                isVerified = HasApprovedRegistration(uid) || (!string.IsNullOrWhiteSpace(phone) && !string.IsNullOrWhiteSpace(address)
-                    && dateOfBirth.HasValue && (studentId is not null || teacherId is not null || employeeId is not null)
-                    && HasIdentityDocuments(uid)),
+                isVerified = HasApprovedRegistration(uid)
+                    || (string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase)
+                        && (!string.IsNullOrWhiteSpace(studentId)
+                            || !string.IsNullOrWhiteSpace(teacherId)
+                            || !string.IsNullOrWhiteSpace(employeeId)))
+                    || HasApprovedLoanHistory(uid)
+                    || (!string.IsNullOrWhiteSpace(phone) && !string.IsNullOrWhiteSpace(address)
+                        && dateOfBirth.HasValue && (studentId is not null || teacherId is not null || employeeId is not null)
+                        && HasIdentityDocuments(uid)),
                 permissions
             };
         }
@@ -526,6 +532,21 @@ public class SupabaseAuthService : IIdentityProvider
         conn.Open();
         using var cmd = new NpgsqlCommand(
             "SELECT EXISTS (SELECT 1 FROM registration_requests WHERE user_id = @uid AND status::text = 'Approved')", conn);
+        cmd.Parameters.AddWithValue("uid", userId);
+        return cmd.ExecuteScalar() is true;
+    }
+
+    private bool HasApprovedLoanHistory(Guid userId)
+    {
+        using var conn = new NpgsqlConnection(_connectionString);
+        conn.Open();
+        using var cmd = new NpgsqlCommand(@"
+            SELECT EXISTS (
+                SELECT 1
+                FROM borrow_records
+                WHERE reader_id = @uid
+                  AND is_deleted = false
+                  AND status IN ('approved', 'borrowed', 'returned', 'overdue'))", conn);
         cmd.Parameters.AddWithValue("uid", userId);
         return cmd.ExecuteScalar() is true;
     }

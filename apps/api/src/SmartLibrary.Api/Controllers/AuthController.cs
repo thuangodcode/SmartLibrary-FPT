@@ -8,6 +8,7 @@ using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Auth.Commands;
 using SmartLibrary.Application.Interfaces;
 using SmartLibrary.Infrastructure.Persistence;
+using SmartLibrary.Infrastructure.Services;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -156,7 +157,7 @@ public class AuthController : ControllerBase
 
         var permissions = await _db.UserProfiles.Where(x => x.Id == profile.Id)
             .SelectMany(x => x.Role.RolePermissions).Select(x => x.Permission.Code).ToListAsync(ct);
-        var isVerified = await IsProfileVerifiedAsync(profile.Id, ct);
+        var isVerified = await ReaderVerificationService.IsVerifiedAsync(_db, profile.Id, ct);
         return Ok(ApiResponse<object>.Ok(new { user = new {
             id = profile.Id, email = profile.Email, fullName = profile.FullName, avatarUrl = profile.AvatarUrl,
             role = profile.Role.Name, status = profile.Status.ToString(), permissions, isVerified,
@@ -165,25 +166,12 @@ public class AuthController : ControllerBase
         }}));
     }
 
-    private async Task<bool> IsProfileVerifiedAsync(Guid userId, CancellationToken ct)
-    {
-        if (await _db.RegistrationRequests.AsNoTracking().AnyAsync(
-                r => r.UserId == userId && r.Status == SmartLibrary.Domain.Enums.RegistrationRequestStatus.Approved, ct))
-            return true;
-
-        var p = await _db.UserProfiles.AsNoTracking().FirstAsync(x => x.Id == userId, ct);
-        if (string.IsNullOrWhiteSpace(p.Phone) || string.IsNullOrWhiteSpace(p.Address) || p.DateOfBirth is null
-            || (p.StudentId is null && p.TeacherId is null && p.EmployeeId is null)) return false;
-        return await _db.IdentityDocuments.IgnoreQueryFilters().Where(d => d.Request.UserId == userId && !d.IsDeleted && d.Request.Status == SmartLibrary.Domain.Enums.RegistrationRequestStatus.Approved)
-            .Select(d => d.Side).Distinct().CountAsync(ct) == 3;
-    }
-
     private async Task<object> AddVerificationStateAsync(object userProfile, string userId)
     {
         if (!Guid.TryParse(userId, out var id)) return userProfile;
         var json = System.Text.Json.JsonSerializer.SerializeToElement(userProfile);
         if (!json.TryGetProperty("email", out var emailElement) || !json.TryGetProperty("isVerified", out _)) return userProfile;
-        var verified = await IsProfileVerifiedAsync(id, HttpContext.RequestAborted);
+        var verified = await ReaderVerificationService.IsVerifiedAsync(_db, id, HttpContext.RequestAborted);
         return new { id, email = emailElement.GetString(), fullName = json.TryGetProperty("fullName", out var name) ? name.GetString() : null,
             avatarUrl = json.TryGetProperty("avatarUrl", out var avatar) ? avatar.GetString() : null,
             role = json.TryGetProperty("role", out var role) ? role.GetString() : null,

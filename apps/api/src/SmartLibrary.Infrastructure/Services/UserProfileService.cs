@@ -40,8 +40,7 @@ public sealed class UserProfileService(
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var isVerified = reg?.Status == RegistrationRequestStatus.Approved
-            || IsProfileComplete(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl);
+        var isVerified = await ReaderVerificationService.IsVerifiedAsync(dbContext, userId, cancellationToken);
 
         return Map(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl, reg?.DocumentType.ToString(), isVerified);
     }
@@ -93,9 +92,8 @@ public sealed class UserProfileService(
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return Map(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl, reg?.DocumentType.ToString(),
-            reg?.Status == RegistrationRequestStatus.Approved
-            || IsProfileComplete(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl));
+        var isVerified = await ReaderVerificationService.IsVerifiedAsync(dbContext, userId, cancellationToken);
+        return Map(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl, reg?.DocumentType.ToString(), isVerified);
     }
 
     public async Task<string> SendEmailVerificationOtpAsync(
@@ -240,11 +238,6 @@ public sealed class UserProfileService(
         selfieDocUrl,
         documentType,
         isVerified);
-
-    private static bool IsProfileComplete(UserProfile profile, string? front, string? back, string? selfie) =>
-        !string.IsNullOrWhiteSpace(profile.Phone) && !string.IsNullOrWhiteSpace(profile.Address)
-        && profile.DateOfBirth.HasValue && (profile.StudentId is not null || profile.TeacherId is not null || profile.EmployeeId is not null)
-        && !string.IsNullOrWhiteSpace(front) && !string.IsNullOrWhiteSpace(back) && !string.IsNullOrWhiteSpace(selfie);
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

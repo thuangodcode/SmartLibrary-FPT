@@ -8,6 +8,7 @@ using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Circulation;
 using SmartLibrary.Application.Features.Circulation.DTOs;
 using SmartLibrary.Api.Hubs;
+using SmartLibrary.Infrastructure.Services;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -184,13 +185,7 @@ public class CirculationMeController : ControllerBase
     private IActionResult VerificationRequired() => StatusCode(403, ApiResponse<object>.Fail("Vui lòng hoàn tất xác thực hồ sơ để sử dụng dịch vụ thư viện."));
 
     private async Task<bool> IsVerifiedReaderAsync(Guid readerId, CancellationToken ct)
-    {
-        var profile = await _db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == readerId, ct);
-        if (profile is null || string.IsNullOrWhiteSpace(profile.Phone) || string.IsNullOrWhiteSpace(profile.Address)
-            || profile.DateOfBirth is null || (profile.StudentId is null && profile.TeacherId is null && profile.EmployeeId is null)) return false;
-        return await _db.IdentityDocuments.IgnoreQueryFilters().Where(x => x.Request.UserId == readerId && !x.IsDeleted && x.Request.Status == SmartLibrary.Domain.Enums.RegistrationRequestStatus.Approved)
-            .Select(x => x.Side).Distinct().CountAsync(ct) == 3;
-    }
+        => await ReaderVerificationService.IsVerifiedAsync(_db, readerId, ct);
 
     private async Task BroadcastBorrowUpdateAsync(CirculationLoanDto loan, CancellationToken ct)
     {

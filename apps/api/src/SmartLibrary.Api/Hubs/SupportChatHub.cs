@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using SmartLibrary.Domain.Entities;
 using SmartLibrary.Infrastructure.Persistence;
+using SmartLibrary.Infrastructure.Services;
 
 namespace SmartLibrary.Api.Hubs;
 
@@ -99,13 +100,7 @@ public sealed class SupportChatHub(AppDbContext db) : Hub
     }
 
     private async Task<bool> IsVerifiedReaderAsync(Guid readerId)
-    {
-        var profile = await db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == readerId, Context.ConnectionAborted);
-        if (profile is null || string.IsNullOrWhiteSpace(profile.Phone) || string.IsNullOrWhiteSpace(profile.Address)
-            || profile.DateOfBirth is null || (profile.StudentId is null && profile.TeacherId is null && profile.EmployeeId is null)) return false;
-        return await db.IdentityDocuments.IgnoreQueryFilters().Where(x => x.Request.UserId == readerId && !x.IsDeleted && x.Request.Status == SmartLibrary.Domain.Enums.RegistrationRequestStatus.Approved)
-            .Select(x => x.Side).Distinct().CountAsync(Context.ConnectionAborted) == 3;
-    }
+        => await ReaderVerificationService.IsVerifiedAsync(db, readerId, Context.ConnectionAborted);
 
     private Guid GetUserId()
     {
