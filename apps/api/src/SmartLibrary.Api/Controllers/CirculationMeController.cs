@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using SmartLibrary.Infrastructure.Persistence;
 using Microsoft.AspNetCore.SignalR;
 using PayOS.Exceptions;
 using SmartLibrary.Application.Common;
@@ -15,17 +17,20 @@ namespace SmartLibrary.Api.Controllers;
 public class CirculationMeController : ControllerBase
 {
     private readonly CirculationService _circulation;
+    private readonly AppDbContext _db;
     private readonly IHubContext<NotificationHub> _hub;
     private readonly ILogger<CirculationMeController> _logger;
 
     public CirculationMeController(
         CirculationService circulation,
         IHubContext<NotificationHub> hub,
-        ILogger<CirculationMeController> logger)
+        ILogger<CirculationMeController> logger,
+        AppDbContext db)
     {
         _circulation = circulation;
         _hub = hub;
         _logger = logger;
+        _db = db;
     }
 
     [HttpGet("loans")]
@@ -86,6 +91,7 @@ public class CirculationMeController : ControllerBase
     public async Task<IActionResult> RequestBorrow([FromBody] BorrowRequest request, CancellationToken ct)
     {
         var readerId = CirculationService.ReadUserId(User);
+        if (!await IsVerifiedReaderAsync(readerId, ct)) return VerificationRequired();
         var result = await _circulation.RequestBorrowAsync(readerId, request, ct);
         if (!result.IsSuccess)
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
@@ -104,6 +110,7 @@ public class CirculationMeController : ControllerBase
     public async Task<IActionResult> RequestBorrowBook([FromBody] RequestBookBorrowRequest request, CancellationToken ct)
     {
         var readerId = CirculationService.ReadUserId(User);
+        if (!await IsVerifiedReaderAsync(readerId, ct)) return VerificationRequired();
         var result = await _circulation.RequestBorrowBookAsync(readerId, request.BookId, request.PickupAt, ct);
         if (!result.IsSuccess)
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
@@ -172,6 +179,17 @@ public class CirculationMeController : ControllerBase
         return result.IsSuccess
             ? Ok(ApiResponse<bool>.Ok(true, new { message = "Đã hủy đặt trước." }))
             : BadRequest(ApiResponse<object>.Fail(result.Error!));
+    }
+
+    private IActionResult VerificationRequired() => StatusCode(403, ApiResponse<object>.Fail("Vui lòng hoàn tất xác thực hồ sơ để sử dụng dịch vụ thư viện."));
+
+    private async Task<bool> IsVerifiedReaderAsync(Guid readerId, CancellationToken ct)
+    {
+        var profile = await _db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == readerId, ct);
+        if (profile is null || string.IsNullOrWhiteSpace(profile.Phone) || string.IsNullOrWhiteSpace(profile.Address)
+            || profile.DateOfBirth is null || (profile.StudentId is null && profile.TeacherId is null && profile.EmployeeId is null)) return false;
+        return await _db.IdentityDocuments.IgnoreQueryFilters().Where(x => x.Request.UserId == readerId && !x.IsDeleted && x.Request.Status == SmartLibrary.Domain.Enums.RegistrationRequestStatus.Approved)
+            .Select(x => x.Side).Distinct().CountAsync(ct) == 3;
     }
 
     private async Task BroadcastBorrowUpdateAsync(CirculationLoanDto loan, CancellationToken ct)

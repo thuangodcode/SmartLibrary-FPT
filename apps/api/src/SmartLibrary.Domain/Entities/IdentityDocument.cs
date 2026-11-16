@@ -16,4 +16,5 @@ public class IdentityDocument : AuditableEntity, ISoftDeletable
     public string? DocumentLast4 { get; set; }
 
     public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
 }

@@ -1,4 +1,4 @@
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+﻿import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Clock3, MapPin } from 'lucide-react';
 import campusPhoto from '../../../assets/figma/HCM-Campus.jpg';
 import libraryPhoto from '../../../assets/figma/home-library.png';
@@ -8,10 +8,12 @@ import HomeNavbar from '../components/HomeNavbar';
 import Marquee from '../components/Marquee';
 import { useHomeBooks, useHomeCategories } from '../hooks/useHomeData';
 import { toBookCardData } from '../utils/toBookCardData';
+import { useAuthStore } from '../../auth/store/useAuthStore';
 import './HomePage.css';
 
 export const HomePage = () => {
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeCategory = searchParams.get('category') ?? '';
   const categoriesQuery = useHomeCategories();
@@ -35,6 +37,10 @@ export const HomePage = () => {
       <HomeNavbar />
 
       <main>
+        {user?.role === 'Reader' && user.isVerified === false && <section className="annual-verify-prompt">
+          <div><strong>Hoàn tất xác thực tài khoản</strong><span>Cập nhật hồ sơ và giấy tờ để sử dụng dịch vụ mượn sách và hỗ trợ của thư viện.</span></div>
+          <Link to="/profile">Xác thực ngay <span aria-hidden="true">→</span></Link>
+        </section>}
         <section className="annual-hero" id="top" aria-label="Khuôn viên FPT University">
           <div className="annual-hero-media">
             <img src={campusPhoto} alt="Khuôn viên xanh của FPT University TP. Hồ Chí Minh" />

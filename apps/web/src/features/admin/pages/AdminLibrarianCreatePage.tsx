@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, ArrowLeft, Check, ImagePlus, LoaderCircle, UserRoundCheck, X } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Check, Eye, EyeOff, ImagePlus, LoaderCircle, UserRoundCheck, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
@@ -17,6 +17,8 @@ const AdminLibrarianCreatePage: React.FC = () => {
   const accessToken = useAuthStore((state) => state.accessToken);
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -143,11 +145,11 @@ const AdminLibrarianCreatePage: React.FC = () => {
             </label>
             <label>
               Mật khẩu
-              <input autoComplete="new-password" minLength={8} name="password" placeholder="Ít nhất 8 ký tự" required type="password" />
+              <span className="admin-librarian-password-field"><input autoComplete="new-password" minLength={8} name="password" placeholder="Ít nhất 8 ký tự" required type={showPassword ? 'text' : 'password'} /><button type="button" aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></span>
             </label>
             <label>
               Xác nhận mật khẩu
-              <input autoComplete="new-password" minLength={8} name="confirmPassword" placeholder="Nhập lại mật khẩu" required type="password" />
+              <span className="admin-librarian-password-field"><input autoComplete="new-password" minLength={8} name="confirmPassword" placeholder="Nhập lại mật khẩu" required type={showConfirmPassword ? 'text' : 'password'} /><button type="button" aria-label={showConfirmPassword ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'} onClick={() => setShowConfirmPassword((visible) => !visible)}>{showConfirmPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></span>
             </label>
             <p className="admin-librarian-create-hint">Tài khoản sử dụng tên đăng nhập để đăng nhập; hệ thống tự tạo email nội bộ.</p>
             <footer>

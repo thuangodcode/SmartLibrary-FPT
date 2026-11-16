@@ -40,7 +40,14 @@ public sealed class SupportChatHub(AppDbContext db) : Hub
     {
         if (Context.User?.IsInRole("Reader") != true)
             throw new HubException("Chỉ độc giả mới có thể gửi tin nhắn theo phiên này.");
-        return SaveAndBroadcastAsync(GetUserId(), message);
+        return SendReaderMessageAsync(GetUserId(), message);
+    }
+
+    private async Task SendReaderMessageAsync(Guid readerId, string message)
+    {
+        if (!await IsVerifiedReaderAsync(readerId))
+            throw new HubException("Vui lòng hoàn tất xác thực hồ sơ để sử dụng dịch vụ thư viện.");
+        await SaveAndBroadcastAsync(readerId, message);
     }
 
     public Task SendReply(Guid readerId, string message)
@@ -89,6 +96,15 @@ public sealed class SupportChatHub(AppDbContext db) : Hub
             .SendAsync("ReceiveChatMessage", dto, Context.ConnectionAborted);
         await Clients.Group(LibrarianGroup)
             .SendAsync("ConversationUpdated", new { readerId, lastMessage = message, createdAt = row.CreatedAt }, Context.ConnectionAborted);
+    }
+
+    private async Task<bool> IsVerifiedReaderAsync(Guid readerId)
+    {
+        var profile = await db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == readerId, Context.ConnectionAborted);
+        if (profile is null || string.IsNullOrWhiteSpace(profile.Phone) || string.IsNullOrWhiteSpace(profile.Address)
+            || profile.DateOfBirth is null || (profile.StudentId is null && profile.TeacherId is null && profile.EmployeeId is null)) return false;
+        return await db.IdentityDocuments.IgnoreQueryFilters().Where(x => x.Request.UserId == readerId && !x.IsDeleted && x.Request.Status == SmartLibrary.Domain.Enums.RegistrationRequestStatus.Approved)
+            .Select(x => x.Side).Distinct().CountAsync(Context.ConnectionAborted) == 3;
     }
 
     private Guid GetUserId()

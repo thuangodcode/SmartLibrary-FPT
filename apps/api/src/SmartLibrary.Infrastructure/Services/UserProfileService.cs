@@ -33,13 +33,17 @@ public sealed class UserProfileService(
             .Select(r => new
             {
                 r.DocumentType,
+                r.Status,
                 FrontDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Front).Select(d => d.StoragePath).FirstOrDefault(),
                 BackDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Back).Select(d => d.StoragePath).FirstOrDefault(),
                 SelfieDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Selfie).Select(d => d.StoragePath).FirstOrDefault(),
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return Map(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl, reg?.DocumentType.ToString());
+        var isVerified = reg?.Status == RegistrationRequestStatus.Approved
+            || IsProfileComplete(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl);
+
+        return Map(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl, reg?.DocumentType.ToString(), isVerified);
     }
 
     public async Task<UserProfileResponse?> UpdateAsync(
@@ -82,13 +86,16 @@ public sealed class UserProfileService(
             .Select(r => new
             {
                 r.DocumentType,
+                r.Status,
                 FrontDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Front).Select(d => d.StoragePath).FirstOrDefault(),
                 BackDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Back).Select(d => d.StoragePath).FirstOrDefault(),
                 SelfieDocUrl = r.Documents.Where(d => d.Side == SmartLibrary.Domain.Enums.DocumentSide.Selfie).Select(d => d.StoragePath).FirstOrDefault(),
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return Map(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl, reg?.DocumentType.ToString());
+        return Map(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl, reg?.DocumentType.ToString(),
+            reg?.Status == RegistrationRequestStatus.Approved
+            || IsProfileComplete(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl));
     }
 
     public async Task<string> SendEmailVerificationOtpAsync(
@@ -215,7 +222,8 @@ public sealed class UserProfileService(
         string? frontDocUrl = null,
         string? backDocUrl = null,
         string? selfieDocUrl = null,
-        string? documentType = null) => new(
+        string? documentType = null,
+        bool isVerified = false) => new(
         profile.Id,
         profile.Email,
         profile.FullName,
@@ -230,7 +238,13 @@ public sealed class UserProfileService(
         frontDocUrl,
         backDocUrl,
         selfieDocUrl,
-        documentType);
+        documentType,
+        isVerified);
+
+    private static bool IsProfileComplete(UserProfile profile, string? front, string? back, string? selfie) =>
+        !string.IsNullOrWhiteSpace(profile.Phone) && !string.IsNullOrWhiteSpace(profile.Address)
+        && profile.DateOfBirth.HasValue && (profile.StudentId is not null || profile.TeacherId is not null || profile.EmployeeId is not null)
+        && !string.IsNullOrWhiteSpace(front) && !string.IsNullOrWhiteSpace(back) && !string.IsNullOrWhiteSpace(selfie);
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -113,8 +113,9 @@ public class AppDbContext : DbContext
         {
             entity.ToTable("identity_documents");
             entity.Property(d => d.Side).HasConversion<string>();
-            entity.Ignore(d => d.UpdatedAt);
             entity.Ignore(d => d.IsDeleted);
+            entity.Property(d => d.DeletedAt).HasColumnName("deleted_at");
+            entity.Ignore(d => d.UpdatedAt);
         });
 
         modelBuilder.Entity<BorrowRecord>(entity =>
@@ -437,7 +438,14 @@ public class AppDbContext : DbContext
         // Global query filter for soft delete
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
-            if (typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType) && entityType.ClrType != typeof(IdentityDocument))
+            if (entityType.ClrType == typeof(IdentityDocument))
+            {
+                var parameter = System.Linq.Expressions.Expression.Parameter(entityType.ClrType, "d");
+                var deletedAt = System.Linq.Expressions.Expression.Property(parameter, "DeletedAt");
+                var condition = System.Linq.Expressions.Expression.Equal(deletedAt, System.Linq.Expressions.Expression.Constant(null, typeof(DateTime?)));
+                modelBuilder.Entity(entityType.ClrType).HasQueryFilter(System.Linq.Expressions.Expression.Lambda(condition, parameter));
+            }
+            else if (typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType))
             {
                 modelBuilder.Entity(entityType.ClrType)
                     .HasQueryFilter(

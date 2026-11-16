@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Mail, Lock, User as UserIcon, ArrowRight, Check, Phone, MapPin, Calendar, UploadCloud, FileText, Loader2, RotateCcw } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, User as UserIcon, ArrowRight, Check, Phone, MapPin, Calendar, UploadCloud, FileText, Loader2, RotateCcw } from 'lucide-react';
 import { AuthLayout } from '../components/AuthLayout';
 import { useToast } from '../../../components/ui/useToast';
 import { registerSchema, type RegisterInput } from '../schemas/authSchemas';
@@ -14,6 +14,8 @@ import { API_BASE_URL } from '../../../config';
 export const RegisterPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { showToast } = useToast();
 
   // Stored form data from Step 1
@@ -280,7 +282,7 @@ export const RegisterPage: React.FC = () => {
       subtitle="Bắt đầu hành trình tri thức cùng SmartLibrary."
     >
       {/* Stepper Header */}
-      <div className="flex items-center justify-between mb-8 relative">
+      <div className="auth-register-stepper flex items-center justify-between mb-8 relative">
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-200 dark:bg-slate-800 -z-10 rounded-full overflow-hidden">
           <div
             className="h-full bg-indigo-600 transition-all duration-500"
@@ -304,7 +306,7 @@ export const RegisterPage: React.FC = () => {
               {step > s.id ? <Check className="w-4 h-4" /> : s.id}
             </div>
             <span
-              className={`text-[10px] font-medium ${
+              className={`auth-register-stepper-label text-[10px] font-medium ${
                 step >= s.id ? 'text-indigo-600 font-bold' : 'text-slate-400'
               }`}
             >
@@ -394,11 +396,12 @@ export const RegisterPage: React.FC = () => {
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="Nhập mật khẩu tùy ý..."
                   {...register('password')}
                   className="w-full pl-9 pr-3 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs focus:border-indigo-600 focus:outline-none"
                 />
+                <button type="button" aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} onClick={() => setShowPassword((visible) => !visible)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
               </div>
               {errors.password && <p className="text-[10px] text-rose-500 mt-1">{errors.password.message}</p>}
             </div>
@@ -407,11 +410,12 @@ export const RegisterPage: React.FC = () => {
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   placeholder="Nhập lại mật khẩu..."
                   {...register('confirmPassword')}
                   className="w-full pl-9 pr-3 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs focus:border-indigo-600 focus:outline-none"
                 />
+                <button type="button" aria-label={showConfirmPassword ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'} onClick={() => setShowConfirmPassword((visible) => !visible)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800">{showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
               </div>
               {errors.confirmPassword && <p className="text-[10px] text-rose-500 mt-1">{errors.confirmPassword.message}</p>}
             </div>
@@ -623,7 +627,7 @@ export const RegisterPage: React.FC = () => {
       )}
 
       {step !== 4 && (
-        <div className="text-center pt-6 pb-2">
+        <div className="auth-register-footer text-center pt-6 pb-2">
           <p className="text-xs text-slate-500">
             Sinh viên trường? Vui lòng <span className="font-bold">kiểm tra Email</span> để kích hoạt tài khoản.<br />
             Đã có tài khoản?{' '}

@@ -88,6 +88,37 @@
   font-weight: 450;
 }
 
+.admin-librarian-create-form > label .admin-librarian-password-field {
+  position: relative;
+  display: block;
+  color: inherit;
+  font-weight: inherit;
+}
+
+.admin-librarian-password-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 44px;
+}
+
+.admin-librarian-password-field button {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #718096;
+  cursor: pointer;
+}
+
+.admin-librarian-password-field button:hover { background: #f2f4f7; color: #29384d; }
+
 .admin-librarian-avatar-card {
   display: flex;
   min-width: 0;

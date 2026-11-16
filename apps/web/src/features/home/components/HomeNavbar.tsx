@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
+﻿import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { HubConnectionBuilder, HubConnectionState, LogLevel, type HubConnection } from '@microsoft/signalr';
 import { Bell, BookOpen, ChevronDown, CircleHelp, Heart, History, LoaderCircle, LogOut, Menu, Moon, Search, ShieldCheck, Sun, UserRound, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -542,9 +542,10 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
               </button>
               <div className="annual-user-popover" role="menu" aria-label={t('header.accountMenu')}>
                 <Link to="/profile" role="menuitem" onClick={closeMenu}><UserRound size={16} /> {t('header.profile')}</Link>
+                {user.role === 'Reader' && user.isVerified === false && <Link to="/profile" role="menuitem" onClick={closeMenu}><ShieldCheck size={16} /> Xác thực tài khoản</Link>}
                 {user.role === 'Reader' && (
                   <>
-                    <Link to="/support" role="menuitem" onClick={closeMenu}>
+                    <Link to={user.isVerified === false ? '/profile?redirect=%2Fsupport' : '/support'} role="menuitem" onClick={closeMenu}>
                       <CircleHelp size={16} />
                       <span className="annual-support-menu-label">{t('header.support')}</span>
                       {supportUnreadCount > 0 && (
@@ -553,7 +554,7 @@ const HomeNavbar: React.FC<{ activeSection?: HomeNavSection; searchSlot?: ReactN
                         </span>
                       )}
                     </Link>
-                    <Link to="/history" role="menuitem" onClick={closeMenu}><History size={16} /> {t('header.history')}</Link>
+                    <Link to={user.isVerified === false ? '/profile?redirect=%2Fhistory' : '/history'} role="menuitem" onClick={closeMenu}><History size={16} /> {t('header.history')}</Link>
                     <Link to="/favorites" role="menuitem" onClick={closeMenu}><Heart size={16} /> {t('header.favorites')}</Link>
                   </>
                 )}

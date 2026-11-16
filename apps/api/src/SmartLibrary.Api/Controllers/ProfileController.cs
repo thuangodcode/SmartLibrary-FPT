@@ -172,9 +172,10 @@ public sealed class ProfileController(
                     form.ClearAvatar,
                     avatarUrl),
                 cancellationToken);
+            var refreshedProfile = await profileService.GetAsync(userId, cancellationToken);
             return profile is null
                 ? NotFound(ApiResponse<object>.Fail("Không tìm thấy hồ sơ người dùng."))
-                : Ok(ApiResponse<UserProfileResponse>.Ok(profile));
+                : Ok(ApiResponse<UserProfileResponse>.Ok(profile with { IsVerified = refreshedProfile?.IsVerified ?? false }));
         }
         catch (ArgumentException exception)
         {

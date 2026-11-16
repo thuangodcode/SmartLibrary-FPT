@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Camera, Check, FileText, LoaderCircle, Mail, Pencil, UserRound, X, ZoomIn } from 'lucide-react';
+import { AlertCircle, Camera, Check, Eye, EyeOff, FileText, LoaderCircle, Mail, Pencil, UserRound, X, ZoomIn, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import HomeNavbar from '../../home/components/HomeNavbar';
 import HomeFooter from '../../home/components/HomeFooter';
+import { useToast } from '../../../components/ui/useToast';
 import './ProfilePage.css';
 
 interface ApiResult<T> {
@@ -30,6 +31,7 @@ interface UserProfile {
   backDocUrl?: string | null;
   selfieDocUrl?: string | null;
   documentType?: string | null;
+  isVerified?: boolean;
 }
 
 const roleLabels: Record<string, string> = {
@@ -39,13 +41,16 @@ const roleLabels: Record<string, string> = {
 };
 
 const ProfilePage: React.FC = () => {
+  const { showToast } = useToast();
   const location = useLocation();
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
+  const verifyMode = new URLSearchParams(location.search).get('verify') === '1';
   const embeddedInShell = location.pathname === '/admin/profile' || location.pathname === '/librarian/profile';
   const backTo = currentUser?.role === 'Admin' ? '/admin' : currentUser?.role === 'Librarian' ? '/librarian' : '/';
-  const permissions = useAuthStore((state) => state.permissions);
   const setAuth = useAuthStore((state) => state.setAuth);
+  const permissions = useAuthStore((state) => state.permissions);
+  const updateUser = useAuthStore((state) => state.updateUser);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [clearAvatar, setClearAvatar] = useState(false);
@@ -59,6 +64,12 @@ const ProfilePage: React.FC = () => {
   const [emailVerificationOtp, setEmailVerificationOtp] = useState('');
   const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [emailVerificationBusy, setEmailVerificationBusy] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [visiblePasswords, setVisiblePasswords] = useState({ current: false, next: false, confirm: false });
+  const [passwordBusy, setPasswordBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -109,12 +120,16 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     if (!accessToken) return;
     let cancelled = false;
+    const controller = new AbortController();
     const fetchProfile = async () => {
       setLoading(true);
       setError(null);
       try {
+        const token = await useAuthStore.getState().getAccessToken();
         const response = await fetch(`${API_BASE_URL}/api/v1/profile`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
+          credentials: 'include',
+          signal: controller.signal,
+          headers: { Authorization: `Bearer ${token}` },
         });
         const result = await parseApiResponse<ApiResult<UserProfile>>(response);
         if (!response.ok || !result?.success || !result.data) {
@@ -126,12 +141,18 @@ const ProfilePage: React.FC = () => {
           setPhone(result.data.phone || '');
           setDateOfBirth(result.data.dateOfBirth || '');
           setAddress(result.data.address || '');
+          updateUser({
+            isVerified: result.data.isVerified,
+            phone: result.data.phone ?? undefined,
+            address: result.data.address ?? undefined,
+            dateOfBirth: result.data.dateOfBirth ?? undefined,
+          });
           if (!result.data.email.toLowerCase().endsWith('@smartlibrary.local')) {
             setEmailVerificationEmail(result.data.email);
           }
         }
       } catch (caught) {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : 'Không thể tải hồ sơ cá nhân.');
+        if (!cancelled && !controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Không thể tải hồ sơ cá nhân.');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -139,8 +160,9 @@ const ProfilePage: React.FC = () => {
     void fetchProfile();
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [accessToken]);
+  }, [accessToken, updateUser]);
 
   const handleStartEdit = () => {
     setIsEditing(true);
@@ -220,6 +242,7 @@ const ProfilePage: React.FC = () => {
       }
 
       setProfile(result.data);
+      setAuth({ ...currentUser, fullName: result.data.fullName, avatarUrl: result.data.avatarUrl ?? undefined, isVerified: result.data.isVerified, phone: result.data.phone ?? undefined, address: result.data.address ?? undefined, dateOfBirth: result.data.dateOfBirth ?? undefined }, accessToken, permissions);
       setFullName(result.data.fullName || '');
       setPhone(result.data.phone || '');
       setDateOfBirth(result.data.dateOfBirth || '');
@@ -306,6 +329,37 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  const changePassword = async () => {
+    if (!accessToken) return;
+    if (newPassword !== confirmPassword) {
+      showToast({ type: 'error', title: 'Không thể đổi mật khẩu', message: 'Mật khẩu mới và xác nhận mật khẩu mới chưa khớp.' });
+      return;
+    }
+    setPasswordBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const token = await useAuthStore.getState().getAccessToken();
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/change-password`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const result = await parseApiResponse<ApiResult<unknown>>(response);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể đổi mật khẩu.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setVisiblePasswords({ current: false, next: false, confirm: false });
+      setShowPasswordChange(false);
+      showToast({ type: 'success', title: 'Đổi mật khẩu thành công', message: 'Mật khẩu của bạn đã được cập nhật.' });
+    } catch (caught) {
+      showToast({ type: 'error', title: 'Không thể đổi mật khẩu', message: caught instanceof Error ? caught.message : 'Vui lòng thử lại.' });
+    } finally {
+      setPasswordBusy(false);
+    }
+  };
+
   const selectAvatar = (file: File | undefined, input: HTMLInputElement) => {
     if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
@@ -338,6 +392,10 @@ const ProfilePage: React.FC = () => {
         </div>
         {!embeddedInShell && <Link to={backTo}>Quay lại</Link>}
       </header>
+
+      {verifyMode && <div className="profile-message profile-message--verification" role="status">
+        <FileText size={18} /><div><strong>Hoàn tất xác thực tài khoản</strong><br />Bổ sung số điện thoại, ngày sinh, địa chỉ và tải đủ ảnh CCCD hai mặt cùng ảnh chân dung để dùng dịch vụ mượn sách và hỗ trợ.</div>
+      </div>}
 
       {visibleError && <div className="profile-message profile-message--error" role="alert"><AlertCircle size={17} />{visibleError}</div>}
       {notice && <div className="profile-message profile-message--success" role="status"><Check size={17} />{notice}</div>}
@@ -420,13 +478,13 @@ const ProfilePage: React.FC = () => {
                 <h2>Thông tin cá nhân</h2>
                 <p className="profile-card-description">Thông tin này được dùng trong tài khoản SmartLibrary của bạn.</p>
               </div>
-              {!isEditing && (
+              {isEditing ? <span className="profile-editing-badge"><Pencil size={13} /> Chế độ chỉnh sửa đang bật</span> : (
                 <button
                   className="profile-btn-edit-header"
                   onClick={handleStartEdit}
                   type="button"
                 >
-                  <Pencil size={14} /> Chỉnh sửa
+                  <Pencil size={14} /> Chỉnh sửa hồ sơ
                 </button>
               )}
             </div>
@@ -537,6 +595,29 @@ const ProfilePage: React.FC = () => {
               {profile.teacherId && <div><dt>Mã giảng viên</dt><dd>{profile.teacherId}</dd></div>}
               {profile.employeeId && <div><dt>Mã nhân viên</dt><dd>{profile.employeeId}</dd></div>}
             </dl>
+            <div className="profile-password-section">
+              <div className="profile-password-intro">
+                <span className="profile-password-icon"><LockKeyhole size={18} /></span>
+                <div><strong>Bảo mật tài khoản</strong><span>Cập nhật mật khẩu để bảo vệ tài khoản của bạn.</span></div>
+              </div>
+              {!showPasswordChange ? (
+                <button className="profile-btn-secondary" type="button" onClick={() => { setShowPasswordChange(true); setError(null); setNotice(null); }}>
+                  <ShieldCheck size={16} /> Thay đổi mật khẩu
+                </button>
+              ) : (
+                <div className="profile-password-editor">
+                  <label>Mật khẩu hiện tại<div className="profile-password-input-wrap"><input autoComplete="current-password" onChange={(event) => setCurrentPassword(event.target.value)} type={visiblePasswords.current ? 'text' : 'password'} value={currentPassword} /><button type="button" className="profile-password-visibility" aria-label={visiblePasswords.current ? 'Ẩn mật khẩu hiện tại' : 'Hiện mật khẩu hiện tại'} onClick={() => setVisiblePasswords((state) => ({ ...state, current: !state.current }))}>{visiblePasswords.current ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label>
+                  <label>Mật khẩu mới<div className="profile-password-input-wrap"><input autoComplete="new-password" onChange={(event) => setNewPassword(event.target.value)} type={visiblePasswords.next ? 'text' : 'password'} value={newPassword} /><button type="button" className="profile-password-visibility" aria-label={visiblePasswords.next ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'} onClick={() => setVisiblePasswords((state) => ({ ...state, next: !state.next }))}>{visiblePasswords.next ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label>
+                  <label>Xác nhận mật khẩu mới<div className="profile-password-input-wrap"><input autoComplete="new-password" onChange={(event) => setConfirmPassword(event.target.value)} type={visiblePasswords.confirm ? 'text' : 'password'} value={confirmPassword} /><button type="button" className="profile-password-visibility" aria-label={visiblePasswords.confirm ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'} onClick={() => setVisiblePasswords((state) => ({ ...state, confirm: !state.confirm }))}>{visiblePasswords.confirm ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label>
+                  <div className="profile-password-actions">
+                    <button className="profile-btn-secondary" type="button" disabled={passwordBusy} onClick={() => { setShowPasswordChange(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }}><X size={15} /> Hủy</button>
+                    <button className="profile-btn-primary" type="button" disabled={passwordBusy || !currentPassword || !newPassword || !confirmPassword} onClick={() => void changePassword()}>
+                      {passwordBusy ? <LoaderCircle size={15} className="profile-spinner" /> : <Check size={15} />} Lưu mật khẩu
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </section>
 
           {/* Identity Documents Section */}
@@ -557,15 +638,6 @@ const ProfilePage: React.FC = () => {
                   <FileText size={14} />
                   {showDocs ? 'Ẩn giấy tờ' : 'Xem giấy tờ tùy thân'}
                 </button>
-                {!isEditing && (
-                  <button
-                    type="button"
-                    className="profile-btn-edit-header"
-                    onClick={handleStartEdit}
-                  >
-                    <Pencil size={14} /> Chỉnh sửa ảnh giấy tờ
-                  </button>
-                )}
               </div>
             </div>
 

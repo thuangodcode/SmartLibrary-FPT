@@ -53,7 +53,7 @@ public class SupabaseAuthService : IIdentityProvider
             {
                 var errorJson = await response.Content.ReadAsStringAsync();
                 _logger.LogError("Supabase signup failed: {Error}", errorJson);
-                var errorMsg = "Đăng ký không thành công.";
+                var errorMsg = "ÄÄƒng kÃ½ khÃ´ng thÃ nh cÃ´ng.";
                 if (errorJson.Contains("msg"))
                 {
                     using var doc = System.Text.Json.JsonDocument.Parse(errorJson);
@@ -69,8 +69,8 @@ public class SupabaseAuthService : IIdentityProvider
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Không thể kết nối dịch vụ Supabase Auth: {Message}", ex.Message);
-            throw new ValidationException("Không thể kết nối đến máy chủ xác thực Supabase. Vui lòng kiểm tra lại kết nối mạng.");
+            _logger.LogError(ex, "KhÃ´ng thá»ƒ káº¿t ná»‘i dá»‹ch vá»¥ Supabase Auth: {Message}", ex.Message);
+            throw new ValidationException("KhÃ´ng thá»ƒ káº¿t ná»‘i Ä‘áº¿n mÃ¡y chá»§ xÃ¡c thá»±c Supabase. Vui lÃ²ng kiá»ƒm tra láº¡i káº¿t ná»‘i máº¡ng.");
         }
     }
 
@@ -83,7 +83,7 @@ public class SupabaseAuthService : IIdentityProvider
             {
                 IsSuccess = false,
                 ErrorCode = "AUTH_SERVICE_UNAVAILABLE",
-                ErrorMessage = "Dịch vụ đăng nhập chưa được cấu hình đầy đủ. Vui lòng liên hệ quản trị viên."
+                ErrorMessage = "Dá»‹ch vá»¥ Ä‘Äƒng nháº­p chÆ°a Ä‘Æ°á»£c cáº¥u hÃ¬nh Ä‘áº§y Ä‘á»§. Vui lÃ²ng liÃªn há»‡ quáº£n trá»‹ viÃªn."
             };
         }
 
@@ -121,7 +121,7 @@ public class SupabaseAuthService : IIdentityProvider
                 {
                     IsSuccess = false,
                     ErrorCode = "AUTH_SERVICE_UNAVAILABLE",
-                    ErrorMessage = "Dịch vụ xác thực đang tạm thời không khả dụng. Vui lòng thử lại."
+                    ErrorMessage = "Dá»‹ch vá»¥ xÃ¡c thá»±c Ä‘ang táº¡m thá»i khÃ´ng kháº£ dá»¥ng. Vui lÃ²ng thá»­ láº¡i."
                 };
             }
             if ((int)response.StatusCode == 429)
@@ -131,7 +131,7 @@ public class SupabaseAuthService : IIdentityProvider
                 {
                     IsSuccess = false,
                     ErrorCode = "AUTH_RATE_LIMITED",
-                    ErrorMessage = "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng chờ rồi thử lại."
+                    ErrorMessage = "Báº¡n Ä‘Ã£ thá»­ Ä‘Äƒng nháº­p quÃ¡ nhiá»u láº§n. Vui lÃ²ng chá» rá»“i thá»­ láº¡i."
                 };
             }
         }
@@ -142,7 +142,7 @@ public class SupabaseAuthService : IIdentityProvider
             {
                 IsSuccess = false,
                 ErrorCode = "AUTH_SERVICE_UNAVAILABLE",
-                ErrorMessage = "Không thể kết nối đến dịch vụ xác thực Supabase."
+                ErrorMessage = "KhÃ´ng thá»ƒ káº¿t ná»‘i Ä‘áº¿n dá»‹ch vá»¥ xÃ¡c thá»±c Supabase."
             };
         }
         catch (TaskCanceledException ex)
@@ -152,7 +152,7 @@ public class SupabaseAuthService : IIdentityProvider
             {
                 IsSuccess = false,
                 ErrorCode = "AUTH_SERVICE_UNAVAILABLE",
-                ErrorMessage = "Dịch vụ xác thực phản hồi quá thời gian chờ. Vui lòng thử lại."
+                ErrorMessage = "Dá»‹ch vá»¥ xÃ¡c thá»±c pháº£n há»“i quÃ¡ thá»i gian chá». Vui lÃ²ng thá»­ láº¡i."
             };
         }
         catch (NpgsqlException ex)
@@ -162,7 +162,7 @@ public class SupabaseAuthService : IIdentityProvider
             {
                 IsSuccess = false,
                 ErrorCode = "AUTH_PROFILE_SERVICE_UNAVAILABLE",
-                ErrorMessage = "Không thể kiểm tra hồ sơ tài khoản lúc này. Vui lòng thử lại."
+                ErrorMessage = "KhÃ´ng thá»ƒ kiá»ƒm tra há»“ sÆ¡ tÃ i khoáº£n lÃºc nÃ y. Vui lÃ²ng thá»­ láº¡i."
             };
         }
 
@@ -177,7 +177,7 @@ public class SupabaseAuthService : IIdentityProvider
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
         await using var cmd = new NpgsqlCommand(@"
-            SELECT p.status::text, p.is_active, p.is_deleted, r.name
+            SELECT p.status::text, p.is_active, p.is_deleted, r.name, p.email
             FROM profiles p
             LEFT JOIN roles r ON r.id = p.role_id
             WHERE p.id = @uid
@@ -191,7 +191,7 @@ public class SupabaseAuthService : IIdentityProvider
             {
                 IsSuccess = false,
                 ErrorCode = "AUTH_PROFILE_MISSING",
-                ErrorMessage = "Tài khoản xác thực đã tồn tại nhưng chưa có hồ sơ thư viện. Vui lòng liên hệ quản trị viên."
+                ErrorMessage = "TÃ i khoáº£n xÃ¡c thá»±c Ä‘Ã£ tá»“n táº¡i nhÆ°ng chÆ°a cÃ³ há»“ sÆ¡ thÆ° viá»‡n. Vui lÃ²ng liÃªn há»‡ quáº£n trá»‹ viÃªn."
             };
         }
 
@@ -199,6 +199,7 @@ public class SupabaseAuthService : IIdentityProvider
         var isActive = !reader.IsDBNull(1) && reader.GetBoolean(1);
         var isDeleted = !reader.IsDBNull(2) && reader.GetBoolean(2);
         var role = reader.IsDBNull(3) ? null : reader.GetString(3);
+        var email = reader.IsDBNull(4) ? null : reader.GetString(4);
 
         if (!isActive || isDeleted || string.Equals(status, "Suspended", StringComparison.OrdinalIgnoreCase))
         {
@@ -206,17 +207,19 @@ public class SupabaseAuthService : IIdentityProvider
             {
                 IsSuccess = false,
                 ErrorCode = "AUTH_ACCOUNT_SUSPENDED",
-                ErrorMessage = "Tài khoản đã bị tạm ngưng hoặc vô hiệu hóa. Vui lòng liên hệ quản trị viên."
+                ErrorMessage = "TÃ i khoáº£n Ä‘Ã£ bá»‹ táº¡m ngÆ°ng hoáº·c vÃ´ hiá»‡u hÃ³a. Vui lÃ²ng liÃªn há»‡ quáº£n trá»‹ viÃªn."
             };
         }
 
-        if (!string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase)
+            && email?.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase) != true
+            && email?.EndsWith("@googlemail.com", StringComparison.OrdinalIgnoreCase) != true)
         {
             return new AuthResult
             {
                 IsSuccess = false,
                 ErrorCode = "AUTH_ACCOUNT_NOT_ACTIVE",
-                ErrorMessage = "Tài khoản chưa được kích hoạt. Vui lòng xác minh thông tin hoặc liên hệ quản trị viên."
+                ErrorMessage = "TÃ i khoáº£n chÆ°a Ä‘Æ°á»£c kÃ­ch hoáº¡t. Vui lÃ²ng xÃ¡c minh thÃ´ng tin hoáº·c liÃªn há»‡ quáº£n trá»‹ viÃªn."
             };
         }
 
@@ -226,7 +229,7 @@ public class SupabaseAuthService : IIdentityProvider
             {
                 IsSuccess = false,
                 ErrorCode = "AUTH_ROLE_MISSING",
-                ErrorMessage = "Tài khoản chưa được cấp vai trò truy cập. Vui lòng liên hệ quản trị viên."
+                ErrorMessage = "TÃ i khoáº£n chÆ°a Ä‘Æ°á»£c cáº¥p vai trÃ² truy cáº­p. Vui lÃ²ng liÃªn há»‡ quáº£n trá»‹ viÃªn."
             };
         }
 
@@ -237,7 +240,7 @@ public class SupabaseAuthService : IIdentityProvider
     {
         IsSuccess = false,
         ErrorCode = "AUTH_INVALID_CREDENTIALS",
-        ErrorMessage = "Email, tên đăng nhập hoặc mật khẩu không đúng."
+        ErrorMessage = "Email, tÃªn Ä‘Äƒng nháº­p hoáº·c máº­t kháº©u khÃ´ng Ä‘Ãºng."
     };
 
     private async Task<string?> ResolveLoginEmailAsync(string identifier)
@@ -253,7 +256,7 @@ public class SupabaseAuthService : IIdentityProvider
             FROM profiles p
             WHERE p.is_active = true
               AND p.is_deleted = false
-              AND p.status::text = 'Active'
+              AND (p.status::text = 'Active' OR lower(p.email) LIKE '%@gmail.com' OR lower(p.email) LIKE '%@googlemail.com')
               AND (
                   LOWER(SPLIT_PART(p.email, '@', 1)) = LOWER(@identifier)
                   OR LOWER(p.student_id) = LOWER(@identifier)
@@ -268,11 +271,11 @@ public class SupabaseAuthService : IIdentityProvider
         var payload = new { refresh_token = refreshToken };
         var response = await _httpClient.PostAsJsonAsync("token?grant_type=refresh_token", payload);
         if (!response.IsSuccessStatusCode)
-            return new AuthResult { IsSuccess = false, ErrorCode = "AUTH_TOKEN_EXPIRED", ErrorMessage = "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại." };
+            return new AuthResult { IsSuccess = false, ErrorCode = "AUTH_TOKEN_EXPIRED", ErrorMessage = "PhiÃªn lÃ m viá»‡c Ä‘Ã£ háº¿t háº¡n. Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i." };
         var tokenRes = await response.Content.ReadFromJsonAsync<SupabaseTokenResponse>();
         if (tokenRes?.User?.Id is not { Length: > 0 } userId ||
             await GetActiveUserRoleAsync(userId) is null)
-            return new AuthResult { IsSuccess = false, ErrorCode = "AUTH_TOKEN_EXPIRED", ErrorMessage = "Tài khoản không còn hoạt động. Vui lòng đăng nhập lại." };
+            return new AuthResult { IsSuccess = false, ErrorCode = "AUTH_TOKEN_EXPIRED", ErrorMessage = "TÃ i khoáº£n khÃ´ng cÃ²n hoáº¡t Ä‘á»™ng. Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i." };
 
         return new AuthResult
         {
@@ -315,7 +318,7 @@ public class SupabaseAuthService : IIdentityProvider
             WHERE p.id = @uid
               AND p.is_active = true
               AND p.is_deleted = false
-              AND p.status::text = 'Active'
+              AND (p.status::text = 'Active' OR lower(p.email) LIKE '%@gmail.com' OR lower(p.email) LIKE '%@googlemail.com')
             LIMIT 1;", conn);
         cmd.Parameters.AddWithValue("uid", uid);
         var role = await cmd.ExecuteScalarAsync() as string;
@@ -333,7 +336,7 @@ public class SupabaseAuthService : IIdentityProvider
     public async Task UpdateEmailAsync(string userId, string email, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(_serviceRoleKey) || string.IsNullOrWhiteSpace(_supabaseUrl))
-            throw new InvalidOperationException("Supabase Admin API chưa được cấu hình.");
+            throw new InvalidOperationException("Supabase Admin API chÆ°a Ä‘Æ°á»£c cáº¥u hÃ¬nh.");
 
         using var request = new HttpRequestMessage(
             HttpMethod.Put,
@@ -350,10 +353,10 @@ public class SupabaseAuthService : IIdentityProvider
             return;
 
         if (response.StatusCode is System.Net.HttpStatusCode.Conflict or System.Net.HttpStatusCode.UnprocessableEntity)
-            throw new ValidationException("Email này đã được tài khoản khác sử dụng.");
+            throw new ValidationException("Email nÃ y Ä‘Ã£ Ä‘Æ°á»£c tÃ i khoáº£n khÃ¡c sá»­ dá»¥ng.");
 
         _logger.LogError("Supabase email update failed with HTTP {StatusCode}.", (int)response.StatusCode);
-        throw new InvalidOperationException("Không thể cập nhật email trên dịch vụ xác thực.");
+        throw new InvalidOperationException("KhÃ´ng thá»ƒ cáº­p nháº­t email trÃªn dá»‹ch vá»¥ xÃ¡c thá»±c.");
     }
 
     public async Task SendPasswordResetEmailAsync(string email)
@@ -369,7 +372,7 @@ public class SupabaseAuthService : IIdentityProvider
 
         using var response = await _httpClient.PostAsJsonAsync("recover", new { email, redirect_to = redirectTo });
         if (!response.IsSuccessStatusCode)
-            throw new ValidationException("Không thể gửi email đặt lại mật khẩu.");
+            throw new ValidationException("KhÃ´ng thá»ƒ gá»­i email Ä‘áº·t láº¡i máº­t kháº©u.");
     }
 
     public async Task ResetPasswordAsync(string token, string newPassword)
@@ -379,14 +382,40 @@ public class SupabaseAuthService : IIdentityProvider
         request.Content = JsonContent.Create(new { password = newPassword });
         var response = await _httpClient.SendAsync(request);
         if (!response.IsSuccessStatusCode)
-            throw new ValidationException("Đặt lại mật khẩu thất bại. Mã xác nhận có thể đã hết hạn.");
+            throw new ValidationException("Äáº·t láº¡i máº­t kháº©u tháº¥t báº¡i. MÃ£ xÃ¡c nháº­n cÃ³ thá»ƒ Ä‘Ã£ háº¿t háº¡n.");
     }
 
-    public async Task ChangePasswordAsync(string userId, string currentPassword, string newPassword)
+    public async Task ChangePasswordAsync(string userId, string email, string currentPassword, string newPassword)
     {
-        var response = await _httpClient.PutAsJsonAsync("user", new { password = newPassword });
+        if (string.IsNullOrWhiteSpace(_anonKey))
+            throw new ValidationException("Dịch vụ đổi mật khẩu chưa được cấu hình.");
+
+        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, "token?grant_type=password")
+        {
+            Content = JsonContent.Create(new { email, password = currentPassword }),
+        };
+        loginRequest.Headers.TryAddWithoutValidation("apikey", _anonKey);
+        using var loginResponse = await _httpClient.SendAsync(loginRequest);
+        if (!loginResponse.IsSuccessStatusCode)
+            throw new ValidationException("Mật khẩu hiện tại không chính xác.");
+
+        var session = await loginResponse.Content.ReadFromJsonAsync<SupabaseTokenResponse>();
+        if (session?.User?.Id != userId || string.IsNullOrWhiteSpace(session.AccessToken))
+            throw new ValidationException("Không thể xác nhận tài khoản để đổi mật khẩu.");
+
+        using var request = new HttpRequestMessage(HttpMethod.Put, "user")
+        {
+            Content = JsonContent.Create(new { password = newPassword }),
+        };
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session.AccessToken);
+        request.Headers.TryAddWithoutValidation("apikey", _anonKey);
+        using var response = await _httpClient.SendAsync(request);
         if (!response.IsSuccessStatusCode)
-            throw new ValidationException("Đổi mật khẩu thất bại.");
+        {
+            var errorBody = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("Supabase password update failed with HTTP {StatusCode}: {ErrorBody}", (int)response.StatusCode, errorBody);
+            throw new ValidationException("Đổi mật khẩu thất bại. Vui lòng kiểm tra cấu hình xác thực Supabase và thử lại.");
+        }
     }
 
     public async Task ResendVerificationEmailAsync(string email)
@@ -406,15 +435,18 @@ public class SupabaseAuthService : IIdentityProvider
             await using var conn = new NpgsqlConnection(_connectionString);
             await conn.OpenAsync();
 
-            string? email = null, fullName = null, avatarUrl = null, roleName = null, status = null;
+            string? email = null, fullName = null, avatarUrl = null, roleName = null, status = null,
+                phone = null, studentId = null, teacherId = null, employeeId = null, address = null;
+            DateOnly? dateOfBirth = null;
             await using (var cmd = new NpgsqlCommand(@"
-                SELECT p.email, p.full_name, p.avatar_url, r.name AS role_name, p.status::text
+                SELECT p.email, p.full_name, p.avatar_url, r.name AS role_name, p.status::text,
+                       p.phone, p.student_id, p.teacher_id, p.employee_id, p.address, p.date_of_birth
                 FROM profiles p
                 JOIN roles r ON p.role_id = r.id
                 WHERE p.id = @uid
                   AND p.is_active = true
                   AND p.is_deleted = false
-                  AND p.status::text = 'Active'", conn))
+                  AND (p.status::text = 'Active' OR lower(p.email) LIKE '%@gmail.com' OR lower(p.email) LIKE '%@googlemail.com')", conn))
             {
                 cmd.Parameters.AddWithValue("uid", uid);
                 await using var reader = await cmd.ExecuteReaderAsync();
@@ -425,6 +457,12 @@ public class SupabaseAuthService : IIdentityProvider
                     avatarUrl = reader.IsDBNull(2) ? null : reader.GetString(2);
                     roleName = reader.IsDBNull(3) ? null : reader.GetString(3);
                     status = reader.IsDBNull(4) ? null : reader.GetString(4);
+                    phone = reader.IsDBNull(5) ? null : reader.GetString(5);
+                    studentId = reader.IsDBNull(6) ? null : reader.GetString(6);
+                    teacherId = reader.IsDBNull(7) ? null : reader.GetString(7);
+                    employeeId = reader.IsDBNull(8) ? null : reader.GetString(8);
+                    address = reader.IsDBNull(9) ? null : reader.GetString(9);
+                    dateOfBirth = reader.IsDBNull(10) ? null : DateOnly.FromDateTime(reader.GetDateTime(10));
                 }
             }
 
@@ -457,6 +495,10 @@ public class SupabaseAuthService : IIdentityProvider
                 avatarUrl,
                 role = roleName ?? "Reader",
                 status = status ?? "PendingVerification",
+                phone, studentId, teacherId, employeeId, address, dateOfBirth,
+                isVerified = HasApprovedRegistration(uid) || (!string.IsNullOrWhiteSpace(phone) && !string.IsNullOrWhiteSpace(address)
+                    && dateOfBirth.HasValue && (studentId is not null || teacherId is not null || employeeId is not null)
+                    && HasIdentityDocuments(uid)),
                 permissions
             };
         }
@@ -465,6 +507,27 @@ public class SupabaseAuthService : IIdentityProvider
             _logger.LogError(ex, "Error fetching user profile for {UserId}", userId);
             return null;
         }
+    }
+
+    private bool HasIdentityDocuments(Guid userId)
+    {
+        using var conn = new NpgsqlConnection(_connectionString);
+        conn.Open();
+        using var cmd = new NpgsqlCommand(@"SELECT COUNT(DISTINCT d.side::text) = 3
+            FROM registration_requests r JOIN identity_documents d ON d.request_id = r.id
+            WHERE r.user_id = @uid AND d.deleted_at IS NULL AND r.status = 'Approved'", conn);
+        cmd.Parameters.AddWithValue("uid", userId);
+        return cmd.ExecuteScalar() is true;
+    }
+
+    private bool HasApprovedRegistration(Guid userId)
+    {
+        using var conn = new NpgsqlConnection(_connectionString);
+        conn.Open();
+        using var cmd = new NpgsqlCommand(
+            "SELECT EXISTS (SELECT 1 FROM registration_requests WHERE user_id = @uid AND status::text = 'Approved')", conn);
+        cmd.Parameters.AddWithValue("uid", userId);
+        return cmd.ExecuteScalar() is true;
     }
 
     private class SupabaseUserResponse

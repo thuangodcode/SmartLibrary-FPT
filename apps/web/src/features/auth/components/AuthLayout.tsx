@@ -21,7 +21,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
 }) => {
   if (variant === 'design') {
     return (
-      <div className="figma-auth-page" style={{ backgroundImage: `linear-gradient(130deg, rgb(250 252 251 / 92%), rgb(242 246 244 / 82%)), url(${libraryImage})` }}>
+    <div className="figma-auth-page" style={{ backgroundImage: `linear-gradient(130deg, rgb(250 252 251 / 92%), rgb(242 246 244 / 82%)), url(${libraryImage})` }}>
         <main className="figma-auth-panel">
           <nav className="figma-auth-nav" aria-label="Điều hướng xác thực">
             <Link to="/" className="figma-auth-logo" aria-label="SmartLibrary - Trang chủ">
@@ -55,7 +55,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   }
 
   return (
-      <div className="auth-classic-page min-h-screen bg-[#FAFAF8] dark:bg-[#0B0F17] flex flex-col justify-between" style={{ backgroundImage: `linear-gradient(rgb(246 248 247 / 88%), rgb(246 248 247 / 88%)), url(${libraryImage})` }}>
+      <div className="figma-auth-page auth-classic-page min-h-screen bg-[#FAFAF8] dark:bg-[#0B0F17] flex flex-col justify-between" style={{ backgroundImage: `linear-gradient(rgb(246 248 247 / 88%), rgb(246 248 247 / 88%)), url(${libraryImage})` }}>
       <AnnouncementBar />
 
       <main className="flex-grow flex items-center justify-center p-4 sm:p-6 lg:p-8">

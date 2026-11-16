@@ -58,6 +58,48 @@ public sealed partial class CopyLifecycleTests
     }
 
     [BookCodePostgresFact]
+    public async Task GoogleExchangeCreatesReaderAndKeepsProfileIncompleteUntilIdentityIsApproved()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await using var db = fixture.Context();
+        var incomplete = new UserProfile
+        {
+            Email = "new.google@example.test", FullName = "New Google Reader",
+            RoleId = (await db.UserProfiles.FirstAsync(x => x.Id != fixture.StaffId)).RoleId,
+            Status = AccountStatus.Active, Phone = "0900000000", Address = "FPT", DateOfBirth = new DateOnly(2000, 1, 1),
+            StudentId = "SE000001"
+        };
+        db.UserProfiles.Add(incomplete);
+        var registration = new RegistrationRequest
+        {
+            UserId = incomplete.Id, DocumentType = DocumentType.NationalId, Status = RegistrationRequestStatus.Submitted,
+            Documents = [
+                new() { Side = DocumentSide.Front, StoragePath = "front", MimeType = "image/jpeg", SizeBytes = 12, Sha256 = "x" },
+                new() { Side = DocumentSide.Back, StoragePath = "back", MimeType = "image/jpeg", SizeBytes = 12, Sha256 = "x" },
+                new() { Side = DocumentSide.Selfie, StoragePath = "selfie", MimeType = "image/jpeg", SizeBytes = 12, Sha256 = "x" }
+            ]
+        };
+        db.RegistrationRequests.Add(registration);
+        await db.SaveChangesAsync();
+
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:DefaultConnection"] = db.Database.GetConnectionString()
+        }).Build();
+        using var http = new HttpClient();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var auth = new SupabaseAuthService(http, null!, config, NullLogger<SupabaseAuthService>.Instance, cache);
+
+        var beforeApproval = JsonSerializer.SerializeToElement(await auth.GetUserProfileWithPermissionsAsync(incomplete.Id.ToString()));
+        Assert.False(beforeApproval.GetProperty("isVerified").GetBoolean());
+
+        registration.Status = RegistrationRequestStatus.Approved;
+        await db.SaveChangesAsync();
+        var afterApproval = JsonSerializer.SerializeToElement(await auth.GetUserProfileWithPermissionsAsync(incomplete.Id.ToString()));
+        Assert.True(afterApproval.GetProperty("isVerified").GetBoolean());
+    }
+
+    [BookCodePostgresFact]
     public async Task LightDamageCanBeShelvedBeforePaymentAndRetainsItsNotes()
     {
         await using var fixture = await Fixture.CreateAsync();

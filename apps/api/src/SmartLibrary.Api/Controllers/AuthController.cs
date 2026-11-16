@@ -1,10 +1,13 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Net.Http.Json;
 using SmartLibrary.Application.Common;
 using SmartLibrary.Application.Features.Auth.Commands;
 using SmartLibrary.Application.Interfaces;
+using SmartLibrary.Infrastructure.Persistence;
 
 namespace SmartLibrary.Api.Controllers;
 
@@ -15,15 +18,21 @@ public class AuthController : ControllerBase
     private readonly IIdentityProvider _identityProvider;
     private readonly IAuthOtpService _authOtpService;
     private readonly ILogger<AuthController> _logger;
+    private readonly AppDbContext _db;
+    private readonly IConfiguration _configuration;
 
     public AuthController(
         IIdentityProvider identityProvider,
         IAuthOtpService authOtpService,
-        ILogger<AuthController> logger)
+        ILogger<AuthController> logger,
+        AppDbContext db,
+        IConfiguration configuration)
     {
         _identityProvider = identityProvider;
         _authOtpService = authOtpService;
         _logger = logger;
+        _db = db;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -82,6 +91,8 @@ public class AuthController : ControllerBase
         {
             userProfile = await _identityProvider.GetUserProfileWithPermissionsAsync(result.UserId);
         }
+        if (userProfile is not null && !string.IsNullOrEmpty(result.UserId))
+            userProfile = await AddVerificationStateAsync(userProfile, result.UserId);
         if (userProfile is null)
         {
             _logger.LogError("Authentication succeeded for user {UserId}, but the application profile could not be loaded.", result.UserId);
@@ -104,6 +115,88 @@ public class AuthController : ControllerBase
         return Ok(ApiResponse<object>.Ok(responseData));
     }
 
+    [HttpPost("google/exchange")]
+    public async Task<IActionResult> ExchangeGoogleToken([FromBody] GoogleExchangeRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.AccessToken) || string.IsNullOrWhiteSpace(request.Email))
+            return Unauthorized(ApiResponse<object>.Fail("Phiên Google không hợp lệ."));
+        var userId = await _identityProvider.GetAuthenticatedUserIdAsync(request.AccessToken, ct);
+        if (!Guid.TryParse(userId, out var id)) return Unauthorized(ApiResponse<object>.Fail("Phiên Google không hợp lệ."));
+
+        using var http = new HttpClient();
+        var url = _configuration["Supabase:Url"];
+        var key = _configuration["Supabase:AnonKey"];
+        if (string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(key))
+            return StatusCode(503, ApiResponse<object>.Fail("Đăng nhập Google chưa được cấu hình."));
+        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", request.AccessToken);
+        http.DefaultRequestHeaders.Add("apikey", key);
+        using var googleResponse = await http.GetAsync($"{url.TrimEnd('/')}/auth/v1/user", ct);
+        if (!googleResponse.IsSuccessStatusCode) return Unauthorized(ApiResponse<object>.Fail("Phiên Google không hợp lệ."));
+        var identity = await googleResponse.Content.ReadFromJsonAsync<GoogleIdentity>(cancellationToken: ct);
+        if (identity?.Id != id.ToString() || !string.Equals(identity.Email, request.Email, StringComparison.OrdinalIgnoreCase))
+            return Unauthorized(ApiResponse<object>.Fail("Thông tin email Google không khớp."));
+
+        var profile = await _db.UserProfiles.Include(x => x.Role).FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (profile is null)
+        {
+            var role = await _db.UserProfiles.Select(x => x.Role).Distinct().FirstOrDefaultAsync(x => x.Name == "Reader", ct);
+            if (role is null) return StatusCode(503, ApiResponse<object>.Fail("Chưa cấu hình vai trò độc giả."));
+            profile = new SmartLibrary.Domain.Entities.UserProfile
+            {
+                Id = id, Email = identity.Email.Trim().ToLowerInvariant(),
+                FullName = string.IsNullOrWhiteSpace(request.FullName) ? identity.Email.Split('@')[0] : request.FullName.Trim(),
+                AvatarUrl = request.AvatarUrl, RoleId = role.Id, Role = role,
+                Status = SmartLibrary.Domain.Enums.AccountStatus.Active, IsActive = true
+            };
+            _db.UserProfiles.Add(profile);
+            await _db.SaveChangesAsync(ct);
+        }
+        else if (!profile.IsActive || profile.IsDeleted || profile.Status == SmartLibrary.Domain.Enums.AccountStatus.Suspended)
+            return StatusCode(403, ApiResponse<object>.Fail("Tài khoản đã bị tạm ngưng."));
+
+        var permissions = await _db.UserProfiles.Where(x => x.Id == profile.Id)
+            .SelectMany(x => x.Role.RolePermissions).Select(x => x.Permission.Code).ToListAsync(ct);
+        var isVerified = await IsProfileVerifiedAsync(profile.Id, ct);
+        return Ok(ApiResponse<object>.Ok(new { user = new {
+            id = profile.Id, email = profile.Email, fullName = profile.FullName, avatarUrl = profile.AvatarUrl,
+            role = profile.Role.Name, status = profile.Status.ToString(), permissions, isVerified,
+            phone = profile.Phone, studentId = profile.StudentId, teacherId = profile.TeacherId,
+            employeeId = profile.EmployeeId, address = profile.Address, dateOfBirth = profile.DateOfBirth
+        }}));
+    }
+
+    private async Task<bool> IsProfileVerifiedAsync(Guid userId, CancellationToken ct)
+    {
+        if (await _db.RegistrationRequests.AsNoTracking().AnyAsync(
+                r => r.UserId == userId && r.Status == SmartLibrary.Domain.Enums.RegistrationRequestStatus.Approved, ct))
+            return true;
+
+        var p = await _db.UserProfiles.AsNoTracking().FirstAsync(x => x.Id == userId, ct);
+        if (string.IsNullOrWhiteSpace(p.Phone) || string.IsNullOrWhiteSpace(p.Address) || p.DateOfBirth is null
+            || (p.StudentId is null && p.TeacherId is null && p.EmployeeId is null)) return false;
+        return await _db.IdentityDocuments.IgnoreQueryFilters().Where(d => d.Request.UserId == userId && !d.IsDeleted && d.Request.Status == SmartLibrary.Domain.Enums.RegistrationRequestStatus.Approved)
+            .Select(d => d.Side).Distinct().CountAsync(ct) == 3;
+    }
+
+    private async Task<object> AddVerificationStateAsync(object userProfile, string userId)
+    {
+        if (!Guid.TryParse(userId, out var id)) return userProfile;
+        var json = System.Text.Json.JsonSerializer.SerializeToElement(userProfile);
+        if (!json.TryGetProperty("email", out var emailElement) || !json.TryGetProperty("isVerified", out _)) return userProfile;
+        var verified = await IsProfileVerifiedAsync(id, HttpContext.RequestAborted);
+        return new { id, email = emailElement.GetString(), fullName = json.TryGetProperty("fullName", out var name) ? name.GetString() : null,
+            avatarUrl = json.TryGetProperty("avatarUrl", out var avatar) ? avatar.GetString() : null,
+            role = json.TryGetProperty("role", out var role) ? role.GetString() : null,
+            status = json.TryGetProperty("status", out var status) ? status.GetString() : null,
+            permissions = json.TryGetProperty("permissions", out var permissions) ? permissions : default,
+            isVerified = verified,
+            phone = json.TryGetProperty("phone", out var phone) ? phone.GetString() : null,
+            address = json.TryGetProperty("address", out var address) ? address.GetString() : null,
+            dateOfBirth = json.TryGetProperty("dateOfBirth", out var dob) ? dob.GetString() : null };
+    }
+    public sealed record GoogleExchangeRequest(string AccessToken, string Email, string? FullName, string? AvatarUrl);
+    private sealed record GoogleIdentity(string Id, string Email);
+
     private static ApiResponse<object> AuthFailure(AuthResult result) =>
         new()
         {
@@ -121,6 +214,7 @@ public class AuthController : ControllerBase
             return Unauthorized(ApiResponse<object>.Fail("Phiên đăng nhập không hợp lệ."));
 
         var userProfile = await _identityProvider.GetUserProfileWithPermissionsAsync(userId);
+        if (userProfile is not null) userProfile = await AddVerificationStateAsync(userProfile, userId);
         if (userProfile is null)
             return Unauthorized(ApiResponse<object>.Fail("Tài khoản không hoạt động hoặc chưa được cấp quyền truy cập."));
 
@@ -199,6 +293,32 @@ public class AuthController : ControllerBase
             return BadRequest(ApiResponse<object>.Fail(result.Error!));
 
         return Ok(ApiResponse<object>.Ok(true, new { message = "Nếu email tồn tại trong hệ thống, hướng dẫn và mã xác thực đặt lại mật khẩu đã được gửi đến hộp thư của bạn." }));
+    }
+
+    [Authorize]
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken ct)
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(userId, out var id))
+            return Unauthorized(ApiResponse<object>.Fail("Phiên đăng nhập không hợp lệ."));
+        if (string.IsNullOrEmpty(request.CurrentPassword) || request.NewPassword is null)
+            return BadRequest(ApiResponse<object>.Fail("Vui lòng nhập mật khẩu hiện tại và mật khẩu mới."));
+
+        var email = await _db.UserProfiles.AsNoTracking().Where(profile => profile.Id == id)
+            .Select(profile => profile.Email).FirstOrDefaultAsync(ct);
+        if (string.IsNullOrWhiteSpace(email))
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy tài khoản."));
+
+        try
+        {
+            await _identityProvider.ChangePasswordAsync(id.ToString(), email, request.CurrentPassword, request.NewPassword);
+            return Ok(ApiResponse<object>.Ok(true, new { message = "Đổi mật khẩu thành công." }));
+        }
+        catch (SmartLibrary.Domain.Exceptions.ValidationException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
     }
 
     /// <summary>
@@ -283,6 +403,7 @@ public class AuthController : ControllerBase
 
     public record RefreshRequest(string? RefreshToken);
     public record ForgotPasswordRequest(string Email);
+    public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
     public record ResetPasswordRequest(string? Email, string? Token, string? Otp, string NewPassword);
     public record SendOtpRequest(string Email, string? FullName);
     public record VerifyOtpRequest(string Email, string Otp);

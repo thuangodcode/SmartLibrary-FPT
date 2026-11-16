@@ -11,7 +11,7 @@ public interface IIdentityProvider
     Task UpdateEmailAsync(string userId, string email, CancellationToken cancellationToken);
     Task SendPasswordResetEmailAsync(string email);
     Task ResetPasswordAsync(string token, string newPassword);
-    Task ChangePasswordAsync(string userId, string currentPassword, string newPassword);
+    Task ChangePasswordAsync(string userId, string email, string currentPassword, string newPassword);
     Task ResendVerificationEmailAsync(string email);
     Task<object?> GetUserProfileWithPermissionsAsync(string userId);
     Task<string?> GetAuthenticatedUserIdAsync(string accessToken, CancellationToken cancellationToken = default);

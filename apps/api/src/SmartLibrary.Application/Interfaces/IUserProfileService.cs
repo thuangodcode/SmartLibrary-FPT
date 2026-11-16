@@ -34,7 +34,8 @@ public sealed record UserProfileResponse(
     string? FrontDocUrl = null,
     string? BackDocUrl = null,
     string? SelfieDocUrl = null,
-    string? DocumentType = null);
+    string? DocumentType = null,
+    bool IsVerified = false);
 
 /// <summary>Editable profile information supplied by the authenticated user.</summary>
 public sealed record UpdateUserProfileRequest(

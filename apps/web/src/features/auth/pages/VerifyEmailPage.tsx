@@ -52,7 +52,7 @@ export const VerifyEmailPage: React.FC = () => {
 
   if (isVerifyingToken) {
     return (
-      <AuthLayout title="Đang Xác Minh Email" subtitle="Vui lòng chờ trong giây lát...">
+      <AuthLayout variant="design" title="Đang Xác Minh Email" subtitle="Vui lòng chờ trong giây lát...">
         <div className="text-center py-8 space-y-4">
           <RefreshCw className="w-10 h-10 text-indigo-600 animate-spin mx-auto" />
           <p className="text-xs text-slate-500">Hệ thống đang kiểm tra mã OTP xác thực email...</p>
@@ -63,7 +63,7 @@ export const VerifyEmailPage: React.FC = () => {
 
   if (verificationSuccess) {
     return (
-      <AuthLayout title="Xác Minh Thành Công!" subtitle="Tài khoản độc giả đã được kích hoạt thành công">
+      <AuthLayout variant="design" title="Xác Minh Thành Công!" subtitle="Tài khoản độc giả đã được kích hoạt thành công">
         <div className="text-center py-6 space-y-6">
           <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center mx-auto">
             <CheckCircle2 className="w-8 h-8" />
@@ -84,7 +84,7 @@ export const VerifyEmailPage: React.FC = () => {
   }
 
   return (
-    <AuthLayout title="Xác Minh Địa Chỉ Email" subtitle="Hệ thống đã gửi mã OTP xác thực tới hộp thư của bạn">
+    <AuthLayout variant="design" title="Xác Minh Địa Chỉ Email" subtitle="Hệ thống đã gửi mã OTP xác thực tới hộp thư của bạn">
       <div className="text-center space-y-6 py-4">
         <div className="w-16 h-16 rounded-3xl bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 flex items-center justify-center mx-auto">
           <Mail className="w-8 h-8" />

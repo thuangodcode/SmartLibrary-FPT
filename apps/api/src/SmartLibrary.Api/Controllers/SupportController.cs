@@ -39,6 +39,7 @@ public sealed class SupportController(
     {
         if (!TryGetUserId(out var readerId))
             return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
+        if (!await IsVerifiedReaderAsync(readerId, ct)) return VerificationRequired();
         var rows = await GetChatMessagesAsync(readerId, ct);
         return Ok(ApiResponse<IReadOnlyList<SupportChatMessageDto>>.Ok(rows));
     }
@@ -49,6 +50,7 @@ public sealed class SupportController(
     {
         if (!TryGetUserId(out var readerId))
             return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
+        if (!await IsVerifiedReaderAsync(readerId, ct)) return VerificationRequired();
         var count = await db.SupportChatMessages.AsNoTracking()
             .CountAsync(x => x.ReaderId == readerId && x.SenderId != readerId && !x.IsReadByReader, ct);
         return Ok(ApiResponse<object>.Ok(new { unreadCount = count }));
@@ -60,6 +62,7 @@ public sealed class SupportController(
     {
         if (!TryGetUserId(out var readerId))
             return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
+        if (!await IsVerifiedReaderAsync(readerId, ct)) return VerificationRequired();
         await db.SupportChatMessages
             .Where(x => x.ReaderId == readerId && x.SenderId != readerId && !x.IsReadByReader)
             .ExecuteUpdateAsync(setters => setters
@@ -74,6 +77,7 @@ public sealed class SupportController(
     {
         if (!TryGetUserId(out var readerId))
             return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
+        if (!await IsVerifiedReaderAsync(readerId, ct)) return VerificationRequired();
         var rows = await db.SupportComplaints.AsNoTracking()
             .Include(x => x.Reader)
             .Include(x => x.RequestType)
@@ -94,6 +98,7 @@ public sealed class SupportController(
     {
         if (!TryGetUserId(out var readerId))
             return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
+        if (!await IsVerifiedReaderAsync(readerId, ct)) return VerificationRequired();
         var content = form.Content?.Trim() ?? string.Empty;
         if (content.Length is < 10 or > 5000)
             return BadRequest(ApiResponse<object>.Fail("Nội dung đơn phải có từ 10 đến 5000 ký tự."));
@@ -554,6 +559,17 @@ public sealed class SupportController(
             && read >= 12
             && header.AsSpan(0, 4).SequenceEqual("RIFF"u8)
             && header.AsSpan(8, 4).SequenceEqual("WEBP"u8);
+    }
+
+    private IActionResult VerificationRequired() => StatusCode(403, ApiResponse<object>.Fail("Vui lòng hoàn tất xác thực hồ sơ để sử dụng dịch vụ thư viện."));
+
+    private async Task<bool> IsVerifiedReaderAsync(Guid readerId, CancellationToken ct)
+    {
+        var profile = await db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == readerId, ct);
+        if (profile is null || string.IsNullOrWhiteSpace(profile.Phone) || string.IsNullOrWhiteSpace(profile.Address)
+            || profile.DateOfBirth is null || (profile.StudentId is null && profile.TeacherId is null && profile.EmployeeId is null)) return false;
+        return await db.IdentityDocuments.IgnoreQueryFilters().Where(x => x.Request.UserId == readerId && !x.IsDeleted && x.Request.Status == SmartLibrary.Domain.Enums.RegistrationRequestStatus.Approved)
+            .Select(x => x.Side).Distinct().CountAsync(ct) == 3;
     }
 
     private bool TryGetUserId(out Guid userId)

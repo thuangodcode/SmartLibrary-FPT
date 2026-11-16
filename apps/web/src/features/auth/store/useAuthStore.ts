@@ -26,6 +26,10 @@ export interface User {
   avatarUrl?: string;
   role: 'Reader' | 'Librarian' | 'Admin';
   status: string;
+  phone?: string;
+  address?: string;
+  dateOfBirth?: string;
+  isVerified?: boolean;
 }
 
 interface AuthState {
@@ -35,6 +39,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   setAuth: (user: User, token: string, permissions?: string[]) => void;
+  updateUser: (updates: Partial<User>) => void;
   setAccessToken: (token: string) => void;
   logout: () => void;
   hydrate: () => Promise<void>;
@@ -66,6 +71,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAuthenticated: true,
       isLoading: false,
     });
+  },
+
+  updateUser: (updates) => {
+    const user = get().user;
+    if (!user) return;
+    const nextUser = { ...user, ...updates };
+    localStorage.setItem('sl_user', JSON.stringify(nextUser));
+    set({ user: nextUser });
   },
 
   setAccessToken: (token) => {
@@ -164,7 +177,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
 
         const result = await parseApiResponse<AuthApiResponse<{
-          user?: User & { permissions?: string[] };
+          user?: User & { permissions?: string[]; isVerified?: boolean };
         }>>(response);
         const user = result?.data?.user;
         if (
