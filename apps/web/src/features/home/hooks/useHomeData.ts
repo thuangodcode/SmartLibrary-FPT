@@ -83,14 +83,14 @@ export function useHomeCategories() {
   });
 }
 
-export function useHomeBooks(categoryId: string, search: string, page: number, enabled = true, sortByReviewCount = false, reviewCountAscending = false) {
+export function useHomeBooks(categoryId: string, search: string, page: number, enabled = true, sortByReviewCount = false, reviewCountAscending = false, pageSize = 20) {
   return useQuery({
-    queryKey: ['public-home-books', categoryId, search, page, sortByReviewCount, reviewCountAscending],
+    queryKey: ['public-home-books', categoryId, search, page, sortByReviewCount, reviewCountAscending, pageSize],
     enabled,
     queryFn: async ({ signal }) => {
       const params = new URLSearchParams({
         page: String(page),
-        pageSize: '18',
+        pageSize: String(pageSize),
       });
       if (categoryId) params.set('categoryId', categoryId);
       if (search.trim()) params.set('search', search.trim());
