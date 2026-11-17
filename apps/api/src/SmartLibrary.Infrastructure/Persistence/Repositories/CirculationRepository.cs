@@ -20,7 +20,7 @@ public class CirculationRepository : ICirculationRepository
 
     public async Task<IReadOnlyList<CirculationReminderDto>> MarkOverdueAsync(CancellationToken ct)
     {
-        var cutoff = CirculationRules.StartOfLibraryDateUtc(DateTime.UtcNow);
+        var cutoff = DateTime.UtcNow;
         var newlyOverdue = await _db.BorrowRecords.AsNoTracking()
             .Where(x => x.Status == BorrowStatus.Borrowed && x.DueDate != null && x.DueDate < cutoff)
             .Select(x => new CirculationReminderDto(
@@ -37,10 +37,8 @@ public class CirculationRepository : ICirculationRepository
     public async Task<CirculationStatsDto> GetStatsAsync(int finePerDay, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var overdueCutoff = CirculationRules.StartOfLibraryDateUtc(now);
-        var weekStart = now.Date.AddDays(-(int)now.DayOfWeek + (int)DayOfWeek.Monday);
-        if (now.DayOfWeek == DayOfWeek.Sunday)
-            weekStart = now.Date.AddDays(-6);
+        var overdueCutoff = now;
+        var weekStart = CirculationRules.StartOfLibraryWeekUtc(now);
         var lastWeekStart = weekStart.AddDays(-7);
         var dueSoonLimit = now.AddDays(3);
 
@@ -71,19 +69,21 @@ public class CirculationRepository : ICirculationRepository
             })
             .SingleOrDefaultAsync(ct);
 
-        var fines = await _db.Fines.AsNoTracking()
-            .GroupBy(_ => 1)
-            .Select(group => new
-            {
-                Unpaid = group.Sum(x => x.Status == FineStatus.Pending ? (decimal?)x.Amount : 0m),
-                UnpaidThis = group.Sum(x =>
-                    x.Status == FineStatus.Pending && x.CreatedAt >= weekStart ? (decimal?)x.Amount : 0m),
-                UnpaidLast = group.Sum(x =>
-                    x.Status == FineStatus.Pending && x.CreatedAt >= lastWeekStart && x.CreatedAt < weekStart
-                        ? (decimal?)x.Amount
-                        : 0m)
-            })
-            .SingleOrDefaultAsync(ct);
+        // Group mapped statuses first; avoid conditional enum aggregates on PostgreSQL.
+        var feeGroups = await _db.Fines.AsNoTracking()
+            .GroupBy(x => new { x.Status, IsServiceFee = x.Reason == CirculationRules.BorrowServiceFeeReason
+                || x.Reason == CirculationRules.RenewalServiceFeeReason })
+            .Select(group => new { group.Key.Status, group.Key.IsServiceFee, Amount = group.Sum(x => x.Amount) })
+            .ToListAsync(ct);
+        FeeTotalsDto Totals(bool service) => new(
+            feeGroups.Where(x => x.IsServiceFee == service && x.Status == FineStatus.Paid).Sum(x => x.Amount),
+            feeGroups.Where(x => x.IsServiceFee == service && x.Status == FineStatus.Pending).Sum(x => x.Amount),
+            feeGroups.Where(x => x.IsServiceFee == service && x.Status == FineStatus.Waived).Sum(x => x.Amount));
+        var pendingFines = _db.Fines.AsNoTracking().Where(x => x.Status == FineStatus.Pending);
+        var unpaidThisWeek = await pendingFines.Where(x => x.CreatedAt >= weekStart && x.CreatedAt < weekStart.AddDays(7))
+            .SumAsync(x => (decimal?)x.Amount, ct) ?? 0m;
+        var unpaidLastWeek = await pendingFines.Where(x => x.CreatedAt >= lastWeekStart && x.CreatedAt < weekStart)
+            .SumAsync(x => (decimal?)x.Amount, ct) ?? 0m;
 
         // Track money actually collected. Keep these as filtered SUM queries so enum
         // conversion and conditional aggregate translation cannot turn paid amounts into zero.
@@ -107,8 +107,10 @@ public class CirculationRepository : ICirculationRepository
             ReturnedDelta = (loans?.ReturnedThis ?? 0) - (loans?.ReturnedLast ?? 0),
             Overdue = loans?.Overdue ?? 0,
             OverdueDelta = (loans?.OverdueThis ?? 0) - (loans?.OverdueLast ?? 0),
-            UnpaidFines = fines?.Unpaid ?? 0,
-            UnpaidFinesDelta = (fines?.UnpaidThis ?? 0) - (fines?.UnpaidLast ?? 0),
+            UnpaidFines = feeGroups.Where(x => x.Status == FineStatus.Pending).Sum(x => x.Amount),
+            UnpaidFinesDelta = unpaidThisWeek - unpaidLastWeek,
+            Penalties = Totals(false),
+            ServiceFees = Totals(true),
             TotalFines = totalPaidFines,
             TotalFinesDelta = totalPaidThisWeek - totalPaidLastWeek,
             DueSoon = loans?.DueSoon ?? 0,
@@ -253,7 +255,7 @@ public class CirculationRepository : ICirculationRepository
 
     public Task<bool> HasOverdueLoansAsync(Guid readerId, DateTime asOfUtc, CancellationToken ct)
     {
-        var overdueStart = CirculationRules.StartOfLibraryDateUtc(asOfUtc);
+        var overdueStart = asOfUtc;
         return _db.BorrowRecords.AnyAsync(x =>
             x.ReaderId == readerId &&
             (x.Status == BorrowStatus.Overdue
@@ -373,7 +375,7 @@ public class CirculationRepository : ICirculationRepository
 
     public async Task<IReadOnlyList<CirculationLoanDto>> GetOverdueAsync(int finePerDay, CancellationToken ct)
     {
-        var cutoff = CirculationRules.StartOfLibraryDateUtc(DateTime.UtcNow);
+        var cutoff = DateTime.UtcNow;
         var rows = await LoanQuery()
             .Where(x => x.Status == BorrowStatus.Overdue
                         || (x.Status == BorrowStatus.Borrowed && x.DueDate != null && x.DueDate < cutoff))
@@ -382,13 +384,18 @@ public class CirculationRepository : ICirculationRepository
         return await MapStaffLoansAsync(rows, finePerDay, ct);
     }
 
-    public async Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct, DateTime? from = null, DateTime? to = null)
+    public async Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct, DateTime? from = null, DateTime? to = null, string? feeType = null)
     {
         var query = _db.Fines.AsNoTracking()
             .Include(x => x.Reader)
             .Include(x => x.Payments)
             .Include(x => x.BorrowRecord).ThenInclude(x => x.BookCopy).ThenInclude(x => x.Book)
             .AsQueryable();
+
+        if (feeType == "ServiceFee")
+            query = query.Where(x => x.Reason == CirculationRules.BorrowServiceFeeReason || x.Reason == CirculationRules.RenewalServiceFeeReason);
+        else if (feeType == "Penalty")
+            query = query.Where(x => x.Reason != CirculationRules.BorrowServiceFeeReason && x.Reason != CirculationRules.RenewalServiceFeeReason);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -412,12 +419,12 @@ public class CirculationRepository : ICirculationRepository
 
         if (from.HasValue)
         {
-            var start = DateTime.SpecifyKind(from.Value.Date, DateTimeKind.Utc);
+            var start = CirculationRules.StartOfLibraryDateUtc(DateOnly.FromDateTime(from.Value));
             query = query.Where(x => (x.PaidAt ?? x.CreatedAt) >= start);
         }
         if (to.HasValue)
         {
-            var endExclusive = DateTime.SpecifyKind(to.Value.Date, DateTimeKind.Utc).AddDays(1);
+            var endExclusive = CirculationRules.StartOfLibraryDateUtc(DateOnly.FromDateTime(to.Value).AddDays(1));
             query = query.Where(x => (x.PaidAt ?? x.CreatedAt) < endExclusive);
         }
 
@@ -593,7 +600,7 @@ public class CirculationRepository : ICirculationRepository
                     row.DueDate,
                     now,
                     byLibrarian: false,
-                    CirculationRules.CalendarOverdueDays(row.DueDate, now) > 0,
+                    CirculationRules.IsPastDue(row.DueDate, now),
                     reservedBookIds.Contains(row.BookCopy.BookId),
                     CirculationRules.IsTextbook(row.BookCopy.Book.Categories?.Select(x => x.Name)),
                     hasUnpaidFines)
@@ -1109,13 +1116,14 @@ public class CirculationRepository : ICirculationRepository
         if (!Enum.TryParse<BorrowStatus>(status, true, out var parsed))
             return query;
 
+        var now = DateTime.UtcNow;
         return parsed switch
         {
             BorrowStatus.Pending => query.Where(x => x.Status == BorrowStatus.Pending),
             BorrowStatus.Approved => query.Where(x => x.Status == BorrowStatus.Approved),
-            BorrowStatus.Borrowed => query.Where(x => x.Status == BorrowStatus.Borrowed),
+            BorrowStatus.Borrowed => query.Where(x => x.Status == BorrowStatus.Borrowed && (x.DueDate == null || x.DueDate >= now)),
             BorrowStatus.Returned => query.Where(x => x.Status == BorrowStatus.Returned),
-            BorrowStatus.Overdue => query.Where(x => x.Status == BorrowStatus.Overdue),
+            BorrowStatus.Overdue => query.Where(x => x.Status == BorrowStatus.Overdue || (x.Status == BorrowStatus.Borrowed && x.DueDate != null && x.DueDate < now)),
             BorrowStatus.Rejected => query.Where(x => x.Status == BorrowStatus.Rejected),
             _ => query
         };
@@ -1141,7 +1149,7 @@ public class CirculationRepository : ICirculationRepository
             var reserved = reservations.Any(item => item.BookId == row.BookCopy.BookId && item.ReaderId != row.ReaderId
                 && (item.Status == CirculationRules.ReservationPending || CirculationRules.IsUnexpiredReadyHold(item.Status, item.ExpiresAt, now)));
             var reason = CirculationRules.ValidateRenewal(settings, row.RenewalCount, row.DueDate, now,
-                byLibrarian: true, CirculationRules.CalendarOverdueDays(row.DueDate, now) > 0, reserved,
+                byLibrarian: true, CirculationRules.IsPastDue(row.DueDate, now), reserved,
                 CirculationRules.IsTextbook(row.BookCopy.Book.Categories?.Select(item => item.Name)));
             reason ??= CirculationRules.MissingRenewalDays(CirculationRules.RenewalDays(settings, row.BookCopy.Book.Language));
             mapped[index] = mapped[index] with { CanRenew = reason is null, RenewalUnavailableReason = reason };
@@ -1177,7 +1185,8 @@ public class CirculationRepository : ICirculationRepository
         var now = DateTime.UtcNow;
         var reference = loan.ReturnDate ?? now;
         var overdueDays = CirculationRules.CalendarOverdueDays(loan.DueDate, reference);
-        var display = overdueDays > 0 && loan.Status != BorrowStatus.Returned ? "Overdue" : loan.Status.ToString();
+        var display = loan.Status is BorrowStatus.Borrowed or BorrowStatus.Overdue
+            && CirculationRules.IsPastDue(loan.DueDate, reference) ? "Overdue" : loan.Status.ToString();
         var categories = loan.BookCopy.Book.Categories?.Select(x => x.Name) ?? [];
         var isTextbook = CirculationRules.IsTextbook(categories);
         return new CirculationLoanDto
@@ -1238,6 +1247,7 @@ public class CirculationRepository : ICirculationRepository
             Barcode = fine.BorrowRecord.BookCopy.Barcode,
             Amount = fine.Amount,
             Reason = fine.Reason,
+            FeeType = CirculationRules.IsServiceFeeReason(fine.Reason) ? "ServiceFee" : "Penalty",
             Status = fine.Status.ToString(),
             CreatedAt = fine.CreatedAt,
             PaidAt = fine.PaidAt,

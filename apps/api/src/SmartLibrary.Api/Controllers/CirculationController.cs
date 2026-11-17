@@ -216,8 +216,8 @@ public class CirculationController : ControllerBase
         => Ok(ApiResponse<IReadOnlyList<CirculationLoanDto>>.Ok(await _circulation.GetOverdueAsync(ct)));
 
     [HttpGet("fines")]
-    public async Task<IActionResult> Fines([FromQuery] string? search, [FromQuery] string? status, CancellationToken ct)
-        => Ok(ApiResponse<IReadOnlyList<CirculationFineDto>>.Ok(await _circulation.GetFinesAsync(search, status, ct)));
+    public async Task<IActionResult> Fines([FromQuery] string? search, [FromQuery] string? status, CancellationToken ct, [FromQuery] string? feeType = null)
+        => Ok(ApiResponse<IReadOnlyList<CirculationFineDto>>.Ok(await _circulation.GetFinesAsync(search, status, ct, feeType: feeType)));
 
     [HttpPost("fines")]
     public async Task<IActionResult> RecordFine([FromBody] RecordFineRequest request, CancellationToken ct)

@@ -390,7 +390,8 @@ public class CirculationService
                     createdFine,
                     incidentOpened,
                     settings.FinePerDay > 0,
-                    overdueFineAlreadyExists),
+                    overdueFineAlreadyExists,
+                    CirculationRules.IsPastDue(loan.DueDate, now)),
                 "return", ct, entityId: loan.Id);
 
             await _unitOfWork.SaveChangesAsync(ct);
@@ -605,7 +606,7 @@ public class CirculationService
                 loan.DueDate,
                 now,
                 byLibrarian,
-                CirculationRules.CalendarOverdueDays(loan.DueDate, now) > 0,
+                CirculationRules.IsPastDue(loan.DueDate, now),
                 hasOtherReservation,
                 CirculationRules.IsTextbook(loan.BookCopy?.Book?.Categories?.Select(x => x.Name)),
                 hasUnpaidFines);
@@ -623,7 +624,7 @@ public class CirculationService
                 return Result<CirculationLoanDto>.Failure("Không tìm thấy hồ sơ độc giả của phiếu mượn.");
             var isMorning = loan.PickupAt.HasValue
                 ? CirculationRules.IsMorning(loan.PickupAt.Value)
-                : (loan.DueDate.HasValue ? CirculationRules.IsMorning(loan.DueDate.Value) : CirculationRules.IsMorning(now));
+                : (loan.DueDate.HasValue ? CirculationRules.IsMorningDue(loan.DueDate.Value) : CirculationRules.IsMorning(now));
             loan.DueDate = CirculationRules.CalculateDueDate(baseDate, days, isMorning);
             loan.RenewalCount += 1;
             loan.Status = BorrowStatus.Borrowed;
@@ -652,7 +653,7 @@ public class CirculationService
                 loan.DueDate,
                 renewedAt,
                 byLibrarian: false,
-                CirculationRules.CalendarOverdueDays(loan.DueDate, renewedAt) > 0,
+                CirculationRules.IsPastDue(loan.DueDate, renewedAt),
                 hasOtherReservation,
                 updated.RequiresApproval,
                 hasUnpaidFines);
@@ -684,8 +685,8 @@ public class CirculationService
         return newlyOverdue;
     }
 
-    public Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct = default, DateTime? from = null, DateTime? to = null)
-        => _repository.GetFinesAsync(search, status, ct, from, to);
+    public Task<IReadOnlyList<CirculationFineDto>> GetFinesAsync(string? search, string? status, CancellationToken ct = default, DateTime? from = null, DateTime? to = null, string? feeType = null)
+        => _repository.GetFinesAsync(search, status, ct, from, to, feeType);
 
     public async Task<Result<CirculationFineDto>> RecordFineAsync(RecordFineRequest request, CancellationToken ct = default)
     {
@@ -1674,7 +1675,7 @@ public class CirculationService
     {
         var amount = CirculationRules.ServiceFee(settings, reader.ReaderType, renewal);
         if (amount <= 0) return;
-        var reason = renewal ? "Phí gia hạn sách" : "Phí mượn sách";
+        var reason = renewal ? CirculationRules.RenewalServiceFeeReason : CirculationRules.BorrowServiceFeeReason;
         var unit = renewal ? "lần gia hạn" : "lượt mượn";
         var policyKey = renewal ? "external_renewal_fee" : "external_borrow_fee";
         await _repository.AddFineAsync(NewFine(
@@ -1720,7 +1721,8 @@ public class CirculationService
         decimal? fine,
         bool incidentOpened,
         bool overdueFeeConfigured,
-        bool overdueFineAlreadyExists)
+        bool overdueFineAlreadyExists,
+        bool pastDue)
     {
         var book = string.IsNullOrWhiteSpace(title) ? "sách" : $"“{title}”";
         if (incidentOpened)
@@ -1733,14 +1735,14 @@ public class CirculationService
             return $"Đã trả {book} quá hạn {overdueDays} ngày. Phí quá hạn đã được ghi nhận trước đó, không lập trùng.";
         if (overdueDays > 0)
             return $"Đã trả {book} quá hạn {overdueDays} ngày. Chưa lập được phí, vui lòng kiểm tra danh sách phí phạt.";
-        return $"Đã trả {book} đúng hạn.";
+        return pastDue ? $"Đã trả {book} sau giờ hạn trả. Không tính phí quá hạn trong cùng ngày." : $"Đã trả {book} đúng hạn.";
     }
 
     private static BookCondition ParseCondition(string? value)
         => Enum.TryParse<BookCondition>(value, true, out var parsed) ? parsed : BookCondition.Good;
 
     private static string FormatDue(DateTime? value)
-        => value.HasValue ? CirculationRules.LibraryDate(value.Value).ToString("dd/MM/yyyy") : "—";
+        => FormatPickup(value);
 
     private static string FormatPickup(DateTime? value)
         => value.HasValue
