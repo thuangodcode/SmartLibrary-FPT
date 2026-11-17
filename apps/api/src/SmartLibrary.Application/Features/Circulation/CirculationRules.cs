@@ -39,7 +39,7 @@ public static class CirculationRules
 
     /// <summary>
     /// UTC instant of 00:00 on the Vietnam calendar date that contains <paramref name="utc"/>.
-    /// A due timestamp is overdue once it is strictly before this instant on a later library day.
+    /// Used for calendar-day fee calculation and date filters; overdue status uses the exact deadline.
     /// </summary>
     public static DateTime StartOfLibraryDateUtc(DateTime utc)
     {
@@ -53,8 +53,24 @@ public static class CirculationRules
         return TimeZoneInfo.ConvertTimeToUtc(localMidnight, LibraryTimeZone());
     }
 
-    public static bool IsPastDueOnLibraryCalendar(DateTime? dueUtc, DateTime nowUtc)
-        => CalendarOverdueDays(dueUtc, nowUtc) > 0;
+    // The deadline controls status; fees still start on the next Vietnam calendar day.
+    public static bool IsPastDue(DateTime? dueUtc, DateTime nowUtc)
+        => dueUtc.HasValue && NormalizeUtc(nowUtc) > NormalizeUtc(dueUtc.Value);
+
+    public static DateTime StartOfLibraryWeekUtc(DateTime utc)
+    {
+        var today = LibraryDate(utc);
+        var monday = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+        return StartOfLibraryDateUtc(DateOnly.FromDateTime(monday));
+    }
+
+    public const string BorrowServiceFeeReason = "Phí mượn sách";
+    public const string RenewalServiceFeeReason = "Phí gia hạn sách";
+    public static bool IsServiceFeeReason(string? reason)
+        => reason is BorrowServiceFeeReason or RenewalServiceFeeReason;
+
+    public static bool IsMorningDue(DateTime dueUtc)
+        => TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(dueUtc), LibraryTimeZone()).TimeOfDay <= TimeSpan.FromHours(12);
 
     public static int CalendarOverdueDays(DateTime? dueUtc, DateTime returnedUtc)
     {
@@ -227,7 +243,9 @@ public static class CirculationRules
         bool hasUnpaidFines = false)
     {
         if (settings.BlockRenewIfOverdue && isOverdue)
-            return $"Sách đã quá hạn {Math.Max(1, CalendarOverdueDays(dueUtc, nowUtc))} ngày. Cần nhận trả để chốt phí quá hạn.";
+            return CalendarOverdueDays(dueUtc, nowUtc) > 0
+                ? $"Sách đã quá hạn {CalendarOverdueDays(dueUtc, nowUtc)} ngày. Cần nhận trả để chốt phí quá hạn."
+                : "Sách đã qua giờ hạn trả. Chưa tính phí quá hạn trong cùng ngày; cần nhận trả trước khi tiếp tục.";
         if (!byLibrarian && settings.RestrictIfUnpaid && hasUnpaidFines)
             return "Còn phí chưa thanh toán nên chưa được tự gia hạn.";
         if (settings.MaxRenewals is null)
@@ -242,7 +260,7 @@ public static class CirculationRules
             return settings.BlockRenewIfOverdue
                 ? settings.SelfRenewBeforeDays <= 0
                     ? "Ngoài cửa sổ tự gia hạn. Chỉ tự gia hạn trong ngày hạn trả; quá hạn cần nhận trả để chốt phí."
-                    : $"Ngoài cửa sổ tự gia hạn. Chỉ tự gia hạn từ {settings.SelfRenewBeforeDays} ngày trước hạn đến hết ngày hạn trả."
+                    : $"Ngoài cửa sổ tự gia hạn. Chỉ tự gia hạn từ {settings.SelfRenewBeforeDays} ngày trước hạn đến giờ hạn trả."
                 : $"Ngoài cửa sổ tự gia hạn: từ {Math.Max(0, settings.SelfRenewBeforeDays)} ngày trước đến {Math.Max(0, settings.SelfRenewAfterDays)} ngày sau hạn trả (theo chính sách).";
         return null;
     }

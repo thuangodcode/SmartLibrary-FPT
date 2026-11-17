@@ -8,20 +8,46 @@ namespace SmartLibrary.UnitTests.Features.Circulation;
 public class CirculationRulesTests
 {
     [Fact]
-    public void OverdueRenewalStartsAfterTheDueDateEndsInVietnamForBothRoles()
+    public void PassingNoonBlocksRenewalForBothRolesButDoesNotChargeSameDay()
     {
-        var settings = new CirculationSettings { MaxRenewals = 2, BlockRenewIfOverdue = true, SelfRenewBeforeDays = 1, SelfRenewAfterDays = 1 };
-        var due = new DateTime(2026, 11, 11, 18, 0, 0, DateTimeKind.Utc); // 01:00 on Nov 12 in Vietnam.
-        var endOfDay = new DateTime(2026, 11, 12, 16, 59, 59, DateTimeKind.Utc);
-        foreach (var byLibrarian in new[] { false, true })
+        var settings = new CirculationSettings { MaxRenewals = 2, BlockRenewIfOverdue = true, SelfRenewBeforeDays = 1 };
+        var due = new DateTime(2026, 11, 12, 5, 0, 0, DateTimeKind.Utc); // noon Vietnam
+        foreach (var staff in new[] { false, true })
         {
-            CirculationRules.ValidateRenewal(settings, 0, due, endOfDay, byLibrarian,
-                CirculationRules.CalendarOverdueDays(due, endOfDay) > 0, false, false).Should().BeNull();
-            CirculationRules.ValidateRenewal(settings, 0, due, endOfDay.AddSeconds(1), byLibrarian,
-                CirculationRules.CalendarOverdueDays(due, endOfDay.AddSeconds(1)) > 0, false, false)
-                .Should().Contain("quá hạn 1 ngày").And.Contain("nhận trả");
+            CirculationRules.ValidateRenewal(settings, 0, due, due, staff, CirculationRules.IsPastDue(due, due), false, false).Should().BeNull();
+            var later = due.AddHours(1);
+            CirculationRules.ValidateRenewal(settings, 0, due, later, staff, CirculationRules.IsPastDue(due, later), false, false)
+                .Should().Contain("qua giờ hạn trả").And.Contain("Chưa tính phí");
+            CirculationRules.OverdueFineAmount(CirculationRules.CalendarOverdueDays(due, later), 5000).Should().Be(0);
+            var midnight = new DateTime(2026, 11, 12, 17, 0, 0, DateTimeKind.Utc);
+            CirculationRules.OverdueFineAmount(CirculationRules.CalendarOverdueDays(due, midnight), 5000).Should().Be(5000);
         }
     }
+
+    [Theory]
+    [InlineData(5, true)]
+    [InlineData(10, false)]
+    public void RenewalPreservesNoonAndAfternoonDeadlines(int utcHour, bool morning)
+    {
+        var due = new DateTime(2026, 11, 25, utcHour, 0, 0, DateTimeKind.Utc);
+        CirculationRules.IsMorningDue(due).Should().Be(morning);
+        CirculationRules.CalculateDueDate(due, 7, CirculationRules.IsMorningDue(due)).Should().Be(due.AddDays(7));
+    }
+
+    [Fact]
+    public void WeekStartsAtMondayMidnightInVietnam()
+    {
+        CirculationRules.StartOfLibraryWeekUtc(new DateTime(2026, 11, 22, 17, 30, 0, DateTimeKind.Utc))
+            .Should().Be(new DateTime(2026, 11, 22, 17, 0, 0, DateTimeKind.Utc));
+    }
+
+    [Theory]
+    [InlineData("Phí mượn sách", true)]
+    [InlineData("Phí gia hạn sách", true)]
+    [InlineData("Phạt quá hạn 1 ngày", false)]
+    [InlineData("Bồi thường mất sách", false)]
+    public void ServiceChargesAreDistinctFromPenalties(string reason, bool service)
+        => CirculationRules.IsServiceFeeReason(reason).Should().Be(service);
 
     [Fact]
     public void CalendarOverdueDays_OnTimeOrEarly_IsZero()
@@ -45,7 +71,7 @@ public class CirculationRulesTests
         var due = new DateTime(2026, 10, 21, 17, 0, 0, DateTimeKind.Utc); // 22/10 00:00 VN
         var returnedSameDay = new DateTime(2026, 10, 22, 16, 59, 0, DateTimeKind.Utc); // 22/10 23:59 VN
         CirculationRules.CalendarOverdueDays(due, returnedSameDay).Should().Be(0);
-        CirculationRules.IsPastDueOnLibraryCalendar(due, returnedSameDay).Should().BeFalse();
+        CirculationRules.IsPastDue(due, returnedSameDay).Should().BeTrue();
     }
 
     [Fact]
@@ -54,7 +80,7 @@ public class CirculationRulesTests
         var due = new DateTime(2026, 10, 21, 17, 0, 0, DateTimeKind.Utc); // 22/10 00:00 VN
         var nextMidnight = new DateTime(2026, 10, 22, 17, 0, 0, DateTimeKind.Utc); // 23/10 00:00 VN
         CirculationRules.CalendarOverdueDays(due, nextMidnight).Should().Be(1);
-        CirculationRules.IsPastDueOnLibraryCalendar(due, nextMidnight).Should().BeTrue();
+        CirculationRules.IsPastDue(due, nextMidnight).Should().BeTrue();
     }
 
     [Fact]
@@ -63,7 +89,7 @@ public class CirculationRulesTests
         var dueEndOfVnDay = new DateTime(2026, 10, 21, 16, 59, 59, DateTimeKind.Utc); // 21/10 23:59:59 VN
         var justAfterMidnight = new DateTime(2026, 10, 21, 17, 0, 0, DateTimeKind.Utc); // 22/10 00:00 VN
         CirculationRules.CalendarOverdueDays(dueEndOfVnDay, justAfterMidnight).Should().Be(1);
-        CirculationRules.IsPastDueOnLibraryCalendar(dueEndOfVnDay, dueEndOfVnDay).Should().BeFalse();
+        CirculationRules.IsPastDue(dueEndOfVnDay, dueEndOfVnDay).Should().BeFalse();
     }
 
     [Fact]
@@ -74,7 +100,7 @@ public class CirculationRulesTests
             .Should().Be(new DateTime(2026, 10, 21, 17, 0, 0, DateTimeKind.Utc));
         var dueSameVnDay = new DateTime(2026, 10, 22, 10, 0, 0, DateTimeKind.Utc);
         (dueSameVnDay < CirculationRules.StartOfLibraryDateUtc(duringVnMorning)).Should().BeFalse();
-        CirculationRules.IsPastDueOnLibraryCalendar(dueSameVnDay, duringVnMorning).Should().BeFalse();
+        CirculationRules.IsPastDue(dueSameVnDay, duringVnMorning).Should().BeFalse();
     }
 
     [Fact]
