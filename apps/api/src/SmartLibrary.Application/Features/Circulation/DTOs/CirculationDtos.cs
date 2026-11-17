@@ -1,5 +1,7 @@
 namespace SmartLibrary.Application.Features.Circulation.DTOs;
 
+public sealed record FeeTotalsDto(decimal Paid = 0, decimal Pending = 0, decimal Waived = 0);
+
 public class CirculationStatsDto
 {
     public int Pending { get; init; }
@@ -13,6 +15,8 @@ public class CirculationStatsDto
     public int OverdueDelta { get; init; }
     public decimal UnpaidFines { get; init; }
     public decimal UnpaidFinesDelta { get; init; }
+    public FeeTotalsDto Penalties { get; init; } = new();
+    public FeeTotalsDto ServiceFees { get; init; } = new();
     public decimal TotalFines { get; init; }
     public decimal TotalFinesDelta { get; init; }
     public int DueSoon { get; init; }
@@ -200,6 +204,7 @@ public class CirculationFineDto
     public string Barcode { get; init; } = string.Empty;
     public decimal Amount { get; init; }
     public string Reason { get; init; } = string.Empty;
+    public string FeeType { get; init; } = "Penalty";
     public string Status { get; init; } = string.Empty;
     public DateTime CreatedAt { get; init; }
     public DateTime? PaidAt { get; init; }
