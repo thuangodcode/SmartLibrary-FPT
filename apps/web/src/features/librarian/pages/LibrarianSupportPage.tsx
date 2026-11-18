@@ -705,6 +705,43 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
           </div>
         </section>
       )}
+
+      {isTypeModalOpen && (
+        <div className="lib-support-modal-backdrop" onClick={handleCloseTypeModal}>
+          <div className="lib-support-modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="lib-support-modal-header">
+              <div className="lib-support-modal-header-icon"><Settings2 size={22} /></div>
+              <div className="lib-support-modal-header-text">
+                <h3>Quản lý loại đơn hỗ trợ</h3>
+                <p>Thêm, bớt hoặc chỉnh sửa danh mục loại đơn độc giả có thể chọn khi gửi hỗ trợ.</p>
+              </div>
+              <button type="button" className="lib-support-modal-close" onClick={handleCloseTypeModal} aria-label="Đóng hộp thoại"><X size={18} /></button>
+            </div>
+            <div className="lib-support-modal-body">
+              <form className="lib-support-modal-add-form" onSubmit={handleAddModalType}>
+                <input type="text" placeholder="Nhập tên loại đơn mới..." value={modalTypeDraft} onChange={(event) => setModalTypeDraft(event.target.value)} maxLength={100} />
+                <button type="submit" disabled={!modalTypeDraft.trim()}><Plus size={16} />Thêm</button>
+              </form>
+              <div className="lib-support-modal-chips-title"><span>Danh sách loại đơn hiện tại ({modalTypes.length}):</span></div>
+              <div className="lib-support-modal-chips-list">
+                {modalTypes.map((type) => (
+                  <span className="lib-support-modal-chip" key={type.id}>
+                    <span>{type.name}</span>
+                    <button type="button" aria-label={`Xóa ${type.name}`} onClick={() => handleRemoveModalType(type.id)}><X size={13} /></button>
+                  </span>
+                ))}
+                {!modalTypes.length && <p className="lib-support-modal-empty">Chưa có loại đơn nào. Vui lòng thêm ít nhất một loại đơn.</p>}
+              </div>
+            </div>
+            <div className="lib-support-modal-footer">
+              <button type="button" className="lib-support-btn-secondary" onClick={handleCloseTypeModal}>Đóng</button>
+              <button type="button" className="lib-support-btn-primary" disabled={typeSaving || !modalTypes.length} onClick={() => void handleSaveModalTypes()}>
+                {typeSaving ? <LoaderCircle size={15} className="librarian-support-spinner" /> : <Check size={15} />}Lưu loại đơn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
