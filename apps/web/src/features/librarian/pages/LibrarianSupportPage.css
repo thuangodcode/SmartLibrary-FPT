@@ -259,13 +259,15 @@
   color: #a44f20;
 }
 
-.librarian-support-response-tabs {
+.librarian-support-status-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   border-bottom: 1px solid #e5e9ef;
+  margin-bottom: 14px;
 }
 
-.librarian-support-response-tabs button {
+.librarian-support-status-tabs button {
   display: inline-flex;
   min-height: 40px;
   align-items: center;
@@ -281,8 +283,25 @@
   cursor: pointer;
 }
 
-.librarian-support-response-tabs button.is-active {
+.librarian-support-status-tabs button.is-active {
   border-bottom-color: #4f8b5c;
+  color: #2e6740;
+}
+
+.librarian-support-status-tabs button span {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  background: #eef1f4;
+  padding: 0 5px;
+  color: #647084;
+  font-size: 10px;
+}
+
+.librarian-support-status-tabs button.is-active span {
+  background: #e7f2e8;
   color: #2e6740;
 }
 
@@ -481,8 +500,7 @@
   font-size: 10px;
 }
 
-.librarian-support-workflow-summary button,
-.librarian-support-schedule > div button {
+.librarian-support-workflow-summary button {
   display: inline-flex;
   min-height: 30px;
   align-items: center;
@@ -498,51 +516,9 @@
   cursor: pointer;
 }
 
-.librarian-support-workflow-summary button:disabled,
-.librarian-support-schedule button:disabled {
+.librarian-support-workflow-summary button:disabled {
   opacity: .55;
   cursor: wait;
-}
-
-.librarian-support-schedule {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: space-between;
-  gap: 9px;
-}
-
-.librarian-support-schedule label {
-  display: grid;
-  min-width: 200px;
-  flex: 1;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 6px;
-  color: #6e7887;
-  font-size: 9px;
-  font-weight: 650;
-}
-
-.librarian-support-schedule input {
-  min-height: 31px;
-  grid-column: 1 / -1;
-  border: 1px solid #e1e6ed;
-  padding: 4px 7px;
-  color: #4b5668;
-  font: inherit;
-  font-size: 10px;
-}
-
-.librarian-support-schedule > div {
-  display: flex;
-  gap: 6px;
-}
-
-.librarian-support-schedule > div button:last-child {
-  border-color: #e5e7eb;
-  background: #fff;
-  color: #7a8391;
 }
 
 .librarian-support-workflow-times {
@@ -551,6 +527,50 @@
   gap: 8px 16px;
   color: #788394;
   font-size: 9px;
+}
+
+.librarian-support-completed-at {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  color: #2e6740;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.librarian-support-completion-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.librarian-support-completion-actions button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #dce5df;
+  background: #fff;
+  padding: 0 9px;
+  color: #45604f;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.librarian-support-completion-actions button.is-complete {
+  border-color: #244d39;
+  background: #244d39;
+  color: #fff;
+}
+
+.librarian-support-completion-actions button:disabled {
+  opacity: .6;
+  cursor: not-allowed;
 }
 
 .librarian-support-workflow-note {
@@ -612,15 +632,19 @@
 
 .librarian-support-chat {
   display: grid;
-  min-height: 520px;
+  height: min(680px, calc(100vh - 250px));
+  min-height: 420px;
   grid-template-columns: minmax(240px, .75fr) minmax(0, 1.5fr);
+  overflow: hidden;
 }
 
 .librarian-support-conversations {
   display: flex;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
   border-right: 1px solid #e8ebf0;
+  overflow-y: auto;
 }
 
 .librarian-support-conversations > header {
@@ -719,7 +743,10 @@
 .librarian-support-chat-panel {
   display: flex;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
+  position: relative;
+  overflow: hidden;
 }
 
 .librarian-support-chat-messages {
@@ -729,8 +756,37 @@
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
   padding: 16px;
   background: #fafbfc;
+}
+
+.librarian-support-chat-scroll-controls {
+  position: absolute;
+  right: 14px;
+  bottom: 72px;
+  z-index: 1;
+  display: grid;
+  gap: 6px;
+}
+
+.librarian-support-chat-scroll-controls button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid #dce3e8;
+  border-radius: 50%;
+  background: #fff;
+  color: #3d604b;
+  box-shadow: 0 2px 8px rgb(30 50 40 / 12%);
+  cursor: pointer;
+}
+
+.librarian-support-chat-scroll-controls button:hover {
+  border-color: #9cbaa2;
+  background: #f2f7f2;
 }
 
 .librarian-support-chat-message {
@@ -871,7 +927,14 @@
   }
 
   .librarian-support-chat-panel {
-    min-height: 340px;
+    height: 420px;
+    min-height: 0;
+  }
+
+  .librarian-support-chat {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
   }
 }
 

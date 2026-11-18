@@ -137,7 +137,7 @@ export const LoginPage: React.FC = () => {
           : response.status === 429
             ? 'B\u1ea1n \u0111\u00e3 th\u1eed \u0111\u0103ng nh\u1eadp qu\u00e1 nhi\u1ec1u l\u1ea7n. Vui l\u00f2ng ch\u1edd r\u1ed3i th\u1eed l\u1ea1i.'
             : 'Email ho\u1eb7c m\u1eadt kh\u1ea9u kh\u00f4ng \u0111\u00fang. Vui l\u00f2ng th\u1eed l\u1ea1i.';
-        showToast({ type: 'error', title: '\u0110\u0103ng nh\u1eadp th\u1ea5t b\u1ea1i', message: resData?.error || fallback });
+        showToast({ type: 'error', title: '\u0110\u0103ng nh\u1eadp th\u1ea5t b\u1ea1i', message: fallback });
         return;
       }
       const account = resData.data?.user;

@@ -314,6 +314,59 @@ public sealed class SupportController(
         return Ok(ApiResponse<SupportComplaintDto>.Ok(dto));
     }
 
+    [HttpPost("complaints/{id:guid}/resolve")]
+    [Authorize(Roles = "Librarian,Admin")]
+    public async Task<IActionResult> ResolveComplaint(Guid id, CancellationToken ct)
+    {
+        if (!TryGetUserId(out var librarianId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
+
+        var complaint = await db.SupportComplaints.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (complaint is null)
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy đơn hỗ trợ."));
+        if (complaint.AcceptedById is { } acceptedById && !User.IsInRole("Admin") && acceptedById != librarianId)
+            return Forbid();
+        if (complaint.Status == "Resolved")
+            return Ok(ApiResponse<SupportComplaintDto>.Ok(MapComplaint(await GetComplaintForDtoAsync(id, ct))));
+        if (complaint.AcceptedById is null)
+            return Conflict(ApiResponse<object>.Fail("Hãy tiếp nhận đơn trước khi đánh dấu đã xử lý."));
+        if (complaint.FirstRespondedAt is null)
+            return Conflict(ApiResponse<object>.Fail("Hãy gửi phản hồi cho độc giả trước khi xác nhận hoàn thành."));
+        complaint.Status = "Resolved";
+        complaint.UpdatedAt = DateTime.UtcNow;
+        complaint.CompletedAt = complaint.UpdatedAt;
+        await db.SaveChangesAsync(ct);
+        var updated = await GetComplaintForDtoAsync(id, ct);
+        var dto = MapComplaint(updated);
+        await BroadcastComplaintUpdateAsync(dto, updated.ReaderId, ct);
+        return Ok(ApiResponse<SupportComplaintDto>.Ok(dto));
+    }
+
+    [HttpPost("complaints/{id:guid}/continue")]
+    [Authorize(Roles = "Librarian,Admin")]
+    public async Task<IActionResult> ContinueComplaint(Guid id, CancellationToken ct)
+    {
+        if (!TryGetUserId(out var librarianId))
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được tài khoản."));
+
+        var complaint = await db.SupportComplaints.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (complaint is null)
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy đơn hỗ trợ."));
+        if (complaint.AcceptedById is null)
+            return Conflict(ApiResponse<object>.Fail("Hãy tiếp nhận đơn trước khi tiếp tục xử lý."));
+        if (!User.IsInRole("Admin") && complaint.AcceptedById != librarianId)
+            return Forbid();
+
+        complaint.Status = "InProgress";
+        complaint.CompletedAt = null;
+        complaint.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        var updated = await GetComplaintForDtoAsync(id, ct);
+        var dto = MapComplaint(updated);
+        await BroadcastComplaintUpdateAsync(dto, updated.ReaderId, ct);
+        return Ok(ApiResponse<SupportComplaintDto>.Ok(dto));
+    }
+
     [HttpPost("complaints/{id:guid}/replies")]
     [Authorize(Roles = "Librarian,Admin")]
     public async Task<IActionResult> ReplyToComplaint(Guid id, [FromBody] ReplyToSupportComplaintRequest request, CancellationToken ct)
@@ -344,7 +397,8 @@ public sealed class SupportController(
                 .SetProperty(x => x.AcceptedById, x => x.AcceptedById ?? senderId)
                 .SetProperty(x => x.AcceptedAt, x => x.AcceptedAt ?? respondedAt)
                 .SetProperty(x => x.FirstRespondedAt, x => x.FirstRespondedAt ?? respondedAt)
-                .SetProperty(x => x.Status, x => x.Status == "Pending" ? "InProgress" : x.Status)
+                .SetProperty(x => x.Status, x => x.Status == "Pending" || x.Status == "Resolved" ? "InProgress" : x.Status)
+                .SetProperty(x => x.CompletedAt, (DateTime?)null)
                 .SetProperty(x => x.UpdatedAt, respondedAt), ct);
             if (updatedCount == 0)
             {
@@ -534,6 +588,7 @@ public sealed class SupportController(
             complaint.AcceptedAt,
             complaint.DueAt,
             complaint.FirstRespondedAt,
+            complaint.CompletedAt,
             complaint.Replies.OrderBy(x => x.CreatedAt).Select(MapReply).ToList());
 
     private static SupportComplaintReplyDto MapReply(SupportComplaintReply reply)
@@ -600,6 +655,7 @@ public sealed record SupportComplaintDto(
     DateTime? AcceptedAt,
     DateTimeOffset? DueAt,
     DateTime? FirstRespondedAt,
+    DateTime? CompletedAt,
     IReadOnlyList<SupportComplaintReplyDto> Replies);
 public sealed record SupportConversationDto(
     Guid ReaderId,

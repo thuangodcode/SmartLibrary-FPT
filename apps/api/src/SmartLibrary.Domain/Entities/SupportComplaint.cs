@@ -16,5 +16,6 @@ public sealed class SupportComplaint : AuditableEntity
     public DateTime? AcceptedAt { get; set; }
     public DateTimeOffset? DueAt { get; set; }
     public DateTime? FirstRespondedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
     public ICollection<SupportComplaintReply> Replies { get; set; } = new List<SupportComplaintReply>();
 }

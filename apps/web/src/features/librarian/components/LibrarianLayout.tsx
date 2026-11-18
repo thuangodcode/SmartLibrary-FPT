@@ -43,7 +43,7 @@ const circulationChildren = [
 
 const supportChildren = [
   { label: 'Đơn tiếp nhận', to: '/librarian/support/requests', icon: CircleHelp, end: true },
-  { label: 'Phản hồi đơn', to: '/librarian/support/replies', icon: MessagesSquare, end: true },
+  { label: 'Chat hỗ trợ', to: '/librarian/support/chat', icon: MessagesSquare, end: true },
 ];
 
 const bookChildren = [
@@ -88,7 +88,7 @@ export const LibrarianLayout: React.FC = () => {
     'Tin tức & Thông báo': 'shell.news', 'Thống kê & báo cáo': 'shell.librarianReports', 'Thiết lập AI nghiệp vụ': 'shell.librarianAi',
     'Mượn sách': 'shell.circulationLoans', 'Trả sách': 'shell.circulationReturn', 'Đặt chỗ': 'shell.reservations',
     'Quá hạn & Sự cố': 'shell.overdue', 'Phí phạt': 'shell.fines', 'Đơn tiếp nhận': 'shell.supportRequests',
-    'Phản hồi đơn': 'shell.supportReplies', 'Hồ sơ cá nhân': 'shell.profile',
+    'Phản hồi đơn': 'shell.supportReplies', 'Chat hỗ trợ': 'shell.supportReplies', 'Hồ sơ cá nhân': 'shell.profile',
     'Danh mục đầu sách': 'shell.bookCatalog', 'Bản sao & kệ sách': 'shell.bookCopies',
   };
   const translateLabel = (label: string) => translatedLabels[label] ? t(translatedLabels[label]) : label;

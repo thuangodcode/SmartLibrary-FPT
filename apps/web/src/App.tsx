@@ -163,7 +163,8 @@ function App() {
         <Route path="news/:articleId" element={<NewsArticleDetailPage librarianMode />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="support/requests" element={<LibrarianSupportPage view="requests" />} />
-        <Route path="support/replies" element={<LibrarianSupportPage view="replies" />} />
+        <Route path="support/chat" element={<LibrarianSupportPage view="chat" />} />
+        <Route path="support/replies" element={<LibrarianSupportPage view="chat" />} />
       </Route>
 
       {/* Admin Routes */}
