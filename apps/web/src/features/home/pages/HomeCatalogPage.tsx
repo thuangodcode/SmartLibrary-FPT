@@ -208,7 +208,7 @@ const HomeCatalogPage = () => {
 
             {booksQuery.isPending ? (
               <div className="catalog-book-grid" aria-label="Đang tải đầu sách">
-                {Array.from({ length: 8 }, (_, index) => (
+                {Array.from({ length: 10 }, (_, index) => (
                   <div className="catalog-book-skeleton" key={index} />
                 ))}
               </div>
