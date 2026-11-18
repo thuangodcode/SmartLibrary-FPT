@@ -156,15 +156,16 @@ html.dark .book-card__borrow-count { color: #9bd2aa; }
 .book-card__reason p { display: -webkit-box; margin: 0; overflow: hidden; color: #31533f; font-size: 12px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 
 .book-card__footer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 8px 10px;
   margin-top: auto;
-  padding-top: 16px;
+  padding-top: 14px;
 }
 
-.book-card__availability { display: inline-flex; min-width: 0; align-items: center; gap: 6px; color: #13764d; font-size: 12px; font-weight: 750; white-space: nowrap; }
+.book-card__availability { display: inline-flex; min-width: 0; align-items: center; gap: 6px; color: #13764d; font-size: 12px; font-weight: 750; flex-shrink: 0; }
 .book-card__availability svg { width: 14px; height: 14px; flex: 0 0 auto; stroke-width: 2.2; }
 .book-card__availability small { color: var(--book-card-soft); font-size: 12px; font-weight: 600; }
 .book-card--reserved_only .book-card__availability { color: #a34d17; }
@@ -184,6 +185,7 @@ html.dark .book-card__borrow-count { color: #9bd2aa; }
   font-weight: 750;
   white-space: nowrap;
   cursor: pointer;
+  margin-left: auto;
   transition: background 180ms ease, transform 180ms ease;
 }
 

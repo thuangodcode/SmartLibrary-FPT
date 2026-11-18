@@ -1,6 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
-import { AlertCircle, CalendarClock, Check, CircleHelp, Image as ImageIcon, LoaderCircle, MessageCircle, Plus, Send, Settings2, UserRound } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  CalendarClock,
+  Check,
+  CircleHelp,
+  Image as ImageIcon,
+  LoaderCircle,
+  MessageCircle,
+  Plus,
+  Send,
+  Settings2,
+  UserRound,
+  X,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config';
 import { parseApiResponse } from '../../../lib/api';
@@ -107,7 +121,9 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
   const token = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
   const [types, setTypes] = useState<RequestType[]>([]);
-  const [typeDraft, setTypeDraft] = useState('');
+  const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
+  const [modalTypes, setModalTypes] = useState<RequestType[]>([]);
+  const [modalTypeDraft, setModalTypeDraft] = useState('');
   const [typeSaving, setTypeSaving] = useState(false);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [selectedComplaintId, setSelectedComplaintId] = useState('');
@@ -138,11 +154,8 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
     if (!token) return;
     const result = await fetchData<Complaint[]>('/api/v1/support/complaints', token);
     setComplaints(result);
-    const visibleComplaints = view === 'replies' ? result.filter((item) => item.status !== 'Resolved') : result;
-    setSelectedComplaintId((current) => visibleComplaints.some((item) => item.id === current)
-      ? current
-      : visibleComplaints[0]?.id ?? '');
-  }, [token, view]);
+    setSelectedComplaintId((current) => (current && result.some((item) => item.id === current) ? current : ''));
+  }, [token]);
 
   const loadConversations = useCallback(async () => {
     if (!token) return;
@@ -237,9 +250,9 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
 
   const openComplaints = useMemo(() => complaints.filter((item) => item.status !== 'Resolved'), [complaints]);
   const selectableComplaints = view === 'replies' ? openComplaints : complaints;
-  const selectedComplaint = selectableComplaints.find((item) => item.id === selectedComplaintId)
-    ?? selectableComplaints[0]
-    ?? null;
+  const selectedComplaint = selectedComplaintId
+    ? (selectableComplaints.find((item) => item.id === selectedComplaintId) ?? null)
+    : null;
   const pendingComplaints = openComplaints.filter((item) => !item.acceptedAt);
   const totalUnreadMessages = conversations.reduce((total, conversation) => total + conversation.unreadCount, 0);
 
@@ -296,10 +309,36 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
     }
   };
 
-  const saveRequestTypes = async () => {
+  const handleOpenTypeModal = () => {
+    setModalTypes([...types]);
+    setModalTypeDraft('');
+    setIsTypeModalOpen(true);
+  };
+
+  const handleCloseTypeModal = () => {
+    setIsTypeModalOpen(false);
+    setModalTypeDraft('');
+  };
+
+  const handleAddModalType = (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = modalTypeDraft.trim();
+    if (!trimmed) return;
+    if (modalTypes.some((t) => t.name.toLowerCase() === trimmed.toLowerCase())) {
+      setError('Loại đơn này đã tồn tại trong danh sách.');
+      return;
+    }
+    setModalTypes((prev) => [...prev, { id: `new-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, name: trimmed }]);
+    setModalTypeDraft('');
+  };
+
+  const handleRemoveModalType = (id: string) => {
+    setModalTypes((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const handleSaveModalTypes = async () => {
     if (!token || typeSaving) return;
-    const names = types.map((item) => item.name.trim()).filter(Boolean);
-    if (typeDraft.trim()) names.push(typeDraft.trim());
+    const names = modalTypes.map((item) => item.name.trim()).filter(Boolean);
     if (!names.length) {
       setError('Cần duy trì ít nhất một loại đơn.');
       return;
@@ -313,17 +352,13 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
         body: JSON.stringify({ names }),
       });
       setTypes(saved);
-      setTypeDraft('');
-      setNotice('Danh sách loại đơn đã được cập nhật.');
+      setIsTypeModalOpen(false);
+      setNotice('Danh sách loại đơn đã được cập nhật thành công.');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Không thể lưu loại đơn.');
     } finally {
       setTypeSaving(false);
     }
-  };
-
-  const removeRequestType = (id: string) => {
-    setTypes((current) => current.filter((item) => item.id !== id));
   };
 
   const sendComplaintReply = async (event: FormEvent<HTMLFormElement>) => {
@@ -414,39 +449,46 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
       </div>
       {complaint.acceptedById && (
         <>
-        <form
-          className="librarian-support-schedule"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void saveComplaintSchedule(complaint.id);
-          }}
-        >
-          <label>
-            <CalendarClock size={15} />
-            <span>Hạn xử lý</span>
-            <input
-              type="datetime-local"
-              min={dateTimeLocalValue(new Date().toISOString())}
-              value={scheduleDrafts[complaint.id] ?? dateTimeLocalValue(complaint.dueAt)}
-              disabled={complaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin'}
-              onChange={(event) => setScheduleDrafts((prev) => ({ ...prev, [complaint.id]: event.target.value }))}
-            />
-          </label>
-          <div>
-            <button type="submit" disabled={!(scheduleDrafts[complaint.id] ?? dateTimeLocalValue(complaint.dueAt)) || Boolean(complaintActionBusy) || (complaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin')}>
-              {complaintActionBusy === complaint.id ? <LoaderCircle size={14} className="librarian-support-spinner" /> : <Check size={14} />}
-              Lưu hạn
-            </button>
-            {complaint.dueAt && (
-              <button type="button" disabled={Boolean(complaintActionBusy) || (complaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin')} onClick={() => void saveComplaintSchedule(complaint.id, true)}>
-                Xóa hạn
+          <form
+            className="librarian-support-schedule"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveComplaintSchedule(complaint.id);
+            }}
+          >
+            <label>
+              <CalendarClock size={15} />
+              <span>Hạn xử lý</span>
+              <input
+                type="datetime-local"
+                min={dateTimeLocalValue(new Date().toISOString())}
+                value={scheduleDrafts[complaint.id] ?? dateTimeLocalValue(complaint.dueAt)}
+                disabled={complaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin'}
+                onChange={(event) => setScheduleDrafts((prev) => ({ ...prev, [complaint.id]: event.target.value }))}
+              />
+            </label>
+            <div>
+              <button
+                type="submit"
+                disabled={!(scheduleDrafts[complaint.id] ?? dateTimeLocalValue(complaint.dueAt)) || Boolean(complaintActionBusy) || (complaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin')}
+              >
+                {complaintActionBusy === complaint.id ? <LoaderCircle size={14} className="librarian-support-spinner" /> : <Check size={14} />}
+                Lưu hạn
               </button>
-            )}
-          </div>
-        </form>
-        {complaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin' && (
-          <span className="librarian-support-workflow-note">Đơn này đang do thủ thư {complaint.acceptedByName} phụ trách.</span>
-        )}
+              {complaint.dueAt && (
+                <button
+                  type="button"
+                  disabled={Boolean(complaintActionBusy) || (complaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin')}
+                  onClick={() => void saveComplaintSchedule(complaint.id, true)}
+                >
+                  Xóa hạn
+                </button>
+              )}
+            </div>
+          </form>
+          {complaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin' && (
+            <span className="librarian-support-workflow-note">Đơn này đang do thủ thư {complaint.acceptedByName} phụ trách.</span>
+          )}
         </>
       )}
       {(complaint.firstRespondedAt || complaint.dueAt) && (
@@ -455,6 +497,173 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
           {complaint.dueAt && <span>Dự kiến xử lý: {dateTime(complaint.dueAt)}</span>}
         </div>
       )}
+    </section>
+  );
+
+  const renderTicketsGrid = (items: Complaint[]) => (
+    <div className="lib-support-tickets-grid" role="list" aria-label="Danh sách đơn từ độc giả">
+      {items.map((complaint) => (
+        <div
+          role="button"
+          tabIndex={0}
+          className="lib-support-ticket-card"
+          key={complaint.id}
+          onClick={() => setSelectedComplaintId(complaint.id)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setSelectedComplaintId(complaint.id);
+            }
+          }}
+        >
+          <div className="lib-support-card-top">
+            <span className="lib-support-card-type">{complaint.requestType}</span>
+            <span className={`librarian-support-status librarian-support-status--${complaint.status.toLowerCase()}`}>
+              {complaintStatus[complaint.status] ?? complaint.status}
+            </span>
+          </div>
+
+          <div className="lib-support-card-reader">
+            <div className="lib-support-card-avatar">
+              {complaint.readerAvatarUrl ? (
+                <img src={complaint.readerAvatarUrl} alt={complaint.readerName} />
+              ) : (
+                <UserRound size={16} />
+              )}
+            </div>
+            <div className="lib-support-card-reader-meta">
+              <strong title={complaint.readerName}>{complaint.readerName}</strong>
+              <span title={complaint.readerEmail}>{complaint.readerEmail}</span>
+            </div>
+          </div>
+
+          <p className="lib-support-card-snippet" title={complaint.content}>{complaint.content}</p>
+
+          <div className="lib-support-card-footer">
+            <time dateTime={complaint.createdAt}>{dateTime(complaint.createdAt)}</time>
+            <div className="lib-support-card-badges">
+              {complaint.attachmentUrl && (
+                <span className="lib-support-card-badge-icon" title="Có ảnh đính kèm">
+                  <ImageIcon size={13} />
+                </span>
+              )}
+              {complaint.replies.length > 0 && (
+                <span className="lib-support-card-badge-replies" title={`${complaint.replies.length} phản hồi`}>
+                  <MessageCircle size={13} />
+                  <span>{complaint.replies.length}</span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderDedicatedComplaintView = (complaint: Complaint) => (
+    <section className="lib-support-dedicated-page" aria-label="Chi tiết đơn hỗ trợ">
+      <div className="lib-support-dedicated-header">
+        <button
+          type="button"
+          className="lib-support-back-btn"
+          onClick={() => setSelectedComplaintId('')}
+        >
+          <ArrowLeft size={16} /> Quay lại danh sách đơn
+        </button>
+        <div className="lib-support-dedicated-header-tags">
+          <span className="lib-support-card-type">{complaint.requestType}</span>
+          <span className={`librarian-support-status librarian-support-status--${complaint.status.toLowerCase()}`}>
+            {complaintStatus[complaint.status] ?? complaint.status}
+          </span>
+        </div>
+      </div>
+
+      <div className="lib-support-dedicated-grid">
+        <div className="lib-support-dedicated-main">
+          <div className="lib-support-dedicated-card lib-support-reader-banner">
+            <div className="lib-support-reader-avatar-large">
+              {complaint.readerAvatarUrl ? (
+                <img src={complaint.readerAvatarUrl} alt={complaint.readerName} />
+              ) : (
+                <UserRound size={28} />
+              )}
+            </div>
+            <div className="lib-support-reader-info">
+              <h3>{complaint.readerName}</h3>
+              <p>{complaint.readerEmail}</p>
+              <time>Thời gian gửi đơn: {dateTime(complaint.createdAt)}</time>
+            </div>
+          </div>
+
+          <div className="lib-support-dedicated-card">
+            <h4 className="lib-support-card-heading">Nội dung yêu cầu / báo cáo</h4>
+            <div className="lib-support-dedicated-body">
+              <p>{complaint.content}</p>
+            </div>
+            {complaint.attachmentUrl && (
+              <div className="lib-support-dedicated-attachment">
+                <span className="lib-support-attachment-label">
+                  <ImageIcon size={15} /> Hình ảnh đính kèm:
+                </span>
+                <div className="lib-support-attachment-preview">
+                  <a href={complaint.attachmentUrl} target="_blank" rel="noreferrer" title="Xem ảnh gốc">
+                    <img src={complaint.attachmentUrl} alt="Bằng chứng đính kèm" />
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="lib-support-dedicated-card">
+            <h4 className="lib-support-card-heading">
+              Lịch sử trao đổi & phản hồi ({complaint.replies.length})
+            </h4>
+            <div className="librarian-support-ticket-replies">
+              {complaint.replies.length ? (
+                complaint.replies.map((reply) => (
+                  <article key={reply.id} className={reply.senderRole === 'Librarian' ? 'is-librarian-reply' : 'is-reader-reply'}>
+                    <div className="lib-reply-header">
+                      <strong>{reply.senderName} · {reply.senderRole === 'Librarian' ? 'Thủ thư' : 'Độc giả'}</strong>
+                      <time>{dateTime(reply.createdAt)}</time>
+                    </div>
+                    <p>{reply.message}</p>
+                  </article>
+                ))
+              ) : (
+                <p className="lib-support-no-replies">Chưa có phản hồi nào cho đơn này.</p>
+              )}
+            </div>
+
+            <form className="librarian-support-reply-form" onSubmit={(event) => void sendComplaintReply(event)}>
+              <textarea
+                maxLength={3000}
+                required
+                rows={4}
+                placeholder="Nhập nội dung phản hồi cho độc giả..."
+                value={replyDrafts[complaint.id] ?? ''}
+                onChange={(event) => setReplyDrafts((prev) => ({ ...prev, [complaint.id]: event.target.value }))}
+              />
+              <button
+                type="submit"
+                disabled={!(replyDrafts[complaint.id]?.trim()) || replyBusy || (Boolean(complaint.acceptedById) && complaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin')}
+              >
+                {replyBusy ? <LoaderCircle size={16} className="librarian-support-spinner" /> : <Send size={16} />}
+                Gửi phản hồi
+              </button>
+              {complaint.acceptedById && complaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin' && (
+                <span className="librarian-support-workflow-note">Đơn này đang do thủ thư {complaint.acceptedByName} phụ trách.</span>
+              )}
+            </form>
+          </div>
+        </div>
+
+        <div className="lib-support-dedicated-side">
+          <div className="lib-support-dedicated-card">
+            <h4 className="lib-support-card-heading">Quy trình xử lý & Hạn giải quyết</h4>
+            {renderComplaintWorkflow(complaint)}
+          </div>
+        </div>
+      </div>
     </section>
   );
 
@@ -489,88 +698,72 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
         <>
           <section className="librarian-support-types">
             <div className="librarian-support-section-heading">
-              <div><Settings2 size={18} /><div><strong>Loại đơn hỗ trợ</strong><span>Độc giả sẽ chọn một trong các loại đơn đang mở.</span></div></div>
-              <button type="button" disabled={typeSaving} onClick={() => void saveRequestTypes()}>
-                {typeSaving ? <LoaderCircle size={15} className="librarian-support-spinner" /> : <Check size={15} />}Lưu loại đơn
+              <div>
+                <Settings2 size={18} />
+                <div>
+                  <strong>Loại đơn hỗ trợ ({types.length})</strong>
+                  <span>Độc giả sẽ chọn một trong các loại đơn đang mở khi gửi hỗ trợ.</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="lib-support-manage-types-btn"
+                onClick={handleOpenTypeModal}
+              >
+                <Settings2 size={15} />
+                Quản lý loại đơn
               </button>
             </div>
-            <div className="librarian-support-type-editor">
+            <div className="lib-support-type-preview-chips">
               {types.map((type) => (
                 <span className="librarian-support-type-chip" key={type.id}>
                   {type.name}
-                  <button type="button" aria-label={`Xóa ${type.name}`} onClick={() => removeRequestType(type.id)}>×</button>
                 </span>
               ))}
-              <form onSubmit={(event) => { event.preventDefault(); if (typeDraft.trim()) { setTypes((current) => [...current, { id: `new-${Date.now()}`, name: typeDraft.trim() }]); setTypeDraft(''); } }}>
-                <input maxLength={100} placeholder="Thêm loại đơn..." value={typeDraft} onChange={(event) => setTypeDraft(event.target.value)} />
-                <button type="submit" aria-label="Thêm loại đơn"><Plus size={16} /></button>
-              </form>
             </div>
           </section>
 
-          <div className="librarian-support-list-heading">
-            <h2>Đơn từ độc giả</h2><span>{complaints.length} đơn</span>
-          </div>
-          {loading ? <div className="librarian-support-empty"><LoaderCircle size={20} className="librarian-support-spinner" />Đang tải đơn...</div> : complaints.length ? (
-            <div className="librarian-support-ticket-layout">
-              <section className="librarian-support-ticket-list" aria-label="Danh sách đơn hỗ trợ">
-                {complaints.map((complaint) => (
-                  <button
-                    type="button"
-                    className={`librarian-support-ticket-item${selectedComplaint?.id === complaint.id ? ' is-selected' : ''}`}
-                    key={complaint.id}
-                    onClick={() => {
-                      setSelectedComplaintId(complaint.id);
-                    }}
-                  >
-                    <span className={`librarian-support-status librarian-support-status--${complaint.status.toLowerCase()}`}>{complaintStatus[complaint.status] ?? complaint.status}</span>
-                    <strong>{complaint.requestType}</strong>
-                    <span>{complaint.readerName} · {complaint.readerEmail}</span>
-                    <p>{complaint.content}</p>
-                    <time>{dateTime(complaint.createdAt)}</time>
-                  </button>
-                ))}
-              </section>
-
-              {selectedComplaint ? (
-                <section className="librarian-support-ticket-detail">
-                  <header>
-                    <div className="librarian-support-reader-avatar">
-                      {selectedComplaint.readerAvatarUrl
-                        ? <img src={selectedComplaint.readerAvatarUrl} alt="" />
-                        : <UserRound size={18} />}
-                    </div>
-                    <div><strong>{selectedComplaint.readerName}</strong><span>{selectedComplaint.readerEmail}</span></div>
-                    <span className={`librarian-support-status librarian-support-status--${selectedComplaint.status.toLowerCase()}`}>{complaintStatus[selectedComplaint.status] ?? selectedComplaint.status}</span>
-                  </header>
-                  <div className="librarian-support-ticket-content">
-                    <span>{selectedComplaint.requestType} · {dateTime(selectedComplaint.createdAt)}</span>
-                    <p>{selectedComplaint.content}</p>
-                    {selectedComplaint.attachmentUrl && (
-                      <a href={selectedComplaint.attachmentUrl} target="_blank" rel="noreferrer"><ImageIcon size={15} />Mở ảnh bằng chứng</a>
-                    )}
-                  </div>
-                  {renderComplaintWorkflow(selectedComplaint)}
-                  <div className="librarian-support-ticket-replies">
-                    {selectedComplaint.replies.map((reply) => (
-                      <article key={reply.id}>
-                        <strong>{reply.senderName} · {reply.senderRole === 'Librarian' ? 'Thủ thư' : 'Độc giả'}</strong>
-                        <p>{reply.message}</p><time>{dateTime(reply.createdAt)}</time>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              ) : <div className="librarian-support-empty">Chọn đơn để xem nội dung.</div>}
-            </div>
-          ) : <div className="librarian-support-empty"><CircleHelp size={22} />Chưa có đơn hỗ trợ nào.</div>}
+          {selectedComplaint ? (
+            renderDedicatedComplaintView(selectedComplaint)
+          ) : (
+            <>
+              <div className="librarian-support-list-heading">
+                <h2>Đơn từ độc giả</h2><span>{complaints.length} đơn</span>
+              </div>
+              {loading ? (
+                <div className="librarian-support-empty">
+                  <LoaderCircle size={20} className="librarian-support-spinner" />
+                  Đang tải đơn...
+                </div>
+              ) : complaints.length ? (
+                renderTicketsGrid(complaints)
+              ) : (
+                <div className="librarian-support-empty">
+                  <CircleHelp size={22} />
+                  Chưa có đơn hỗ trợ nào.
+                </div>
+              )}
+            </>
+          )}
         </>
       ) : (
         <>
           <nav className="librarian-support-response-tabs" aria-label="Nội dung phản hồi">
-            <button type="button" className={responseTab === 'complaints' ? 'is-active' : ''} onClick={() => setResponseTab('complaints')}>
+            <button
+              type="button"
+              className={responseTab === 'complaints' ? 'is-active' : ''}
+              onClick={() => {
+                setResponseTab('complaints');
+                setSelectedComplaintId('');
+              }}
+            >
               <CircleHelp size={15} />Phản hồi đơn
             </button>
-            <button type="button" className={responseTab === 'chat' ? 'is-active' : ''} onClick={() => setResponseTab('chat')}>
+            <button
+              type="button"
+              className={responseTab === 'chat' ? 'is-active' : ''}
+              onClick={() => setResponseTab('chat')}
+            >
               <MessageCircle size={15} />Chat realtime
               {totalUnreadMessages > 0 && (
                 <span className="librarian-support-unread-total" aria-label={`${totalUnreadMessages} tin nhắn chưa đọc`}>
@@ -581,132 +774,157 @@ const LibrarianSupportPage: React.FC<{ view: SupportView }> = ({ view }) => {
           </nav>
           {responseTab === 'complaints' ? (
             <>
-              <div className="librarian-support-list-heading">
-                <h2>Đơn cần phản hồi</h2><span>{openComplaints.length} đơn đang mở</span>
-              </div>
-              {loading ? <div className="librarian-support-empty"><LoaderCircle size={20} className="librarian-support-spinner" />Đang tải đơn...</div> : openComplaints.length ? (
-                <div className="librarian-support-ticket-layout">
-                  <section className="librarian-support-ticket-list" aria-label="Đơn cần phản hồi">
-                    {openComplaints.map((complaint) => (
-                      <button
-                        type="button"
-                        className={`librarian-support-ticket-item${selectedComplaintId === complaint.id ? ' is-selected' : ''}`}
-                        key={complaint.id}
-                        onClick={() => {
-                          setSelectedComplaintId(complaint.id);
-                        }}
-                      >
-                        <span className={`librarian-support-status librarian-support-status--${complaint.status.toLowerCase()}`}>{complaintStatus[complaint.status] ?? complaint.status}</span>
-                        <strong>{complaint.requestType}</strong>
-                        <span>{complaint.readerName} · {complaint.readerEmail}</span>
-                        <p>{complaint.content}</p>
-                        <time>{dateTime(complaint.createdAt)}</time>
-                      </button>
-                    ))}
-                  </section>
-                  {selectedComplaint ? (
-                    <section className="librarian-support-ticket-detail">
-                      <header>
-                        <div className="librarian-support-reader-avatar">
-                          {selectedComplaint.readerAvatarUrl
-                            ? <img src={selectedComplaint.readerAvatarUrl} alt="" />
-                            : <UserRound size={18} />}
-                        </div>
-                        <div><strong>{selectedComplaint.readerName}</strong><span>{selectedComplaint.readerEmail}</span></div>
-                        <span className={`librarian-support-status librarian-support-status--${selectedComplaint.status.toLowerCase()}`}>{complaintStatus[selectedComplaint.status] ?? selectedComplaint.status}</span>
-                      </header>
-                      <div className="librarian-support-ticket-content">
-                        <span>{selectedComplaint.requestType} · {dateTime(selectedComplaint.createdAt)}</span>
-                        <p>{selectedComplaint.content}</p>
-                        {selectedComplaint.attachmentUrl && (
-                          <a href={selectedComplaint.attachmentUrl} target="_blank" rel="noreferrer"><ImageIcon size={15} />Mở ảnh bằng chứng</a>
-                        )}
-                      </div>
-                      {renderComplaintWorkflow(selectedComplaint)}
-                      <div className="librarian-support-ticket-replies">
-                        {selectedComplaint.replies.map((reply) => (
-                          <article key={reply.id}>
-                            <strong>{reply.senderName} · {reply.senderRole === 'Librarian' ? 'Thủ thư' : 'Độc giả'}</strong>
-                            <p>{reply.message}</p><time>{dateTime(reply.createdAt)}</time>
-                          </article>
-                        ))}
-                      </div>
-                      <form className="librarian-support-reply-form" onSubmit={(event) => void sendComplaintReply(event)}>
-                        <textarea
-                          maxLength={3000}
-                          required
-                          rows={3}
-                          placeholder="Nhập phản hồi cho đơn này..."
-                          value={replyDrafts[selectedComplaint.id] ?? ''}
-                          onChange={(event) => setReplyDrafts((prev) => ({ ...prev, [selectedComplaint.id]: event.target.value }))}
-                        />
-                        <button
-                          type="submit"
-                          disabled={!(replyDrafts[selectedComplaint.id]?.trim()) || replyBusy || (Boolean(selectedComplaint.acceptedById) && selectedComplaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin')}
-                        >
-                          {replyBusy ? <LoaderCircle size={16} className="librarian-support-spinner" /> : <Send size={16} />}Gửi phản hồi
-                        </button>
-                        {selectedComplaint.acceptedById && selectedComplaint.acceptedById !== currentUser?.id && currentUser?.role !== 'Admin' && (
-                          <span className="librarian-support-workflow-note">Đơn này đang do thủ thư {selectedComplaint.acceptedByName} phụ trách.</span>
-                        )}
-                      </form>
-                    </section>
-                  ) : <div className="librarian-support-empty">Chọn đơn để xem và gửi phản hồi.</div>}
-                </div>
-              ) : <div className="librarian-support-empty"><CircleHelp size={22} />Không có đơn đang chờ phản hồi.</div>}
+              {selectedComplaint ? (
+                renderDedicatedComplaintView(selectedComplaint)
+              ) : (
+                <>
+                  <div className="librarian-support-list-heading">
+                    <h2>Đơn cần phản hồi</h2><span>{openComplaints.length} đơn đang mở</span>
+                  </div>
+                  {loading ? (
+                    <div className="librarian-support-empty">
+                      <LoaderCircle size={20} className="librarian-support-spinner" />
+                      Đang tải đơn...
+                    </div>
+                  ) : openComplaints.length ? (
+                    renderTicketsGrid(openComplaints)
+                  ) : (
+                    <div className="librarian-support-empty">
+                      <CircleHelp size={22} />
+                      Không có đơn đang chờ phản hồi.
+                    </div>
+                  )}
+                </>
+              )}
             </>
           ) : (
-        <section className="librarian-support-chat">
-          <aside className="librarian-support-conversations">
-            <header><strong>Cuộc trò chuyện</strong><span className={connection?.state === 'Connected' ? 'is-online' : ''}>{connection?.state === 'Connected' ? 'Đang trực tuyến' : 'Đang kết nối'}</span></header>
-            {loading ? <div className="librarian-support-empty"><LoaderCircle size={18} className="librarian-support-spinner" /></div> :
-              conversations.length ? conversations.map((conversation) => (
-                <button type="button" className={`librarian-support-conversation${selectedReaderId === conversation.readerId ? ' is-selected' : ''}${conversation.unreadCount > 0 ? ' has-unread' : ''}`} key={conversation.readerId} onClick={() => void openConversation(conversation)}>
-                  <div className="librarian-support-reader-avatar">
-                    {conversation.avatarUrl ? <img src={conversation.avatarUrl} alt="" /> : <UserRound size={17} />}
-                  </div>
-                  <div><strong>{conversation.readerName}</strong><span>{conversation.lastMessage.message}</span></div>
-                  <div className="librarian-support-conversation-meta">
-                    <time>{dateTime(conversation.lastMessage.createdAt)}</time>
-                    {conversation.unreadCount > 0 && (
-                      <span className="librarian-support-unread-count" aria-label={`${conversation.unreadCount} tin nhắn chưa đọc`}>
-                        {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
-                      </span>
-                    )}
-                  </div>
-                </button>
-              )) : <div className="librarian-support-empty"><MessageCircle size={22} />Chưa có cuộc trò chuyện.</div>}
-          </aside>
+            <section className="librarian-support-chat">
+              <aside className="librarian-support-conversations">
+                <header><strong>Cuộc trò chuyện</strong><span className={connection?.state === 'Connected' ? 'is-online' : ''}>{connection?.state === 'Connected' ? 'Đang trực tuyến' : 'Đang kết nối'}</span></header>
+                {loading ? <div className="librarian-support-empty"><LoaderCircle size={18} className="librarian-support-spinner" /></div> :
+                  conversations.length ? conversations.map((conversation) => (
+                    <button type="button" className={`librarian-support-conversation${selectedReaderId === conversation.readerId ? ' is-selected' : ''}${conversation.unreadCount > 0 ? ' has-unread' : ''}`} key={conversation.readerId} onClick={() => void openConversation(conversation)}>
+                      <div className="librarian-support-reader-avatar">
+                        {conversation.avatarUrl ? <img src={conversation.avatarUrl} alt="" /> : <UserRound size={17} />}
+                      </div>
+                      <div><strong>{conversation.readerName}</strong><span>{conversation.lastMessage.message}</span></div>
+                      <div className="librarian-support-conversation-meta">
+                        <time>{dateTime(conversation.lastMessage.createdAt)}</time>
+                        {conversation.unreadCount > 0 && (
+                          <span className="librarian-support-unread-count" aria-label={`${conversation.unreadCount} tin nhắn chưa đọc`}>
+                            {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  )) : <div className="librarian-support-empty"><MessageCircle size={22} />Chưa có cuộc trò chuyện.</div>}
+              </aside>
 
-          <div className="librarian-support-chat-panel">
-            {selectedReaderId ? (
-              <>
-                <div className="librarian-support-chat-messages" aria-live="polite">
-                  {chatMessages.length ? chatMessages.map((message) => {
-                    const mine = message.senderRole !== 'Reader';
-                    return (
-                      <article className={`librarian-support-chat-message${mine ? ' is-mine' : ''}`} key={message.id}>
-                        <div className="librarian-support-chat-bubble">
-                          {!mine && <strong>{message.senderName}</strong>}
-                          <p>{message.message}</p><time>{dateTime(message.createdAt)}</time>
-                        </div>
-                      </article>
-                    );
-                  }) : <div className="librarian-support-empty"><MessageCircle size={22} />Chưa có tin nhắn.</div>}
-                  <div ref={messagesEndRef} />
-                </div>
-                <form className="librarian-support-chat-composer" onSubmit={(event) => void sendChatReply(event)}>
-                  <input maxLength={2000} placeholder="Nhập tin nhắn..." value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} />
-                  <button type="submit" disabled={!chatDraft.trim() || !connection || chatBusy} aria-label="Gửi tin nhắn">
-                    {chatBusy ? <LoaderCircle size={16} className="librarian-support-spinner" /> : <Send size={16} />}
-                  </button>
-                </form>
-              </>
-            ) : <div className="librarian-support-empty"><MessageCircle size={23} />Chọn một cuộc trò chuyện để bắt đầu phản hồi.</div>}
-          </div>
-        </section>
+              <div className="librarian-support-chat-panel">
+                {selectedReaderId ? (
+                  <>
+                    <div className="librarian-support-chat-messages" aria-live="polite">
+                      {chatMessages.length ? chatMessages.map((message) => {
+                        const mine = message.senderRole !== 'Reader';
+                        return (
+                          <article className={`librarian-support-chat-message${mine ? ' is-mine' : ''}`} key={message.id}>
+                            <div className="librarian-support-chat-bubble">
+                              {!mine && <strong>{message.senderName}</strong>}
+                              <p>{message.message}</p><time>{dateTime(message.createdAt)}</time>
+                            </div>
+                          </article>
+                        );
+                      }) : <div className="librarian-support-empty"><MessageCircle size={22} />Chưa có tin nhắn.</div>}
+                      <div ref={messagesEndRef} />
+                    </div>
+                    <form className="librarian-support-chat-composer" onSubmit={(event) => void sendChatReply(event)}>
+                      <input maxLength={2000} placeholder="Nhập tin nhắn..." value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} />
+                      <button type="submit" disabled={!chatDraft.trim() || !connection || chatBusy} aria-label="Gửi tin nhắn">
+                        {chatBusy ? <LoaderCircle size={16} className="librarian-support-spinner" /> : <Send size={16} />}
+                      </button>
+                    </form>
+                  </>
+                ) : <div className="librarian-support-empty"><MessageCircle size={23} />Chọn một cuộc trò chuyện để bắt đầu phản hồi.</div>}
+              </div>
+            </section>
           )}
         </>
+      )}
+
+      {/* Support Type Management Modal */}
+      {isTypeModalOpen && (
+        <div className="lib-support-modal-backdrop" onClick={handleCloseTypeModal}>
+          <div className="lib-support-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="lib-support-modal-header">
+              <div className="lib-support-modal-header-icon">
+                <Settings2 size={22} />
+              </div>
+              <div className="lib-support-modal-header-text">
+                <h3>Quản lý loại đơn hỗ trợ</h3>
+                <p>Thêm, bớt hoặc chỉnh sửa danh mục loại đơn độc giả có thể chọn khi gửi hỗ trợ.</p>
+              </div>
+              <button
+                type="button"
+                className="lib-support-modal-close"
+                onClick={handleCloseTypeModal}
+                aria-label="Đóng hộp thoại"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="lib-support-modal-body">
+              <form className="lib-support-modal-add-form" onSubmit={handleAddModalType}>
+                <input
+                  type="text"
+                  placeholder="Nhập tên loại đơn mới..."
+                  value={modalTypeDraft}
+                  onChange={(e) => setModalTypeDraft(e.target.value)}
+                  maxLength={100}
+                />
+                <button type="submit" disabled={!modalTypeDraft.trim()}>
+                  <Plus size={16} /> Thêm
+                </button>
+              </form>
+
+              <div className="lib-support-modal-chips-title">
+                <span>Danh sách loại đơn hiện tại ({modalTypes.length}):</span>
+              </div>
+              <div className="lib-support-modal-chips-list">
+                {modalTypes.map((type) => (
+                  <span className="lib-support-modal-chip" key={type.id}>
+                    <span>{type.name}</span>
+                    <button
+                      type="button"
+                      aria-label={`Xóa ${type.name}`}
+                      onClick={() => handleRemoveModalType(type.id)}
+                    >
+                      <X size={13} />
+                    </button>
+                  </span>
+                ))}
+                {!modalTypes.length && (
+                  <p className="lib-support-modal-empty">Chưa có loại đơn nào. Vui lòng thêm ít nhất một loại đơn.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="lib-support-modal-footer">
+              <button type="button" className="lib-support-btn-secondary" onClick={handleCloseTypeModal}>
+                Đóng
+              </button>
+              <button
+                type="button"
+                className="lib-support-btn-primary"
+                disabled={typeSaving || !modalTypes.length}
+                onClick={() => void handleSaveModalTypes()}
+              >
+                {typeSaving ? <LoaderCircle size={15} className="librarian-support-spinner" /> : <Check size={15} />}
+                Lưu loại đơn
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
