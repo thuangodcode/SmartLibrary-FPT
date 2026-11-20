@@ -332,7 +332,7 @@ public sealed partial class CopyLifecycleTests
         Assert.True(correct.IsSuccess, correct.Error);
         Assert.Equal("Borrowed", correct.Data!.Status);
         Assert.Equal(BookCondition.LightDamaged, copy.Condition);
-        Assert.InRange((loan.DueDate!.Value - DateTime.UtcNow).TotalDays, 6.99, 7.01);
+        Assert.Equal(CirculationRules.CalculateDueDate(loan.BorrowDate!.Value, 7, CirculationRules.IsMorning(loan.PickupAt!.Value)), loan.DueDate);
     }
 
     [BookCodePostgresFact]

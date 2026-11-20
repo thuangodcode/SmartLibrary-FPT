@@ -285,7 +285,7 @@ public sealed partial class CopyLifecycleTests
         loan.DueDate = DateTime.UtcNow.AddDays(1); await db.SaveChangesAsync();
         var oldDue = loan.DueDate;
         Assert.True((await service.RenewAsync(loan.Id, fixture.StaffId, byLibrarian: true)).IsSuccess);
-        Assert.Equal(oldDue!.Value.AddDays(7), loan.DueDate);
+        Assert.Equal(CirculationRules.CalculateDueDate(oldDue!.Value, 7, CirculationRules.IsMorningDue(oldDue.Value)), loan.DueDate);
         Assert.False((await service.RenewAsync(loan.Id, fixture.StaffId, byLibrarian: true)).IsSuccess);
         Assert.Equal(1, loan.RenewalCount);
     }
