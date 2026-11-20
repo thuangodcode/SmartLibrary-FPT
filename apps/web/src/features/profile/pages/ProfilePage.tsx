@@ -229,6 +229,9 @@ const ProfilePage: React.FC = () => {
       form.set('DateOfBirth', dateOfBirth);
       form.set('Address', address.trim());
       form.set('ClearAvatar', String(clearAvatar));
+      const submitForReview = currentUser.role === 'Reader' && ['PendingDocuments', 'Rejected'].includes(profile?.accountStatus || currentUser.status)
+        && !!(frontDocFile || profile?.frontDocUrl) && !!(backDocFile || profile?.backDocUrl) && !!(selfieDocFile || profile?.selfieDocUrl);
+      if (submitForReview) form.set('SubmitForReview', 'true');
       if (avatarFile) form.set('Avatar', avatarFile);
       if (frontDocFile) form.set('FrontDoc', frontDocFile);
       if (backDocFile) form.set('BackDoc', backDocFile);
@@ -265,7 +268,7 @@ const ProfilePage: React.FC = () => {
         accessToken,
         permissions,
       );
-      setNotice(frontDocFile || backDocFile || selfieDocFile
+      setNotice(submitForReview || frontDocFile || backDocFile || selfieDocFile
         ? 'Giấy tờ đã được gửi. Tài khoản sẽ được duyệt sau khi thủ thư kiểm tra hồ sơ.'
         : 'Hồ sơ cá nhân đã được cập nhật thành công.');
     } catch (caught) {

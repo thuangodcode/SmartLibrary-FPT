@@ -108,14 +108,15 @@ public sealed class ProfileController(
         string? selfieDocUrl = form.SelfieDoc is not null ? await UploadDocumentAsync(form.SelfieDoc, "selfie") : null;
 
         var hasDocumentUpload = frontDocUrl is not null || backDocUrl is not null || selfieDocUrl is not null;
-        var previousRegistration = hasDocumentUpload
+        var submitForReview = hasDocumentUpload || form.SubmitForReview;
+        var previousRegistration = submitForReview
             ? await dbContext.RegistrationRequests
                 .Include(r => r.Documents)
                 .Where(r => r.UserId == userId)
                 .OrderByDescending(r => r.SubmittedAt)
                 .FirstOrDefaultAsync(cancellationToken)
             : null;
-        if (hasDocumentUpload)
+        if (submitForReview)
         {
             var existingDocuments = previousRegistration?.Documents
                 .Where(document => !document.IsDeleted).Select(document => document.Side).ToList() ?? [];
@@ -125,7 +126,7 @@ public sealed class ProfileController(
             if (!hasFront || !hasBack || !hasSelfie)
                 return BadRequest(ApiResponse<object>.Fail("Vui lòng tải đủ ảnh mặt trước, mặt sau giấy tờ và ảnh chân dung trước khi gửi duyệt."));
         }
-        if (hasDocumentUpload)
+        if (submitForReview)
         {
             var reg = previousRegistration;
 
@@ -291,6 +292,7 @@ public sealed class ProfileController(
         public string? DateOfBirth { get; set; }
         public bool ClearAvatar { get; set; }
         public IFormFile? Avatar { get; set; }
+        public bool SubmitForReview { get; set; }
         public IFormFile? FrontDoc { get; set; }
         public IFormFile? BackDoc { get; set; }
         public IFormFile? SelfieDoc { get; set; }
