@@ -5,6 +5,7 @@ import { ApiError, apiRequest, setSessionTokenHandler } from './api';
 import { isAccessTokenExpiring } from './tokenExpiry';
 import type { AppRole, User } from './types';
 import { googleSignIn } from './googleAuth';
+import { canUseMobileSession } from './readerVerification';
 
 interface SessionContextValue {
   user: User | null;
@@ -12,19 +13,11 @@ interface SessionContextValue {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  updateUser: (patch: Partial<Pick<User, 'email' | 'fullName' | 'avatarUrl' | 'isVerified' | 'phone' | 'address' | 'dateOfBirth'>>) => Promise<void>;
+  updateUser: (patch: Partial<Pick<User, 'email' | 'fullName' | 'avatarUrl' | 'isVerified' | 'status' | 'phone' | 'address' | 'dateOfBirth'>>, expectedUserId?: string) => Promise<void>;
   refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 const SessionContext = createContext<SessionContextValue | null>(null);
-// The API decides whether a sign-in is allowed. Pending Readers can finish their
-// verification profile, while mobile never exposes Admin or suspended accounts.
-function canUseMobileSession(account: User) {
-  return account.status === 'Active' || (account.role === 'Reader' && account.isVerified === false
-    && ['PendingVerification', 'PendingActivation', 'PendingDocuments', 'PendingApproval'].includes(account.status));
-}
-
-
 export function SessionProvider({ children }: React.PropsWithChildren) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -143,8 +136,8 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
   const acceptSession = useCallback(async (version: number, data: { accessToken?: string; refreshToken?: string; user?: User }) => {
     if (version !== sessionVersion.current) return;
     const nextUser = data.user; const nextToken = data.accessToken;
+    if (nextUser && !['Reader', 'Librarian'].includes(nextUser.role)) throw new Error('Ứng dụng mobile chỉ hỗ trợ vai trò Reader và Thủ thư.');
     if (!nextUser?.id || !nextToken || !canUseMobileSession(nextUser)) throw new Error('Tài khoản chưa được kích hoạt hoặc thông tin đăng nhập không hợp lệ.');
-    if (!['Reader', 'Librarian'].includes(nextUser.role)) throw new Error('Ứng dụng mobile chỉ hỗ trợ vai trò Reader và Thủ thư.');
     await persist(async () => {
       if (version !== sessionVersion.current) return;
       await SecureStore.setItemAsync('sl_access_token', nextToken);
@@ -172,13 +165,15 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
     });
     await acceptSession(version, { ...session, user: result.data?.user });
   }, [acceptSession]);
-  const updateUser = useCallback(async (patch: Partial<Pick<User, 'email' | 'fullName' | 'avatarUrl' | 'isVerified' | 'phone' | 'address' | 'dateOfBirth'>>) => {
+  const updateUser = useCallback(async (patch: Partial<Pick<User, 'email' | 'fullName' | 'avatarUrl' | 'isVerified' | 'status' | 'phone' | 'address' | 'dateOfBirth'>>, expectedUserId?: string) => {
     const version = sessionVersion.current;
     await persist(async () => {
       if (version !== sessionVersion.current || !signedIn.current) return;
       const saved = await SecureStore.getItemAsync('sl_user');
       if (!saved || version !== sessionVersion.current) return;
-      const next = { ...JSON.parse(saved), ...patch } as User;
+      const stored = JSON.parse(saved) as User;
+      if (expectedUserId && stored.id !== expectedUserId) return;
+      const next = { ...stored, ...patch } as User;
       await SecureStore.setItemAsync('sl_user', JSON.stringify(next));
       if (version === sessionVersion.current) setUser(next);
     });
@@ -190,10 +185,11 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
     const result = await apiRequest<{ user: User }>('/api/v1/auth/me', {}, saved);
     if (version === sessionVersion.current && result.data?.user) {
       const next = result.data.user;
-      await updateUser({ email: next.email, fullName: next.fullName, avatarUrl: next.avatarUrl, isVerified: next.isVerified,
-        phone: next.phone, address: next.address, dateOfBirth: next.dateOfBirth });
+      if (!canUseMobileSession(next)) { await clearSession(); throw new Error('Tài khoản không còn được phép đăng nhập mobile.'); }
+      await updateUser({ email: next.email, fullName: next.fullName, avatarUrl: next.avatarUrl, isVerified: next.isVerified, status: next.status,
+        phone: next.phone, address: next.address, dateOfBirth: next.dateOfBirth }, next.id);
     }
-  }, [updateUser]);
+  }, [updateUser, clearSession]);
   const value = useMemo(() => ({ user, token, loading, signIn, signInWithGoogle, updateUser, refreshUser, signOut }), [user, token, loading, signIn, signInWithGoogle, updateUser, refreshUser, signOut]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
