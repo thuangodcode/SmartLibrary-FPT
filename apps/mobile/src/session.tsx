@@ -4,15 +4,26 @@ import * as SecureStore from 'expo-secure-store';
 import { ApiError, apiRequest, setSessionTokenHandler } from './api';
 import { isAccessTokenExpiring } from './tokenExpiry';
 import type { AppRole, User } from './types';
+import { googleSignIn } from './googleAuth';
 
 interface SessionContextValue {
   user: User | null;
   token: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  updateUser: (patch: Partial<Pick<User, 'email' | 'fullName' | 'avatarUrl' | 'isVerified' | 'phone' | 'address' | 'dateOfBirth'>>) => Promise<void>;
+  refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 const SessionContext = createContext<SessionContextValue | null>(null);
+// The API decides whether a sign-in is allowed. Pending Readers can finish their
+// verification profile, while mobile never exposes Admin or suspended accounts.
+function canUseMobileSession(account: User) {
+  return account.status === 'Active' || (account.role === 'Reader' && account.isVerified === false
+    && ['PendingVerification', 'PendingActivation', 'PendingDocuments', 'PendingApproval'].includes(account.status));
+}
+
 
 export function SessionProvider({ children }: React.PropsWithChildren) {
   const [user, setUser] = useState<User | null>(null);
@@ -93,7 +104,7 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
         // /auth/me now participates in refresh, including cold starts with an expired access token.
         const result = await apiRequest<{ user: User }>('/api/v1/auth/me', {}, saved);
         const verified = result.data?.user;
-        if (!verified?.id || verified.status !== 'Active' || !['Reader', 'Librarian'].includes(verified.role)) throw new ApiError('Phiên đăng nhập không hợp lệ.', 401);
+        if (!verified?.id || !canUseMobileSession(verified) || !['Reader', 'Librarian'].includes(verified.role)) throw new ApiError('Phiên đăng nhập không hợp lệ.', 401);
         if (active && version === sessionVersion.current) { signedIn.current = true; setToken(currentToken.current); setUser(verified); }
       } catch (error) {
         if (!active || version !== sessionVersion.current) return;
@@ -102,7 +113,7 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
         if (cached && currentToken.current) {
           try {
             const savedUser = JSON.parse(cached) as User;
-            if (savedUser.id && ['Reader', 'Librarian'].includes(savedUser.role)) {
+            if (savedUser.id && canUseMobileSession(savedUser) && ['Reader', 'Librarian'].includes(savedUser.role)) {
               signedIn.current = true; setToken(currentToken.current); setUser(savedUser); return;
             }
           } catch { /* Remove invalid cache below. */ }
@@ -129,19 +140,15 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
       try { await apiRequest('/api/v1/auth/logout', { method: 'POST', body: JSON.stringify({}) }, saved); } catch { /* Local sign-out already succeeded. */ }
     }
   }, [clearSession]);
-  const signIn = useCallback(async (email: string, password: string) => {
-    const version = ++sessionVersion.current;
-    const result = await apiRequest<{ accessToken?: string; refreshToken?: string; user?: User }>('/api/v1/auth/login', {
-      method: 'POST', headers: { 'X-Client-Type': 'mobile' }, body: JSON.stringify({ email: email.trim(), password }),
-    });
+  const acceptSession = useCallback(async (version: number, data: { accessToken?: string; refreshToken?: string; user?: User }) => {
     if (version !== sessionVersion.current) return;
-    const nextUser = result.data?.user; const nextToken = result.data?.accessToken;
-    if (!nextUser?.id || !nextToken || nextUser.status !== 'Active') throw new Error('Tài khoản chưa được kích hoạt hoặc thông tin đăng nhập không hợp lệ.');
+    const nextUser = data.user; const nextToken = data.accessToken;
+    if (!nextUser?.id || !nextToken || !canUseMobileSession(nextUser)) throw new Error('Tài khoản chưa được kích hoạt hoặc thông tin đăng nhập không hợp lệ.');
     if (!['Reader', 'Librarian'].includes(nextUser.role)) throw new Error('Ứng dụng mobile chỉ hỗ trợ vai trò Reader và Thủ thư.');
     await persist(async () => {
       if (version !== sessionVersion.current) return;
       await SecureStore.setItemAsync('sl_access_token', nextToken);
-      if (result.data?.refreshToken) await SecureStore.setItemAsync('sl_refresh_token', result.data.refreshToken);
+      if (data.refreshToken) await SecureStore.setItemAsync('sl_refresh_token', data.refreshToken);
       else await SecureStore.deleteItemAsync('sl_refresh_token');
       await SecureStore.setItemAsync('sl_user', JSON.stringify(nextUser));
     });
@@ -149,7 +156,45 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
     signedIn.current = true; currentToken.current = nextToken;
     setToken(nextToken); setUser({ ...nextUser, role: nextUser.role as AppRole });
   }, [persist]);
-  const value = useMemo(() => ({ user, token, loading, signIn, signOut }), [user, token, loading, signIn, signOut]);
+  const signIn = useCallback(async (email: string, password: string) => {
+    const version = ++sessionVersion.current;
+    const result = await apiRequest<{ accessToken?: string; refreshToken?: string; user?: User }>('/api/v1/auth/login', {
+      method: 'POST', headers: { 'X-Client-Type': 'mobile' }, body: JSON.stringify({ email: email.trim(), password }),
+    });
+    await acceptSession(version, result.data || {});
+  }, [acceptSession]);
+  const signInWithGoogle = useCallback(async () => {
+    const version = ++sessionVersion.current;
+    const session = await googleSignIn();
+    if (!session || version !== sessionVersion.current) return;
+    const result = await apiRequest<{ user?: User }>('/api/v1/auth/google/exchange', {
+      method: 'POST', body: JSON.stringify({ accessToken: session.accessToken, email: session.email, fullName: session.fullName, avatarUrl: session.avatarUrl }),
+    });
+    await acceptSession(version, { ...session, user: result.data?.user });
+  }, [acceptSession]);
+  const updateUser = useCallback(async (patch: Partial<Pick<User, 'email' | 'fullName' | 'avatarUrl' | 'isVerified' | 'phone' | 'address' | 'dateOfBirth'>>) => {
+    const version = sessionVersion.current;
+    await persist(async () => {
+      if (version !== sessionVersion.current || !signedIn.current) return;
+      const saved = await SecureStore.getItemAsync('sl_user');
+      if (!saved || version !== sessionVersion.current) return;
+      const next = { ...JSON.parse(saved), ...patch } as User;
+      await SecureStore.setItemAsync('sl_user', JSON.stringify(next));
+      if (version === sessionVersion.current) setUser(next);
+    });
+  }, [persist]);
+  const refreshUser = useCallback(async () => {
+    const version = sessionVersion.current;
+    const saved = currentToken.current;
+    if (!saved) return;
+    const result = await apiRequest<{ user: User }>('/api/v1/auth/me', {}, saved);
+    if (version === sessionVersion.current && result.data?.user) {
+      const next = result.data.user;
+      await updateUser({ email: next.email, fullName: next.fullName, avatarUrl: next.avatarUrl, isVerified: next.isVerified,
+        phone: next.phone, address: next.address, dateOfBirth: next.dateOfBirth });
+    }
+  }, [updateUser]);
+  const value = useMemo(() => ({ user, token, loading, signIn, signInWithGoogle, updateUser, refreshUser, signOut }), [user, token, loading, signIn, signInWithGoogle, updateUser, refreshUser, signOut]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 export function useSession() {

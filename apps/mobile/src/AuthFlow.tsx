@@ -22,10 +22,11 @@ function Link({ title, onPress }: { title: string; onPress: () => void }) {
 }
 
 export function AuthFlow() {
-  const { signIn } = useSession();
+  const { signIn, signInWithGoogle } = useSession();
   const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const [mode, setMode] = useState<AuthMode | 'welcome'>('welcome');
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -104,6 +105,13 @@ export function AuthFlow() {
     catch (error) { notifyError(error, 'Không thể đăng nhập'); }
     finally { setBusy(false); }
   };
+  const submitGoogle = async () => {
+    if (busy) return;
+    setGoogleBusy(true); setBusy(true);
+    try { await signInWithGoogle(); }
+    catch (error) { notifyError(error, 'Không thể đăng nhập Google'); }
+    finally { setGoogleBusy(false); setBusy(false); }
+  };
   const introDescription = mode === 'login'
     ? 'Không gian đọc và quản lý thư viện dành cho cộng đồng FPT.'
     : mode.startsWith('register')
@@ -111,7 +119,7 @@ export function AuthFlow() {
       : mode === 'pending'
         ? 'Hồ sơ của bạn đang được thủ thư xem xét.'
         : 'Lấy lại quyền truy cập tài khoản thư viện của bạn.';
-  const primary = (label: string, action: () => void) => <Pressable disabled={busy} onPress={action} style={({ pressed }) => [styles.primary, busy && styles.disabled, pressed && styles.pressed]}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{label}</Text>}</Pressable>;
+  const primary = (label: string, action: () => void) => <Pressable disabled={busy} onPress={action} style={({ pressed }) => [styles.primary, busy && styles.disabled, pressed && styles.pressed]}>{busy && !googleBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{label}</Text>}</Pressable>;
   const nav = (text: string, target: AuthMode) => <Pressable onPress={() => { setMode(target); setNotice(''); }}><Text style={styles.link}>{text}</Text></Pressable>;
 
   if (mode === 'welcome') return <SafeAreaView style={styles.welcomeRoot} edges={['top', 'bottom']}>
@@ -151,6 +159,7 @@ export function AuthFlow() {
           <View style={styles.labelRow}><Text style={styles.label}>MẬT KHẨU</Text><Link title="Quên mật khẩu?" onPress={() => setMode('forgot')} /></View>
           <View style={styles.passwordBox}><TextInput value={password} onChangeText={setPassword} placeholder="Nhập mật khẩu" placeholderTextColor="#929e95" secureTextEntry={!showPassword} autoCapitalize="none" style={styles.passwordInput} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 220)} onSubmitEditing={() => void submitLogin()} returnKeyType="go" /><Pressable onPress={() => setShowPassword((value) => !value)}><Text style={styles.link}>{showPassword ? 'Ẩn' : 'Hiện'}</Text></Pressable></View>
           {primary('Đăng nhập', () => void submitLogin())}
+          <Pressable disabled={busy} onPress={() => void submitGoogle()} style={({ pressed }) => [styles.fptLoginButton, busy && styles.disabled, pressed && styles.pressed]}><Text style={styles.fptLoginText}>{googleBusy ? 'Đang kết nối Google…' : 'Đăng nhập bằng Google'}</Text></Pressable>
           <View style={styles.bottomLinks}><Text style={styles.note}>Chưa có tài khoản? </Text>{nav('Đăng ký bạn đọc', 'register')}</View>
         </>}
         {mode === 'register' && <>

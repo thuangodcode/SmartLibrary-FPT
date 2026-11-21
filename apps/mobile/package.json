@@ -7,7 +7,10 @@
     "start": "expo start --lan --go",
     "android": "expo start --lan --go --android",
     "ios": "expo start --lan --go --ios",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "start:dev": "expo start --lan --dev-client",
+    "build:ios:dev": "LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 expo run:ios",
+    "build:android:dev": "expo run:android"
   },
   "dependencies": {
     "@microsoft/signalr": "^10.0.11",
@@ -15,11 +18,14 @@
     "expo-blur": "~58.0.5",
     "expo-camera": "~58.0.14",
     "expo-constants": "~58.0.14",
+    "expo-crypto": "~58.0.8",
+    "expo-dev-client": "~58.0.21",
     "expo-device": "~58.0.5",
     "expo-haptics": "~58.0.7",
     "expo-image-picker": "~58.0.10",
     "expo-secure-store": "~58.0.2",
     "expo-status-bar": "~58.0.4",
+    "expo-web-browser": "~58.1.0",
     "lucide-react-native": "^0.577.0",
     "react": "19.3.0",
     "react-native": "0.88.1",

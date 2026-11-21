@@ -32,7 +32,7 @@ function Panel({ colors, children }: { colors: Palette; children: React.ReactNod
 function Copy({ colors, children }: { colors: Palette; children: React.ReactNode }) { return <Text style={[f.copy, { color: colors.muted }]}>{children}</Text>; }
 function Heading({ colors, children }: { colors: Palette; children: React.ReactNode }) { return <Text style={[f.heading, { color: colors.ink }]}>{children}</Text>; }
 function Action({ title, colors, onPress, disabled, secondary }: { title: string; colors: Palette; onPress: () => void; disabled?: boolean; secondary?: boolean }) { return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[f.action, { backgroundColor: secondary ? colors.soft : colors.green, opacity: disabled ? .5 : 1 }]}><Text style={[f.actionText, { color: secondary ? colors.green : colors.bg }]}>{title}</Text></Pressable>; }
-function Field({ colors, value, onChangeText, placeholder, multiline, keyboardType }: { colors: Palette; value: string; onChangeText: (value: string) => void; placeholder: string; multiline?: boolean; keyboardType?: 'default' | 'email-address' | 'phone-pad' }) { return <TextInput placeholder={placeholder} placeholderTextColor={colors.muted} value={value} onChangeText={onChangeText} multiline={multiline} keyboardType={keyboardType} style={[f.field, multiline && f.multiline, { color: colors.ink, backgroundColor: colors.surface, borderColor: colors.border }]} />; }
+function Field({ colors, value, onChangeText, placeholder, multiline, keyboardType, secureTextEntry }: { colors: Palette; value: string; onChangeText: (value: string) => void; placeholder: string; multiline?: boolean; secureTextEntry?: boolean; keyboardType?: 'default' | 'email-address' | 'phone-pad' | 'numeric' }) { return <TextInput placeholder={placeholder} placeholderTextColor={colors.muted} value={value} onChangeText={onChangeText} multiline={multiline} keyboardType={keyboardType} secureTextEntry={secureTextEntry} autoCapitalize={secureTextEntry !== undefined || keyboardType === 'email-address' ? 'none' : undefined} autoCorrect={secureTextEntry !== undefined ? false : undefined} style={[f.field, multiline && f.multiline, { color: colors.ink, backgroundColor: colors.surface, borderColor: colors.border }]} />; }
 function State({ loading, error, colors, retry }: { loading: boolean; error: string; colors: Palette; retry: () => void }) { return loading ? <ActivityIndicator color={colors.green} style={{ marginVertical: 28 }} /> : error ? <Panel colors={colors}><Heading colors={colors}>Không tải được dữ liệu</Heading><Copy colors={colors}>{error}</Copy><Action title="Thử lại" colors={colors} secondary onPress={retry} /></Panel> : null; }
 
 type Notice = { id: string; title: string; message: string; isRead: boolean; createdAt: string; href?: string | null };
@@ -98,9 +98,71 @@ export function SupportRequests({ token, colors }: Props) {
   return <View style={{ gap: 12 }}><Heading colors={colors}>Tạo đơn hỗ trợ</Heading><State {...types} colors={colors} retry={types.reload} /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>{types.data?.map(item => <Pressable key={item.id} onPress={() => setTypeId(item.id)} style={[f.tag, { backgroundColor: typeId === item.id ? colors.green : colors.surface, borderColor: colors.border }]}><Text style={{ color: typeId === item.id ? colors.bg : colors.ink }}>{item.name}</Text></Pressable>)}</ScrollView><Field colors={colors} value={text} onChangeText={setText} placeholder="Nội dung cần hỗ trợ" multiline /><Pressable onPress={() => void pick()}><Text style={[f.link, { color: colors.green }]}>{attachment ? `Ảnh: ${attachment.fileName || 'Đã chọn'} (chạm để đổi)` : 'Đính kèm ảnh (không bắt buộc)'}</Text></Pressable>{attachment ? <Pressable onPress={() => setAttachment(null)}><Text style={[f.link, { color: colors.orange }]}>Bỏ ảnh</Text></Pressable> : null}<Action title={busy ? 'Đang gửi…' : 'Gửi đơn'} colors={colors} disabled={busy || !typeId || !text.trim()} onPress={() => void send()} /><Heading colors={colors}>Đơn của tôi</Heading><State {...complaints} colors={colors} retry={complaints.reload} />{complaints.data?.length ? complaints.data.map(item => <Panel key={item.id} colors={colors}><Text style={[f.itemTitle, { color: colors.ink }]}>{item.requestType} · {item.status === 'Pending' ? 'Chờ tiếp nhận' : item.status === 'InProgress' ? 'Đang xử lý' : item.status === 'Resolved' ? 'Đã phản hồi' : item.status}</Text><Copy colors={colors}>{item.content}</Copy><Text style={[f.caption, { color: colors.muted }]}>{fmt(item.createdAt)}</Text>{item.replies?.map(r => <View key={r.id} style={[f.reply, { borderColor: colors.border }]}><Text style={[f.itemTitle, { color: colors.ink }]}>{r.senderName}</Text><Copy colors={colors}>{r.message}</Copy></View>)}</Panel>) : !complaints.loading && !complaints.error ? <Copy colors={colors}>Bạn chưa gửi đơn nào.</Copy> : null}</View>;
 }
 
-type ProfileData = { id: string; email: string; fullName: string; avatarUrl: string | null; phone: string | null; studentId: string | null; teacherId: string | null; employeeId: string | null; address: string | null; dateOfBirth: string | null; frontDocUrl?: string | null; backDocUrl?: string | null; selfieDocUrl?: string | null; documentType?: string | null };
+function PasswordChange({ token, colors }: Props) {
+  const [editing, setEditing] = useState(false);
+  const [currentPassword, setCurrent] = useState('');
+  const [newPassword, setNext] = useState('');
+  const [confirmPassword, setConfirm] = useState('');
+  const [visible, setVisible] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const close = () => { setCurrent(''); setNext(''); setConfirm(''); setVisible(false); setEditing(false); };
+  const save = async () => {
+    if (busy) return;
+    if (newPassword !== confirmPassword) { Alert.alert('Không thể đổi mật khẩu', 'Mật khẩu mới và xác nhận chưa khớp.'); return; }
+    setBusy(true);
+    try {
+      await apiRequest('/api/v1/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }, token);
+      close(); Alert.alert('Đổi mật khẩu thành công');
+    } catch (error) { Alert.alert('Không thể đổi mật khẩu', err(error)); }
+    finally { setBusy(false); }
+  };
+  return <Panel colors={colors}><Heading colors={colors}>Bảo mật tài khoản</Heading>{editing ? <>
+    <Text style={[f.label, { color: colors.ink }]}>Mật khẩu hiện tại</Text><Field colors={colors} value={currentPassword} onChangeText={setCurrent} placeholder="Mật khẩu hiện tại" secureTextEntry={!visible} />
+    <Text style={[f.label, { color: colors.ink }]}>Mật khẩu mới</Text><Field colors={colors} value={newPassword} onChangeText={setNext} placeholder="Mật khẩu mới" secureTextEntry={!visible} />
+    <Text style={[f.label, { color: colors.ink }]}>Xác nhận mật khẩu mới</Text><Field colors={colors} value={confirmPassword} onChangeText={setConfirm} placeholder="Nhập lại mật khẩu mới" secureTextEntry={!visible} />
+    <Action title={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} colors={colors} secondary onPress={() => setVisible(value => !value)} />
+    <Action title={busy ? 'Đang lưu…' : 'Lưu mật khẩu'} colors={colors} disabled={busy || !currentPassword || !newPassword || !confirmPassword} onPress={() => void save()} />
+    <Action title="Hủy" colors={colors} secondary disabled={busy} onPress={close} />
+  </> : <Action title="Đổi mật khẩu" colors={colors} secondary onPress={() => setEditing(true)} />}</Panel>;
+}
+
+function ProfileEmailVerification({ token, colors, onVerified }: Props & { onVerified: () => void }) {
+  const { updateUser } = useSession();
+  const [email, setEmail] = useState(''); const [otp, setOtp] = useState('');
+  const [sent, setSent] = useState(false); const [busy, setBusy] = useState(false);
+  const send = async () => {
+    setBusy(true);
+    try {
+      await apiRequest('/api/v1/profile/email-verification/send', { method: 'POST', body: JSON.stringify({ email: email.trim() }) }, token);
+      setSent(true); Alert.alert('Đã gửi mã xác minh', 'Kiểm tra hộp thư cá nhân và thư mục thư rác.');
+    } catch (error) { Alert.alert('Không gửi được mã', err(error)); }
+    finally { setBusy(false); }
+  };
+  const verify = async () => {
+    setBusy(true);
+    try {
+      const result = await apiRequest<ProfileData>('/api/v1/profile/email-verification/verify', { method: 'POST', body: JSON.stringify({ email: email.trim(), otp: otp.trim() }) }, token);
+      if (!result.data) throw new Error('Không nhận được hồ sơ mới.');
+      await updateUser({ email: result.data.email, isVerified: result.data.isVerified });
+      onVerified(); Alert.alert('Đã xác minh và cập nhật email cá nhân');
+    } catch (error) { Alert.alert('Không xác minh được email', err(error)); }
+    finally { setBusy(false); }
+  };
+  return <Panel colors={colors}><Heading colors={colors}>Xác minh email cá nhân</Heading><Copy colors={colors}>Tài khoản được thư viện cấp đang dùng email nội bộ. Xác minh email cá nhân để cập nhật địa chỉ liên hệ của bạn.</Copy>
+    <Field colors={colors} value={email} onChangeText={value => { setEmail(value); setSent(false); setOtp(''); }} placeholder="Email cá nhân" keyboardType="email-address" />
+    <Action title={busy ? 'Đang xử lý…' : sent ? 'Gửi lại mã' : 'Gửi mã xác minh'} colors={colors} disabled={busy || !email.trim()} onPress={() => void send()} />
+    {sent ? <><Field colors={colors} value={otp} onChangeText={value => setOtp(value.replace(/\D/g, '').slice(0, 6))} placeholder="Mã xác minh 6 chữ số" keyboardType="numeric" /><Action title="Xác minh email" colors={colors} disabled={busy || otp.length !== 6} onPress={() => void verify()} /></> : null}
+  </Panel>;
+}
+
+type ProfileData = { id: string; email: string; fullName: string; avatarUrl: string | null; phone: string | null; studentId: string | null; teacherId: string | null; employeeId: string | null; address: string | null; dateOfBirth: string | null; frontDocUrl?: string | null; backDocUrl?: string | null; selfieDocUrl?: string | null; documentType?: string | null; isVerified?: boolean };
 export function Profile({ token, colors, user }: Props & { user: User }) {
   const profile = useRemote<ProfileData>('/api/v1/profile', token);
+  const { updateUser } = useSession();
+  useEffect(() => {
+    const p = profile.data;
+    if (p) void updateUser({ email: p.email, fullName: p.fullName, avatarUrl: p.avatarUrl, isVerified: p.isVerified, phone: p.phone, address: p.address, dateOfBirth: p.dateOfBirth }).catch(() => {});
+  }, [profile.data, updateUser]);
   const [editing, setEditing] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
   const [preview, setPreview] = useState<{ uri: string; label: string } | null>(null);
@@ -118,7 +180,8 @@ export function Profile({ token, colors, user }: Props & { user: User }) {
       const form = new FormData(); form.append('FullName', name.trim()); form.append('Phone', phone.trim()); form.append('Address', address.trim()); form.append('DateOfBirth', birth); form.append('ClearAvatar', String(clearAvatar));
       if (avatar) form.append('Avatar', { uri: avatar.uri, name: avatar.fileName || 'avatar.jpg', type: avatar.mimeType || 'image/jpeg' } as unknown as Blob);
       Object.entries(documents).forEach(([key, image]) => form.append(key, { uri: image.uri, name: image.fileName || `${key}.jpg`, type: image.mimeType || 'image/jpeg' } as unknown as Blob));
-      await apiRequest('/api/v1/profile', { method: 'PUT', body: form }, token, 60_000);
+      const result = await apiRequest<ProfileData>('/api/v1/profile', { method: 'PUT', body: form }, token, 60_000);
+      if (result.data) await updateUser({ email: result.data.email, fullName: result.data.fullName, avatarUrl: result.data.avatarUrl, isVerified: result.data.isVerified, phone: result.data.phone, address: result.data.address, dateOfBirth: result.data.dateOfBirth });
       cancel(); profile.reload(); Alert.alert('Đã cập nhật hồ sơ');
     } catch (e) { Alert.alert('Không cập nhật được hồ sơ', err(e)); } finally { setBusy(false); }
   };
@@ -137,6 +200,8 @@ export function Profile({ token, colors, user }: Props & { user: User }) {
   return <View style={{ gap: 12 }}>
     <State {...profile} colors={colors} retry={profile.reload} />
     {p ? <>
+      {p.email.toLowerCase().endsWith('@smartlibrary.local') ? <ProfileEmailVerification token={token} colors={colors} onVerified={profile.reload} /> : null}
+      {user.role === 'Reader' ? <Panel colors={colors}><Heading colors={colors}>{p.isVerified === false ? 'Hoàn tất xác thực tài khoản' : p.isVerified === true ? 'Tài khoản đã xác thực' : 'Thông tin xác thực'}</Heading>{p.isVerified === false ? <><Copy colors={colors}>Bổ sung số điện thoại, ngày sinh, địa chỉ và ảnh CCCD hai mặt cùng ảnh chân dung để dùng dịch vụ mượn sách và hỗ trợ.</Copy>{!editing ? <Action title="Bổ sung hồ sơ xác thực" colors={colors} onPress={begin} /> : null}</> : null}<Action title="Kiểm tra lại trạng thái" colors={colors} secondary disabled={profile.loading} onPress={profile.reload} /></Panel> : null}
       <Panel colors={colors}><View style={{ alignItems: 'center', gap: 8 }}>
         {!clearAvatar && (avatar?.uri || p.avatarUrl) ? <Image source={{ uri: avatar?.uri || p.avatarUrl || '' }} style={f.avatar} /> : <View style={[f.avatar, { backgroundColor: colors.soft, justifyContent: 'center', alignItems: 'center' }]}><Text style={{ color: colors.green, fontSize: 24, fontWeight: '700' }}>{p.fullName.split(' ').slice(-1)[0]?.charAt(0)}</Text></View>}
         <Text style={[f.itemTitle, { color: colors.ink, fontSize: 18 }]}>{p.fullName}</Text><Copy colors={colors}>{p.email}</Copy>
@@ -163,6 +228,7 @@ export function Profile({ token, colors, user }: Props & { user: User }) {
         </View>) : null}
       </Panel>
       {editing ? <><Action title={busy ? 'Đang lưu…' : 'Lưu thay đổi'} colors={colors} disabled={busy || !name.trim()} onPress={() => void save()} /><Action title="Hủy" colors={colors} secondary disabled={busy} onPress={cancel} /></> : <Action title="Chỉnh sửa hồ sơ" colors={colors} onPress={begin} />}
+      <PasswordChange token={token} colors={colors} />
       <Modal visible={!!preview} animationType="fade" onRequestClose={() => setPreview(null)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: '#101713' }} edges={['top', 'bottom']}><View style={{ padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><Text style={{ color: '#fff', fontSize: 17, fontWeight: '700', flex: 1 }}>{preview?.label}</Text><Pressable accessibilityRole="button" accessibilityLabel="Đóng ảnh" onPress={() => setPreview(null)}><Text style={{ color: '#fff', fontSize: 24, paddingHorizontal: 10 }}>✕</Text></Pressable></View>{preview ? <Image source={{ uri: preview.uri }} resizeMode="contain" style={{ flex: 1, width: '100%' }} /> : null}</SafeAreaView>
       </Modal>
