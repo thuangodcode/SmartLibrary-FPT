@@ -22,12 +22,16 @@
     },
     "plugins": [
       "expo-secure-store",
-      ["expo-camera", {
-        "cameraPermission": "Cho phép SmartLibrary quét mã QR của bản sao sách.",
-        "microphonePermission": false,
-        "recordAudioAndroid": false,
-        "barcodeScannerEnabled": true
-      }]
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Cho phép SmartLibrary quét mã QR của bản sao sách.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

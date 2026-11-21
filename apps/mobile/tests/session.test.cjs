@@ -16,7 +16,7 @@ function load(file, modules, globals = {}) {
   }, console, atob, Date, AbortController, setTimeout, clearTimeout, setInterval, clearInterval, ...globals });
   return module.exports;
 }
-async function session(initial = {}) {
+async function session(initial = {}, googleSignIn = async () => null) {
   const storage = new Map(Object.entries(initial));
   const alerts = []; const effects = []; let fetcher;
   const api = load('api.ts', { './config': { API_BASE_URL: 'http://local.test' } }, { fetch: (...args) => fetcher(...args) });
@@ -25,7 +25,7 @@ async function session(initial = {}) {
   const provider = load('session.tsx', {
     react, 'react-native': { Alert:{alert:(...args)=>alerts.push(args)}, AppState:{ currentState:'active', addEventListener:()=>({remove(){}}) } },
     'expo-secure-store': { getItemAsync:async key=>storage.get(key)??null, setItemAsync:async(key,value)=>{storage.set(key,value);}, deleteItemAsync:async key=>{storage.delete(key);} },
-    './api':api, './tokenExpiry':expiry,
+    './api':api, './tokenExpiry':expiry, './googleAuth': { googleSignIn },
   });
   const value = provider.SessionProvider({ children:null }).props.value;
   const user={id:'reader',role:'Reader',status:'Active'};
@@ -99,7 +99,7 @@ test('mobile cold start refreshes an expired access token before validating /aut
     if(path.endsWith('/refresh'))return {data:{accessToken:next,refreshToken:'rotated'}};
     assert.equal(await handler(),next);assert.equal(token,old);return {data:{user:{id:'reader',role:'Reader',status:'Active'}}};
   }};
-  const p=load('session.tsx',{react,'react-native':{Alert:{alert(){}},AppState:{}},'expo-secure-store':{getItemAsync:async k=>storage.get(k),setItemAsync:async(k,v)=>storage.set(k,v),deleteItemAsync:async k=>storage.delete(k)},'./api':api,'./tokenExpiry':load('tokenExpiry.ts',{})});
+  const p=load('session.tsx',{react,'react-native':{Alert:{alert(){}},AppState:{}},'expo-secure-store':{getItemAsync:async k=>storage.get(k),setItemAsync:async(k,v)=>storage.set(k,v),deleteItemAsync:async k=>storage.delete(k)},'./api':api,'./tokenExpiry':load('tokenExpiry.ts',{}),'./googleAuth':{googleSignIn:async()=>null}});
   p.SessionProvider({children:null});effects[0]();effects[1]();await new Promise(r=>setImmediate(r));
   assert.ok(calls.includes('/api/v1/auth/refresh'));assert.equal(storage.get('sl_access_token'),next);
 });
@@ -136,4 +136,92 @@ test('mobile negotiate waits for an in-progress forced refresh, even when old JW
  const factory=s.api.getSessionAccessToken();const next=jwt(7200);
  complete(response(200,{accessToken:next,refreshToken:'rotated'}));
  assert.equal(await factory,next);assert.equal(await forced,next);
+});
+
+
+test('mobile Google exchange saves the library profile and refresh token, including unverified status', async () => {
+  const google = { accessToken: jwt(3600), refreshToken: 'google-refresh', email: 'reader@example.test', fullName: 'Reader' };
+  const r = await session({}, async () => google);
+  r.setFetch(async (url, options) => {
+    assert.ok(url.endsWith('/auth/google/exchange'));
+    assert.equal(JSON.parse(options.body).accessToken, google.accessToken);
+    return response(200, { user: { ...r.user, isVerified: false } });
+  });
+  await r.value.signInWithGoogle();
+  assert.equal(r.storage.get('sl_refresh_token'), 'google-refresh');
+  assert.equal(JSON.parse(r.storage.get('sl_user')).isVerified, false);
+  assert.equal(await r.api.getSessionAccessToken(), google.accessToken);
+});
+
+test('mobile Google cancel and unsupported Admin never persist credentials', async () => {
+  const cancelled = await session();
+  await cancelled.value.signInWithGoogle();
+  assert.equal(cancelled.storage.size, 0);
+  const r = await session({}, async () => ({ accessToken: jwt(3600), refreshToken: 'google-refresh', email: 'admin@example.test' }));
+  r.setFetch(async () => response(200, { user: { ...r.user, role: 'Admin' } }));
+  await assert.rejects(r.value.signInWithGoogle(), /chỉ hỗ trợ/);
+  assert.equal(r.storage.size, 0);
+});
+
+test('mobile logout while Google exchange is pending cannot restore credentials', async () => {
+  const r = await session({}, async () => ({ accessToken: jwt(3600), refreshToken: 'google-refresh', email: 'reader@example.test' }));
+  let finish;
+  r.setFetch(() => new Promise(resolve => { finish = resolve; }));
+  const signingIn = r.value.signInWithGoogle();
+  await new Promise(resolve => setImmediate(resolve));
+  await r.value.signOut();
+  finish(response(200, { user: r.user }));
+  await signingIn;
+  assert.equal(r.storage.size, 0);
+});
+
+test('mobile profile refresh persists verification without losing the refresh token', async () => {
+  const r = await session();
+  await r.login(jwt(3600));
+  r.setFetch(async () => response(200, { user: { ...r.user, fullName: 'Verified Reader', isVerified: true } }));
+  await r.value.refreshUser();
+  assert.equal(JSON.parse(r.storage.get('sl_user')).isVerified, true);
+  assert.equal(r.storage.get('sl_refresh_token'), 'refresh-1');
+});
+
+test('mobile Google uses PKCE and only exchanges a code from its own callback', async () => {
+  const crypto = require('node:crypto');
+  const bytes = new Uint8Array(32).fill(5);
+  const verifier = Buffer.from(bytes).toString('hex');
+  let callback = 'smartlibrary://google-auth?code=one-time-code';
+  let fetches = 0;
+  const oauth = load('googleAuth.ts', {
+    'expo-constants': { __esModule: true, default: { executionEnvironment: 'standalone' }, ExecutionEnvironment: { StoreClient: 'storeClient' } },
+    'expo-crypto': { getRandomBytesAsync: async () => bytes, CryptoDigestAlgorithm: { SHA256: 'SHA256' }, CryptoEncoding: { BASE64: 'BASE64' }, digestStringAsync: async (_, text) => crypto.createHash('sha256').update(text).digest('base64') },
+    'expo-web-browser': { openAuthSessionAsync: async url => {
+      const params = new URL(url).searchParams;
+      assert.equal(params.get('code_challenge_method'), 's256');
+      assert.equal(params.get('code_challenge'), crypto.createHash('sha256').update(verifier).digest('base64url'));
+      return { type: 'success', url: callback };
+    } },
+  }, { process: { env: { EXPO_PUBLIC_SUPABASE_URL: 'https://auth.example.test', EXPO_PUBLIC_SUPABASE_ANON_KEY: 'public-key' } }, URL, URLSearchParams,
+    fetch: async (_, options) => {
+      fetches++;
+      assert.deepEqual(JSON.parse(options.body), { auth_code: 'one-time-code', code_verifier: verifier });
+      return new Response(JSON.stringify({ access_token: 'access', refresh_token: 'refresh', user: { email: 'reader@example.test' } }));
+    } });
+  assert.equal((await oauth.googleSignIn()).refreshToken, 'refresh');
+  callback = 'malicious://google-auth?code=one-time-code';
+  await assert.rejects(oauth.googleSignIn(), /hợp lệ/);
+  assert.equal(fetches, 1);
+});
+
+
+test('mobile unverified pending Reader can reach verification while suspended accounts stay blocked', async () => {
+  for (const status of ['PendingVerification', 'PendingDocuments', 'PendingApproval', 'Suspended']) {
+    const r = await session({}, async () => ({ accessToken: jwt(3600), refreshToken: 'google-refresh', email: 'reader@example.test' }));
+    r.setFetch(async () => response(200, { user: { ...r.user, status, isVerified: false } }));
+    if (status === 'Suspended') {
+      await assert.rejects(r.value.signInWithGoogle());
+      assert.equal(r.storage.size, 0);
+    } else {
+      await r.value.signInWithGoogle();
+      assert.equal(JSON.parse(r.storage.get('sl_user')).status, status);
+    }
+  }
 });

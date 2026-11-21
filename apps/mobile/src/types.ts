@@ -8,6 +8,10 @@ export interface User {
   role: AppRole;
   status: string;
   permissions?: string[];
+  isVerified?: boolean;
+  phone?: string | null;
+  address?: string | null;
+  dateOfBirth?: string | null;
 }
 
 export interface Book {

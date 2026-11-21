@@ -43,6 +43,9 @@ dist/
 *.tsbuildinfo
 
 # Expo
+# Generated native projects (Expo prebuild)
+/apps/mobile/ios/
+/apps/mobile/android/
 .expo/
 *.jks
 *.p8
