@@ -700,8 +700,11 @@ function LoansView() {
     }
   };
 
+  const pendingRequests = pending.filter((item) => item.status === 'Pending');
+  const acceptedRequests = pending.filter((item) => item.status === 'Approved');
+  const visibleRequests = loansView === 'accepted' ? acceptedRequests : pendingRequests;
   const pendingTerm = pendingSearch.trim().toLocaleLowerCase('vi');
-  const filteredPending = pending.filter((item) => [
+  const filteredRequests = visibleRequests.filter((item) => [
     item.readerName,
     item.readerEmail,
     item.studentId,
@@ -735,12 +738,13 @@ function LoansView() {
         label="Nội dung mượn sách"
         value={loansView}
         onChange={(value) => {
-          const nextView = value as 'pending' | 'list' | 'due';
+          const nextView = value as 'pending' | 'accepted' | 'list' | 'due';
           if (nextView === 'due') setDueLoading(true);
           setLoansView(nextView);
         }}
         tabs={[
-          { value: 'pending', label: 'Yêu cầu chờ xử lý', count: pending.length },
+          { value: 'pending', label: 'Yêu cầu chờ xử lý', count: pendingRequests.length },
+          { value: 'accepted', label: 'Đã tiếp nhận', count: acceptedRequests.length },
           { value: 'list', label: 'Danh sách mượn sách', count: list?.totalCount ?? 0 },
           { value: 'due', label: 'Sắp đến hạn', count: dueLoans.filter((l) => { const d = dayStart(l.dueDate); if (!d) return false; const r = Math.ceil((d - todayStart.getTime()) / 86400000); return r >= 0 && r <= 4; }).length },
         ]}
@@ -860,16 +864,16 @@ function LoansView() {
             )}
           </div>
         </section>
-      ) : loansView === 'pending' ? (
-      <section className="circ-card circ-pending-card" id="circ-panel-pending" role="tabpanel" aria-labelledby="circ-tab-pending" tabIndex={0}>
+      ) : loansView === 'pending' || loansView === 'accepted' ? (
+      <section className="circ-card circ-pending-card" id={`circ-panel-${loansView}`} role="tabpanel" aria-labelledby={`circ-tab-${loansView}`} tabIndex={0}>
         <div className="circ-card-head">
           <div>
-            <h2>Yêu cầu chờ xử lý</h2>
-            <p className="circ-card-subtitle">Tiếp nhận yêu cầu và xác nhận giao sách tại quầy.</p>
+            <h2>{loansView === 'accepted' ? 'Đã tiếp nhận' : 'Yêu cầu chờ xử lý'}</h2>
+            <p className="circ-card-subtitle">{loansView === 'accepted' ? 'Các yêu cầu đã được thủ thư tiếp nhận, chờ giao sách tại quầy.' : 'Tiếp nhận yêu cầu và xác nhận giao sách tại quầy.'}</p>
           </div>
           <div className="circ-pending-tools">
-            <span className="circ-count">{filteredPending.length} / {pending.length} yêu cầu</span>
-            <Link className="circ-btn circ-btn--primary" to="/librarian/circulation/direct-borrow">Mượn tại quầy</Link>
+            <span className="circ-count">{filteredRequests.length} / {visibleRequests.length} yêu cầu</span>
+            {loansView === 'pending' && <Link className="circ-btn circ-btn--primary" to="/librarian/circulation/direct-borrow">Mượn tại quầy</Link>}
           </div>
         </div>
         <div className="circ-pending-search">
@@ -878,10 +882,10 @@ function LoansView() {
             onSearch={setPendingSearch}
           />
         </div>
-        {loading && !pending.length ? (
+        {loading && !visibleRequests.length ? (
           <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải yêu cầu...</p>
-        ) : !filteredPending.length ? (
-          <p className="circ-empty">{pendingSearch.trim() ? 'Không tìm thấy yêu cầu phù hợp.' : 'Không có yêu cầu chờ xử lý.'}</p>
+        ) : !filteredRequests.length ? (
+          <p className="circ-empty">{pendingSearch.trim() ? 'Không tìm thấy yêu cầu phù hợp.' : loansView === 'accepted' ? 'Chưa có yêu cầu nào được tiếp nhận.' : 'Không có yêu cầu chờ xử lý.'}</p>
         ) : (
           <div className="circ-table-wrap circ-request-table-wrap">
             <table className="circ-table circ-request-table">
@@ -896,7 +900,7 @@ function LoansView() {
                 </tr>
               </thead>
               <tbody>
-                {filteredPending.map((item) => (
+                {filteredRequests.map((item) => (
                   <tr key={item.id}>
                     <td>
                       <span className="circ-reader">

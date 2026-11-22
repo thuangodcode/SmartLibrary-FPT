@@ -425,7 +425,7 @@ const BookDetailPage = () => {
               {bookFieldLabels.location !== '' && book.copyLocations !== undefined && (
                 <div className="book-detail-fact-location">
                   <dt><MapPin size={16} /> {bookFieldLabels.location || 'Vị trí kệ'}</dt>
-                  <dd>{book.copyLocations.join(' · ') || 'Chưa xếp kệ'}</dd>
+                  <dd>{book.copyLocations[0] || 'Chưa xếp kệ'}</dd>
                 </div>
               )}
               {Object.entries(book.customFields ?? {}).filter((entry) => Boolean(entry[1]?.trim()) && bookFieldLabels[entry[0]] !== '').map(([key, value]) => (
