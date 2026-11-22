@@ -503,7 +503,7 @@ function LoansView() {
   const [rejecting, setRejecting] = useState<CirculationLoan | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [renewConfirm, setRenewConfirm] = useState(false);
-  const [loansView, setLoansView] = useState<'pending' | 'list' | 'due'>('pending');
+  const [loansView, setLoansView] = useState<'pending' | 'accepted' | 'list' | 'due'>('pending');
   const [dueLoans, setDueLoans] = useState<CirculationLoan[]>([]);
   const [dueLoading, setDueLoading] = useState(false);
   const [dueError, setDueError] = useState<string | null>(null);
