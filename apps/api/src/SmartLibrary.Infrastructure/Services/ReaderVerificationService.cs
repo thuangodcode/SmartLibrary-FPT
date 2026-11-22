@@ -12,7 +12,7 @@ public static class ReaderVerificationService
         var profile = await db.UserProfiles.AsNoTracking()
             .FirstOrDefaultAsync(user => user.Id == readerId, cancellationToken);
         if (profile is null || !profile.IsActive || profile.IsDeleted
-            || profile.Status == AccountStatus.Suspended)
+            || profile.Status != AccountStatus.Active)
             return false;
 
         if (await db.RegistrationRequests.AsNoTracking().AnyAsync(

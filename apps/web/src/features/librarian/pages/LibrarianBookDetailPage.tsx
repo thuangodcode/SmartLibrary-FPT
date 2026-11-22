@@ -28,6 +28,13 @@ import './LibrarianBookDetailPage.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5278';
 
+const formatVndInput = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};
+
+const parseVndInput = (value: string) => value.replace(/\D/g, '');
+
 export interface BookDetailData {
   id: string;
   code: string;
@@ -38,6 +45,7 @@ export interface BookDetailData {
   coverImageUrl?: string | null;
   publishedYear?: number | null;
   language?: string;
+  price: number;
   totalCopies: number;
   availableCopies: number;
   averageRating: number;
@@ -114,6 +122,7 @@ const LibrarianBookDetailPage: React.FC = () => {
   const [editLanguage, setEditLanguage] = useState('vi');
   const [editCustomLanguage, setEditCustomLanguage] = useState('');
   const [editTotalCopies, setEditTotalCopies] = useState(1);
+  const [editPrice, setEditPrice] = useState('0');
   const [editCategoryIds, setEditCategoryIds] = useState<string[]>([]);
   const [editDescription, setEditDescription] = useState('');
   const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
@@ -221,6 +230,7 @@ const LibrarianBookDetailPage: React.FC = () => {
     setEditLanguage(book.language && knownLanguages.includes(book.language) ? book.language : 'custom');
     setEditCustomLanguage(book.language && !knownLanguages.includes(book.language) ? book.language : '');
     setEditTotalCopies(book.totalCopies);
+    setEditPrice(formatVndInput(String(book.price ?? 0)));
     setEditDescription(book.description || '');
     setEditCoverFile(null);
     setEditCoverPreview(book.coverImageUrl || null);
@@ -285,6 +295,7 @@ const LibrarianBookDetailPage: React.FC = () => {
       }
       formData.append('Language', language);
       formData.append('TotalCopies', String(editTotalCopies));
+      formData.append('Price', parseVndInput(editPrice) || '0');
       if (editCategoryIds.length === 0) throw new Error('Vui lòng chọn ít nhất một danh mục.');
       editCategoryIds.forEach(categoryId => formData.append('CategoryIds', categoryId));
       if (editDescription.trim()) formData.append('Description', editDescription.trim());
@@ -305,6 +316,12 @@ const LibrarianBookDetailPage: React.FC = () => {
         throw new Error(json?.error || json?.message || 'Không thể cập nhật đầu sách.');
       }
 
+      const savedBook = (json?.data ?? json?.Data) as BookDetailData | undefined;
+      if (!savedBook || Number(savedBook.price) !== Number(parseVndInput(editPrice) || 0)) {
+        throw new Error('Máy chủ chưa xác nhận giá mới đã được lưu. Vui lòng tải lại trang và kiểm tra cấu hình database/migration.');
+      }
+      setBook(savedBook);
+
       showToast({
         type: 'success',
         title: 'Cập nhật thành công',
@@ -312,7 +329,7 @@ const LibrarianBookDetailPage: React.FC = () => {
       });
 
       setIsEditModalOpen(false);
-      fetchBookDetails();
+      void fetchBookDetails();
       setCopiesPage(1);
       setCopiesRefreshKey((current) => current + 1);
     } catch (err: unknown) {
@@ -548,6 +565,11 @@ const LibrarianBookDetailPage: React.FC = () => {
             </div>
 
             <div className="lib-book-meta-card">
+              <span className="lib-book-meta-label">Giá tiền cuốn sách</span>
+              <span className="lib-book-meta-value">{new Intl.NumberFormat('vi-VN').format(book.price ?? 0)} đ</span>
+            </div>
+
+            <div className="lib-book-meta-card">
               <span className="lib-book-meta-label">Đánh giá</span>
               <span className="lib-book-meta-value">
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#f59e0b' }}>
@@ -674,7 +696,7 @@ const LibrarianBookDetailPage: React.FC = () => {
 
       {/* ─── Modal 2: Edit Book Modal ─── */}
       {isEditModalOpen && (
-        <div className="lib-cat-modal-overlay" onClick={() => setIsEditModalOpen(false)}>
+        <div className="lib-cat-modal-overlay">
           <div
             className="lib-cat-modal-content edit-book-modal"
             onClick={(e) => e.stopPropagation()}
@@ -797,6 +819,12 @@ const LibrarianBookDetailPage: React.FC = () => {
                 <small>
                   Tăng số lượng sẽ tạo mã bản sao mới. Chỉ có thể giảm số lượng bằng các bản sao đang sẵn sàng thu hồi.
                 </small>
+              </div>
+
+              <div className="lib-cat-form-group">
+                <label htmlFor="book-edit-price">Giá tiền cuốn sách (đồng)</label>
+                <input id="book-edit-price" type="text" inputMode="numeric" maxLength={17} value={editPrice} onChange={event => setEditPrice(formatVndInput(event.target.value))} placeholder="Ví dụ: 5.000.000" required />
+                <small>Giá trị quản lý tài sản, tách biệt với phí dịch vụ mượn/gia hạn.</small>
               </div>
 
               <div className="lib-cat-form-group">

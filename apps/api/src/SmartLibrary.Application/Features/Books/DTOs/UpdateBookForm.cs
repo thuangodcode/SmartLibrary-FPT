@@ -12,6 +12,7 @@ public class UpdateBookForm
     public int? PublishedYear { get; set; }
     public string Language { get; set; } = "vi";
     public int? PageCount { get; set; }
+    public decimal? Price { get; set; }
     public int? TotalCopies { get; set; }
     public string? Location { get; set; }
     public Guid? CategoryId { get; set; }

@@ -127,6 +127,8 @@ public class BookService
         {
             return Result<BookDto>.Failure("Số lượng bản sao phải từ 1 đến 500.");
         }
+        if (form.Price is null or < 0 or > 1_000_000_000_000m)
+            return Result<BookDto>.Failure("Giá tiền phải từ 0 đến 1.000.000.000.000 đồng.");
 
         var copies = form.TotalCopies;
         var location = string.IsNullOrWhiteSpace(form.Location) ? null : form.Location.Trim();
@@ -184,6 +186,7 @@ public class BookService
             PublishedYear = form.PublishedYear,
             Language = string.IsNullOrWhiteSpace(form.Language) ? "vi" : form.Language.Trim(),
             PageCount = form.PageCount,
+            Price = form.Price,
             TotalCopies = copies,
             AvailableCopies = shelfQuantity,
             AverageRating = 0m,
@@ -275,6 +278,8 @@ public class BookService
             return Result<BookDto>.Failure("Vị trí lưu trữ không được vượt quá 255 ký tự.");
         }
         var requestedTotalCopies = form.TotalCopies ?? book.TotalCopies;
+        if (form.Price is < 0 or > 1_000_000_000_000m)
+            return Result<BookDto>.Failure("Giá tiền phải từ 0 đến 1.000.000.000.000 đồng.");
         if (requestedTotalCopies is < 1 or > 500)
         {
             return Result<BookDto>.Failure("Số lượng bản sao phải từ 1 đến 500.");
@@ -340,6 +345,7 @@ public class BookService
         book.PublishedYear = form.PublishedYear;
         book.Language = string.IsNullOrWhiteSpace(form.Language) ? "vi" : form.Language.Trim();
         book.PageCount = form.PageCount;
+        if (form.Price.HasValue) book.Price = form.Price.Value;
         if (form.RemoveCoverImage)
         {
             book.CoverImageUrl = null;

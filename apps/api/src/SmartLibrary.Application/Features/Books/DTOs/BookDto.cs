@@ -16,6 +16,7 @@ public class BookDto
     public int? PublishedYear { get; set; }
     public string Language { get; set; } = string.Empty;
     public int? PageCount { get; set; }
+    public decimal? Price { get; set; }
     public int TotalCopies { get; set; }
     public int AvailableCopies { get; set; }
     public decimal AverageRating { get; set; }

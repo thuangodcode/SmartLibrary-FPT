@@ -184,7 +184,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           !response.ok ||
           !result?.success ||
           !user?.id ||
-          user.status !== 'Active' ||
+          !['Active', 'PendingVerification', 'PendingActivation', 'PendingDocuments', 'PendingApproval', 'Rejected'].includes(user.status) ||
           !['Admin', 'Librarian', 'Reader'].includes(user.role)
         ) {
           throw new Error('The saved session is no longer valid.');

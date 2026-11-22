@@ -24,7 +24,7 @@ public interface ICirculationRepository
     Task<bool> HasActiveLoanAsync(Guid copyId, Guid? exceptLoanId, CancellationToken ct);
     Task<int> CountActiveLoansAsync(Guid readerId, Guid? exceptLoanId, CancellationToken ct);
     Task<bool> HasOverdueLoansAsync(Guid readerId, DateTime asOfUtc, CancellationToken ct);
-    Task<bool> HasUnpaidFinesAsync(Guid readerId, CancellationToken ct);
+    Task<bool> HasUnpaidFinesAsync(Guid readerId, CancellationToken ct, Guid? exceptBorrowRecordId = null);
     Task<int> CountPickupRequestsAsync(DateTime pickupAt, CancellationToken ct);
     Task<IReadOnlyDictionary<DateTime, int>> GetPickupRequestCountsAsync(IReadOnlyList<DateTime> pickupTimes, CancellationToken ct);
     Task LockBorrowReaderAsync(Guid readerId, CancellationToken ct);

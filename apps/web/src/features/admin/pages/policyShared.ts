@@ -133,11 +133,13 @@ export const DEFAULT_PARAMS: Record<PolicyType, PolicyParameter[]> = {
     { key: 'block_if_overdue', value: 'true', label: 'Chặn mượn khi còn sách quá hạn' },
   ],
   BorrowDuration: [
+    { key: 'external_borrow_fee', value: '', label: 'Phí mượn mỗi cuốn cho độc giả ngoài trường (đồng)' },
     { key: 'max_days', value: '', label: 'Số ngày mượn theo chính sách' },
     { key: 'max_days_vi', value: '', label: 'Sách tiếng Việt (chỉ dùng khi chưa đặt số ngày chung)' },
     { key: 'max_days_foreign', value: '', label: 'Sách ngoại văn (chỉ dùng khi chưa đặt số ngày chung)' },
   ],
   Renewal: [
+    { key: 'external_renewal_fee', value: '', label: 'Phí gia hạn mỗi lần cho độc giả ngoài trường (đồng)' },
     { key: 'max_renewals', value: '', label: 'Số lần gia hạn tối đa' },
     { key: 'renewal_days', value: '', label: 'Số ngày mỗi lần gia hạn' },
     { key: 'self_renew_before_days', value: '', label: 'Tự gia hạn trước hạn (ngày)' },
@@ -178,6 +180,7 @@ const COUNT_KEYS = new Set([
 ]);
 const FEE_KEYS = new Set([
   'overdue_fee_per_day', 'damage_fee', 'damaged_book_fee', 'lost_book_fee', 'lost_fee',
+  'external_borrow_fee', 'external_renewal_fee',
 ]);
 const FLAG_KEYS = new Set([
   'block_if_overdue', 'block_if_reserved', 'restrict_if_unpaid',
@@ -374,6 +377,8 @@ export function buildSummaryCards(parameters: PolicyParameter[]): SummaryCard[] 
   take('overdue_fee_per_day', 'đ/ngày', 'Phạt quá hạn', formatFee);
   take('damage_fee', 'đ', 'Phí hư hỏng nhẹ', formatFee);
   take('lost_book_fee', 'đ', 'Phí hư nặng / mất sách', formatFee);
+  take('external_borrow_fee', 'đ/cuốn', 'Phí mượn ngoài trường', formatFee);
+  take('external_renewal_fee', 'đ/lần', 'Phí gia hạn ngoài trường', formatFee);
   take('hold_hours', 'giờ', 'Thời gian giữ sách');
   take('pickup_deadline_hours', 'giờ', 'Hạn nhận sách');
   return cards.slice(0, 3);

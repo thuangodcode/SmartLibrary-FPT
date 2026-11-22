@@ -218,6 +218,7 @@ public class CirculationService
                 Notes = "Thủ thư lập phiếu tại quầy."
             };
             await _repository.AddLoanAsync(loan, ct);
+            await AddExternalServiceFeeAsync(loan, currentReader, currentSettings, renewal: false, ct);
             await CompleteReservationAsync(reader.Id, copy.BookId, now, ct);
             await NotifyAsync(reader.Id, "Đã mượn sách",
                 $"Bạn đã mượn “{copy.Book?.Title}”. Bắt đầu: {FormatPickup(loan.BorrowDate)}. Hạn trả: {FormatPickup(loan.DueDate)}.", "borrow", ct, entityId: loan.Id);
@@ -503,6 +504,7 @@ public class CirculationService
             loan.LibrarianId = librarianId == Guid.Empty ? loan.LibrarianId : librarianId;
             loan.BorrowDate = now;
             loan.DueDate = now.AddDays(borrowDays);
+            await AddExternalServiceFeeAsync(loan, reader, settings, renewal: false, ct);
             await CompleteReservationAsync(loan.ReaderId, loan.BookCopy.BookId, now, ct);
             var student = string.IsNullOrWhiteSpace(reader.StudentId) ? "Chưa có mã sinh viên" : reader.StudentId;
             await NotifyAsync(loan.ReaderId, "Đã hoàn tất mượn sách",
@@ -588,9 +590,13 @@ public class CirculationService
                 return Result<CirculationLoanDto>.Failure(missingDays);
             var oldDue = loan.DueDate;
             var baseDate = loan.DueDate.HasValue && loan.DueDate.Value > now ? loan.DueDate.Value : now;
+            var renewalReader = await _repository.FindReaderAsync(loan.ReaderId.ToString(), ct);
+            if (renewalReader is null)
+                return Result<CirculationLoanDto>.Failure("Không tìm thấy hồ sơ độc giả của phiếu mượn.");
             loan.DueDate = baseDate.AddDays(days);
             loan.RenewalCount += 1;
             loan.Status = BorrowStatus.Borrowed;
+            await AddExternalServiceFeeAsync(loan, renewalReader, settings, renewal: true, ct);
             loan.Notes = AppendNote(loan.Notes, byLibrarian
                 ? $"Thủ thư gia hạn lần {loan.RenewalCount}: {FormatDue(oldDue)} → {FormatDue(loan.DueDate)}, +{days} ngày."
                 : $"Tự gia hạn lần {loan.RenewalCount}: {FormatDue(oldDue)} → {FormatDue(loan.DueDate)}, +{days} ngày.");
@@ -1457,7 +1463,7 @@ public class CirculationService
         var accountError = CirculationRules.ValidateBorrower(reader.Status, reader.IsActive, reader.MembershipExpiresAt, now);
         if (accountError is not null)
             return accountError;
-        if (settings.RestrictIfUnpaid && await _repository.HasUnpaidFinesAsync(reader.Id, ct))
+        if (settings.RestrictIfUnpaid && await _repository.HasUnpaidFinesAsync(reader.Id, ct, exceptLoanId))
             return "Độc giả còn phí chưa thanh toán nên bị hạn chế mượn. Vẫn có thể xem khoản phí.";
         if (settings.BlockBorrowIfOverdue && await _repository.HasOverdueLoansAsync(reader.Id, now, ct))
             return "Độc giả còn sách quá hạn nên chưa thể mượn thêm.";
@@ -1624,6 +1630,25 @@ public class CirculationService
             Status = FineStatus.Pending,
             Notes = notes
         };
+
+    private async Task AddExternalServiceFeeAsync(
+        BorrowRecord loan, UserProfile reader, CirculationSettings settings, bool renewal, CancellationToken ct)
+    {
+        var amount = CirculationRules.ServiceFee(settings, reader.ReaderType, renewal);
+        if (amount <= 0) return;
+        var reason = renewal ? "Phí gia hạn sách" : "Phí mượn sách";
+        var unit = renewal ? "lần gia hạn" : "lượt mượn";
+        var policyKey = renewal ? "external_renewal_fee" : "external_borrow_fee";
+        await _repository.AddFineAsync(NewFine(
+            loan.Id,
+            reader.Id,
+            amount,
+            reason,
+            $"Phí dịch vụ {unit} cho độc giả bên ngoài trường. Mức phí tại thời điểm phát sinh: {amount:0.##}đ ({policyKey})."), ct);
+        await NotifyAsync(reader.Id, "Khoản phí dịch vụ thư viện mới",
+            $"{reason} là {amount:0.##}đ. Bạn có thể thanh toán trong mục Lịch sử mượn.",
+            "fine", ct, entityId: loan.Id);
+    }
 
     private static void MarkBorrowed(BookCopy copy)
     {

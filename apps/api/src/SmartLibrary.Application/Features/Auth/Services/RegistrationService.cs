@@ -133,13 +133,6 @@ public class RegistrationService : IRegistrationService
     {
         var req = await _unitOfWork.Repository<RegistrationRequest>().Query().Include(r => r.User).FirstOrDefaultAsync(r => r.Id == id);
         if (req == null) throw new Exception("Không tìm thấy đơn đăng ký.");
-        if (req.Status == RegistrationRequestStatus.Approved)
-        {
-            req.User.Status = AccountStatus.Active;
-            req.User.ReaderType = ReaderType.External;
-            await _unitOfWork.SaveChangesAsync();
-            return;
-        }
         if (req.Status != RegistrationRequestStatus.Submitted) 
             throw new Exception("Đơn đăng ký không ở trạng thái chờ duyệt.");
 
@@ -218,19 +211,43 @@ public class RegistrationService : IRegistrationService
         var user = await _unitOfWork.Repository<UserProfile>().GetByIdAsync(userId);
         if (user == null || user.Status != AccountStatus.PendingDocuments) throw new Exception("Invalid user state");
 
-        var request = new RegistrationRequest
+        var request = await _unitOfWork.Repository<RegistrationRequest>().Query()
+            .Include(r => r.Documents)
+            .Where(r => r.UserId == userId && r.Status == RegistrationRequestStatus.NeedMoreInfo)
+            .OrderByDescending(r => r.SubmittedAt)
+            .FirstOrDefaultAsync();
+        if (request is null)
         {
-            UserId = userId,
-            DocumentType = documentType,
-            Status = RegistrationRequestStatus.Submitted
-        };
-        await _unitOfWork.Repository<RegistrationRequest>().AddAsync(request);
-        await _unitOfWork.SaveChangesAsync(); // to get request.Id
+            request = new RegistrationRequest
+            {
+                UserId = userId,
+                DocumentType = documentType,
+                Status = RegistrationRequestStatus.Submitted,
+                AttemptNo = await _unitOfWork.Repository<RegistrationRequest>().Query().CountAsync(r => r.UserId == userId) + 1,
+                SubmittedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.Repository<RegistrationRequest>().AddAsync(request);
+            await _unitOfWork.SaveChangesAsync(); // to get request.Id
+        }
+        else
+        {
+            request.DocumentType = documentType;
+            request.Status = RegistrationRequestStatus.Submitted;
+            request.SubmittedAt = DateTime.UtcNow;
+            request.ReviewedById = null;
+            request.ReviewedAt = null;
+            request.RejectReason = null;
+            request.Note = null;
+        }
 
         var docs = new List<IdentityDocument>();
         if (front != null) docs.Add(await ProcessDocument(front, request.Id, userId, DocumentSide.Front));
         if (back != null) docs.Add(await ProcessDocument(back, request.Id, userId, DocumentSide.Back));
         if (selfie != null) docs.Add(await ProcessDocument(selfie, request.Id, userId, DocumentSide.Selfie));
+
+        var sides = request.Documents.Where(d => !d.IsDeleted).Select(d => d.Side).Concat(docs.Select(d => d.Side)).Distinct().ToHashSet();
+        if (!sides.Contains(DocumentSide.Front) || !sides.Contains(DocumentSide.Back) || !sides.Contains(DocumentSide.Selfie))
+            throw new Exception("Vui lòng gửi đủ ảnh mặt trước, mặt sau và ảnh chân dung.");
 
         foreach (var d in docs)
         {

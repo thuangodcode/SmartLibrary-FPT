@@ -80,7 +80,7 @@ export const LoginPage: React.FC = () => {
         }, session.access_token, account.permissions || []);
         await supabase.auth.signOut();
         window.history.replaceState({}, document.title, window.location.pathname);
-        navigate(account.role === 'Admin' ? '/admin' : account.role === 'Librarian' ? '/librarian' : redirect || '/');
+        navigate(account.role === 'Admin' ? '/admin' : account.role === 'Librarian' ? '/librarian' : account.status === 'Active' ? (redirect || '/') : '/profile');
       } catch (error) {
         setGoogleError(error instanceof Error ? error.message : 'Kh\u00f4ng th\u1ec3 ho\u00e0n t\u1ea5t \u0111\u0103ng nh\u1eadp Google.');
         await supabase.auth.signOut();
@@ -143,7 +143,7 @@ export const LoginPage: React.FC = () => {
       const account = resData.data?.user;
       const accessToken = resData.data?.accessToken;
       const role = account?.role;
-      if (!account?.id || !accessToken || account.status !== 'Active' || !['Admin', 'Librarian', 'Reader'].includes(role || '')) {
+      if (!account?.id || !accessToken || !['Active', 'PendingVerification', 'PendingActivation', 'PendingDocuments', 'PendingApproval', 'Rejected'].includes(account.status || '') || !['Admin', 'Librarian', 'Reader'].includes(role || '')) {
         showToast({ type: 'error', title: 'Kh\u00f4ng th\u1ec3 \u0111\u0103ng nh\u1eadp', message: 'T\u00e0i kho\u1ea3n ch\u01b0a \u0111\u01b0\u1ee3c c\u1ea5p quy\u1ec1n h\u1ee3p l\u1ec7.' });
         return;
       }
@@ -167,6 +167,7 @@ export const LoginPage: React.FC = () => {
       });
       if (role === 'Admin') navigate(redirect?.startsWith('/admin') ? redirect : '/admin');
       else if (role === 'Librarian') navigate(redirect?.startsWith('/librarian') ? redirect : '/librarian');
+      else if (account.status !== 'Active') navigate('/profile');
       else navigate(redirect && !redirect.startsWith('/admin') && !redirect.startsWith('/librarian') ? redirect : '/');
     } catch {
       showToast({ type: 'error', title: 'L\u1ed7i k\u1ebft n\u1ed1i', message: 'Kh\u00f4ng th\u1ec3 k\u1ebft n\u1ed1i Backend API. Vui l\u00f2ng ki\u1ec3m tra d\u1ecbch v\u1ee5 Backend.' });

@@ -42,7 +42,7 @@ public sealed class UserProfileService(
 
         var isVerified = await ReaderVerificationService.IsVerifiedAsync(dbContext, userId, cancellationToken);
 
-        return Map(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl, reg?.DocumentType.ToString(), isVerified);
+        return Map(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl, reg?.DocumentType.ToString(), isVerified, reg?.Status.ToString());
     }
 
     public async Task<UserProfileResponse?> UpdateAsync(
@@ -93,7 +93,7 @@ public sealed class UserProfileService(
             .FirstOrDefaultAsync(cancellationToken);
 
         var isVerified = await ReaderVerificationService.IsVerifiedAsync(dbContext, userId, cancellationToken);
-        return Map(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl, reg?.DocumentType.ToString(), isVerified);
+        return Map(profile, reg?.FrontDocUrl, reg?.BackDocUrl, reg?.SelfieDocUrl, reg?.DocumentType.ToString(), isVerified, reg?.Status.ToString());
     }
 
     public async Task<string> SendEmailVerificationOtpAsync(
@@ -221,7 +221,8 @@ public sealed class UserProfileService(
         string? backDocUrl = null,
         string? selfieDocUrl = null,
         string? documentType = null,
-        bool isVerified = false) => new(
+        bool isVerified = false,
+        string? registrationStatus = null) => new(
         profile.Id,
         profile.Email,
         profile.FullName,
@@ -237,7 +238,9 @@ public sealed class UserProfileService(
         backDocUrl,
         selfieDocUrl,
         documentType,
-        isVerified);
+        isVerified,
+        profile.Status.ToString(),
+        registrationStatus);
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

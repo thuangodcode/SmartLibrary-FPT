@@ -147,13 +147,25 @@ public class AuthController : ControllerBase
                 Id = id, Email = identity.Email.Trim().ToLowerInvariant(),
                 FullName = string.IsNullOrWhiteSpace(request.FullName) ? identity.Email.Split('@')[0] : request.FullName.Trim(),
                 AvatarUrl = request.AvatarUrl, RoleId = role.Id, Role = role,
-                Status = SmartLibrary.Domain.Enums.AccountStatus.Active, IsActive = true
+                Status = SmartLibrary.Domain.Enums.AccountStatus.PendingDocuments, IsActive = true
             };
             _db.UserProfiles.Add(profile);
             await _db.SaveChangesAsync(ct);
         }
         else if (!profile.IsActive || profile.IsDeleted || profile.Status == SmartLibrary.Domain.Enums.AccountStatus.Suspended)
             return StatusCode(403, ApiResponse<object>.Fail("Tài khoản đã bị tạm ngưng."));
+
+        if (profile.Status == SmartLibrary.Domain.Enums.AccountStatus.Active
+            && profile.Role.Name == "Reader"
+            && profile.StudentId is null && profile.TeacherId is null && profile.EmployeeId is null
+            && !await _db.RegistrationRequests.AnyAsync(request => request.UserId == profile.Id
+                && request.Status == SmartLibrary.Domain.Enums.RegistrationRequestStatus.Approved, ct)
+            && (string.IsNullOrWhiteSpace(profile.Phone) || string.IsNullOrWhiteSpace(profile.Address)
+                || profile.DateOfBirth is null))
+        {
+            profile.Status = SmartLibrary.Domain.Enums.AccountStatus.PendingDocuments;
+            await _db.SaveChangesAsync(ct);
+        }
 
         var permissions = await _db.UserProfiles.Where(x => x.Id == profile.Id)
             .SelectMany(x => x.Role.RolePermissions).Select(x => x.Permission.Code).ToListAsync(ct);
@@ -172,10 +184,11 @@ public class AuthController : ControllerBase
         var json = System.Text.Json.JsonSerializer.SerializeToElement(userProfile);
         if (!json.TryGetProperty("email", out var emailElement) || !json.TryGetProperty("isVerified", out _)) return userProfile;
         var verified = await ReaderVerificationService.IsVerifiedAsync(_db, id, HttpContext.RequestAborted);
+        var account = await _db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, HttpContext.RequestAborted);
         return new { id, email = emailElement.GetString(), fullName = json.TryGetProperty("fullName", out var name) ? name.GetString() : null,
             avatarUrl = json.TryGetProperty("avatarUrl", out var avatar) ? avatar.GetString() : null,
             role = json.TryGetProperty("role", out var role) ? role.GetString() : null,
-            status = json.TryGetProperty("status", out var status) ? status.GetString() : null,
+            status = account?.Status.ToString() ?? (json.TryGetProperty("status", out var status) ? status.GetString() : null),
             permissions = json.TryGetProperty("permissions", out var permissions) ? permissions : default,
             isVerified = verified,
             phone = json.TryGetProperty("phone", out var phone) ? phone.GetString() : null,

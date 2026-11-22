@@ -32,6 +32,8 @@ interface UserProfile {
   selfieDocUrl?: string | null;
   documentType?: string | null;
   isVerified?: boolean;
+  accountStatus?: string | null;
+  registrationStatus?: string | null;
 }
 
 const roleLabels: Record<string, string> = {
@@ -143,6 +145,7 @@ const ProfilePage: React.FC = () => {
           setAddress(result.data.address || '');
           updateUser({
             isVerified: result.data.isVerified,
+            status: result.data.accountStatus ?? undefined,
             phone: result.data.phone ?? undefined,
             address: result.data.address ?? undefined,
             dateOfBirth: result.data.dateOfBirth ?? undefined,
@@ -242,7 +245,7 @@ const ProfilePage: React.FC = () => {
       }
 
       setProfile(result.data);
-      setAuth({ ...currentUser, fullName: result.data.fullName, avatarUrl: result.data.avatarUrl ?? undefined, isVerified: result.data.isVerified, phone: result.data.phone ?? undefined, address: result.data.address ?? undefined, dateOfBirth: result.data.dateOfBirth ?? undefined }, accessToken, permissions);
+      setAuth({ ...currentUser, fullName: result.data.fullName, avatarUrl: result.data.avatarUrl ?? undefined, isVerified: result.data.isVerified, status: result.data.accountStatus ?? currentUser.status, phone: result.data.phone ?? undefined, address: result.data.address ?? undefined, dateOfBirth: result.data.dateOfBirth ?? undefined }, accessToken, permissions);
       setFullName(result.data.fullName || '');
       setPhone(result.data.phone || '');
       setDateOfBirth(result.data.dateOfBirth || '');
@@ -262,7 +265,9 @@ const ProfilePage: React.FC = () => {
         accessToken,
         permissions,
       );
-      setNotice('Hồ sơ của bạn đã được cập nhật thành công.');
+      setNotice(frontDocFile || backDocFile || selfieDocFile
+        ? 'Giấy tờ đã được gửi. Tài khoản sẽ được duyệt sau khi thủ thư kiểm tra hồ sơ.'
+        : 'Hồ sơ cá nhân đã được cập nhật thành công.');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Không thể cập nhật hồ sơ cá nhân.');
     } finally {
@@ -399,6 +404,9 @@ const ProfilePage: React.FC = () => {
 
       {visibleError && <div className="profile-message profile-message--error" role="alert"><AlertCircle size={17} />{visibleError}</div>}
       {notice && <div className="profile-message profile-message--success" role="status"><Check size={17} />{notice}</div>}
+      {profile?.registrationStatus === 'Submitted' && <div className="profile-message profile-message--verification" role="status">
+        <ShieldCheck size={18} /><div><strong>Hồ sơ đang chờ thủ thư duyệt</strong><br />Bạn đã gửi thông tin và giấy tờ. Tài khoản chỉ được kích hoạt sau khi thủ thư phê duyệt.</div>
+      </div>}
 
       {profile?.email.toLowerCase().endsWith('@smartlibrary.local') && (
         <section className="profile-email-verification">

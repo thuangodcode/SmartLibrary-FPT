@@ -10,6 +10,7 @@ public sealed class BookCatalogItem
     public string? Language { get; init; }
     public string? CoverImageUrl { get; init; }
     public int? PublishedYear { get; init; }
+    public decimal? Price { get; init; }
     public int AvailableCopies { get; init; }
     public int TotalCopies { get; init; }
     public IReadOnlyList<string> Authors { get; init; } = Array.Empty<string>();

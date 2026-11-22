@@ -16,6 +16,7 @@ public class CreateBookRequest
     public int? PublishedYear { get; set; }
     public string Language { get; set; } = "vi";
     public int? PageCount { get; set; }
+    public decimal? Price { get; set; }
     public List<Guid> AuthorIds { get; set; } = new();
     public List<Guid> CategoryIds { get; set; } = new();
 }

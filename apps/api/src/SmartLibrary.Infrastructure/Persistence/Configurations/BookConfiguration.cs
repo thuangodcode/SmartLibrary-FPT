@@ -25,6 +25,7 @@ public class BookConfiguration : IEntityTypeConfiguration<Book>
         builder.Property(b => b.PublishedYear).HasColumnName("published_year");
         builder.Property(b => b.Language).HasColumnName("language").HasMaxLength(10).HasDefaultValue("vi");
         builder.Property(b => b.PageCount).HasColumnName("page_count");
+        builder.Property(b => b.Price).HasColumnName("price").HasPrecision(18, 2);
         builder.Property(b => b.TotalCopies).HasColumnName("total_copies").HasDefaultValue(0);
         builder.Property(b => b.AvailableCopies).HasColumnName("available_copies").HasDefaultValue(0);
         builder.Property(b => b.AverageRating).HasColumnName("average_rating").HasColumnType("decimal(3,2)").HasDefaultValue(0m);

@@ -30,5 +30,10 @@ public class CreateBookValidator : AbstractValidator<CreateBookRequest>
             .GreaterThan(0)
             .When(x => x.PageCount.HasValue)
             .WithMessage("Page count must be positive.");
+
+        RuleFor(x => x.Price)
+            .NotNull().WithMessage("Vui lòng nhập giá tiền cuốn sách.")
+            .InclusiveBetween(0m, 1_000_000_000_000m)
+            .WithMessage("Giá tiền phải từ 0 đến 1.000.000.000.000 đồng.");
     }
 }

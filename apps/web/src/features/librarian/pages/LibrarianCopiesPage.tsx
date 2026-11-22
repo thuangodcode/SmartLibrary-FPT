@@ -21,6 +21,13 @@ import { parseApiResponse } from '../../../lib/api';
 import { CopyQrDialog, type CopyQrLabel } from '../components/CopyQrDialog';
 import './LibrarianCopiesPage.css';
 
+const formatVndInput = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};
+
+const parseVndInput = (value: string) => value.replace(/\D/g, '');
+
 type CopyCondition = 'New' | 'Good' | 'Fair' | 'LightDamaged' | 'Damaged' | 'Lost';
 
 interface CopyItem {
@@ -160,6 +167,7 @@ const LibrarianCopiesPage: React.FC = () => {
   const [newBookCodeError, setNewBookCodeError] = useState('');
   const [newBookAuthor, setNewBookAuthor] = useState('');
   const [newBookIsbn, setNewBookIsbn] = useState('');
+  const [newBookPrice, setNewBookPrice] = useState('0');
   const [newBookYear, setNewBookYear] = useState('');
   const [newBookLanguage, setNewBookLanguage] = useState('vi');
   const [newBookCategoryIds, setNewBookCategoryIds] = useState<string[]>(() => {
@@ -498,6 +506,7 @@ const LibrarianCopiesPage: React.FC = () => {
       body.append('Title', newBookTitle.trim());
       if (newBookAuthor.trim()) body.append('AuthorName', newBookAuthor.trim());
       if (newBookIsbn.trim()) body.append('Isbn', newBookIsbn.trim());
+      body.append('Price', parseVndInput(newBookPrice) || '0');
       if (newBookYear) body.append('PublishedYear', newBookYear);
       body.append('Language', newBookLanguage);
       body.append('TotalCopies', String(newBookQuantity));
@@ -510,7 +519,7 @@ const LibrarianCopiesPage: React.FC = () => {
       if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể tạo đầu sách và nhập vào kho.');
       showToast({ type: 'success', title: 'Đã nhập đầu sách mới', message: `Đã tạo “${newBookTitle.trim()}” cùng ${newBookQuantity} bản sao trong kho. Chọn Xem QR tại bản sao để mở mã.` });
       if (newBookCoverPreview) URL.revokeObjectURL(newBookCoverPreview);
-      setNewBookTitle(''); setNewBookCode(''); setNewBookCodeState('idle'); setNewBookAuthor(''); setNewBookIsbn(''); setNewBookYear(''); setNewBookLanguage('vi'); setNewBookCategoryIds([]); setNewBookQuantity(1); setNewBookDescription(''); setNewBookCover(null); setNewBookCoverPreview('');
+      setNewBookTitle(''); setNewBookCode(''); setNewBookCodeState('idle'); setNewBookAuthor(''); setNewBookIsbn(''); setNewBookPrice('0'); setNewBookYear(''); setNewBookLanguage('vi'); setNewBookCategoryIds([]); setNewBookQuantity(1); setNewBookDescription(''); setNewBookCover(null); setNewBookCoverPreview('');
       setNewBookCodeCategoryId('');
       closeNewBookForm();
       setTab('sorting');
@@ -924,7 +933,7 @@ const LibrarianCopiesPage: React.FC = () => {
       </section>
 
       {newBookOpen && (
-        <div className="lib-copies-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeNewBookForm(); }}>
+        <div className="lib-copies-modal-backdrop" role="presentation">
           <form className="lib-copies-modal lib-copies-new-book-modal" onSubmit={handleCreateAndIntakeBook} role="dialog" aria-modal="true" aria-labelledby="lib-copy-new-book-title">
             <header><div><span><BookCopy size={19} /></span><div><h2 id="lib-copy-new-book-title">Tạo đầu sách mới và nhập kho</h2><p>Điền thông tin sách và số bản nhận về. Tất cả bản sao sẽ được lưu trong kho trước.</p></div></div><button type="button" className="lib-copies-modal-back" onClick={closeNewBookForm}><ChevronLeft size={16} /> Quay lại</button></header>
             <label className="lib-copies-field"><span>Tên sách <b>*</b></span><input value={newBookTitle} onChange={event => setNewBookTitle(event.target.value)} placeholder="Ví dụ: Lập trình C# căn bản" required /></label>
@@ -938,6 +947,7 @@ const LibrarianCopiesPage: React.FC = () => {
               <div className="lib-copies-field lib-copies-code-field"><label htmlFor="lib-new-book-code">Mã sách tự động</label><input id="lib-new-book-code" value={newBookCode} readOnly placeholder="Chọn danh mục để cấp mã" aria-describedby="lib-new-book-code-help" /><small id="lib-new-book-code-help">{newBookCodeState === 'checking' ? 'Đang lấy mã còn trống...' : newBookCodeState === 'available' ? 'Số thứ tự còn trống nhỏ nhất của danh mục. Mã chính thức được cấp khi lưu.' : newBookCodeState === 'error' ? newBookCodeError : 'Chọn danh mục cấp mã. Mã sách không nhập thủ công.'}</small>{newBookCodeCategoryId && <button type="button" className="lib-copy-qr" disabled={saving} onClick={() => { setNewBookCodeState('checking'); setNewBookCodeRefresh(value => value + 1); }}>Lấy lại mã tự động</button>}</div>
               <label className="lib-copies-field">Tác giả<input value={newBookAuthor} onChange={event => setNewBookAuthor(event.target.value)} placeholder="Tên tác giả" /></label>
             </div>
+            <label className="lib-copies-field"><span>Giá tiền cuốn sách (đồng) <b>*</b></span><input type="text" inputMode="numeric" maxLength={17} value={newBookPrice} onChange={event => setNewBookPrice(formatVndInput(event.target.value))} placeholder="Ví dụ: 5.000.000" required /><small>Giá trị lưu trong danh mục để quản lý tài sản; phí mượn/gia hạn được cấu hình riêng trong Chính sách.</small></label>
             <div className="lib-copies-form-row">
               <label className="lib-copies-field">Mã ISBN<input value={newBookIsbn} onChange={event => setNewBookIsbn(event.target.value)} placeholder="Mã ISBN (nếu có)" /></label>
               <label className="lib-copies-field">Năm xuất bản<input type="number" min={1000} max={new Date().getFullYear() + 1} value={newBookYear} onChange={event => setNewBookYear(event.target.value)} placeholder="Ví dụ: 2026" /></label>

@@ -14,6 +14,7 @@ public class CreateBookForm
     public int? PublishedYear { get; set; }
     public string Language { get; set; } = "vi";
     public int? PageCount { get; set; }
+    public decimal? Price { get; set; }
     public int TotalCopies { get; set; } = 1;
     public string? Location { get; set; }
     public int? ShelfQuantity { get; set; }

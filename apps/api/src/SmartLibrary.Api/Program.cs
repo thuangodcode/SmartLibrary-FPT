@@ -260,6 +260,37 @@ app.UseMiddleware<GlobalExceptionMiddleware>();
 
 app.UseCors(CorsExtensions.PolicyName);
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    var user = context.User;
+    var role = user.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+    var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    if (user.Identity?.IsAuthenticated == true && role == "Reader" && Guid.TryParse(userId, out var readerId))
+    {
+        var path = context.Request.Path.Value ?? string.Empty;
+        var profileAccess = path.Equals("/api/v1/profile", StringComparison.OrdinalIgnoreCase)
+            || path.Equals("/api/v1/auth/me", StringComparison.OrdinalIgnoreCase)
+            || path.Equals("/api/v1/me/verification", StringComparison.OrdinalIgnoreCase)
+            || path.Equals("/api/v1/me/verification/documents", StringComparison.OrdinalIgnoreCase);
+        if (!profileAccess)
+        {
+            var db = context.RequestServices.GetRequiredService<AppDbContext>();
+            var status = await db.UserProfiles.AsNoTracking()
+                .Where(profile => profile.Id == readerId)
+                .Select(profile => (SmartLibrary.Domain.Enums.AccountStatus?)profile.Status)
+                .FirstOrDefaultAsync(context.RequestAborted);
+            if (status != SmartLibrary.Domain.Enums.AccountStatus.Active)
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await context.Response.WriteAsJsonAsync(
+                    SmartLibrary.Application.Common.ApiResponse<object>.Fail("Tài khoản cần được thủ thư duyệt trước khi sử dụng dịch vụ độc giả."),
+                    context.RequestAborted);
+                return;
+            }
+        }
+    }
+    await next();
+});
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<SupportChatHub>("/hubs/support-chat");

@@ -19,6 +19,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
     return <Navigate to="/403" replace />;
   }
 
+  if (user.role === 'Reader' && user.status !== 'Active'
+      && location.pathname !== '/profile' && location.pathname !== '/') {
+    return <Navigate to="/profile" replace />;
+  }
+
   if (user.role === 'Reader' && user.isVerified === false
       && (location.pathname === '/support' || location.pathname.startsWith('/history') || location.pathname.startsWith('/books/'))) {
     return <Navigate to={`/profile?redirect=${encodeURIComponent(location.pathname)}`} replace />;

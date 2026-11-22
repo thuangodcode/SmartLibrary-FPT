@@ -84,6 +84,8 @@ public record CirculationSettings
     public int RenewalDays { get; init; }
     public int RenewalDaysVi { get; init; }
     public int RenewalDaysForeign { get; init; }
+    public int ExternalBorrowFee { get; init; }
+    public int ExternalRenewalFee { get; init; }
     public bool BlockRenewIfOverdue { get; init; }
     public bool BlockRenewIfReserved { get; init; }
     public int SelfRenewBeforeDays { get; init; } = 1;

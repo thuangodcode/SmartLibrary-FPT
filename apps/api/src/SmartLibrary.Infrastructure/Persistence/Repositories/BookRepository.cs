@@ -174,6 +174,7 @@ public class BookRepository : RepositoryBase<Book>, IBookRepository
         Language = item.Language ?? "vi",
         CoverImageUrl = item.CoverImageUrl,
         PublishedYear = item.PublishedYear,
+        Price = item.Price,
         AvailableCopies = item.AvailableCopies,
         TotalCopies = item.TotalCopies,
         Authors = item.Authors.Select(name => new Author { Name = name }).ToList(),

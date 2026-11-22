@@ -24,6 +24,7 @@ public class MappingProfile : Profile
                 .ToList()));
 
         CreateMap<CreateBookRequest, Book>();
-        CreateMap<UpdateBookRequest, Book>();
+        CreateMap<UpdateBookRequest, Book>()
+            .ForMember(destination => destination.Price, options => options.Condition(source => source.Price.HasValue));
     }
 }

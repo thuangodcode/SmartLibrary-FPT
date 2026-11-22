@@ -107,25 +107,59 @@ public sealed class ProfileController(
         string? backDocUrl = form.BackDoc is not null ? await UploadDocumentAsync(form.BackDoc, "back") : null;
         string? selfieDocUrl = form.SelfieDoc is not null ? await UploadDocumentAsync(form.SelfieDoc, "selfie") : null;
 
-        if (frontDocUrl is not null || backDocUrl is not null || selfieDocUrl is not null)
-        {
-            var reg = await dbContext.RegistrationRequests
+        var hasDocumentUpload = frontDocUrl is not null || backDocUrl is not null || selfieDocUrl is not null;
+        var previousRegistration = hasDocumentUpload
+            ? await dbContext.RegistrationRequests
                 .Include(r => r.Documents)
                 .Where(r => r.UserId == userId)
                 .OrderByDescending(r => r.SubmittedAt)
-                .FirstOrDefaultAsync(cancellationToken);
+                .FirstOrDefaultAsync(cancellationToken)
+            : null;
+        if (hasDocumentUpload)
+        {
+            var existingDocuments = previousRegistration?.Documents
+                .Where(document => !document.IsDeleted).Select(document => document.Side).ToList() ?? [];
+            var hasFront = frontDocUrl is not null || existingDocuments.Contains(DocumentSide.Front);
+            var hasBack = backDocUrl is not null || existingDocuments.Contains(DocumentSide.Back);
+            var hasSelfie = selfieDocUrl is not null || existingDocuments.Contains(DocumentSide.Selfie);
+            if (!hasFront || !hasBack || !hasSelfie)
+                return BadRequest(ApiResponse<object>.Fail("Vui lòng tải đủ ảnh mặt trước, mặt sau giấy tờ và ảnh chân dung trước khi gửi duyệt."));
+        }
+        if (hasDocumentUpload)
+        {
+            var reg = previousRegistration;
 
-            if (reg is null)
+            if (reg is null || reg.Status == RegistrationRequestStatus.Approved)
             {
+                var priorDocuments = reg?.Documents.Where(document => !document.IsDeleted).ToList() ?? [];
                 reg = new RegistrationRequest
                 {
                     UserId = userId,
                     DocumentType = DocumentType.NationalId,
-                    Status = RegistrationRequestStatus.Approved,
-                    SubmittedAt = DateTime.UtcNow
+                    Status = RegistrationRequestStatus.Submitted,
+                    AttemptNo = await dbContext.RegistrationRequests.CountAsync(r => r.UserId == userId, cancellationToken) + 1,
+                    SubmittedAt = DateTime.UtcNow,
+                    Documents = priorDocuments.Select(document => new IdentityDocument
+                    {
+                        Side = document.Side,
+                        StoragePath = document.StoragePath,
+                        MimeType = document.MimeType,
+                        SizeBytes = document.SizeBytes,
+                        Sha256 = document.Sha256,
+                        DocumentLast4 = document.DocumentLast4
+                    }).ToList()
                 };
                 dbContext.RegistrationRequests.Add(reg);
-                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+            else
+            {
+                if (reg.Status == RegistrationRequestStatus.Rejected) reg.AttemptNo++;
+                reg.Status = RegistrationRequestStatus.Submitted;
+                reg.SubmittedAt = DateTime.UtcNow;
+                reg.ReviewedAt = null;
+                reg.ReviewedById = null;
+                reg.RejectReason = null;
+                reg.Note = null;
             }
 
             void UpdateOrAddDoc(DocumentSide side, string? url, IFormFile? file)
@@ -156,6 +190,11 @@ public sealed class ProfileController(
             UpdateOrAddDoc(DocumentSide.Front, frontDocUrl, form.FrontDoc);
             UpdateOrAddDoc(DocumentSide.Back, backDocUrl, form.BackDoc);
             UpdateOrAddDoc(DocumentSide.Selfie, selfieDocUrl, form.SelfieDoc);
+
+            var account = await dbContext.UserProfiles.Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+            if (account is not null && account.Role.Name == "Reader")
+                account.Status = AccountStatus.PendingApproval;
 
             await dbContext.SaveChangesAsync(cancellationToken);
         }

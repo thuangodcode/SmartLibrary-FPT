@@ -109,6 +109,12 @@ public static class CirculationRules
         return BorrowDays(settings, language);
     }
 
+    public static decimal ServiceFee(CirculationSettings settings, ReaderType? readerType, bool renewal)
+    {
+        if ((readerType ?? ReaderType.External) != ReaderType.External) return 0m;
+        return renewal ? settings.ExternalRenewalFee : settings.ExternalBorrowFee;
+    }
+
     public static string? MissingBorrowDays(int days)
         => days <= 0
             ? "Chưa cấu hình thời hạn mượn. Admin hãy vào Chính sách > Thời hạn mượn và đặt số ngày."

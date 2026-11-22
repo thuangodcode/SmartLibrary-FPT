@@ -20,6 +20,7 @@ public class Book : AuditableEntity, ISoftDeletable
     public int? PublishedYear { get; set; }
     public string Language { get; set; } = "vi";
     public int? PageCount { get; set; }
+    public decimal? Price { get; set; }
     public int TotalCopies { get; set; }
     public int AvailableCopies { get; set; }
     public decimal AverageRating { get; set; }

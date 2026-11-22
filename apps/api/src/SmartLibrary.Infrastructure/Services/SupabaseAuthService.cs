@@ -212,8 +212,11 @@ public class SupabaseAuthService : IIdentityProvider
         }
 
         if (!string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase)
-            && email?.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase) != true
-            && email?.EndsWith("@googlemail.com", StringComparison.OrdinalIgnoreCase) != true)
+            && !string.Equals(status, "PendingDocuments", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(status, "PendingApproval", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(status, "PendingVerification", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(status, "PendingActivation", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(status, "Rejected", StringComparison.OrdinalIgnoreCase))
         {
             return new AuthResult
             {
@@ -256,7 +259,7 @@ public class SupabaseAuthService : IIdentityProvider
             FROM profiles p
             WHERE p.is_active = true
               AND p.is_deleted = false
-              AND (p.status::text = 'Active' OR lower(p.email) LIKE '%@gmail.com' OR lower(p.email) LIKE '%@googlemail.com')
+              AND p.status::text IN ('Active', 'PendingDocuments', 'PendingApproval', 'PendingVerification', 'PendingActivation', 'Rejected')
               AND (
                   LOWER(SPLIT_PART(p.email, '@', 1)) = LOWER(@identifier)
                   OR LOWER(p.student_id) = LOWER(@identifier)
@@ -306,8 +309,8 @@ public class SupabaseAuthService : IIdentityProvider
             return null;
 
         var cacheKey = "auth-role:" + userId;
-        if (_cache.TryGetValue(cacheKey, out string? cached))
-            return string.IsNullOrEmpty(cached) ? null : cached;
+        // Authorization state must reflect current approval status; do not cache an
+        // earlier active role after a profile is moved back into review.
 
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
@@ -318,11 +321,10 @@ public class SupabaseAuthService : IIdentityProvider
             WHERE p.id = @uid
               AND p.is_active = true
               AND p.is_deleted = false
-              AND (p.status::text = 'Active' OR lower(p.email) LIKE '%@gmail.com' OR lower(p.email) LIKE '%@googlemail.com')
+              AND p.status::text IN ('Active', 'PendingDocuments', 'PendingApproval', 'PendingVerification', 'PendingActivation', 'Rejected')
             LIMIT 1;", conn);
         cmd.Parameters.AddWithValue("uid", uid);
         var role = await cmd.ExecuteScalarAsync() as string;
-        _cache.Set(cacheKey, role ?? string.Empty, TimeSpan.FromSeconds(role is null ? 5 : 30));
         return role;
     }
 
@@ -446,7 +448,7 @@ public class SupabaseAuthService : IIdentityProvider
                 WHERE p.id = @uid
                   AND p.is_active = true
                   AND p.is_deleted = false
-                  AND (p.status::text = 'Active' OR lower(p.email) LIKE '%@gmail.com' OR lower(p.email) LIKE '%@googlemail.com')", conn))
+                  AND p.status::text IN ('Active', 'PendingDocuments', 'PendingApproval', 'PendingVerification', 'PendingActivation', 'Rejected')", conn))
             {
                 cmd.Parameters.AddWithValue("uid", uid);
                 await using var reader = await cmd.ExecuteReaderAsync();

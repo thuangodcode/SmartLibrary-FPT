@@ -41,7 +41,8 @@ public static class PolicyParameterRules
 
     private static readonly HashSet<string> FeeKeys = new(StringComparer.OrdinalIgnoreCase)
     {
-        "overdue_fee_per_day", "damage_fee", "damaged_book_fee", "lost_book_fee", "lost_fee"
+        "overdue_fee_per_day", "damage_fee", "damaged_book_fee", "lost_book_fee", "lost_fee",
+        "external_borrow_fee", "external_renewal_fee"
     };
 
     public static string? Validate(

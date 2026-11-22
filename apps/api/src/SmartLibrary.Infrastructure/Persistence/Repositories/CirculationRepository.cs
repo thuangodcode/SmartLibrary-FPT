@@ -312,8 +312,9 @@ public class CirculationRepository : ICirculationRepository
             await _db.Entry(loan).ReloadAsync(ct);
     }
 
-    public Task<bool> HasUnpaidFinesAsync(Guid readerId, CancellationToken ct)
-        => _db.Fines.AnyAsync(x => x.ReaderId == readerId && x.Status == FineStatus.Pending, ct);
+    public Task<bool> HasUnpaidFinesAsync(Guid readerId, CancellationToken ct, Guid? exceptBorrowRecordId = null)
+        => _db.Fines.AnyAsync(x => x.ReaderId == readerId && x.Status == FineStatus.Pending
+            && (!exceptBorrowRecordId.HasValue || x.BorrowRecordId != exceptBorrowRecordId.Value), ct);
 
     public async Task AddLoanAsync(BorrowRecord loan, CancellationToken ct)
         => await _db.BorrowRecords.AddAsync(loan, ct);
@@ -848,6 +849,8 @@ public class CirculationRepository : ICirculationRepository
             RenewalDays = ReadInt(renewal, "renewal_days") ?? 0,
             RenewalDaysVi = ReadInt(renewal, "renewal_days_vi") ?? 0,
             RenewalDaysForeign = ReadInt(renewal, "renewal_days_foreign") ?? ReadInt(renewal, "renewal_days_en") ?? 0,
+            ExternalBorrowFee = ReadInt(duration, "external_borrow_fee") ?? 0,
+            ExternalRenewalFee = ReadInt(renewal, "external_renewal_fee") ?? 0,
             BlockRenewIfOverdue = ReadBool(renewal, "block_if_overdue"),
             BlockRenewIfReserved = ReadBool(renewal, "block_if_reserved"),
             SelfRenewBeforeDays = ReadInt(renewal, "self_renew_before_days") ?? 1,
