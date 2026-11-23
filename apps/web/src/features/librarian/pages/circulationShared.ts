@@ -12,6 +12,8 @@ export interface CirculationStats {
   overdueDelta: number;
   unpaidFines: number;
   unpaidFinesDelta: number;
+  totalFines: number;
+  totalFinesDelta: number;
   dueSoon: number;
   suggestedFinePerDay: number;
   borrowDays: number;

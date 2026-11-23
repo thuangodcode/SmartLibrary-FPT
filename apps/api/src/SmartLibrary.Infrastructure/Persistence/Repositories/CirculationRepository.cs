@@ -75,6 +75,14 @@ public class CirculationRepository : ICirculationRepository
             .GroupBy(_ => 1)
             .Select(group => new
             {
+                // TotalFines = chỉ các khoản đã xác nhận thanh toán
+                Total = group.Sum(x => x.Status == FineStatus.Paid ? (decimal?)x.Amount : 0m),
+                TotalThis = group.Sum(x =>
+                    x.Status == FineStatus.Paid && x.PaidAt >= weekStart ? (decimal?)x.Amount : 0m),
+                TotalLast = group.Sum(x =>
+                    x.Status == FineStatus.Paid && x.PaidAt >= lastWeekStart && x.PaidAt < weekStart
+                        ? (decimal?)x.Amount
+                        : 0m),
                 Unpaid = group.Sum(x => x.Status == FineStatus.Pending ? (decimal?)x.Amount : 0m),
                 UnpaidThis = group.Sum(x =>
                     x.Status == FineStatus.Pending && x.CreatedAt >= weekStart ? (decimal?)x.Amount : 0m),
@@ -98,6 +106,8 @@ public class CirculationRepository : ICirculationRepository
             OverdueDelta = (loans?.OverdueThis ?? 0) - (loans?.OverdueLast ?? 0),
             UnpaidFines = fines?.Unpaid ?? 0,
             UnpaidFinesDelta = (fines?.UnpaidThis ?? 0) - (fines?.UnpaidLast ?? 0),
+            TotalFines = fines?.Total ?? 0,
+            TotalFinesDelta = (fines?.TotalThis ?? 0) - (fines?.TotalLast ?? 0),
             DueSoon = loans?.DueSoon ?? 0,
             SuggestedFinePerDay = finePerDay
         };

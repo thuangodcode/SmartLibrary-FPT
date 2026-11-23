@@ -95,6 +95,11 @@
   line-height: 1.25 !important;
 }
 
+/* Dashboard overview uses a larger display scale */
+.lib-content .lib-overview .lib-page-heading h1 {
+  font-size: clamp(28px, 2.6vw, 36px) !important;
+}
+
 /* ─── Subtitle / Description (Unified 14px, Color #64748b) ─── */
 .lib-content .lib-cat-desc,
 .lib-content .reg-description,
@@ -111,6 +116,11 @@
   color: #64748b !important;
   line-height: 1.55 !important;
   max-width: 760px !important;
+}
+
+.lib-content .lib-overview .lib-page-description {
+  font-size: 15px !important;
+  max-width: 52rem !important;
 }
 
 /* ─── Actions Wrapper (Right side) ─── */
