@@ -207,6 +207,7 @@ public class CirculationService
 
             var now = DateTime.UtcNow;
             MarkBorrowed(copy);
+            var isMorning = CirculationRules.IsMorning(now);
             var loan = new BorrowRecord
             {
                 ReaderId = reader.Id,
@@ -214,7 +215,7 @@ public class CirculationService
                 LibrarianId = librarianId == Guid.Empty ? null : librarianId,
                 Status = BorrowStatus.Borrowed,
                 BorrowDate = now,
-                DueDate = now.AddDays(borrowDays),
+                DueDate = CirculationRules.CalculateDueDate(now, borrowDays, isMorning),
                 Notes = "Thủ thư lập phiếu tại quầy."
             };
             await _repository.AddLoanAsync(loan, ct);
@@ -503,7 +504,10 @@ public class CirculationService
             loan.Status = BorrowStatus.Borrowed;
             loan.LibrarianId = librarianId == Guid.Empty ? loan.LibrarianId : librarianId;
             loan.BorrowDate = now;
-            loan.DueDate = now.AddDays(borrowDays);
+            var isMorning = loan.PickupAt.HasValue
+                ? CirculationRules.IsMorning(loan.PickupAt.Value)
+                : CirculationRules.IsMorning(now);
+            loan.DueDate = CirculationRules.CalculateDueDate(now, borrowDays, isMorning);
             await AddExternalServiceFeeAsync(loan, reader, settings, renewal: false, ct);
             await CompleteReservationAsync(loan.ReaderId, loan.BookCopy.BookId, now, ct);
             var student = string.IsNullOrWhiteSpace(reader.StudentId) ? "Chưa có mã sinh viên" : reader.StudentId;
@@ -593,7 +597,10 @@ public class CirculationService
             var renewalReader = await _repository.FindReaderAsync(loan.ReaderId.ToString(), ct);
             if (renewalReader is null)
                 return Result<CirculationLoanDto>.Failure("Không tìm thấy hồ sơ độc giả của phiếu mượn.");
-            loan.DueDate = baseDate.AddDays(days);
+            var isMorning = loan.PickupAt.HasValue
+                ? CirculationRules.IsMorning(loan.PickupAt.Value)
+                : (loan.DueDate.HasValue ? CirculationRules.IsMorning(loan.DueDate.Value) : CirculationRules.IsMorning(now));
+            loan.DueDate = CirculationRules.CalculateDueDate(baseDate, days, isMorning);
             loan.RenewalCount += 1;
             loan.Status = BorrowStatus.Borrowed;
             await AddExternalServiceFeeAsync(loan, renewalReader, settings, renewal: true, ct);
@@ -1088,8 +1095,8 @@ public class CirculationService
     public async Task<IReadOnlyList<CirculationLoanDto>> ExpireUncollectedPickupsAsync(CancellationToken ct = default)
     {
         const int pickupGraceMinutes = 30;
-        var expiredBefore = DateTime.UtcNow.AddMinutes(-pickupGraceMinutes);
-        var ids = await _repository.GetExpiredPickupRequestIdsAsync(expiredBefore, 100, ct);
+        var nowUtc = DateTime.UtcNow;
+        var ids = await _repository.GetExpiredPickupRequestIdsAsync(nowUtc, 100, ct);
         var expired = new List<CirculationLoanDto>();
         var settings = await _repository.GetSettingsAsync(ct);
 
@@ -1103,16 +1110,19 @@ public class CirculationService
                     return null;
                 await _repository.ReloadTrackedLoanAsync(id, ct);
                 if (loan.Status is not (BorrowStatus.Pending or BorrowStatus.Approved)
-                    || loan.PickupAt is null
-                    || loan.PickupAt.Value > expiredBefore)
+                    || loan.PickupAt is null)
+                    return null;
+
+                var deadlineUtc = CirculationRules.GetPickupDeadlineUtc(loan.PickupAt.Value);
+                if (nowUtc <= deadlineUtc.AddMinutes(pickupGraceMinutes))
                     return null;
 
                 loan.Status = BorrowStatus.Rejected;
-                loan.Notes = AppendNote(loan.Notes, "Tự hủy vì độc giả không đến trong vòng 30 phút sau lịch nhận.");
+                loan.Notes = AppendNote(loan.Notes, "Tự hủy vì độc giả không đến trong buổi đã hẹn (sau 30 phút).");
                 if (loan.BookCopy is not null)
                     SetCopyAvailability(loan.BookCopy, loan.BookCopy.Condition, loan.BookCopy.Condition is not (BookCondition.Damaged or BookCondition.Lost));
                 await NotifyAsync(loan.ReaderId, "Yêu cầu mượn đã hết hạn",
-                    $"Yêu cầu nhận “{loan.BookCopy?.Book?.Title}” đã tự hủy vì bạn không đến trong vòng 30 phút sau lịch hẹn. Bản sao đã được trả về kho.",
+                    $"Yêu cầu nhận “{loan.BookCopy?.Book?.Title}” đã tự hủy vì bạn không đến trong buổi hẹn. Bản sao đã được trả về kho.",
                     "borrow", ct, entityId: loan.Id);
                 await _unitOfWork.SaveChangesAsync(ct);
                 if (loan.BookCopy is not null)
@@ -1422,11 +1432,15 @@ public class CirculationService
                 return Result<CirculationLoanDto>.Failure("Bản sao vừa được độc giả khác đặt. Vui lòng thử lại.");
 
             MarkBorrowed(copy);
+            var isMorning = CirculationRules.IsMorning(pickupAt.UtcDateTime);
+            var borrowDays = CirculationRules.BorrowDays(currentSettings, copy.Book?.Language);
+            var expectedDueDate = borrowDays > 0 ? CirculationRules.CalculateDueDate(pickupAt.UtcDateTime, borrowDays, isMorning) : (DateTime?)null;
             var loan = new BorrowRecord
             {
                 ReaderId = readerId,
                 BookCopyId = copy.Id,
                 PickupAt = pickupAt.UtcDateTime,
+                DueDate = expectedDueDate,
                 Status = BorrowStatus.Pending,
                 Notes = "Độc giả gửi yêu cầu và đã giữ bản sao. Chờ thủ thư tiếp nhận."
             };

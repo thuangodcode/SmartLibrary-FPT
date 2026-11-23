@@ -142,7 +142,6 @@ public static class CirculationRules
     {
         var zone = LibraryTimeZone();
         var today = TimeZoneInfo.ConvertTime(now, zone).Date;
-        var slotMinutes = Math.Max(1, settings.PickupSlotMinutes);
         var capacity = Math.Max(1, settings.PickupCapacityPerSlot);
         var slots = new List<DateTimeOffset>();
 
@@ -150,14 +149,25 @@ public static class CirculationRules
         {
             var date = today.AddDays(offset);
             if (date.DayOfWeek == DayOfWeek.Sunday) continue;
-            var start = date.AddHours(9);
-            var end = date.AddHours(date.DayOfWeek == DayOfWeek.Saturday ? 15 : 17);
-            for (var local = start; local.AddMinutes(slotMinutes) <= end; local = local.AddMinutes(slotMinutes))
+
+            // Buổi sáng: 07:00 – 12:00
+            var morningLocal = DateTime.SpecifyKind(date.AddHours(7), DateTimeKind.Unspecified);
+            var morningPickup = new DateTimeOffset(morningLocal, zone.GetUtcOffset(morningLocal));
+            var morningEndLocal = DateTime.SpecifyKind(date.AddHours(12), DateTimeKind.Unspecified);
+            var morningEnd = new DateTimeOffset(morningEndLocal, zone.GetUtcOffset(morningEndLocal));
+            if (now < morningEnd)
             {
-                var localTime = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
-                var pickupAt = new DateTimeOffset(localTime, zone.GetUtcOffset(localTime));
-                if (pickupAt <= now) continue;
-                slots.Add(pickupAt);
+                slots.Add(morningPickup);
+            }
+
+            // Buổi chiều: 13:00 – 17:00
+            var afternoonLocal = DateTime.SpecifyKind(date.AddHours(13), DateTimeKind.Unspecified);
+            var afternoonPickup = new DateTimeOffset(afternoonLocal, zone.GetUtcOffset(afternoonLocal));
+            var afternoonEndLocal = DateTime.SpecifyKind(date.AddHours(17), DateTimeKind.Unspecified);
+            var afternoonEnd = new DateTimeOffset(afternoonEndLocal, zone.GetUtcOffset(afternoonEndLocal));
+            if (now < afternoonEnd)
+            {
+                slots.Add(afternoonPickup);
             }
         }
 
@@ -166,6 +176,31 @@ public static class CirculationRules
 
     public static bool IsPickupSlot(CirculationSettings settings, DateTimeOffset pickupAt, DateTimeOffset now)
         => PickupSlots(settings, now).Any(slot => slot.PickupAt == pickupAt);
+
+    public static bool IsMorning(DateTime timeUtc)
+    {
+        var local = TimeZoneInfo.ConvertTimeFromUtc(timeUtc, LibraryTimeZone());
+        return local.Hour < 12;
+    }
+
+    public static DateTime CalculateDueDate(DateTime baseDateUtc, int borrowDays, bool isMorning)
+    {
+        var zone = LibraryTimeZone();
+        var baseDateLocal = TimeZoneInfo.ConvertTimeFromUtc(baseDateUtc, zone);
+        var dueDay = baseDateLocal.Date.AddDays(borrowDays);
+        // Buổi sáng: hạn trả trước 12h00; Buổi chiều: hạn trả trước 17h00
+        var dueLocal = dueDay.AddHours(isMorning ? 12 : 17);
+        return TimeZoneInfo.ConvertTimeToUtc(dueLocal, zone);
+    }
+
+    public static DateTime GetPickupDeadlineUtc(DateTime pickupAtUtc)
+    {
+        var zone = LibraryTimeZone();
+        var local = TimeZoneInfo.ConvertTimeFromUtc(pickupAtUtc, zone);
+        var endHour = local.Hour < 12 ? 12 : 17;
+        var endLocal = local.Date.AddHours(endHour);
+        return TimeZoneInfo.ConvertTimeToUtc(endLocal, zone);
+    }
 
     public static bool IsOpenReservation(string? status)
         => status is ReservationPending or ReservationReady;

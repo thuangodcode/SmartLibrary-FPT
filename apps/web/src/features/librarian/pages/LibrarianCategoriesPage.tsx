@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BookOpen,
@@ -9,8 +9,6 @@ import {
   BookMarked,
   Image as ImageIcon,
   RefreshCw,
-  ChevronLeft,
-  ChevronRight,
   Archive,
   RotateCcw,
 } from 'lucide-react';
@@ -54,8 +52,6 @@ const LibrarianCategoriesPage: React.FC = () => {
   const [deletedItems, setDeletedItems] = useState<{ books: Array<{ id: string; title: string; code: string; totalCopies: number }>; categories: Array<{ id: string; name: string }> }>({ books: [], categories: [] });
   const [showDeletedItems, setShowDeletedItems] = useState(false);
   const [loadingDeletedItems, setLoadingDeletedItems] = useState(false);
-
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const requestCategories = useCallback(async () => {
     const headers: Record<string, string> = {};
@@ -162,13 +158,6 @@ const LibrarianCategoriesPage: React.FC = () => {
     return categories.reduce((sum, c) => sum + (c.bookCount || 0), 0);
   }, [categories]);
 
-  // Horizontal scroll helpers
-  const scrollHorizontally = (offset: number) => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: offset, behavior: 'smooth' });
-    }
-  };
-
   return (
     <div className="lib-cat-container">
       {/* Page Header */}
@@ -259,26 +248,6 @@ const LibrarianCategoriesPage: React.FC = () => {
             >
               <RefreshCw size={16} className={loading ? 'spinning' : ''} />
             </button>
-
-            {/* Scroll navigation arrows */}
-            <div className="lib-cat-scroll-arrows">
-              <button
-                type="button"
-                className="lib-cat-scroll-btn"
-                onClick={() => scrollHorizontally(-240)}
-                title="Cuộn sang trái"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <button
-                type="button"
-                className="lib-cat-scroll-btn"
-                onClick={() => scrollHorizontally(240)}
-                title="Cuộn sang phải"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
           </div>
         </div>
 
@@ -313,7 +282,7 @@ const LibrarianCategoriesPage: React.FC = () => {
           </div>
         ) : (
           <div className="lib-cat-pnc-strip-wrapper">
-            <div className="lib-cat-pnc-strip" ref={scrollContainerRef}>
+            <div className="lib-cat-pnc-strip">
               {filteredCategories.map((cat, idx) => {
                 const fallbackGradient = FALLBACK_GRADIENTS[idx % FALLBACK_GRADIENTS.length];
                 return (

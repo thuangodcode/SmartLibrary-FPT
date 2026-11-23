@@ -190,6 +190,7 @@ public class BookServiceTests
         {
             Code = "MULTICAT",
             Title = "Language and Literature",
+            Price = 50000m,
             TotalCopies = 2,
             CodeCategoryId = first.Id,
             CategoryIds = [first.Id, second.Id, first.Id]

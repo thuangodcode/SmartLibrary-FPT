@@ -323,31 +323,34 @@
 }
 
 .lib-cat-pnc-strip {
-  display: flex;
-  align-items: flex-start;
-  gap: 28px;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  padding: 10px 4px 18px 4px;
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 28px 16px;
+  padding: 16px 8px;
 }
 
-.lib-cat-pnc-strip::-webkit-scrollbar {
-  height: 6px;
+@media (max-width: 1200px) {
+  .lib-cat-pnc-strip {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 
-.lib-cat-pnc-strip::-webkit-scrollbar-track {
-  background: transparent;
+@media (max-width: 960px) {
+  .lib-cat-pnc-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
-.lib-cat-pnc-strip::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
-  border-radius: 4px;
+@media (max-width: 720px) {
+  .lib-cat-pnc-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
-.lib-cat-pnc-strip::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
+@media (max-width: 480px) {
+  .lib-cat-pnc-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* ─── Category Item (Exact Sample 1 Pattern: Icon on top, Name below) ─── */
@@ -355,8 +358,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 110px;
-  min-width: 110px;
+  width: 100%;
+  min-width: 0;
   cursor: pointer;
   text-align: center;
   position: relative;

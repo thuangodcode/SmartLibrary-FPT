@@ -572,7 +572,7 @@ public class CirculationServiceTests
         result.IsSuccess.Should().BeTrue();
         loan.Status.Should().Be(BorrowStatus.Borrowed);
         loan.BorrowDate.Should().NotBeNull();
-        loan.DueDate.Should().BeCloseTo(loan.BorrowDate!.Value.AddDays(14), TimeSpan.FromSeconds(1));
+        loan.DueDate.Should().Be(CirculationRules.CalculateDueDate(loan.BorrowDate!.Value, 14, CirculationRules.IsMorning(loan.PickupAt!.Value)));
         _repo.Verify(x => x.AddNotificationAsync(It.Is<Notification>(notification =>
             notification.Title == "Đã hoàn tất mượn sách"
             && notification.Message.Contains("SE123456")
@@ -604,7 +604,7 @@ public class CirculationServiceTests
         var result = await _sut.CompleteCheckoutAsync(loan.Id, Guid.NewGuid());
 
         result.IsSuccess.Should().BeTrue();
-        loan.DueDate.Should().BeCloseTo(loan.BorrowDate!.Value.AddDays(7), TimeSpan.FromSeconds(1));
+        loan.DueDate.Should().Be(CirculationRules.CalculateDueDate(loan.BorrowDate!.Value, 7, CirculationRules.IsMorning(loan.BorrowDate!.Value)));
     }
 
     [Fact]
@@ -759,6 +759,8 @@ public class CirculationServiceTests
             BookCopy = ReadyCopy()
         };
         _repo.Setup(x => x.GetTrackedLoanAsync(loan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(loan);
+        _repo.Setup(x => x.FindReaderAsync(loan.ReaderId.ToString(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ActiveReader());
         _repo.Setup(x => x.HasUnpaidFinesAsync(loan.ReaderId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _repo.Setup(x => x.HasOtherReservationAsync(loan.BookCopy.BookId, loan.ReaderId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
@@ -774,7 +776,7 @@ public class CirculationServiceTests
 
         result.IsSuccess.Should().BeTrue();
         loan.DueDate.Should().BeAfter(originalDueDate);
-        loan.DueDate.Should().BeCloseTo(originalDueDate.AddDays(_settings.RenewalDays), TimeSpan.FromSeconds(1));
+        loan.DueDate.Should().Be(CirculationRules.CalculateDueDate(originalDueDate, _settings.RenewalDays, CirculationRules.IsMorning(originalDueDate)));
         loan.RenewalCount.Should().Be(1);
         loan.Status.Should().Be(BorrowStatus.Borrowed);
         loan.Notes.Should().Contain("Tự gia hạn lần 1");

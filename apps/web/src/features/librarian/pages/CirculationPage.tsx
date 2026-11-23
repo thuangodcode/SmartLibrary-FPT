@@ -915,7 +915,18 @@ function LoansView() {
                       <strong>{item.bookTitle}</strong>
                       <small>Mã bản sao: {item.barcode}</small>
                     </td>
-                    <td>{formatDateTime(item.pickupAt)}</td>
+                    <td>
+                      {item.pickupAt ? (
+                        <>
+                          <span className="pickup-session-badge">
+                            {new Date(item.pickupAt).getUTCHours() < 7 ? 'Sáng (07:00 – 12:00)' : 'Chiều (13:00 – 17:00)'}
+                          </span>
+                          <div style={{ marginTop: '2px', fontSize: '11px', color: '#64748b' }}>
+                            {formatDate(item.pickupAt)}
+                          </div>
+                        </>
+                      ) : '—'}
+                    </td>
                     <td>
                       {item.status === 'Approved' ? (
                         <span className="circ-request-accepted-info">
