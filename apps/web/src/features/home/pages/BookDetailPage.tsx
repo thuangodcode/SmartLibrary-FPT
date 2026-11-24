@@ -366,9 +366,12 @@ const BookDetailPage = () => {
                         ? <option value="">{loadingPickupSlots ? 'Đang tải khung giờ…' : 'Không còn khung giờ khả dụng'}</option>
                         : pickupSlots.map((slot) => {
                           const d = new Date(slot.pickupAt);
-                          const hour = Number(
-                            new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: 'numeric', hour12: false }).format(d)
-                          );
+                          const hourStr = new Intl.DateTimeFormat('en-US', {
+                            timeZone: 'Asia/Ho_Chi_Minh',
+                            hour: 'numeric',
+                            hourCycle: 'h23',
+                          }).format(d);
+                          const hour = parseInt(hourStr, 10);
                           const dateStr = new Intl.DateTimeFormat('vi-VN', {
                             timeZone: 'Asia/Ho_Chi_Minh',
                             day: '2-digit',
@@ -378,13 +381,13 @@ const BookDetailPage = () => {
                           const sessionName = hour < 12 ? 'Buổi sáng (07:00 – 12:00)' : 'Buổi chiều (13:00 – 17:00)';
                           return (
                             <option key={slot.pickupAt} value={slot.pickupAt}>
-                              {sessionName} {dateStr} · còn {slot.remainingCapacity}/{slot.capacity} lượt
+                              {sessionName} ngày {dateStr} · còn {slot.remainingCapacity}/{slot.capacity} lượt
                             </option>
                           );
                         })}
                     </select>
                     {pickupSlotsError && <p className="book-detail-pickup-error" role="alert">{pickupSlotsError}</p>}
-                    <p className="book-detail-pickup-note">Thời gian nhận sách: Buổi sáng (07:00 – 12:00) hoặc Buổi chiều (13:00 – 17:00). Mượn buổi nào thì trả vào buổi đó (hạn trả tương ứng trước 12:00 hoặc trước 17:00). Nếu không đến nhận trong vòng 30 phút sau khi kết thúc buổi hẹn, yêu cầu sẽ tự hủy.</p>
+                    <p className="book-detail-pickup-note">Thời gian nhận sách: Buổi sáng (07:00 – 12:00) hoặc Buổi chiều (13:00 – 17:00). Nếu không đến nhận trong vòng 30 phút sau khi kết thúc buổi hẹn, yêu cầu sẽ tự hủy.</p>
                   </>
                 )}
                 <div className="book-detail-circulation-actions">

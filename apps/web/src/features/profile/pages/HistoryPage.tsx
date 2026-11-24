@@ -558,7 +558,8 @@ const HistoryPage = () => {
                       Lịch đến nhận:{' '}
                       {(() => {
                         const d = new Date(loan.pickupAt);
-                        const hour = Number(new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: 'numeric', hour12: false }).format(d));
+                        const hourStr = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour: 'numeric', hourCycle: 'h23' }).format(d);
+                        const hour = parseInt(hourStr, 10);
                         const session = hour < 12 ? 'Buổi sáng (07:00 – 12:00)' : 'Buổi chiều (13:00 – 17:00)';
                         return `${session} ngày ${formatDate(loan.pickupAt)}`;
                       })()}
@@ -576,7 +577,8 @@ const HistoryPage = () => {
                       {loan.dueDate
                         ? (() => {
                             const d = new Date(loan.dueDate);
-                            const hour = Number(new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: 'numeric', hour12: false }).format(d));
+                            const hourStr = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour: 'numeric', hourCycle: 'h23' }).format(d);
+                            const hour = parseInt(hourStr, 10);
                             const session = hour <= 12 ? 'Buổi sáng (trước 12:00)' : 'Buổi chiều (trước 17:00)';
                             return `${formatDate(loan.dueDate)} · ${session}`;
                           })()

@@ -643,7 +643,7 @@ public class CirculationServiceTests
             Id = Guid.NewGuid(),
             ReaderId = reader.Id,
             BookCopyId = copy.Id,
-            PickupAt = DateTime.UtcNow.AddMinutes(-31),
+            PickupAt = DateTime.UtcNow.AddDays(-2),
             Status = BorrowStatus.Approved,
             BookCopy = copy
         };
