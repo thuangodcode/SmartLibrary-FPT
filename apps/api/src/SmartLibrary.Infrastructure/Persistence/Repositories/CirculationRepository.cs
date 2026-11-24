@@ -75,14 +75,6 @@ public class CirculationRepository : ICirculationRepository
             .GroupBy(_ => 1)
             .Select(group => new
             {
-                // TotalFines = chỉ các khoản đã xác nhận thanh toán
-                Total = group.Sum(x => x.Status == FineStatus.Paid ? (decimal?)x.Amount : 0m),
-                TotalThis = group.Sum(x =>
-                    x.Status == FineStatus.Paid && x.PaidAt >= weekStart ? (decimal?)x.Amount : 0m),
-                TotalLast = group.Sum(x =>
-                    x.Status == FineStatus.Paid && x.PaidAt >= lastWeekStart && x.PaidAt < weekStart
-                        ? (decimal?)x.Amount
-                        : 0m),
                 Unpaid = group.Sum(x => x.Status == FineStatus.Pending ? (decimal?)x.Amount : 0m),
                 UnpaidThis = group.Sum(x =>
                     x.Status == FineStatus.Pending && x.CreatedAt >= weekStart ? (decimal?)x.Amount : 0m),
@@ -92,6 +84,17 @@ public class CirculationRepository : ICirculationRepository
                         : 0m)
             })
             .SingleOrDefaultAsync(ct);
+
+        // Track money actually collected. Keep these as filtered SUM queries so enum
+        // conversion and conditional aggregate translation cannot turn paid amounts into zero.
+        var paidFines = _db.Fines.AsNoTracking().Where(x => x.Status == FineStatus.Paid);
+        var totalPaidFines = await paidFines.SumAsync(x => (decimal?)x.Amount, ct) ?? 0m;
+        var totalPaidThisWeek = await paidFines
+            .Where(x => x.PaidAt.HasValue && x.PaidAt.Value >= weekStart && x.PaidAt.Value < weekStart.AddDays(7))
+            .SumAsync(x => (decimal?)x.Amount, ct) ?? 0m;
+        var totalPaidLastWeek = await paidFines
+            .Where(x => x.PaidAt.HasValue && x.PaidAt.Value >= lastWeekStart && x.PaidAt.Value < weekStart)
+            .SumAsync(x => (decimal?)x.Amount, ct) ?? 0m;
 
         return new CirculationStatsDto
         {
@@ -106,8 +109,8 @@ public class CirculationRepository : ICirculationRepository
             OverdueDelta = (loans?.OverdueThis ?? 0) - (loans?.OverdueLast ?? 0),
             UnpaidFines = fines?.Unpaid ?? 0,
             UnpaidFinesDelta = (fines?.UnpaidThis ?? 0) - (fines?.UnpaidLast ?? 0),
-            TotalFines = fines?.Total ?? 0,
-            TotalFinesDelta = (fines?.TotalThis ?? 0) - (fines?.TotalLast ?? 0),
+            TotalFines = totalPaidFines,
+            TotalFinesDelta = totalPaidThisWeek - totalPaidLastWeek,
             DueSoon = loans?.DueSoon ?? 0,
             SuggestedFinePerDay = finePerDay
         };

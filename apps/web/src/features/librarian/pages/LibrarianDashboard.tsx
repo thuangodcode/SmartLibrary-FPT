@@ -1,13 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Users,
+  ArrowRight,
+  BookCopy,
   BookOpen,
+  Bookmark,
+  CalendarClock,
+  CheckCircle2,
+  CircleDollarSign,
+  Clock3,
   FileCheck,
   LayoutDashboard,
   LoaderCircle,
-  BookCopy,
-  ArrowUpRight,
-  Upload,
+  RotateCcw,
+  Users,
+  Warehouse,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../auth/store/useAuthStore';
@@ -19,267 +25,172 @@ interface DashboardStats {
   totalReaders: number;
   totalBooks: number;
   availableCopies: number;
-  borrowedCount: number;
-  overdueCount: number;
 }
 
-const LibrarianDashboard: React.FC = () => {
-  const [statsData, setStatsData] = useState<DashboardStats | null>(null);
+interface CirculationStats {
+  pending: number;
+  approved: number;
+  borrowed: number;
+  returned: number;
+  overdue: number;
+  dueSoon: number;
+}
+
+interface ApiEnvelope<T> {
+  success?: boolean;
+  data?: T;
+}
+
+const LibrarianDashboard = () => {
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [circulationStats, setCirculationStats] = useState<CirculationStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const accessToken = useAuthStore((s) => s.accessToken);
+  const [statsError, setStatsError] = useState(false);
+  const accessToken = useAuthStore((state) => state.accessToken);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    let active = true;
+    const loadDashboard = async () => {
+      setLoading(true);
+      setStatsError(false);
       try {
         const headers: Record<string, string> = {};
-        if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-        const res = await fetch(`${API_BASE_URL}/api/v1/dashboard/stats`, { headers });
-        const json = await res.json();
-        if (json.success && json.data) {
-          setStatsData(json.data);
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+        const [dashboardResponse, circulationResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/v1/dashboard/stats`, { headers }),
+          fetch(`${API_BASE_URL}/api/v1/circulation/stats`, { headers }),
+        ]);
+        const [dashboardResult, circulationResult] = await Promise.all([
+          dashboardResponse.json() as Promise<ApiEnvelope<DashboardStats>>,
+          circulationResponse.json() as Promise<ApiEnvelope<CirculationStats>>,
+        ]);
+        if (!active) return;
+        if (dashboardResponse.ok && dashboardResult.success && dashboardResult.data) {
+          setDashboardStats(dashboardResult.data);
+        } else {
+          setStatsError(true);
         }
-      } catch (err) {
-        console.error('Failed to load dashboard stats:', err);
+        if (circulationResponse.ok && circulationResult.success && circulationResult.data) {
+          setCirculationStats(circulationResult.data);
+        } else {
+          setStatsError(true);
+        }
+      } catch {
+        if (active) setStatsError(true);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
-
-    fetchStats();
+    void loadDashboard();
+    return () => { active = false; };
   }, [accessToken]);
 
-  const cards = [
+  const count = (value?: number) => loading ? '—' : (value ?? 0).toLocaleString('vi-VN');
+  const metrics = [
     {
-      label: 'Đơn chờ duyệt',
-      value: statsData ? statsData.pendingRegistrations.toLocaleString() : '...',
+      label: 'Yêu cầu mượn chờ duyệt',
+      value: circulationStats?.pending,
+      note: 'Mở hàng chờ xác nhận',
       icon: FileCheck,
       tone: 'lib-tone-orange',
-      note: 'Hồ sơ độc giả cần xét duyệt',
-      link: '/librarian/registrations',
+      link: '/librarian/circulation/loans',
     },
     {
-      label: 'Độc giả hệ thống',
-      value: statsData ? statsData.totalReaders.toLocaleString() : '...',
-      icon: Users,
+      label: 'Chờ nhận sách tại quầy',
+      value: circulationStats?.approved,
+      note: 'Các yêu cầu đã tiếp nhận',
+      icon: CheckCircle2,
       tone: 'lib-tone-blue',
-      note: 'Tài khoản bạn đọc đang lưu trữ',
-      link: '/librarian/readers',
+      link: '/librarian/circulation/loans?view=accepted',
     },
     {
-      label: 'Tổng đầu sách',
-      value: statsData ? statsData.totalBooks.toLocaleString() : '...',
-      icon: BookOpen,
-      tone: 'lib-tone-green',
-      note: `${statsData ? statsData.availableCopies.toLocaleString() : '0'} bản sách sẵn sàng mượn`,
-      link: '/librarian/books',
-    },
-    {
-      label: 'Sách đang được mượn',
-      value: statsData ? statsData.borrowedCount.toLocaleString() : '...',
+      label: 'Đang lưu hành',
+      value: circulationStats?.borrowed,
+      note: 'Lượt mượn chưa hoàn trả',
       icon: BookCopy,
-      tone: 'lib-tone-purple',
-      note: `${statsData ? statsData.overdueCount.toLocaleString() : '0'} lượt quá hạn cần nhắc nhở`,
+      tone: 'lib-tone-green',
+      link: '/librarian/circulation/loans?view=list',
+    },
+    {
+      label: 'Quá hạn cần theo dõi',
+      value: circulationStats?.overdue,
+      note: 'Mở danh sách quá hạn',
+      icon: Clock3,
+      tone: 'lib-tone-red',
+      link: '/librarian/circulation/overdue',
     },
   ];
 
-  const totalCopiesEstimate = (statsData?.availableCopies ?? 0) + (statsData?.borrowedCount ?? 0);
-  const availablePercent = totalCopiesEstimate > 0 
-    ? Math.round(((statsData?.availableCopies ?? 0) / totalCopiesEstimate) * 100)
-    : 100;
-  const borrowedPercent = 100 - availablePercent;
-
   return (
-    <div className="lib-overview">
-      {/* Header */}
+    <div className="lib-overview lib-overview--circulation">
       <header className="lib-page-heading">
         <div>
-          <div className="lib-eyebrow">
-            <LayoutDashboard size={16} />
-            <span>KHÔNG GIAN THỦ THƯ • TỔNG QUAN HỆ THỐNG</span>
-          </div>
-          <h1>Tổng Quan Nghiệp Vụ Thư Viện</h1>
-          <p className="lib-page-description">
-            Theo dõi hoạt động mượn trả, phê duyệt hồ sơ bạn đọc và quản lý kho sách theo thời gian thực.
-          </p>
+          <div className="lib-eyebrow"><LayoutDashboard size={15} /><span>BÀN NGHIỆP VỤ THỦ THƯ</span></div>
+          <h1>Điều phối mượn và trả sách</h1>
+          <p className="lib-page-description">Mở nhanh quy trình tại quầy và theo dõi các yêu cầu cần xử lý trong ngày.</p>
         </div>
-        {loading && (
-          <div className="lib-refresh-state">
-            <LoaderCircle className="lib-spin" size={18} />
-            <span>Đang cập nhật số liệu...</span>
-          </div>
-        )}
+        {loading && <div className="lib-refresh-state"><LoaderCircle className="lib-spin" size={17} /><span>Đang cập nhật...</span></div>}
       </header>
 
-      {/* Top 4 Metrics Cards */}
-      <div className="lib-metric-grid">
-        {cards.map((card) => {
-          const CardContent = (
-            <>
-              <div className="lib-metric-card-top">
-                <span className={`lib-metric-icon ${card.tone}`}>
-                  <card.icon size={22} />
-                </span>
-                {card.link && <ArrowUpRight className="lib-metric-arrow" size={20} />}
-              </div>
-              <div className="lib-metric-value">{card.value}</div>
-              <div className="lib-metric-label">{card.label}</div>
-              <div className="lib-metric-note">{card.note}</div>
-            </>
-          );
+      <section className="lib-desk-actions" aria-label="Thao tác mượn trả tại quầy">
+        <Link to="/librarian/circulation/direct-borrow" className="lib-desk-action lib-desk-action--borrow">
+          <span className="lib-desk-action-icon"><BookOpen size={25} /></span>
+          <span className="lib-desk-action-copy"><strong>Lập phiếu mượn tại quầy</strong><small>Tra cứu độc giả và sách, ghi nhận giao sách trực tiếp.</small></span>
+          <span className="lib-desk-action-cta">Bắt đầu mượn <ArrowRight size={17} /></span>
+        </Link>
+        <Link to="/librarian/circulation/return?mode=barcode" className="lib-desk-action lib-desk-action--return">
+          <span className="lib-desk-action-icon"><RotateCcw size={25} /></span>
+          <span className="lib-desk-action-copy"><strong>Ghi nhận trả sách</strong><small>Quét hoặc nhập mã vạch để nhận sách và cập nhật tình trạng.</small></span>
+          <span className="lib-desk-action-cta">Bắt đầu trả <ArrowRight size={17} /></span>
+        </Link>
+      </section>
 
-          return card.link ? (
-            <Link key={card.label} to={card.link} className="lib-metric-card">
-              {CardContent}
-            </Link>
-          ) : (
-            <div key={card.label} className="lib-metric-card">
-              {CardContent}
-            </div>
-          );
-        })}
-      </div>
+      <section className="lib-metric-grid" aria-label="Tình hình mượn trả">
+        {metrics.map((metric) => (
+          <Link key={metric.label} to={metric.link} className="lib-metric-card">
+            <div className="lib-metric-card-top"><span className={`lib-metric-icon ${metric.tone}`}><metric.icon size={21} /></span><ArrowRight className="lib-metric-arrow" size={17} /></div>
+            <div className="lib-metric-value">{count(metric.value)}</div>
+            <div className="lib-metric-label">{metric.label}</div>
+            <div className="lib-metric-note">{metric.note}</div>
+          </Link>
+        ))}
+      </section>
 
-      {/* Lower Section: Quick Actions & Status Breakdown */}
-      <div className="lib-grid-two">
-        {/* Quick Actions Panel */}
-        <section className="lib-panel">
-          <header className="lib-panel-header">
-            <p className="lib-panel-kicker">TIỆN ÍCH QUẢN LÝ</p>
-            <h2>Thao Tác Nghiệp Vụ Nhanh</h2>
-            <p>Truy cập trực tiếp các quy trình làm việc thường nhật của Thủ thư</p>
-          </header>
-          <div className="lib-actions-grid">
-            <Link to="/librarian/registrations" className="lib-action-card">
-              <span className="lib-action-icon lib-tone-orange">
-                <FileCheck size={22} />
-              </span>
-              <div className="lib-action-info">
-                <strong>Duyệt Đăng Ký Tài Khoản</strong>
-                <p>Xem xét và kích hoạt hồ sơ bạn đọc đăng ký từ bên ngoài</p>
-              </div>
-            </Link>
+      <section className="lib-desk-followup">
+        <div className="lib-desk-followup-heading">
+          <div><p className="lib-panel-kicker">THEO DÕI CA LÀM</p><h2>Các mốc cần chú ý</h2></div>
+          <span>{loading ? 'Đang tải số liệu' : 'Số liệu hiện tại'}</span>
+        </div>
+        <div className="lib-desk-followup-grid">
+          <Link to="/librarian/circulation/loans" className="lib-followup-item">
+            <span className="lib-followup-icon is-orange"><FileCheck size={18} /></span><span><strong>{count(circulationStats?.pending)} yêu cầu mượn chờ duyệt</strong><small>Xem thông tin và xác nhận yêu cầu của độc giả</small></span><ArrowRight size={16} />
+          </Link>
+          <Link to="/librarian/circulation/loans?view=accepted" className="lib-followup-item">
+            <span className="lib-followup-icon is-blue"><CheckCircle2 size={18} /></span><span><strong>{count(circulationStats?.approved)} độc giả chờ nhận sách</strong><small>Đối chiếu lịch nhận và bàn giao bản sao</small></span><ArrowRight size={16} />
+          </Link>
+          <Link to="/librarian/circulation/loans?view=due" className="lib-followup-item">
+            <span className="lib-followup-icon is-purple"><CalendarClock size={18} /></span><span><strong>{count(circulationStats?.dueSoon)} sách sắp đến hạn</strong><small>Kiểm tra các lượt mượn cần nhắc trả</small></span><ArrowRight size={16} />
+          </Link>
+          <Link to="/librarian/circulation/overdue" className="lib-followup-item">
+            <span className="lib-followup-icon is-red"><Clock3 size={18} /></span><span><strong>{count(circulationStats?.overdue)} lượt đang quá hạn</strong><small>Theo dõi trả sách và xử lý sự cố nếu có</small></span><ArrowRight size={16} />
+          </Link>
+        </div>
+      </section>
 
-            <Link to="/librarian/registrations" className="lib-action-card">
-              <span className="lib-action-icon lib-tone-blue">
-                <Upload size={22} />
-              </span>
-              <div className="lib-action-info">
-                <strong>Nhập Danh Sách Sinh Viên</strong>
-                <p>Tải lên tệp CSV cấp hàng loạt tài khoản bạn đọc trường FPT</p>
-              </div>
-            </Link>
+      {statsError && <p className="lib-dashboard-data-note" role="status">Một số số liệu chưa tải được. Hãy tải lại trang để đồng bộ.</p>}
 
-            <Link to="/librarian/readers" className="lib-action-card">
-              <span className="lib-action-icon lib-tone-purple">
-                <Users size={22} />
-              </span>
-              <div className="lib-action-info">
-                <strong>Danh Sách Độc Giả</strong>
-                <p>Tra cứu hồ sơ bạn đọc, gia hạn thẻ và lịch sử mượn trả</p>
-              </div>
-            </Link>
-
-            <Link to="/librarian/books" className="lib-action-card">
-              <span className="lib-action-icon lib-tone-green">
-                <BookOpen size={22} />
-              </span>
-              <div className="lib-action-info">
-                <strong>Quản Lý Kho Sách</strong>
-                <p>Cập nhật số lượng ấn bản, đầu sách và tình trạng vật lý</p>
-              </div>
-            </Link>
-          </div>
-        </section>
-
-        {/* Operational Status Panel */}
-        <section className="lib-panel">
-          <header className="lib-panel-header">
-            <p className="lib-panel-kicker">TRẠNG THÁI HOẠT ĐỘNG</p>
-            <h2>Chỉ Số Tài Nguyên Thư Viện</h2>
-            <p>Tình trạng lưu thông và phân bổ ấn phẩm trong kho</p>
-          </header>
-          <div className="lib-breakdown-list">
-            <div className="lib-breakdown-item">
-              <div className="lib-breakdown-row">
-                <span className="lib-breakdown-name">
-                  <span className="lib-breakdown-dot" style={{ background: '#10b981' }} />
-                  Bản sách sẵn sàng phục vụ
-                </span>
-                <span className="lib-breakdown-val">
-                  {statsData?.availableCopies ?? 0} ({availablePercent}%)
-                </span>
-              </div>
-              <div className="lib-progress-bar">
-                <div
-                  className="lib-progress-fill"
-                  style={{ width: `${availablePercent}%`, background: '#10b981' }}
-                />
-              </div>
-            </div>
-
-            <div className="lib-breakdown-item">
-              <div className="lib-breakdown-row">
-                <span className="lib-breakdown-name">
-                  <span className="lib-breakdown-dot" style={{ background: '#8b5cf6' }} />
-                  Sách đang lưu hành (được mượn)
-                </span>
-                <span className="lib-breakdown-val">
-                  {statsData?.borrowedCount ?? 0} ({borrowedPercent}%)
-                </span>
-              </div>
-              <div className="lib-progress-bar">
-                <div
-                  className="lib-progress-fill"
-                  style={{ width: `${borrowedPercent}%`, background: '#8b5cf6' }}
-                />
-              </div>
-            </div>
-
-            <div className="lib-breakdown-item">
-              <div className="lib-breakdown-row">
-                <span className="lib-breakdown-name">
-                  <span className="lib-breakdown-dot" style={{ background: '#ef4444' }} />
-                  Lượt mượn quá hạn cần thu hồi
-                </span>
-                <span className="lib-breakdown-val" style={{ color: '#ef4444' }}>
-                  {statsData?.overdueCount ?? 0} lượt
-                </span>
-              </div>
-              <div className="lib-progress-bar">
-                <div
-                  className="lib-progress-fill"
-                  style={{
-                    width: statsData?.borrowedCount ? `${Math.min(100, Math.round(((statsData?.overdueCount ?? 0) / statsData.borrowedCount) * 100))}%` : '0%',
-                    background: '#ef4444',
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="lib-breakdown-item">
-              <div className="lib-breakdown-row">
-                <span className="lib-breakdown-name">
-                  <span className="lib-breakdown-dot" style={{ background: '#e8783e' }} />
-                  Đơn đăng ký đang đợi duyệt
-                </span>
-                <span className="lib-breakdown-val" style={{ color: '#e8783e' }}>
-                  {statsData?.pendingRegistrations ?? 0} đơn
-                </span>
-              </div>
-              <div className="lib-progress-bar">
-                <div
-                  className="lib-progress-fill"
-                  style={{
-                    width: statsData?.pendingRegistrations ? '100%' : '0%',
-                    background: '#e8783e',
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
+      <section className="lib-secondary-tools" aria-label="Các chức năng quản lý khác">
+        <div><p className="lib-panel-kicker">CHỨC NĂNG LIÊN QUAN</p><h2>Quản lý thư viện</h2></div>
+        <div className="lib-secondary-links">
+          <Link to="/librarian/circulation/reservations"><Bookmark size={16} />Đặt chỗ</Link>
+          <Link to="/librarian/circulation/fines"><CircleDollarSign size={16} />Phí phạt</Link>
+          <Link to="/librarian/books/copies"><Warehouse size={16} />Kho sách</Link>
+          <Link to="/librarian/readers"><Users size={16} />Độc giả</Link>
+          <Link to="/librarian/registrations"><FileCheck size={16} />Duyệt đăng ký{dashboardStats?.pendingRegistrations ? ` (${dashboardStats.pendingRegistrations})` : ''}</Link>
+          <Link to="/librarian/books"><BookCopy size={16} />Đầu sách{dashboardStats ? ` (${dashboardStats.totalBooks.toLocaleString('vi-VN')})` : ''}</Link>
+        </div>
+        {dashboardStats && <p className="lib-secondary-summary">{dashboardStats.availableCopies.toLocaleString('vi-VN')} bản sao sẵn sàng · {dashboardStats.totalReaders.toLocaleString('vi-VN')} độc giả</p>}
+      </section>
     </div>
   );
 };

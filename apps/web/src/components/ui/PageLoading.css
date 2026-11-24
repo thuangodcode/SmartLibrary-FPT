@@ -1,0 +1,23 @@
+.page-loading {
+  display: flex;
+  min-height: min(45vh, 360px);
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  color: #52657a;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.page-loading-spinner {
+  color: #f26722;
+  animation: page-loading-spin 0.9s linear infinite;
+}
+
+@keyframes page-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-loading-spinner { animation-duration: 2.5s; }
+}

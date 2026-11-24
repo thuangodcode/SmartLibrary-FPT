@@ -411,7 +411,7 @@ function Chrome({ tab, stats, loading }: { tab: CirculationTab; stats: Circulati
         <article className="circ-stat circ-stat--fine">
           <span><Wallet size={18} /></span>
           <div>
-            <small>Tổng phí phạt</small>
+            <small>Đã thu phí phạt</small>
             <strong>{loading ? '—' : formatMoney(stats?.totalFines)}</strong>
             <em>{stats ? formatDelta(stats.totalFinesDelta) : 'Đang tải...'}</em>
           </div>
@@ -509,7 +509,10 @@ function LoansView() {
   const [rejecting, setRejecting] = useState<CirculationLoan | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [renewConfirm, setRenewConfirm] = useState(false);
-  const [loansView, setLoansView] = useState<'pending' | 'accepted' | 'list' | 'due'>('pending');
+  const [loansView, setLoansView] = useState<'pending' | 'accepted' | 'list' | 'due'>(() => {
+    const requestedView = params.get('view');
+    return requestedView === 'accepted' || requestedView === 'list' || requestedView === 'due' ? requestedView : 'pending';
+  });
   const [dueLoans, setDueLoans] = useState<CirculationLoan[]>([]);
   const [dueLoading, setDueLoading] = useState(false);
   const [dueError, setDueError] = useState<string | null>(null);
@@ -1273,7 +1276,7 @@ function ReturnView() {
   const [loansError, setLoansError] = useState<string | null>(null);
   const [conditions, setConditions] = useState<Record<string, string>>({});
   const [returningBarcode, setReturningBarcode] = useState<string | null>(null);
-  const [returnMode, setReturnMode] = useState<'reader' | 'barcode' | 'activity'>(params.get('barcode') ? 'barcode' : 'reader');
+  const [returnMode, setReturnMode] = useState<'reader' | 'barcode' | 'activity'>(params.get('barcode') || params.get('mode') === 'barcode' ? 'barcode' : 'reader');
   const [defaultCondition, setDefaultCondition] = useState('Good');
   const [manualBarcode, setManualBarcode] = useState(params.get('barcode') ?? '');
   const [manualCondition, setManualCondition] = useState('Good');

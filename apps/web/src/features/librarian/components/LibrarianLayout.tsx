@@ -99,7 +99,7 @@ export const LibrarianLayout: React.FC = () => {
   const [circulationOpen, setCirculationOpen] = useState(true);
   const [booksOpen, setBooksOpen] = useState(() => location.pathname.startsWith('/librarian/books'));
   const [supportOpen, setSupportOpen] = useState(() => location.pathname.startsWith('/librarian/support'));
-  const [pendingCount, setPendingCount] = useState<number | null>(null);
+  const [, setPendingCount] = useState<number | null>(null);
   const [decisionNotices, setDecisionNotices] = useState<ReportDecisionNotice[]>([]);
   const [inboxNotices, setInboxNotices] = useState<InboxNotice[]>([]);
   const [notificationError, setNotificationError] = useState<string | null>(null);
@@ -155,8 +155,8 @@ export const LibrarianLayout: React.FC = () => {
   const lastFetchRef = React.useRef<number>(0);
   React.useEffect(() => {
     const now = Date.now();
-    // Do not refetch if fetched less than 20 seconds ago
-    if (pendingCount !== null && now - lastFetchRef.current < 20000) {
+    // Sidebar badge is shared across routes; refresh it on a timer instead of every navigation.
+    if (lastFetchRef.current !== 0 && now - lastFetchRef.current < 20000) {
       return;
     }
     lastFetchRef.current = now;
@@ -174,7 +174,7 @@ export const LibrarianLayout: React.FC = () => {
       } catch { /* silently ignore */ }
     };
     fetchPending();
-  }, [location.pathname, pendingCount]);
+  }, [accessToken]);
 
   React.useEffect(() => {
     const storageKey = `smartlibrary:report-decisions:${user?.email ?? 'librarian'}`;

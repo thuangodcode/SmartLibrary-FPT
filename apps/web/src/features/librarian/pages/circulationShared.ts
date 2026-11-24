@@ -211,7 +211,8 @@ export function formatMoney(value?: number | null) {
   return `${Math.round(value ?? 0).toLocaleString('vi-VN')}đ`;
 }
 
-export function formatDelta(value: number) {
+export function formatDelta(value?: number | null) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
   if (value === 0) return 'Không đổi so với tuần trước';
   const sign = value > 0 ? '+' : '';
   return `${sign}${value.toLocaleString('vi-VN')} so với tuần trước`;

@@ -1,54 +1,59 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
-import HomePage from './features/home/pages/HomePage';
-import HomeCatalogPage from './features/home/pages/HomeCatalogPage';
-import BookDetailPage from './features/home/pages/BookDetailPage';
-import HomeInfoPage from './features/home/pages/HomeInfoPage';
-import NewsArticleDetailPage from './features/home/pages/NewsArticleDetailPage';
-import RagAskPanel from './features/home/components/RagAskPanel';
-import LoginPage from './features/auth/pages/LoginPage';
-import RegisterPage from './features/auth/pages/RegisterPage';
-import VerifyEmailPage from './features/auth/pages/VerifyEmailPage';
-import ForgotPasswordPage from './features/auth/pages/ForgotPasswordPage';
-import ResetPasswordPage from './features/auth/pages/ResetPasswordPage';
-import ForbiddenPage from './features/auth/pages/ForbiddenPage';
+import PageLoading from './components/ui/PageLoading';
 import { RoleGuard } from './features/auth/components/RoleGuard';
-import { LibrarianLayout } from './features/librarian/components/LibrarianLayout';
-import LibrarianDashboard from './features/librarian/pages/LibrarianDashboard';
-import RegistrationApprovalPage from './features/librarian/pages/RegistrationApprovalPage';
-import ReadersManagementPage from './features/librarian/pages/ReadersManagementPage';
-import LibrarianReportsPage from './features/librarian/pages/LibrarianReportsPage';
-import LibrarianReportDetailPage from './features/librarian/pages/LibrarianReportDetailPage';
-import LibrarianModulePage from './features/librarian/pages/LibrarianModulePage';
-import LibrarianAiPage from './features/librarian/pages/LibrarianAiPage';
-import AdminAiSettingsPage from './features/admin/pages/AdminAiSettingsPage';
-import LibrarianCategoriesPage from './features/librarian/pages/LibrarianCategoriesPage';
-import LibrarianCopiesPage from './features/librarian/pages/LibrarianCopiesPage';
-import LibrarianCreateCategoryPage from './features/librarian/pages/LibrarianCreateCategoryPage';
-import LibrarianCategoryBooksPage from './features/librarian/pages/LibrarianCategoryBooksPage';
-import LibrarianBookDetailPage from './features/librarian/pages/LibrarianBookDetailPage';
-import LibrarianNewsPage from './features/librarian/pages/LibrarianNewsPage';
-import CirculationPage, { CirculationIncidentDetailPage, DirectCheckoutPage } from './features/librarian/pages/CirculationPage';
-import { AdminLayout } from './features/admin/components/AdminLayout';
-import AdminOverviewPage from './features/admin/pages/AdminOverviewPage';
-import AdminSectionPage from './features/admin/pages/AdminSectionPage';
-import AdminUsersPage from './features/admin/pages/AdminUsersPage';
-import AdminLibrarianCreatePage from './features/admin/pages/AdminLibrarianCreatePage';
-import AdminUserDetailPage from './features/admin/pages/AdminUserDetailPage';
-import AdminPoliciesPage from './features/admin/pages/AdminPoliciesPage';
-import AdminReportsPage from './features/admin/pages/AdminReportsPage';
-import AdminCollectionPage from './features/admin/pages/AdminCollectionPage';
-import AdminReportDetailPage from './features/admin/pages/AdminReportDetailPage';
-import AdminReportTemplatesPage from './features/admin/pages/AdminReportTemplatesPage';
-import AdminReportTemplateDetailPage from './features/admin/pages/AdminReportTemplateDetailPage';
-import AdminRegulationsPage from './features/admin/pages/AdminRegulationsPage';
-import ProfilePage from './features/profile/pages/ProfilePage';
-import HistoryPage from './features/profile/pages/HistoryPage';
-import ReaderFavoritesPage from './features/home/pages/ReaderFavoritesPage';
-import SupportPage from './features/profile/pages/SupportPage';
-import LibrarianSupportPage from './features/librarian/pages/LibrarianSupportPage';
 import { useAuthStore } from './features/auth/store/useAuthStore';
-import PinnedNewsPoster from './features/home/components/PinnedNewsPoster';
+
+// Keep each screen out of the initial bundle until its route is opened.
+const HomePage = lazy(() => import('./features/home/pages/HomePage'));
+const HomeCatalogPage = lazy(() => import('./features/home/pages/HomeCatalogPage'));
+const BookDetailPage = lazy(() => import('./features/home/pages/BookDetailPage'));
+const HomeInfoPage = lazy(() => import('./features/home/pages/HomeInfoPage'));
+const NewsArticleDetailPage = lazy(() => import('./features/home/pages/NewsArticleDetailPage'));
+const RagAskPanel = lazy(() => import('./features/home/components/RagAskPanel'));
+const LoginPage = lazy(() => import('./features/auth/pages/LoginPage'));
+const RegisterPage = lazy(() => import('./features/auth/pages/RegisterPage'));
+const VerifyEmailPage = lazy(() => import('./features/auth/pages/VerifyEmailPage'));
+const ForgotPasswordPage = lazy(() => import('./features/auth/pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./features/auth/pages/ResetPasswordPage'));
+const ForbiddenPage = lazy(() => import('./features/auth/pages/ForbiddenPage'));
+const LibrarianLayout = lazy(() => import('./features/librarian/components/LibrarianLayout').then((m) => ({ default: m.LibrarianLayout })));
+const LibrarianDashboard = lazy(() => import('./features/librarian/pages/LibrarianDashboard'));
+const RegistrationApprovalPage = lazy(() => import('./features/librarian/pages/RegistrationApprovalPage'));
+const ReadersManagementPage = lazy(() => import('./features/librarian/pages/ReadersManagementPage'));
+const LibrarianReportsPage = lazy(() => import('./features/librarian/pages/LibrarianReportsPage'));
+const LibrarianReportDetailPage = lazy(() => import('./features/librarian/pages/LibrarianReportDetailPage'));
+const LibrarianModulePage = lazy(() => import('./features/librarian/pages/LibrarianModulePage'));
+const LibrarianAiPage = lazy(() => import('./features/librarian/pages/LibrarianAiPage'));
+const AdminAiSettingsPage = lazy(() => import('./features/admin/pages/AdminAiSettingsPage'));
+const LibrarianCategoriesPage = lazy(() => import('./features/librarian/pages/LibrarianCategoriesPage'));
+const LibrarianCopiesPage = lazy(() => import('./features/librarian/pages/LibrarianCopiesPage'));
+const LibrarianCreateCategoryPage = lazy(() => import('./features/librarian/pages/LibrarianCreateCategoryPage'));
+const LibrarianCategoryBooksPage = lazy(() => import('./features/librarian/pages/LibrarianCategoryBooksPage'));
+const LibrarianBookDetailPage = lazy(() => import('./features/librarian/pages/LibrarianBookDetailPage'));
+const LibrarianNewsPage = lazy(() => import('./features/librarian/pages/LibrarianNewsPage'));
+const CirculationPage = lazy(() => import('./features/librarian/pages/CirculationPage'));
+const CirculationIncidentDetailPage = lazy(() => import('./features/librarian/pages/CirculationPage').then((m) => ({ default: m.CirculationIncidentDetailPage })));
+const DirectCheckoutPage = lazy(() => import('./features/librarian/pages/CirculationPage').then((m) => ({ default: m.DirectCheckoutPage })));
+const AdminLayout = lazy(() => import('./features/admin/components/AdminLayout').then((m) => ({ default: m.AdminLayout })));
+const AdminOverviewPage = lazy(() => import('./features/admin/pages/AdminOverviewPage'));
+const AdminSectionPage = lazy(() => import('./features/admin/pages/AdminSectionPage'));
+const AdminUsersPage = lazy(() => import('./features/admin/pages/AdminUsersPage'));
+const AdminLibrarianCreatePage = lazy(() => import('./features/admin/pages/AdminLibrarianCreatePage'));
+const AdminUserDetailPage = lazy(() => import('./features/admin/pages/AdminUserDetailPage'));
+const AdminPoliciesPage = lazy(() => import('./features/admin/pages/AdminPoliciesPage'));
+const AdminReportsPage = lazy(() => import('./features/admin/pages/AdminReportsPage'));
+const AdminCollectionPage = lazy(() => import('./features/admin/pages/AdminCollectionPage'));
+const AdminReportDetailPage = lazy(() => import('./features/admin/pages/AdminReportDetailPage'));
+const AdminReportTemplatesPage = lazy(() => import('./features/admin/pages/AdminReportTemplatesPage'));
+const AdminReportTemplateDetailPage = lazy(() => import('./features/admin/pages/AdminReportTemplateDetailPage'));
+const AdminRegulationsPage = lazy(() => import('./features/admin/pages/AdminRegulationsPage'));
+const ProfilePage = lazy(() => import('./features/profile/pages/ProfilePage'));
+const HistoryPage = lazy(() => import('./features/profile/pages/HistoryPage'));
+const ReaderFavoritesPage = lazy(() => import('./features/home/pages/ReaderFavoritesPage'));
+const SupportPage = lazy(() => import('./features/profile/pages/SupportPage'));
+const LibrarianSupportPage = lazy(() => import('./features/librarian/pages/LibrarianSupportPage'));
+const PinnedNewsPoster = lazy(() => import('./features/home/components/PinnedNewsPoster'));
 
 function ProfileEntry() {
   const role = useAuthStore((state) => state.user?.role);
@@ -92,8 +97,15 @@ function App() {
     };
   }, [accessToken]);
 
+  useEffect(() => {
+    // A public enhancement should not delay the first screen users navigate to.
+    const id = window.setTimeout(() => void import('./features/home/components/PinnedNewsPoster'), 1200);
+    return () => window.clearTimeout(id);
+  }, []);
+
   return (
     <>
+    <Suspense fallback={<PageLoading />}>
     <PinnedNewsPoster />
     <Routes>
       {/* Public Routes */}
@@ -204,6 +216,7 @@ function App() {
       </Route>
     </Routes>
     {role === 'Reader' && <RagAskPanel />}
+    </Suspense>
     </>
   );
 }
