@@ -70,6 +70,7 @@ const BookDetailPage = () => {
   });
   const [draft, setDraft] = useState<ReviewDraft>({ reviewId: '', rating: 5, comment: '' });
   const [pickupSlots, setPickupSlots] = useState<PickupSlot[]>([]);
+  const [pickupSlotsVersion, setPickupSlotsVersion] = useState(0);
   const [selectedPickupAt, setSelectedPickupAt] = useState('');
   const [borrowSuccessOpen, setBorrowSuccessOpen] = useState(false);
   const [pickupSlotsError, setPickupSlotsError] = useState<string | null>(null);
@@ -143,7 +144,7 @@ const BookDetailPage = () => {
     };
     void loadPickupSlots();
     return () => controller.abort();
-  }, [accessToken, isReader]);
+  }, [accessToken, isReader, pickupSlotsVersion]);
 
   const invalidateBookData = async () => {
     await Promise.all([
@@ -180,13 +181,18 @@ const BookDetailPage = () => {
         throw new Error(result?.error || `Không gửi được yêu cầu mượn (HTTP ${response.status}).`);
       }
     },
-    onSuccess: async (_data, pickupAt) => {
+    onSuccess: async () => {
       setBorrowSuccessOpen(true);
       await queryClient.invalidateQueries({ queryKey: ['public-book-availability', bookId] });
       await queryClient.invalidateQueries({ queryKey: ['my-book-reservations', accessToken] });
-      setPickupSlots((slots) => slots
-        .map((slot) => slot.pickupAt === pickupAt ? { ...slot, remainingCapacity: slot.remainingCapacity - 1 } : slot)
-        .filter((slot) => slot.remainingCapacity > 0));
+      setPickupSlots((slots) => {
+        const nextSlots = slots
+          .map((slot) => ({ ...slot, remainingCapacity: slot.remainingCapacity - 1 }))
+          .filter((slot) => slot.remainingCapacity > 0);
+        setSelectedPickupAt((current) => (nextSlots.some((s) => s.pickupAt === current) ? current : nextSlots[0]?.pickupAt ?? ''));
+        return nextSlots;
+      });
+      setPickupSlotsVersion((v) => v + 1);
     },
     onError: (error) => showToast({ type: 'error', title: 'Không thể mượn sách', message: error.message }),
   });
@@ -364,14 +370,30 @@ const BookDetailPage = () => {
                     >
                       {pickupSlots.length === 0
                         ? <option value="">{loadingPickupSlots ? 'Đang tải khung giờ…' : 'Không còn khung giờ khả dụng'}</option>
-                        : pickupSlots.map((slot) => (
-                          <option key={slot.pickupAt} value={slot.pickupAt}>
-                            {new Date(slot.pickupAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })} · còn {slot.remainingCapacity}/{slot.capacity} lượt
-                          </option>
-                        ))}
+                        : pickupSlots.map((slot) => {
+                          const d = new Date(slot.pickupAt);
+                          const hourStr = new Intl.DateTimeFormat('en-US', {
+                            timeZone: 'Asia/Ho_Chi_Minh',
+                            hour: 'numeric',
+                            hourCycle: 'h23',
+                          }).format(d);
+                          const hour = parseInt(hourStr, 10);
+                          const dateStr = new Intl.DateTimeFormat('vi-VN', {
+                            timeZone: 'Asia/Ho_Chi_Minh',
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          }).format(d);
+                          const sessionName = hour < 12 ? 'Buổi sáng (07:00 – 12:00)' : 'Buổi chiều (13:00 – 17:00)';
+                          return (
+                            <option key={slot.pickupAt} value={slot.pickupAt}>
+                              {sessionName} ngày {dateStr} · còn {slot.remainingCapacity}/{slot.capacity} lượt
+                            </option>
+                          );
+                        })}
                     </select>
                     {pickupSlotsError && <p className="book-detail-pickup-error" role="alert">{pickupSlotsError}</p>}
-                    <p className="book-detail-pickup-note">Thứ 2–6: 09:00–17:00 · Thứ 7: 09:00–15:00 · Khung 30 phút. Nếu không đến trong 30 phút sau lịch hẹn, yêu cầu và bản sao sẽ tự hủy.</p>
+                    <p className="book-detail-pickup-note">Thời gian nhận sách: Buổi sáng (07:00 – 12:00) hoặc Buổi chiều (13:00 – 17:00). Nếu không đến nhận trong vòng 30 phút sau khi kết thúc buổi hẹn, yêu cầu sẽ tự hủy.</p>
                   </>
                 )}
                 <div className="book-detail-circulation-actions">

@@ -546,6 +546,31 @@ public class CirculationServiceTests
     }
 
     [Fact]
+    public async Task GetPickupSlots_WhenReaderHasActiveLoans_LimitsRemainingCapacityAcrossAllSlots()
+    {
+        var reader = ActiveReader();
+        _repo.Setup(x => x.FindReaderAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+        _repo.Setup(x => x.CountActiveLoansAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var slots = await _sut.GetPickupSlotsAsync(reader.Id);
+
+        slots.Should().NotBeEmpty();
+        slots.Should().OnlyContain(s => s.RemainingCapacity == 1 && s.Capacity == 2);
+    }
+
+    [Fact]
+    public async Task GetPickupSlots_WhenReaderReachesMaxLoanLimit_ReturnsNoSlots()
+    {
+        var reader = ActiveReader();
+        _repo.Setup(x => x.FindReaderAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+        _repo.Setup(x => x.CountActiveLoansAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>())).ReturnsAsync(2);
+
+        var slots = await _sut.GetPickupSlotsAsync(reader.Id);
+
+        slots.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task CompleteCheckout_WhenApproved_StartsBorrowPeriodAndNotifiesReader()
     {
         var reader = ActiveReader();
@@ -572,7 +597,7 @@ public class CirculationServiceTests
         result.IsSuccess.Should().BeTrue();
         loan.Status.Should().Be(BorrowStatus.Borrowed);
         loan.BorrowDate.Should().NotBeNull();
-        loan.DueDate.Should().BeCloseTo(loan.BorrowDate!.Value.AddDays(14), TimeSpan.FromSeconds(1));
+        loan.DueDate.Should().Be(CirculationRules.CalculateDueDate(loan.BorrowDate!.Value, 14, CirculationRules.IsMorning(loan.PickupAt!.Value)));
         _repo.Verify(x => x.AddNotificationAsync(It.Is<Notification>(notification =>
             notification.Title == "Đã hoàn tất mượn sách"
             && notification.Message.Contains("SE123456")
@@ -604,7 +629,7 @@ public class CirculationServiceTests
         var result = await _sut.CompleteCheckoutAsync(loan.Id, Guid.NewGuid());
 
         result.IsSuccess.Should().BeTrue();
-        loan.DueDate.Should().BeCloseTo(loan.BorrowDate!.Value.AddDays(7), TimeSpan.FromSeconds(1));
+        loan.DueDate.Should().Be(CirculationRules.CalculateDueDate(loan.BorrowDate!.Value, 7, CirculationRules.IsMorning(loan.BorrowDate!.Value)));
     }
 
     [Fact]
@@ -643,7 +668,7 @@ public class CirculationServiceTests
             Id = Guid.NewGuid(),
             ReaderId = reader.Id,
             BookCopyId = copy.Id,
-            PickupAt = DateTime.UtcNow.AddMinutes(-31),
+            PickupAt = DateTime.UtcNow.AddDays(-2),
             Status = BorrowStatus.Approved,
             BookCopy = copy
         };
@@ -759,6 +784,8 @@ public class CirculationServiceTests
             BookCopy = ReadyCopy()
         };
         _repo.Setup(x => x.GetTrackedLoanAsync(loan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(loan);
+        _repo.Setup(x => x.FindReaderAsync(loan.ReaderId.ToString(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ActiveReader());
         _repo.Setup(x => x.HasUnpaidFinesAsync(loan.ReaderId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _repo.Setup(x => x.HasOtherReservationAsync(loan.BookCopy.BookId, loan.ReaderId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
@@ -774,7 +801,7 @@ public class CirculationServiceTests
 
         result.IsSuccess.Should().BeTrue();
         loan.DueDate.Should().BeAfter(originalDueDate);
-        loan.DueDate.Should().BeCloseTo(originalDueDate.AddDays(_settings.RenewalDays), TimeSpan.FromSeconds(1));
+        loan.DueDate.Should().Be(CirculationRules.CalculateDueDate(originalDueDate, _settings.RenewalDays, CirculationRules.IsMorning(originalDueDate)));
         loan.RenewalCount.Should().Be(1);
         loan.Status.Should().Be(BorrowStatus.Borrowed);
         loan.Notes.Should().Contain("Tự gia hạn lần 1");

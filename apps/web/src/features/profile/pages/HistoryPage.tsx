@@ -553,7 +553,18 @@ const HistoryPage = () => {
                   </div>
                   <span>Mã bản sao: {loan.barcode}</span>
                   {['Rejected', 'Cancelled'].includes(loan.status) && <span className="history-record-warning">Lý do từ chối / hủy: {loan.rejectionReason || 'Chưa có lý do được ghi nhận.'}</span>}
-                  {loan.pickupAt && <span>Lịch đến nhận: {formatDateTime(loan.pickupAt)}</span>}
+                  {loan.pickupAt && (
+                    <span>
+                      Lịch đến nhận:{' '}
+                      {(() => {
+                        const d = new Date(loan.pickupAt);
+                        const hourStr = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour: 'numeric', hourCycle: 'h23' }).format(d);
+                        const hour = parseInt(hourStr, 10);
+                        const session = hour < 12 ? 'Buổi sáng (07:00 – 12:00)' : 'Buổi chiều (13:00 – 17:00)';
+                        return `${session} ngày ${formatDate(loan.pickupAt)}`;
+                      })()}
+                    </span>
+                  )}
                   {loan.acceptedAt && (
                     <span>
                       Tiếp nhận bởi {loan.librarianName || 'thủ thư'} lúc {formatDateTime(loan.acceptedAt)}
@@ -561,7 +572,18 @@ const HistoryPage = () => {
                   )}
                   <div className="history-record-dates">
                     <span>Mượn: {formatDateTime(loan.borrowDate)}</span>
-                    <span>Hạn trả (hết ngày): {formatDate(loan.dueDate)}</span>
+                    <span>
+                      Hạn trả:{' '}
+                      {loan.dueDate
+                        ? (() => {
+                            const d = new Date(loan.dueDate);
+                            const hourStr = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour: 'numeric', hourCycle: 'h23' }).format(d);
+                            const hour = parseInt(hourStr, 10);
+                            const session = hour <= 12 ? 'Buổi sáng (trước 12:00)' : 'Buổi chiều (trước 17:00)';
+                            return `${formatDate(loan.dueDate)} · ${session}`;
+                          })()
+                        : '—'}
+                    </span>
                     <span>Đã trả: {formatDateTime(loan.returnDate)}</span>
                     <span>Gia hạn: {loan.renewalCount} lần</span>
                   </div>

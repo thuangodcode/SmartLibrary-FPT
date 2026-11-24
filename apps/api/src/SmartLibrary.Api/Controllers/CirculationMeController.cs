@@ -103,7 +103,11 @@ public class CirculationMeController : ControllerBase
     [HttpGet("pickup-slots")]
     [Authorize(Roles = "Reader")]
     public async Task<IActionResult> PickupSlots(CancellationToken ct)
-        => Ok(ApiResponse<IReadOnlyList<PickupSlotDto>>.Ok(await _circulation.GetPickupSlotsAsync(ct)));
+    {
+        var readerId = CirculationService.ReadUserId(User);
+        var slots = await _circulation.GetPickupSlotsAsync(readerId == Guid.Empty ? null : readerId, ct);
+        return Ok(ApiResponse<IReadOnlyList<PickupSlotDto>>.Ok(slots));
+    }
 
     /// <summary>Request to borrow a currently available copy by book ID.</summary>
     [HttpPost("book-requests")]

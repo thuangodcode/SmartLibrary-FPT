@@ -106,11 +106,8 @@ public class CirculationRulesTests
 
         localSlots.Should().NotBeEmpty();
         localSlots.Should().OnlyContain(slot => slot.DayOfWeek != DayOfWeek.Sunday);
-        localSlots.Should().OnlyContain(slot => (slot.Minute == 0 || slot.Minute == 30) && slot.Second == 0);
-        localSlots.Where(slot => slot.DayOfWeek == DayOfWeek.Saturday)
-            .Should().OnlyContain(slot => slot.Hour >= 9 && (slot.Hour < 15));
-        localSlots.Where(slot => slot.DayOfWeek is not DayOfWeek.Saturday)
-            .Should().OnlyContain(slot => slot.Hour >= 9 && slot.Hour < 17);
+        localSlots.Should().OnlyContain(slot => slot.Minute == 0 && slot.Second == 0);
+        localSlots.Should().OnlyContain(slot => slot.Hour == 7 || slot.Hour == 13);
         slots.Should().OnlyContain(slot => slot.Capacity == 3 && slot.RemainingCapacity == 3);
     }
 
