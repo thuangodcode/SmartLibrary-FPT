@@ -400,6 +400,11 @@
   color: #347246;
 }
 
+.librarian-support-status--awaitingreader {
+  background: #fff4d8;
+  color: #8a5b00;
+}
+
 .librarian-support-ticket-detail {
   display: flex;
   min-width: 0;
@@ -629,6 +634,38 @@
   font-size: 10px;
   resize: vertical;
 }
+
+.lib-support-unified-composer {
+  justify-items: stretch;
+  gap: 11px;
+  margin-top: 18px;
+  border: 1px solid #dce7de;
+  border-radius: 13px;
+  background: #f7faf7;
+  padding: 16px;
+}
+
+.lib-support-composer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lib-support-composer-heading > div { display: grid; gap: 4px; }
+.lib-support-composer-heading strong { color: #283c2e; font-size: 13px; }
+.lib-support-composer-heading > div > span,
+.lib-support-composer-heading > span { color: #778579; font-size: 10px; }
+.lib-support-composer-modes { display: flex; flex-wrap: wrap; gap: 8px; }
+.librarian-support-reply-form .lib-support-composer-modes button { min-height: 34px; justify-content: center; border: 1px solid #d3dfd5; border-radius: 8px; background: #fff; padding: 0 11px; color: #526257; font-size: 10px; }
+.librarian-support-reply-form .lib-support-composer-modes button.is-active { border-color: #2e6847; background: #eaf4ec; color: #245a39; }
+.librarian-support-reply-form .lib-support-composer-modes button.is-active.is-request { border-color: #d99c3c; background: #fff4dc; color: #80530d; }
+.lib-support-composer-hint { margin: 0; color: #69766c; font-size: 10px; line-height: 1.5; }
+.librarian-support-reply-form.lib-support-unified-composer textarea { min-height: 92px; border: 1px solid #d6e0d7; border-radius: 8px; background: #fff; padding: 11px; color: #26372b; font-size: 11px; line-height: 1.55; }
+.librarian-support-reply-form.lib-support-unified-composer > button[type='submit'] { width: fit-content; min-height: 36px; justify-self: end; border-radius: 8px; padding: 0 13px; }
+html.dark .librarian-support .lib-support-unified-composer { border-color: #35443b; background: #202c25; }
+html.dark .librarian-support .lib-support-composer-heading strong { color: #edf4ee; }
+html.dark .librarian-support .lib-support-composer-heading > div > span,
+html.dark .librarian-support .lib-support-composer-heading > span,
+html.dark .librarian-support .lib-support-composer-hint { color: #bac8bd; }
+html.dark .librarian-support .librarian-support-reply-form .lib-support-composer-modes button { border-color: #45564b; background: #151d18; color: #d5e1d7; }
+html.dark .librarian-support .librarian-support-reply-form .lib-support-composer-modes button.is-active { border-color: #79b389; background: #244832; color: #e3f3e7; }
+html.dark .librarian-support .librarian-support-reply-form .lib-support-composer-modes button.is-active.is-request { border-color: #b88732; background: #3a301c; color: #ffe0a0; }
+html.dark .librarian-support .librarian-support-reply-form.lib-support-unified-composer textarea { border-color: #45564b; background: #111916; color: #edf4ee; }
 
 .librarian-support-chat {
   display: grid;

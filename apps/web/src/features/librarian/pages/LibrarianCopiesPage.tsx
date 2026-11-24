@@ -75,6 +75,10 @@ interface CopySummary {
 interface StorageLocation {
   id: string;
   name: string;
+  floor: string;
+  area: string;
+  categoryIds: string[];
+  categories: string[];
   copyCount: number;
   bookCount: number;
   capacity: number;
@@ -92,6 +96,9 @@ interface SortingBookOption {
   id: string;
   title: string;
   code: string;
+  categoryIds: string[];
+  categories: string[];
+  suggestedLocations: string[];
   onShelfCopies: number;
   inWarehouseCopies: number;
 }
@@ -121,6 +128,9 @@ interface SortingCopy {
 }
 
 interface SortingBookDetails extends SortingBookOption {
+  categoryIds: string[];
+  categories: string[];
+  suggestedLocations: string[];
   returnedInWarehouseCopies: number;
   copies: SortingCopy[];
 }
@@ -210,6 +220,7 @@ const LibrarianCopiesPage: React.FC = () => {
   const [selectedShelfBook, setSelectedShelfBook] = useState<BookCopyGroup | null>(null);
   const [shelfCopies, setShelfCopies] = useState<CopyItem[]>([]);
   const [shelfCopiesLoading, setShelfCopiesLoading] = useState(false);
+  const [shelfDialog, setShelfDialog] = useState<{ id?: string; floor: string; area: string; capacity: number; categoryIds: string[] } | null>(null);
 
   const headers = useMemo(() => {
     const result: Record<string, string> = {};
@@ -217,14 +228,27 @@ const LibrarianCopiesPage: React.FC = () => {
     return result;
   }, [accessToken]);
 
+  const normalizedLocations = useMemo(() => locations.map(location => ({
+    ...location,
+    floor: location.floor || location.name.match(/^Tầng\s+(.+?)\s+·/i)?.[1] || '',
+    area: location.area || location.name.match(/· Kệ\s+(.+)$/i)?.[1] || '',
+    categoryIds: location.categoryIds ?? [],
+    categories: location.categories ?? [],
+  })), [locations]);
   const shelfFloors = useMemo(() => {
-    const floors = locations.map(location => location.name.match(/^Tầng\s+(.+?)\s+·/i)?.[1]).filter((floor): floor is string => Boolean(floor));
+    const floors = normalizedLocations.map(location => location.floor).filter(Boolean);
     return Array.from(new Set(floors)).sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }));
-  }, [locations]);
-  const visibleShelves = useMemo(() => locations.filter(location => {
-    const floor = location.name.match(/^Tầng\s+(.+?)\s+·/i)?.[1] ?? '';
-    return (shelfFloor === 'all' || floor === shelfFloor) && location.name.toLocaleLowerCase('vi').includes(shelfSearch.trim().toLocaleLowerCase('vi'));
-  }), [locations, shelfFloor, shelfSearch]);
+  }, [normalizedLocations]);
+  const visibleShelves = useMemo(() => normalizedLocations.filter(location =>
+    (shelfFloor === 'all' || location.floor === shelfFloor) && `${location.name} ${location.categories.join(' ')}`.toLocaleLowerCase('vi').includes(shelfSearch.trim().toLocaleLowerCase('vi'))
+  ), [normalizedLocations, shelfFloor, shelfSearch]);
+  const savingShelfSuggestions = useMemo(() => {
+    const bookCategoryIds = sortingDetails?.categoryIds ?? sortingBooks.find(book => book.id === sortingBookId)?.categoryIds ?? [];
+    const assigned = bookCategoryIds.flatMap(categoryId => normalizedLocations
+      .filter(location => location.categoryIds.includes(categoryId))
+      .map(location => location.name));
+    return Array.from(new Set(assigned));
+  }, [normalizedLocations, sortingBookId, sortingBooks, sortingDetails]);
 
   const fetchInventory = useCallback(async (bookId?: string) => {
     const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
@@ -281,7 +305,13 @@ const LibrarianCopiesPage: React.FC = () => {
         throw new Error(restockResult?.error || 'Không thể tải cảnh báo bổ sung sách.');
       }
       setSummary(summaryResult.data ?? null);
-      setLocations(locationsResult.data ?? []);
+      setLocations((locationsResult.data ?? []).map(location => ({
+        ...location,
+        floor: location.floor || location.name.match(/^Tầng\s+(.+?)\s+·/i)?.[1] || '',
+        area: location.area || location.name.match(/· Kệ\s+(.+)$/i)?.[1] || '',
+        categoryIds: location.categoryIds ?? [],
+        categories: location.categories ?? [],
+      })));
       setRestockAlerts(restockResult.data ?? []);
       await fetchInventory(selectedCopyBookId);
     } catch (caught) {
@@ -570,51 +600,27 @@ const LibrarianCopiesPage: React.FC = () => {
     }
   };
 
-  const handleEditShelf = async (location: StorageLocation) => {
-    const name = window.prompt('Tên kệ (dạng: Tầng X · Kệ Y)', location.name)?.trim();
-    if (!name) return;
-    const capacityText = window.prompt('Sức chứa tối đa', String(location.capacity));
-    if (capacityText === null) return;
-    const capacity = Number(capacityText);
-    if (!Number.isInteger(capacity) || capacity < location.copyCount || capacity > 10000) {
-      showToast({ type: 'error', title: 'Sức chứa không hợp lệ', message: `Sức chứa phải từ ${location.copyCount} đến 10.000 cuốn.` });
-      return;
-    }
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/copies/locations/${location.id}`, {
-        method: 'PUT', headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, capacity }),
-      });
-      const result = await parseApiResponse<Envelope<StorageLocation>>(response);
-      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể cập nhật kệ.');
-      await refreshData();
-      showToast({ type: 'success', title: 'Đã cập nhật kệ', message: `${name}: tối đa ${capacity} bản sao.` });
-    } catch (caught) {
-      showToast({ type: 'error', title: 'Cập nhật kệ thất bại', message: caught instanceof Error ? caught.message : 'Không thể cập nhật kệ.' });
-    }
-  };
+  const openShelfDialog = (location?: StorageLocation) => setShelfDialog(location
+    ? { id: location.id, floor: location.floor || location.name.match(/^Tầng\s+(.+?)\s+·/i)?.[1] || '', area: location.area || location.name.match(/· Kệ\s+(.+)$/i)?.[1] || '', capacity: location.capacity, categoryIds: location.categoryIds ?? [] }
+    : { floor: '', area: '', capacity: 100, categoryIds: [] });
 
-  const handleCreateShelf = async () => {
-    const name = window.prompt('Tên kệ mới (dạng: Tầng X · Kệ Y, ví dụ Tầng 4 · Kệ A)')?.trim();
-    if (!name) return;
-    const capacityText = window.prompt('Sức chứa tối đa của kệ', '100');
-    if (capacityText === null) return;
-    const capacity = Number(capacityText);
-    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 10000) {
-      showToast({ type: 'error', title: 'Sức chứa không hợp lệ', message: 'Sức chứa phải từ 1 đến 10.000 cuốn.' });
-      return;
-    }
+  const handleSaveShelf = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!shelfDialog || !shelfDialog.floor.trim() || !shelfDialog.area.trim()) return;
+    const name = `Tầng ${shelfDialog.floor.trim()} · Kệ ${shelfDialog.area.trim()}`;
+    const method = shelfDialog.id ? 'PUT' : 'POST';
+    const url = shelfDialog.id ? `${API_BASE_URL}/api/v1/copies/locations/${shelfDialog.id}` : `${API_BASE_URL}/api/v1/copies/locations`;
+    setSaving(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/copies/locations`, {
-        method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ name, capacity }),
-      });
+      const response = await fetch(url, { method, headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ name, capacity: shelfDialog.capacity, categoryIds: shelfDialog.categoryIds }) });
       const result = await parseApiResponse<Envelope<StorageLocation>>(response);
-      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể tạo kệ mới.');
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Không thể lưu cài đặt khu sách.');
+      setShelfDialog(null);
       await refreshData();
-      showToast({ type: 'success', title: 'Đã thêm kệ', message: `${name} đã sẵn sàng để sắp xếp sách.` });
+      showToast({ type: 'success', title: shelfDialog.id ? 'Đã cập nhật khu sách' : 'Đã thêm khu sách', message: `${name}${shelfDialog.categoryIds.length ? ` · đã gán ${shelfDialog.categoryIds.length} danh mục` : ''}.` });
     } catch (caught) {
-      showToast({ type: 'error', title: 'Thêm kệ thất bại', message: caught instanceof Error ? caught.message : 'Không thể tạo kệ mới.' });
-    }
+      showToast({ type: 'error', title: 'Lưu khu sách thất bại', message: caught instanceof Error ? caught.message : 'Không thể lưu khu sách.' });
+    } finally { setSaving(false); }
   };
 
   const handleDeleteShelf = async (location: StorageLocation) => {
@@ -745,7 +751,7 @@ const LibrarianCopiesPage: React.FC = () => {
                 <select value={selectedLocation} onChange={(event) => { setSelectedLocation(event.target.value); setPage(1); setLoading(true); }}>
                   <option value="">Tất cả vị trí</option>
                   <option value="__warehouse__">Trong kho, chờ xếp kệ</option>
-                  {locations.map((location) => <option key={location.name} value={location.name}>{location.name}</option>)}
+              {normalizedLocations.map((location) => <option key={location.name} value={location.name}>{location.name}</option>)}
                 </select>
               </label>}
               <button type="button" className="lib-copies-refresh" onClick={() => void refreshData()} title="Làm mới"><RefreshCw size={16} className={loading ? 'is-spinning' : ''} /></button>
@@ -822,8 +828,9 @@ const LibrarianCopiesPage: React.FC = () => {
                 <label htmlFor="sorting-common-shelf">Kệ chung cho {sortingSelected.length} bản đã chọn</label>
                 <select id="sorting-common-shelf" value={commonShelf} disabled={saving} onChange={event => setCommonShelf(event.target.value)}>
                   <option value="">Chọn kệ...</option>
-                  {locations.filter(location => location.availableCapacity > 0).map(location => <option key={location.id} value={location.name}>{location.name} · còn {location.availableCapacity} chỗ</option>)}
+                {normalizedLocations.filter(location => location.availableCapacity > 0 && (location.categoryIds.length === 0 || savingShelfSuggestions.includes(location.name))).map(location => <option key={location.id} value={location.name}>{location.name}{location.categories.length ? ` · ${location.categories.join(', ')}` : ' · Kệ chung'} · còn {location.availableCapacity} chỗ</option>)}
                 </select>
+                {sortingDetails.categories.length > 0 && <small>Danh mục đầu sách: {sortingDetails.categories.join(', ')}. Kệ đã gán danh mục được ưu tiên khi xếp.</small>}
                 <button type="button" disabled={saving || !sortingSelected.length || !commonShelf || sortingSelected.length > (locations.find(location => location.name === commonShelf)?.availableCapacity ?? 0)} onClick={() => setSortingDestinations(current => ({ ...current, ...Object.fromEntries(sortingSelected.map(id => [id, commonShelf])) }))}>Áp dụng kệ cho các bản đã chọn</button>
                 {commonShelf && sortingSelected.length > (locations.find(location => location.name === commonShelf)?.availableCapacity ?? 0) && <p role="status">Kệ không đủ chỗ cho {sortingSelected.length} bản. Chọn kệ khác hoặc giảm số bản đã chọn.</p>}
                 <small>Áp dụng để xem trước; nhấn Lưu thay đổi để xác nhận.</small>
@@ -834,7 +841,7 @@ const LibrarianCopiesPage: React.FC = () => {
                   <button type="button" className="lib-copy-qr" onClick={() => setQrCopy({ barcode: copy.barcode, bookTitle: sortingDetails.title })} aria-label={`Xem mã QR ${copy.barcode}`}>Xem QR</button>
                   <select disabled={saving} aria-label={`Vị trí của bản sao ${copy.barcode}`} value={sortingDestinations[copy.id] ?? ''} onChange={event => setSortingDestinations(current => ({ ...current, [copy.id]: event.target.value }))}>
                     <option value="">Giữ trong kho</option>
-                    {locations.filter(location => location.availableCapacity > 0).map(location => <option key={location.id} value={location.name}>{location.name} · còn {location.availableCapacity} chỗ</option>)}
+                    {normalizedLocations.filter(location => location.availableCapacity > 0 && (location.categoryIds.length === 0 || savingShelfSuggestions.includes(location.name))).map(location => <option key={location.id} value={location.name}>{location.name}{location.categories.length ? ` · ${location.categories.join(', ')}` : ' · Kệ chung'} · còn {location.availableCapacity} chỗ</option>)}
                   </select>
                 </article>)}
                 {!sortingDetails.copies.length && <div className="lib-copies-empty"><Check size={30} /><strong>Không còn bản sao trong kho cần sắp xếp</strong></div>}
@@ -910,24 +917,28 @@ const LibrarianCopiesPage: React.FC = () => {
           </div>
         ) : (
           <div className="lib-copies-location-grid">
-            <div className="lib-copies-shelf-actions"><div><strong>Quản lý kệ sách</strong><small>Tạo kệ, đổi tên và sức chứa. Chọn một kệ để xem đầu sách, kiểm tra số chỗ còn lại; chỉ xóa được kệ đang trống.</small></div><button type="button" onClick={() => void handleCreateShelf()}>+ Thêm kệ sách</button></div>
+            <div className="lib-copies-shelf-actions"><div><strong>Quản lý tầng, khu và danh mục</strong><small>Tạo khu theo tầng, gán một hoặc nhiều danh mục cho mỗi khu, rồi theo dõi đầu sách và sức chứa tại đó.</small></div><button type="button" onClick={() => openShelfDialog()}>+ Thêm khu sách</button></div>
             <div className="lib-copies-shelf-filters">
               <label className="lib-copies-search"><Search size={17} /><input value={shelfSearch} onChange={event => setShelfSearch(event.target.value)} placeholder="Tìm nhanh theo tầng hoặc tên kệ..." /></label>
               <div className="lib-copies-floor-tabs" role="tablist" aria-label="Lọc kệ theo tầng">
                 <button type="button" className={shelfFloor === 'all' ? 'is-active' : ''} onClick={() => setShelfFloor('all')}>Tất cả tầng <span>{locations.length}</span></button>
-                {shelfFloors.map(floor => <button type="button" key={floor} className={shelfFloor === floor ? 'is-active' : ''} onClick={() => setShelfFloor(floor)}>Tầng {floor} <span>{locations.filter(location => location.name.match(/^Tầng\s+(.+?)\s+·/i)?.[1] === floor).length}</span></button>)}
+                {shelfFloors.map(floor => <button type="button" key={floor} className={shelfFloor === floor ? 'is-active' : ''} onClick={() => setShelfFloor(floor)}>Tầng {floor} <span>{normalizedLocations.filter(location => location.floor === floor).length}</span></button>)}
               </div>
             </div>
-            {visibleShelves.length ? visibleShelves.map((location) => (
+            {visibleShelves.length ? visibleShelves.map((rawLocation) => {
+              const location = normalizedLocations.find(item => item.id === rawLocation.id) ?? rawLocation;
+              return (
               <article className="lib-copies-shelf-card" key={location.id}>
                 <button type="button" className="lib-copies-shelf-open" aria-label={`Xem ${location.bookCount} đầu sách trên ${location.name}`} onClick={() => { setSelectedShelf(location); setSelectedShelfBook(null); setShelfBookGroups([]); setShelfBooksLoading(true); }}>
-                  <span><MapPin size={19} /></span><strong>{location.name}</strong><small>{location.copyCount} cuốn · {location.bookCount} đầu sách · còn {location.availableCapacity} chỗ</small><ChevronRight size={17} />
+                  <span><MapPin size={19} /></span><strong>{location.name}</strong><small>{location.categories.length ? `Danh mục: ${location.categories.join(', ')}` : 'Chưa gán danh mục'} · {location.copyCount} cuốn · {location.bookCount} đầu sách · còn {location.availableCapacity} chỗ</small><ChevronRight size={17} />
                   <span className="lib-copies-capacity-track"><i style={{ width: `${Math.min(100, (location.copyCount / location.capacity) * 100)}%` }} /></span>
                 </button>
-                <button type="button" className="lib-copies-shelf-edit" onClick={() => void handleEditShelf(location)}>Sửa kệ</button>
+                {location.categories.length > 0 && <div className="lib-copies-shelf-categories">{location.categories.map(category => <span key={category}>{category}</span>)}</div>}
+                <button type="button" className="lib-copies-shelf-edit" onClick={() => openShelfDialog(location)}>Sửa khu / danh mục</button>
                 <button type="button" className="lib-copies-shelf-delete" disabled={location.copyCount > 0} title={location.copyCount > 0 ? 'Chuyển bản sao khỏi kệ trước khi xóa' : 'Xóa kệ trống'} onClick={() => void handleDeleteShelf(location)}>Xóa kệ</button>
               </article>
-            )) : <div className="lib-copies-empty"><MapPin size={30} /><strong>{locations.length ? 'Không tìm thấy kệ phù hợp' : 'Chưa có vị trí lưu trữ'}</strong><p>{locations.length ? 'Thử đổi từ khóa tìm kiếm hoặc chọn tầng khác.' : 'Thêm kệ theo dạng Tầng X · Kệ Y, ví dụ Tầng 4 · Kệ A.'}</p></div>}
+            );
+            }) : <div className="lib-copies-empty"><MapPin size={30} /><strong>{locations.length ? 'Không tìm thấy kệ phù hợp' : 'Chưa có vị trí lưu trữ'}</strong><p>{locations.length ? 'Thử đổi từ khóa tìm kiếm hoặc chọn tầng khác.' : 'Thêm kệ theo dạng Tầng X · Kệ Y, ví dụ Tầng 4 · Kệ A.'}</p></div>}
           </div>
         )}
       </section>
@@ -1010,6 +1021,21 @@ const LibrarianCopiesPage: React.FC = () => {
             </div>
             <aside className="lib-copies-intake-note">Mỗi bản sao được tạo mã riêng và lưu trong kho; sau đó chọn đầu sách trong tab Quản lý kho để xếp từng cuốn lên kệ.</aside>
             <footer><button type="button" onClick={() => setIntakeOpen(false)}>Hủy</button><button type="submit" disabled={saving || !intakeBookId || quantity < 1 || quantity > 500}><PackagePlus size={16} />{saving ? 'Đang nhập...' : 'Nhập vào kho'}</button></footer>
+          </form>
+        </div>
+      )}
+
+      {shelfDialog && (
+        <div className="lib-copies-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !saving) setShelfDialog(null); }}>
+          <form className="lib-copies-modal lib-copies-shelf-modal" onSubmit={handleSaveShelf} role="dialog" aria-modal="true" aria-labelledby="lib-shelf-dialog-title">
+            <header><div><span><MapPin size={19} /></span><div><h2 id="lib-shelf-dialog-title">{shelfDialog.id ? 'Cấu hình khu sách' : 'Thêm khu sách'}</h2><p>Chọn tầng, khu và danh mục đầu sách sẽ được xếp tại đây.</p></div></div><button type="button" disabled={saving} onClick={() => setShelfDialog(null)} aria-label="Đóng"><X size={19} /></button></header>
+            <div className="lib-copies-form-row">
+              <label className="lib-copies-field">Tầng <b>*</b><input required maxLength={20} value={shelfDialog.floor} onChange={event => setShelfDialog(current => current ? { ...current, floor: event.target.value.replace(/[^\p{L}\p{N}-]/gu, '') } : current)} placeholder="Ví dụ: 1" /></label>
+              <label className="lib-copies-field">Khu / kệ <b>*</b><input required maxLength={20} value={shelfDialog.area} onChange={event => setShelfDialog(current => current ? { ...current, area: event.target.value.replace(/[^\p{L}\p{N}-]/gu, '') } : current)} placeholder="Ví dụ: A" /></label>
+            </div>
+            <label className="lib-copies-field">Sức chứa (bản sao)<input type="number" min={shelfDialog.id ? locations.find(item => item.id === shelfDialog.id)?.copyCount ?? 0 : 1} max={10000} required value={shelfDialog.capacity} onChange={event => setShelfDialog(current => current ? { ...current, capacity: Number(event.target.value) } : current)} /></label>
+            <fieldset className="lib-copies-category-picker"><legend>Danh mục đặt tại tầng {shelfDialog.floor || '…'} · khu {shelfDialog.area || '…'}</legend><p>Mỗi danh mục có thể gán cho nhiều khu. Đầu sách có nhiều danh mục sẽ dùng các khu phù hợp; thủ thư chọn khu cuối cùng khi xếp bản sao.</p><div>{categories.map(category => <label key={category.id}><input type="checkbox" checked={shelfDialog.categoryIds.includes(category.id)} disabled={saving} onChange={event => setShelfDialog(current => current ? { ...current, categoryIds: event.target.checked ? [...current.categoryIds, category.id] : current.categoryIds.filter(id => id !== category.id) } : current)} /><span>{category.name} · {category.code}</span></label>)}</div></fieldset>
+            <footer><button type="button" disabled={saving} onClick={() => setShelfDialog(null)}>Hủy</button><button type="submit" disabled={saving || !shelfDialog.floor || !shelfDialog.area || shelfDialog.capacity < (shelfDialog.id ? locations.find(item => item.id === shelfDialog.id)?.copyCount ?? 0 : 1)}>{saving ? 'Đang lưu…' : 'Lưu khu sách'}</button></footer>
           </form>
         </div>
       )}

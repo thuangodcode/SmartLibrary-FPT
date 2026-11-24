@@ -63,8 +63,31 @@
 .book-review-rating-label, .book-review-form > label[for="book-review-comment"] { display: block; margin: 16px 0 9px; color: #46564c; font-size: 14px; font-weight: 700; }
 .book-review-form > label span { color: #7e8a82; font-weight: 400; }
 .book-detail-pickup-label { display: block; margin: 18px 0 8px; color: #46564c; font-size: 14px; font-weight: 700; }
-.book-detail-pickup-select { width: 100%; min-height: 48px; border: 1px solid #d7e0d9; background: #fff; padding: 0 14px; color: var(--detail-ink); font: inherit; font-size: 14px; }
-.book-detail-pickup-select:focus-visible { outline: 3px solid rgb(36 77 57 / 20%); outline-offset: 2px; }
+.book-detail-pickup-trigger { display: flex; width: 100%; min-height: 52px; align-items: center; gap: 12px; border: 1px solid #d7e0d9; border-radius: 8px; background: #fff; padding: 0 15px; color: var(--detail-ink); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.book-detail-pickup-trigger span { flex: 1; }
+.book-detail-pickup-trigger svg:first-child { color: #34714a; }
+.book-detail-pickup-trigger:focus-visible { outline: 3px solid rgb(36 77 57 / 20%); outline-offset: 2px; }
+.book-detail-pickup-trigger:disabled { color: #849087; cursor: not-allowed; }
+.book-pickup-backdrop { position: fixed; z-index: 2147483645; inset: 0; display: grid; place-items: center; overflow-y: auto; background: rgb(12 29 20 / 70%); padding: 24px; }
+.book-pickup-dialog { position: relative; width: min(100%, 760px); max-height: min(88vh, 820px); overflow-y: auto; border-radius: 18px; background: #fff; padding: clamp(28px, 5vw, 48px); color: var(--detail-ink); box-shadow: 0 28px 80px rgb(6 20 12 / 32%); }
+.book-pickup-dialog::before { position: absolute; top: 0; right: 0; left: 0; height: 6px; background: var(--detail-orange); content: ""; }
+.book-pickup-close { position: absolute; top: 20px; right: 20px; display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 50%; background: #f0f3f0; color: #536159; cursor: pointer; }
+.book-pickup-eyebrow { color: #34714a; font-size: 12px; font-weight: 800; letter-spacing: .12em; }
+.book-pickup-dialog h2 { margin: 10px 48px 28px 0; font-family: Newsreader, Georgia, serif; font-size: clamp(30px, 5vw, 42px); letter-spacing: -.035em; }
+.book-pickup-step { margin: 24px 0 12px; color: #425449; font-size: 14px; font-weight: 750; }
+.book-pickup-date-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); gap: 9px; }
+.book-pickup-date { display: grid; min-height: 98px; justify-items: center; align-content: center; gap: 3px; border: 1px solid #dce5de; border-radius: 10px; background: #fff; color: #536159; cursor: pointer; }
+.book-pickup-date span, .book-pickup-date small { font-size: 12px; }
+.book-pickup-date strong { color: #22392b; font-size: 23px; }
+.book-pickup-date.is-selected, .book-pickup-session.is-selected { border-color: #34714a; background: #eaf3ec; box-shadow: inset 0 0 0 1px #34714a; }
+.book-pickup-session-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.book-pickup-session { display: grid; min-height: 86px; align-content: center; gap: 7px; border: 1px solid #dce5de; border-radius: 10px; background: #fff; color: #263b2e; cursor: pointer; }
+.book-pickup-session strong { font-size: 15px; }
+.book-pickup-session span { color: #68766d; font-size: 13px; }
+.book-pickup-session:disabled { opacity: .45; cursor: not-allowed; }
+.book-pickup-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 30px; border-top: 1px solid #e8ede9; padding-top: 20px; color: #68766d; font-size: 13px; }
+.book-pickup-footer button { min-height: 46px; border: 0; border-radius: 7px; background: var(--detail-green); padding: 0 22px; color: #fff; font-weight: 750; cursor: pointer; }
+.book-pickup-footer button:disabled { background: #aebbb2; cursor: not-allowed; }
 .book-detail-pickup-error { margin: 8px 0 0; color: #8b4427; font-size: 13px; }
 .book-detail-pickup-note { margin: 9px 0 0; color: var(--detail-soft); font-size: 12px; line-height: 1.55; }
 .book-review-star-picker { display: flex; align-items: center; gap: 3px; }
@@ -118,6 +141,12 @@
 }
 @media (max-width: 700px) {
   .book-detail-circulation-actions { grid-template-columns: 1fr; }
+  .book-pickup-backdrop { padding: 12px; }
+  .book-pickup-dialog { max-height: 94vh; padding: 28px 20px 22px; }
+  .book-pickup-date-grid { grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 7px; }
+  .book-pickup-date { min-height: 86px; }
+  .book-pickup-footer { align-items: stretch; flex-direction: column; }
+  .book-pickup-footer button { width: 100%; }
   .annual-home > main.book-detail-main { width: min(calc(100% - 32px), 620px); padding: 22px 0 72px; }
   .book-detail-back { margin-bottom: 14px; }
   .book-detail-overview { grid-template-columns: 1fr; }

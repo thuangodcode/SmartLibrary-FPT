@@ -142,7 +142,7 @@ public static class CirculationRules
     {
         var zone = LibraryTimeZone();
         var today = TimeZoneInfo.ConvertTime(now, zone).Date;
-        var capacity = Math.Max(1, settings.PickupCapacityPerSlot);
+        var capacity = settings.PickupCapacityPerSlot;
         var slots = new List<DateTimeOffset>();
 
         for (var offset = 0; offset < Math.Max(1, settings.PickupDaysAhead); offset++)
@@ -155,7 +155,7 @@ public static class CirculationRules
             var morningPickup = new DateTimeOffset(morningLocal, zone.GetUtcOffset(morningLocal));
             var morningEndLocal = DateTime.SpecifyKind(date.AddHours(12), DateTimeKind.Unspecified);
             var morningEnd = new DateTimeOffset(morningEndLocal, zone.GetUtcOffset(morningEndLocal));
-            if (now < morningEnd)
+            if (capacity > 0 && now < morningEnd)
             {
                 slots.Add(morningPickup);
             }
@@ -165,7 +165,7 @@ public static class CirculationRules
             var afternoonPickup = new DateTimeOffset(afternoonLocal, zone.GetUtcOffset(afternoonLocal));
             var afternoonEndLocal = DateTime.SpecifyKind(date.AddHours(17), DateTimeKind.Unspecified);
             var afternoonEnd = new DateTimeOffset(afternoonEndLocal, zone.GetUtcOffset(afternoonEndLocal));
-            if (now < afternoonEnd)
+            if (capacity > 0 && now < afternoonEnd)
             {
                 slots.Add(afternoonPickup);
             }

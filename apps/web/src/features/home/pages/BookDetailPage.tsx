@@ -41,6 +41,16 @@ interface MyBookReservation {
   expiresAt: string | null;
 }
 
+const pickupLocalDate = (pickupAt: string) => {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date(pickupAt));
+  return `${parts.find((part) => part.type === 'year')?.value}-${parts.find((part) => part.type === 'month')?.value}-${parts.find((part) => part.type === 'day')?.value}`;
+};
+
+const pickupLocalHour = (pickupAt: string) => Number(new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Ho_Chi_Minh', hour: 'numeric', hourCycle: 'h23',
+}).format(new Date(pickupAt)));
+
 const BookDetailPage = () => {
   const { bookId = '' } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
@@ -72,6 +82,7 @@ const BookDetailPage = () => {
   const [pickupSlots, setPickupSlots] = useState<PickupSlot[]>([]);
   const [pickupSlotsVersion, setPickupSlotsVersion] = useState(0);
   const [selectedPickupAt, setSelectedPickupAt] = useState('');
+  const [pickupModalOpen, setPickupModalOpen] = useState(false);
   const [borrowSuccessOpen, setBorrowSuccessOpen] = useState(false);
   const [pickupSlotsError, setPickupSlotsError] = useState<string | null>(null);
   const [loadingPickupSlots, setLoadingPickupSlots] = useState(false);
@@ -88,6 +99,8 @@ const BookDetailPage = () => {
   const myReservation = reservationQuery.data?.find((item) => item.bookId === bookId);
   const hasPendingReservation = myReservation?.status.toLowerCase() === 'pending';
   const hasReadyReservation = myReservation?.status.toLowerCase() === 'ready';
+  const pickupDates = Array.from(new Set(pickupSlots.map((slot) => pickupLocalDate(slot.pickupAt))));
+  const selectedPickupDate = selectedPickupAt ? pickupLocalDate(selectedPickupAt) : '';
 
   useEffect(() => {
     const loadFieldLabels = async () => {
@@ -155,10 +168,10 @@ const BookDetailPage = () => {
   };
 
   useEffect(() => {
-    if (!borrowSuccessOpen) return;
+    if (!borrowSuccessOpen && !pickupModalOpen) return;
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setBorrowSuccessOpen(false);
+      if (event.key === 'Escape') { setBorrowSuccessOpen(false); setPickupModalOpen(false); }
     };
     document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', closeOnEscape);
@@ -166,7 +179,7 @@ const BookDetailPage = () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', closeOnEscape);
     };
-  }, [borrowSuccessOpen]);
+  }, [borrowSuccessOpen, pickupModalOpen]);
 
   const borrowMutation = useMutation({
     mutationFn: async (pickupAt: string) => {
@@ -360,40 +373,14 @@ const BookDetailPage = () => {
                 <FavoriteBookButton bookId={book.id} title={book.title} variant="detail" />
                 {(availabilityQuery.data?.canBorrow || hasReadyReservation) && (
                   <>
-                    <label className="book-detail-pickup-label" htmlFor="book-detail-pickup-time">Chọn giờ đến nhận sách</label>
-                    <select
-                      id="book-detail-pickup-time"
-                      className="book-detail-pickup-select"
-                      value={selectedPickupAt}
-                      disabled={loadingPickupSlots || pickupSlots.length === 0}
-                      onChange={(event) => setSelectedPickupAt(event.target.value)}
-                    >
-                      {pickupSlots.length === 0
-                        ? <option value="">{loadingPickupSlots ? 'Đang tải khung giờ…' : 'Không còn khung giờ khả dụng'}</option>
-                        : pickupSlots.map((slot) => {
-                          const d = new Date(slot.pickupAt);
-                          const hourStr = new Intl.DateTimeFormat('en-US', {
-                            timeZone: 'Asia/Ho_Chi_Minh',
-                            hour: 'numeric',
-                            hourCycle: 'h23',
-                          }).format(d);
-                          const hour = parseInt(hourStr, 10);
-                          const dateStr = new Intl.DateTimeFormat('vi-VN', {
-                            timeZone: 'Asia/Ho_Chi_Minh',
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                          }).format(d);
-                          const sessionName = hour < 12 ? 'Buổi sáng (07:00 – 12:00)' : 'Buổi chiều (13:00 – 17:00)';
-                          return (
-                            <option key={slot.pickupAt} value={slot.pickupAt}>
-                              {sessionName} ngày {dateStr} · còn {slot.remainingCapacity}/{slot.capacity} lượt
-                            </option>
-                          );
-                        })}
-                    </select>
+                    <label className="book-detail-pickup-label">Ngày đến nhận sách</label>
+                    <button type="button" className="book-detail-pickup-trigger" onClick={() => setPickupModalOpen(true)} disabled={loadingPickupSlots || pickupSlots.length === 0}>
+                      <CalendarDays size={18} />
+                      <span>{selectedPickupAt ? `${new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(selectedPickupAt))} · ${pickupLocalHour(selectedPickupAt) < 12 ? 'Buổi sáng' : 'Buổi chiều'}` : loadingPickupSlots ? 'Đang tải ngày nhận…' : 'Chọn ngày và buổi nhận'}</span>
+                      <ArrowRight size={17} />
+                    </button>
                     {pickupSlotsError && <p className="book-detail-pickup-error" role="alert">{pickupSlotsError}</p>}
-                    <p className="book-detail-pickup-note">Thời gian nhận sách: Buổi sáng (07:00 – 12:00) hoặc Buổi chiều (13:00 – 17:00). Nếu không đến nhận trong vòng 30 phút sau khi kết thúc buổi hẹn, yêu cầu sẽ tự hủy.</p>
+                    <p className="book-detail-pickup-note">Buổi sáng: 07:00–12:00 · Buổi chiều: 13:00–17:00. Nếu không đến nhận trong vòng 30 phút sau khi kết thúc buổi hẹn, yêu cầu sẽ tự hủy.</p>
                   </>
                 )}
                 <div className="book-detail-circulation-actions">
@@ -556,6 +543,51 @@ const BookDetailPage = () => {
         </section>
       </main>
       <HomeFooter />
+      {pickupModalOpen && (
+        <div className="book-pickup-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPickupModalOpen(false); }}>
+          <section className="book-pickup-dialog" role="dialog" aria-modal="true" aria-labelledby="book-pickup-title" data-ui="dialog">
+            <button type="button" className="book-pickup-close" onClick={() => setPickupModalOpen(false)} aria-label="Đóng"><X size={20} /></button>
+            <span className="book-pickup-eyebrow">LỊCH NHẬN SÁCH</span>
+            <h2 id="book-pickup-title">Chọn ngày và buổi nhận</h2>
+            <p className="book-pickup-step">1. Chọn ngày có thể đến nhận sách</p>
+            <div className="book-pickup-date-grid">
+              {pickupDates.map((date) => {
+                const dateSlots = pickupSlots.filter((slot) => {
+                  return pickupLocalDate(slot.pickupAt) === date;
+                });
+                const parsed = new Date(`${date}T12:00:00+07:00`);
+                return <button type="button" key={date} className={`book-pickup-date${selectedPickupDate === date ? ' is-selected' : ''}`} onClick={() => setSelectedPickupAt(dateSlots[0]?.pickupAt ?? '')}>
+                  <span>{new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'short' }).format(parsed)}</span>
+                  <strong>{new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit' }).format(parsed)}</strong>
+                  <small>{new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', month: 'short' }).format(parsed)}</small>
+                </button>;
+              })}
+              {!pickupDates.length && <p className="book-detail-pickup-error">{loadingPickupSlots ? 'Đang tải lịch nhận…' : 'Hiện không còn ngày nhận khả dụng.'}</p>}
+            </div>
+            {selectedPickupDate && <>
+              <p className="book-pickup-step">2. Chọn buổi nhận</p>
+              <div className="book-pickup-session-grid">
+                {(['morning', 'afternoon'] as const).map((period) => {
+                  const slot = pickupSlots.find((item) => {
+                    const date = pickupLocalDate(item.pickupAt);
+                    const hour = pickupLocalHour(item.pickupAt);
+                    return date === selectedPickupDate && (period === 'morning' ? hour < 12 : hour >= 12);
+                  });
+                  const selected = selectedPickupAt === slot?.pickupAt;
+                  return <button type="button" key={period} disabled={!slot} className={`book-pickup-session${selected ? ' is-selected' : ''}`} onClick={() => slot && setSelectedPickupAt(slot.pickupAt)}>
+                    <strong>{period === 'morning' ? 'Buổi sáng' : 'Buổi chiều'}</strong>
+                    <span>{period === 'morning' ? '07:00–12:00' : '13:00–17:00'}</span>
+                  </button>;
+                })}
+              </div>
+            </>}
+            <div className="book-pickup-footer">
+              <span>{selectedPickupAt ? 'Đã chọn lịch nhận sách' : 'Vui lòng chọn ngày và buổi nhận'}</span>
+              <button type="button" disabled={!selectedPickupAt} onClick={() => setPickupModalOpen(false)}>Xác nhận lịch</button>
+            </div>
+          </section>
+        </div>
+      )}
       {borrowSuccessOpen && (
         <div className="book-borrow-success-backdrop" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setBorrowSuccessOpen(false);

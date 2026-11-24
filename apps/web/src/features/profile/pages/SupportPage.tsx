@@ -59,6 +59,7 @@ interface Complaint {
 }
 
 type SupportTab = 'chat' | 'list' | 'create';
+type ComplaintStatusFilter = 'All' | 'Pending' | 'InProgress' | 'AwaitingReader' | 'Resolved';
 type RealtimeStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
 const mergeMessages = (current: ChatMessage[], incoming: ChatMessage[]) => {
@@ -75,6 +76,7 @@ const dateTime = (value: string) => new Intl.DateTimeFormat('vi-VN', {
 const statusLabel: Record<string, string> = {
   Pending: 'Đang chờ tiếp nhận',
   InProgress: 'Đang xử lý',
+  AwaitingReader: 'Cần bổ sung thông tin',
   Resolved: 'Đã phản hồi',
 };
 
@@ -89,7 +91,7 @@ async function fetchData<T>(path: string, token: string, init?: RequestInit): Pr
   });
   const result = await parseApiResponse<ApiEnvelope<T>>(response);
   if (!response.ok || !result?.success || result.data === undefined) {
-    throw new Error(result?.error || 'Không thể kết nối đến dịch vụ hỗ trợ.');
+    throw new Error(result?.error || `Yêu cầu hỗ trợ thất bại (HTTP ${response.status}).`);
   }
   return result.data;
 }
@@ -101,6 +103,7 @@ const SupportPage = () => {
   const [types, setTypes] = useState<RequestType[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [complaintStatusFilter, setComplaintStatusFilter] = useState<ComplaintStatusFilter>('All');
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [draft, setDraft] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
@@ -110,6 +113,8 @@ const SupportPage = () => {
   const [complaintText, setComplaintText] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
   const [complaintBusy, setComplaintBusy] = useState(false);
+  const [supplementText, setSupplementText] = useState('');
+  const [supplementBusy, setSupplementBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -152,10 +157,12 @@ const SupportPage = () => {
     hub.on('ComplaintReplied', (complaint: Complaint) => {
       if (!active) return;
       setComplaints((current) => current.map((item) => item.id === complaint.id ? complaint : item));
+      setSelectedComplaint((current) => current?.id === complaint.id ? complaint : current);
     });
     hub.on('ComplaintUpdated', (complaint: Complaint) => {
       if (!active) return;
       setComplaints((current) => current.map((item) => item.id === complaint.id ? complaint : item));
+      setSelectedComplaint((current) => current?.id === complaint.id ? complaint : current);
     });
     hub.onreconnecting(() => {
       if (active) setRealtimeStatus('reconnecting');
@@ -272,6 +279,42 @@ const SupportPage = () => {
     }
   };
 
+  const supplementComplaint = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!token || !selectedComplaint || selectedComplaint.status !== 'AwaitingReader' || supplementBusy) return;
+    const message = supplementText.trim();
+    if (!message) return;
+    setSupplementBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await fetchData<ComplaintReply>(`/api/v1/support/complaints/${selectedComplaint.id}/replies`, token, {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+      });
+      const updated = await fetchData<Complaint[]>('/api/v1/support/complaints/mine', token);
+      setComplaints(updated);
+      setSelectedComplaint(updated.find((item) => item.id === selectedComplaint.id) ?? null);
+      setSupplementText('');
+      setNotice('Đã gửi thông tin bổ sung cho thủ thư.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Không thể gửi thông tin bổ sung.');
+    } finally {
+      setSupplementBusy(false);
+    }
+  };
+
+  const complaintStatusCounts = {
+    All: complaints.length,
+    Pending: complaints.filter((item) => item.status === 'Pending').length,
+    InProgress: complaints.filter((item) => item.status === 'InProgress').length,
+    AwaitingReader: complaints.filter((item) => item.status === 'AwaitingReader').length,
+    Resolved: complaints.filter((item) => item.status === 'Resolved').length,
+  };
+  const visibleComplaints = complaintStatusFilter === 'All'
+    ? complaints
+    : complaints.filter((item) => item.status === complaintStatusFilter);
+
   const selectAttachment = (file: File | undefined) => {
     if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
@@ -368,14 +411,33 @@ const SupportPage = () => {
         ) : tab === 'list' ? (
             <section className="support-complaint-list" id="support-panel" role="tabpanel" aria-labelledby="support-tab-list" tabIndex={0}>
               <header><div><span className="support-section-eyebrow">THEO DÕI YÊU CẦU</span><h2>Đơn của tôi</h2></div><span>{complaints.length}</span></header>
+              <nav className="support-complaint-filters" aria-label="Lọc đơn hỗ trợ theo trạng thái">
+                {([
+                  ['All', 'Tất cả'],
+                  ['Pending', 'Chờ tiếp nhận'],
+                  ['InProgress', 'Đang xử lý'],
+                  ['AwaitingReader', 'Cần bổ sung'],
+                  ['Resolved', 'Đã xử lý'],
+                ] as const).map(([status, label]) => (
+                  <button
+                    type="button"
+                    key={status}
+                    className={complaintStatusFilter === status ? 'is-active' : ''}
+                    aria-pressed={complaintStatusFilter === status}
+                    onClick={() => setComplaintStatusFilter(status)}
+                  >
+                    {label}<span>{complaintStatusCounts[status]}</span>
+                  </button>
+                ))}
+              </nav>
               {loading ? <div className="support-chat-empty"><LoaderCircle className="support-spinner" size={21} />Đang tải đơn...</div> :
-                complaints.length ? complaints.map((complaint) => (
+                visibleComplaints.length ? visibleComplaints.map((complaint) => (
                   <article className="support-ticket" key={complaint.id}>
                     <div className="support-ticket-top"><strong>{complaint.requestType}</strong><span className={`support-ticket-status support-ticket-status--${complaint.status.toLowerCase()}`}>{statusLabel[complaint.status] ?? complaint.status}</span></div>
                     <p>{complaint.content}</p>
                     <footer><time>{dateTime(complaint.createdAt)}</time><span>{complaint.replies.length} phản hồi</span><button type="button" onClick={() => setSelectedComplaint(complaint)}>Xem chi tiết</button></footer>
                   </article>
-                )) : <div className="support-chat-empty"><CircleHelp size={22} />Bạn chưa gửi đơn hỗ trợ nào.</div>}
+                )) : <div className="support-chat-empty"><CircleHelp size={22} />{complaints.length ? 'Không có đơn nào ở trạng thái này.' : 'Bạn chưa gửi đơn hỗ trợ nào.'}</div>}
             </section>
         ) : (
             <form className="support-complaint-form" id="support-panel" role="tabpanel" aria-labelledby="support-tab-create" tabIndex={0} onSubmit={(event) => void sendComplaint(event)}>
@@ -422,9 +484,15 @@ const SupportPage = () => {
             {selectedComplaint.dueAt && <div><strong>Hạn xử lý dự kiến</strong><span>{dateTime(selectedComplaint.dueAt)}</span></div>}
             {selectedComplaint.firstRespondedAt && <div><strong>Phản hồi lần đầu</strong><span>{dateTime(selectedComplaint.firstRespondedAt)}</span></div>}
           </div>
-          <div className="support-detail-content">{selectedComplaint.content}</div>
+          <section className="support-detail-content"><h3>Nội dung đơn ban đầu</h3><p>{selectedComplaint.content}</p></section>
           {selectedComplaint.attachmentUrl && <a className="support-detail-attachment" href={selectedComplaint.attachmentUrl} target="_blank" rel="noreferrer"><Camera size={16} /> Xem ảnh đính kèm</a>}
-          <div className="support-detail-replies"><h3>Trao đổi ({selectedComplaint.replies.length})</h3>{selectedComplaint.replies.length ? selectedComplaint.replies.map((reply) => <article className="support-ticket-reply" key={reply.id}><strong>Phản hồi từ {reply.senderRole === 'Librarian' ? 'thủ thư' : reply.senderName}</strong><p>{reply.message}</p><time>{dateTime(reply.createdAt)}</time></article>) : <p>Chưa có phản hồi cho đơn này.</p>}</div>
+          {selectedComplaint.status === 'AwaitingReader' && <div className="support-info-needed" role="status"><strong>Thủ thư đang cần bạn bổ sung thông tin</strong><span>Vui lòng xem yêu cầu trong phần trao đổi bên dưới và gửi câu trả lời để đơn được tiếp tục xử lý.</span></div>}
+          <div className="support-detail-replies"><div className="support-detail-section-heading"><div><span>DIỄN BIẾN ĐƠN</span><h3>Lịch sử trao đổi</h3></div><b>{selectedComplaint.replies.length}</b></div>{selectedComplaint.replies.length ? selectedComplaint.replies.map((reply) => <article className={`support-ticket-reply ${reply.senderRole === 'Librarian' ? 'is-librarian-reply' : 'is-reader-reply'}`} key={reply.id}><div><strong>{reply.senderRole === 'Librarian' ? 'Thủ thư' : reply.senderName}</strong><time>{dateTime(reply.createdAt)}</time></div><p>{reply.message}</p></article>) : <p>Chưa có trao đổi. Thủ thư sẽ phản hồi tại đây khi tiếp nhận đơn.</p>}</div>
+          {selectedComplaint.status === 'AwaitingReader' && <form className="support-supplement-form" onSubmit={(event) => void supplementComplaint(event)}>
+            <label htmlFor="support-supplement-text">Thông tin bổ sung</label>
+            <textarea id="support-supplement-text" required maxLength={3000} rows={4} placeholder="Nhập thông tin thủ thư yêu cầu..." value={supplementText} onChange={(event) => setSupplementText(event.target.value)} />
+            <button type="submit" disabled={!supplementText.trim() || supplementBusy}>{supplementBusy ? <LoaderCircle className="support-spinner" size={17} /> : <Send size={17} />} Gửi bổ sung</button>
+          </form>}
           <footer><button type="button" onClick={() => setSelectedComplaint(null)}>Đóng</button></footer>
         </section>
       </div>}

@@ -33,6 +33,7 @@ html.dark .support-main .support-ticket > footer button { border-color: #536a59;
 html.dark .support-main .support-ticket-status { background: #54351f; color: #ffd0a8; }
 html.dark .support-main .support-ticket-status--inprogress,
 html.dark .support-main .support-ticket-status--resolved { background: #244832; color: #b8e8c4; }
+html.dark .support-main .support-ticket-status--awaitingreader { background: #55451f; color: #ffe0a0; }
 html.dark .support-main .support-detail-modal > header,
 html.dark .support-main .support-detail-modal > footer { border-color: #35443b; }
 html.dark .support-main .support-detail-modal > header button { border-color: #536a59; color: #d6e4d9; }
@@ -500,6 +501,12 @@ html.dark .support-main .support-ticket-top > span { color: #edf4ee; }
   justify-content: space-between;
 }
 
+.support-complaint-filters { display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid #e3ebe3; padding-bottom: 13px; }
+.support-complaint-filters button { display: inline-flex; min-height: 34px; align-items: center; gap: 8px; border: 1px solid #dce6dd; border-radius: 999px; background: #fff; padding: 0 11px; color: #526257; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.support-complaint-filters button > span { display: grid; min-width: 19px; height: 19px; place-items: center; border-radius: 999px; background: #eef3ee; color: #53685a; font-size: 10px; }
+.support-complaint-filters button.is-active { border-color: #2e6847; background: #eaf4ec; color: #245a39; }
+.support-complaint-filters button.is-active > span { background: #2e6847; color: #fff; }
+
 .support-section-eyebrow { display: block; margin-bottom: 5px; color: #d45b25; font-size: 10px; font-weight: 800; letter-spacing: .1em; }
 
 .support-complaint-list > header > span {
@@ -581,6 +588,8 @@ html.dark .support-main .support-ticket-top > span { color: #edf4ee; }
   color: #347246;
 }
 
+.support-ticket-status--awaitingreader { background: #fff4d8; color: #8a5b00; }
+
 .support-ticket > p {
   display: -webkit-box;
   overflow: hidden;
@@ -641,8 +650,91 @@ html.dark .support-main .support-ticket-top > span { color: #edf4ee; }
 .support-detail-replies h3 { margin: 0; font-size: 14px; }
 .support-detail-replies > p { margin: 0; color: #758178; font-size: 12px; }
 .support-detail-replies .support-ticket-reply { margin: 0; border-radius: 0 10px 10px 0; }
+.support-info-needed { display: grid; gap: 5px; border: 1px solid #f0d69b; border-radius: 12px; background: #fff8e8; padding: 13px 15px; color: #76521a; font-size: 12px; line-height: 1.5; }
+.support-info-needed span { color: #6f6551; }
+.support-supplement-form { display: grid; justify-items: end; gap: 9px; border: 1px solid #e4ebe4; border-radius: 13px; background: #f8faf8; padding: 14px; }
+.support-supplement-form label { justify-self: start; font-size: 12px; font-weight: 750; }
+.support-supplement-form textarea { width: 100%; box-sizing: border-box; border: 1px solid #dce5dc; border-radius: 9px; background: #fff; padding: 10px; color: #26372b; font: inherit; font-size: 12px; resize: vertical; }
+.support-supplement-form button { display: inline-flex; min-height: 38px; align-items: center; gap: 7px; border: 0; border-radius: 9px; background: #244d39; padding: 0 14px; color: #fff; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.support-supplement-form button:disabled { opacity: .55; cursor: not-allowed; }
+html.dark .support-main .support-info-needed { border-color: #69552b; background: #302a1c; color: #ffe0a0; }
+html.dark .support-main .support-info-needed span { color: #d6cba9; }
+html.dark .support-main .support-supplement-form { border-color: #35443b; background: #202c25; }
+html.dark .support-main .support-supplement-form textarea { border-color: #45564b; background: #111916; color: #edf4ee; }
 .support-detail-modal > footer { display: flex; justify-content: flex-end; border-top: 1px solid #e7ece7; padding-top: 14px; }
 .support-detail-modal > footer button { min-height: 40px; border: 0; border-radius: 10px; background: #244d39; padding: 0 18px; color: #fff; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+
+/* Wide, structured support request details for easier reading and replies. */
+.support-detail-backdrop { padding: 28px; }
+.support-detail-modal { width: min(100%, 1040px); max-height: min(90vh, 960px); grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-content: start; gap: 20px 24px; padding: 30px; }
+.support-detail-modal > header,
+.support-detail-modal > .support-detail-meta,
+.support-detail-modal > .support-detail-attachment,
+.support-detail-modal > .support-info-needed,
+.support-detail-modal > .support-detail-replies,
+.support-detail-modal > .support-supplement-form,
+.support-detail-modal > footer { grid-column: 1 / -1; }
+.support-detail-modal > header { align-items: center; padding-bottom: 20px; }
+.support-detail-modal > header h2 { margin-top: 5px; color: #1e3024; font-size: 27px; }
+.support-detail-modal > .support-section-eyebrow { color: #b84b18; }
+.support-detail-meta { font-size: 13px; }
+.support-detail-handling { align-content: start; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); padding: 18px; }
+.support-detail-handling strong { color: #758178; font-size: 11px; }
+.support-detail-handling span { font-size: 13px; }
+.support-detail-content { min-height: 96px; align-self: stretch; background: #f8faf8; padding: 18px; }
+.support-detail-content h3 { margin: 0 0 10px; color: #526257; font-size: 12px; }
+.support-detail-content p { margin: 0; color: #26372b; font-size: 14px; line-height: 1.75; }
+.support-detail-attachment { width: fit-content; min-height: 38px; border: 1px solid #d7e5d9; border-radius: 9px; background: #f4faf5; padding: 0 12px; font-size: 13px; }
+.support-info-needed { grid-template-columns: auto 1fr; align-items: start; gap: 5px 12px; border-color: #efd18d; background: #fff8e8; padding: 17px 19px; font-size: 13px; }
+.support-info-needed::before { grid-row: span 2; content: "!"; display: grid; width: 26px; height: 26px; place-items: center; border-radius: 50%; background: #f0d18a; color: #694b0d; font-size: 15px; font-weight: 900; }
+.support-info-needed span { font-size: 12px; }
+.support-detail-replies { gap: 12px; }
+.support-detail-section-heading { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e8eee8; padding-bottom: 12px; }
+.support-detail-section-heading > div > span { color: #748278; font-size: 10px; font-weight: 800; letter-spacing: .09em; }
+.support-detail-section-heading h3 { margin: 4px 0 0; color: #26372b; font-size: 18px; }
+.support-detail-section-heading > b { display: grid; min-width: 30px; height: 30px; place-items: center; border-radius: 50%; background: #edf4ee; color: #315a3b; font-size: 12px; }
+.support-detail-replies .support-ticket-reply { display: grid; gap: 9px; border: 1px solid #e2e9e2; border-left: 4px solid #98a89b; border-radius: 11px; background: #fafcfa; padding: 14px 16px; }
+.support-detail-replies .support-ticket-reply.is-librarian-reply { border-left-color: #d8763b; background: #fffaf6; }
+.support-detail-replies .support-ticket-reply.is-reader-reply { border-left-color: #4e8b5d; background: #f5faf5; }
+.support-detail-replies .support-ticket-reply > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.support-detail-replies .support-ticket-reply > div strong { color: #355b3e; font-size: 12px; }
+.support-detail-replies .support-ticket-reply > div time { color: #748278; font-size: 11px; }
+.support-detail-replies .support-ticket-reply > p { margin: 0; color: #344238; font-size: 13px; line-height: 1.65; }
+.support-supplement-form { gap: 12px; border-color: #d9e6da; background: #f4f9f4; padding: 19px; }
+.support-supplement-form label { justify-self: start; color: #26372b; font-size: 14px; }
+.support-supplement-form textarea { min-height: 112px; padding: 13px; font-size: 13px; line-height: 1.6; }
+.support-supplement-form button { min-height: 42px; padding-inline: 17px; font-size: 13px; }
+.support-detail-modal > footer { padding-top: 17px; }
+html.dark .support-main .support-detail-modal > header h2,
+html.dark .support-main .support-detail-content p,
+html.dark .support-main .support-detail-section-heading h3,
+html.dark .support-main .support-detail-replies .support-ticket-reply > p,
+html.dark .support-main .support-supplement-form label { color: #edf4ee; }
+html.dark .support-main .support-detail-content { background: #202c25; }
+html.dark .support-main .support-detail-content h3,
+html.dark .support-main .support-detail-section-heading > div > span { color: #bccabe; }
+html.dark .support-main .support-detail-attachment { border-color: #455b49; background: #1d3023; color: #c9e4ce; }
+html.dark .support-main .support-detail-section-heading { border-color: #35443b; }
+html.dark .support-main .support-detail-section-heading > b { background: #293c2f; color: #c9e4ce; }
+html.dark .support-main .support-detail-replies .support-ticket-reply { border-color: #35443b; background: #202c25; }
+html.dark .support-main .support-detail-replies .support-ticket-reply.is-librarian-reply { border-left-color: #e08b59; background: #2a241e; }
+html.dark .support-main .support-detail-replies .support-ticket-reply.is-reader-reply { border-left-color: #79b389; background: #1d3023; }
+html.dark .support-main .support-detail-replies .support-ticket-reply > div strong { color: #d7e9db; }
+html.dark .support-main .support-detail-replies .support-ticket-reply > div time { color: #bdcbbf; }
+html.dark .support-main .support-supplement-form { background: #1b2920; }
+@media (max-width: 760px) {
+  .support-detail-modal { grid-template-columns: minmax(0, 1fr); gap: 15px; padding: 19px; }
+  .support-detail-modal > header,
+  .support-detail-modal > .support-detail-meta,
+  .support-detail-modal > .support-detail-attachment,
+  .support-detail-modal > .support-info-needed,
+  .support-detail-modal > .support-detail-replies,
+  .support-detail-modal > .support-supplement-form,
+  .support-detail-modal > footer { grid-column: 1; }
+  .support-detail-modal > header h2 { font-size: 22px; }
+  .support-detail-meta { align-items: flex-start; flex-direction: column; }
+  .support-detail-replies .support-ticket-reply > div { align-items: flex-start; flex-direction: column; gap: 4px; }
+}
 @keyframes support-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes support-modal-in { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
@@ -702,6 +794,7 @@ html.dark .support-main .support-ticket-top > span { color: #edf4ee; }
 .support-complaint-form h2 { color: #1e3024; font-size: 20px; font-weight: 800; }
 .support-section-eyebrow { margin-bottom: 7px; color: #b84b18; font-size: 12px; font-weight: 850; letter-spacing: .09em; }
 .support-complaint-list > header > span { min-width: 30px; height: 30px; font-size: 13px; }
+.support-complaint-filters button { min-height: 38px; padding-inline: 13px; font-size: 12px; }
 .support-ticket { border-radius: 14px; padding: 16px; }
 .support-ticket-top > strong { color: #24392b; font-size: 14px; font-weight: 800; }
 .support-ticket-status { padding: 6px 10px; font-size: 12px; font-weight: 800; }
@@ -728,6 +821,11 @@ html.dark .support-main .support-ticket-top > span { color: #edf4ee; }
 .support-main :is(button, input, select, textarea):focus-visible { outline: 3px solid rgb(232 117 50 / 45%); outline-offset: 2px; }
 
 html.dark .support-main .support-complaint-list { border-color: #45604c; border-top-color: #79b389; background: #17231b; }
+html.dark .support-main .support-complaint-filters { border-color: #35443b; }
+html.dark .support-main .support-complaint-filters button { border-color: #45564b; background: #17231b; color: #d1ded4; }
+html.dark .support-main .support-complaint-filters button > span { background: #29382e; color: #d1ded4; }
+html.dark .support-main .support-complaint-filters button.is-active { border-color: #79b389; background: #244832; color: #e3f3e7; }
+html.dark .support-main .support-complaint-filters button.is-active > span { background: #79b389; color: #142219; }
 html.dark .support-main .support-complaint-form { border-color: #5a4739; border-top-color: #e8783e; background: #211d19; }
 html.dark .support-main :is(.support-complaint-list h2, .support-complaint-form h2, .support-ticket-top > strong, .support-complaint-form > label:not(.support-attachment-control)) { color: #f0f5f1; }
 html.dark .support-main :is(.support-ticket > p, .support-ticket > footer time, .support-ticket > footer > span, .support-complaint-form > header p, .support-complaint-form label small, .support-form-hint) { color: #d0dbd2; }

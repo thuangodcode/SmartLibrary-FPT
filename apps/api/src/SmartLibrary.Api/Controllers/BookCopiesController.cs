@@ -24,6 +24,9 @@ public class BookCopiesController : ControllerBase
         !string.IsNullOrWhiteSpace(name) && name.Trim().Length <= 100
         && Regex.IsMatch(name.Trim(), @"^Tầng [\p{L}\p{N}-]+ · Kệ [\p{L}\p{N}-]+$", RegexOptions.CultureInvariant);
 
+    private static string ShelfFloor(string name) => Regex.Match(name, @"^Tầng (.+?) · Kệ ").Groups[1].Value;
+    private static string ShelfArea(string name) => Regex.Match(name, @"· Kệ (.+)$").Groups[1].Value;
+
     public BookCopiesController(AppDbContext db) => _db = db;
 
     // A scan identifies one physical copy, never a partial search result or an ISBN.
@@ -88,11 +91,7 @@ public class BookCopiesController : ControllerBase
             availableCopies = await copies.CountAsync(copy => copy.IsAvailable && copy.Location != null && copy.Condition != BookCondition.Damaged && copy.Condition != BookCondition.Lost, ct),
             warehouseCopies = await copies.CountAsync(copy => copy.IsAvailable && copy.Location == null && copy.Condition != BookCondition.Damaged && copy.Condition != BookCondition.Lost, ct),
             unavailableCopies = await copies.CountAsync(copy => !copy.IsAvailable || copy.Condition == BookCondition.Damaged || copy.Condition == BookCondition.Lost, ct),
-            locations = await copies
-                .Where(copy => copy.Location != null && copy.Location != "")
-                .Select(copy => copy.Location!)
-                .Distinct()
-                .CountAsync(ct)
+            locations = await _db.StorageShelves.CountAsync(shelf => !shelf.IsDeleted, ct)
         };
         return Ok(ApiResponse<object>.Ok(summary));
     }
@@ -211,14 +210,27 @@ public class BookCopiesController : ControllerBase
             .ToDictionaryAsync(item => item.name, item => new { item.copyCount, item.bookCount }, ct);
         var shelves = await _db.StorageShelves.AsNoTracking().Where(shelf => !shelf.IsDeleted)
             .OrderBy(shelf => shelf.Name).ToListAsync(ct);
-        var locations = shelves.Select(shelf => new
+        var assignments = await _db.StorageShelfCategories.AsNoTracking()
+            .Join(_db.Categories.AsNoTracking().Where(category => !category.IsDeleted), assignment => assignment.CategoryId, category => category.Id,
+                (assignment, category) => new { assignment.ShelfId, CategoryId = category.Id, CategoryName = category.Name })
+            .ToListAsync(ct);
+        var assignmentsByShelf = assignments.GroupBy(item => item.ShelfId).ToDictionary(group => group.Key, group => group.ToList());
+        var locations = shelves.Select(shelf =>
         {
-            id = shelf.Id,
-            name = shelf.Name,
-            copyCount = occupancy.GetValueOrDefault(shelf.Name)?.copyCount ?? 0,
-            bookCount = occupancy.GetValueOrDefault(shelf.Name)?.bookCount ?? 0,
-            capacity = shelf.Capacity,
-            availableCapacity = Math.Max(0, shelf.Capacity - (occupancy.GetValueOrDefault(shelf.Name)?.copyCount ?? 0))
+            var shelfAssignments = assignmentsByShelf.GetValueOrDefault(shelf.Id) ?? [];
+            return new
+            {
+                id = shelf.Id,
+                name = shelf.Name,
+                floor = ShelfFloor(shelf.Name),
+                area = ShelfArea(shelf.Name),
+                categoryIds = shelfAssignments.Select(item => item.CategoryId).ToArray(),
+                categories = shelfAssignments.Select(item => item.CategoryName).ToArray(),
+                copyCount = occupancy.GetValueOrDefault(shelf.Name)?.copyCount ?? 0,
+                bookCount = occupancy.GetValueOrDefault(shelf.Name)?.bookCount ?? 0,
+                capacity = shelf.Capacity,
+                availableCapacity = Math.Max(0, shelf.Capacity - (occupancy.GetValueOrDefault(shelf.Name)?.copyCount ?? 0))
+            };
         }).ToList();
 
         return Ok(ApiResponse<object>.Ok(locations));
@@ -287,6 +299,8 @@ public class BookCopiesController : ControllerBase
                 book.Id,
                 book.Title,
                 book.Code,
+                CategoryIds = book.Categories.Where(category => !category.IsDeleted).Select(category => category.Id).ToArray(),
+                Categories = book.Categories.Where(category => !category.IsDeleted).Select(category => category.Name).ToArray(),
                 OnShelfCopies = book.Copies.Count(copy => !copy.IsDeleted && copy.Location != null),
                 InWarehouseCopies = book.Copies.Count(copy => !copy.IsDeleted && copy.IsAvailable && copy.Location == null
                     && copy.Condition != BookCondition.Damaged && copy.Condition != BookCondition.Lost)
@@ -298,15 +312,30 @@ public class BookCopiesController : ControllerBase
         }
         var rows = await query.Where(book => book.InWarehouseCopies > 0)
             .OrderBy(book => book.Title).ToListAsync(ct);
-        return Ok(ApiResponse<object>.Ok(rows));
+        var shelfAssignments = await _db.StorageShelfCategories.AsNoTracking()
+            .Join(_db.StorageShelves.AsNoTracking().Where(shelf => !shelf.IsDeleted), assignment => assignment.ShelfId, shelf => shelf.Id,
+                (assignment, shelf) => new { assignment.CategoryId, shelf.Name })
+            .ToListAsync(ct);
+        var suggestedByBook = rows.ToDictionary(book => book.Id, book => shelfAssignments
+            .Where(assignment => book.CategoryIds.Contains(assignment.CategoryId)).Select(assignment => assignment.Name).Distinct().ToArray());
+        return Ok(ApiResponse<object>.Ok(rows.Select(book => new
+        {
+            book.Id, book.Title, book.Code, book.OnShelfCopies, book.InWarehouseCopies,
+            book.CategoryIds, book.Categories, suggestedLocations = suggestedByBook[book.Id]
+        })));
     }
 
     [HttpGet("sorting/books/{bookId:guid}")]
     public async Task<IActionResult> GetBookSortingDetails(Guid bookId, CancellationToken ct = default)
     {
         var book = await _db.Books.AsNoTracking().Where(item => item.Id == bookId && !item.IsDeleted)
-            .Select(item => new { item.Id, item.Title, item.Code }).FirstOrDefaultAsync(ct);
+            .Select(item => new { item.Id, item.Title, item.Code, CategoryIds = item.Categories.Where(category => !category.IsDeleted).Select(category => category.Id).ToArray(), Categories = item.Categories.Where(category => !category.IsDeleted).Select(category => category.Name).ToArray() }).FirstOrDefaultAsync(ct);
         if (book is null) return NotFound(ApiResponse<object>.Fail("Không tìm thấy đầu sách."));
+        var suggestedLocations = await _db.StorageShelfCategories.AsNoTracking()
+            .Where(assignment => book.CategoryIds.Contains(assignment.CategoryId))
+            .Join(_db.StorageShelves.AsNoTracking().Where(shelf => !shelf.IsDeleted), assignment => assignment.ShelfId, shelf => shelf.Id,
+                (assignment, shelf) => new { shelf.Name, shelf.Capacity })
+            .ToListAsync(ct);
         var onShelfCopies = await _db.BookCopies.CountAsync(copy => copy.BookId == bookId && !copy.IsDeleted && copy.Location != null, ct);
         var copies = await _db.BookCopies.AsNoTracking()
             .Where(copy => copy.BookId == bookId && !copy.IsDeleted && copy.IsAvailable && copy.Location == null
@@ -325,6 +354,9 @@ public class BookCopiesController : ControllerBase
             bookId = book.Id,
             book.Title,
             book.Code,
+            categoryIds = book.CategoryIds,
+            categories = book.Categories,
+            suggestedLocations = suggestedLocations.Select(item => item.Name).Distinct().ToArray(),
             onShelfCopies,
             inWarehouseCopies = copies.Count,
             returnedInWarehouseCopies = copies.Count(copy => copy.HasBeenReturned),
@@ -341,10 +373,15 @@ public class BookCopiesController : ControllerBase
         var shelfName = name!;
         if (await _db.StorageShelves.AnyAsync(shelf => !shelf.IsDeleted && shelf.Name.ToLower() == shelfName.ToLower(), ct))
             return Conflict(ApiResponse<object>.Fail("Tên kệ này đã được sử dụng."));
+        var categoryIds = request.CategoryIds?.Distinct().ToArray() ?? [];
+        if (categoryIds.Length > 0 && await _db.Categories.CountAsync(category => !category.IsDeleted && categoryIds.Contains(category.Id), ct) != categoryIds.Length)
+            return BadRequest(ApiResponse<object>.Fail("Một hoặc nhiều danh mục không còn hợp lệ."));
         var shelf = new StorageShelf { Id = Guid.NewGuid(), Name = shelfName, Capacity = request.Capacity };
         _db.StorageShelves.Add(shelf);
+        _db.StorageShelfCategories.AddRange(categoryIds.Select(categoryId => new StorageShelfCategory { ShelfId = shelf.Id, CategoryId = categoryId }));
         await _db.SaveChangesAsync(ct);
-        return Ok(ApiResponse<object>.Ok(new { shelf.Id, shelf.Name, shelf.Capacity, copyCount = 0, availableCapacity = shelf.Capacity }));
+        var categories = await _db.Categories.Where(category => categoryIds.Contains(category.Id)).Select(category => category.Name).ToArrayAsync(ct);
+        return Ok(ApiResponse<object>.Ok(new { shelf.Id, shelf.Name, shelf.Capacity, categoryIds, categories, copyCount = 0, availableCapacity = shelf.Capacity }));
     }
 
     [HttpPut("locations/{id:guid}")]
@@ -362,6 +399,16 @@ public class BookCopiesController : ControllerBase
         var occupied = await _db.BookCopies.CountAsync(copy => !copy.IsDeleted && copy.Location == shelf.Name, ct);
         if (request.Capacity < occupied)
             return Conflict(ApiResponse<object>.Fail($"Kệ đang có {occupied} bản sao; sức chứa mới không thể thấp hơn số này."));
+        var categoryIds = request.CategoryIds?.Distinct().ToArray() ?? [];
+        if (categoryIds.Length > 0)
+        {
+            var validCategoryCount = await _db.Categories.CountAsync(category => !category.IsDeleted && categoryIds.Contains(category.Id), ct);
+            if (validCategoryCount != categoryIds.Length)
+                return BadRequest(ApiResponse<object>.Fail("Một hoặc nhiều danh mục không còn hợp lệ."));
+        }
+        var currentShelfCategories = await _db.StorageShelfCategories.Where(item => item.ShelfId == shelf.Id).ToListAsync(ct);
+        _db.StorageShelfCategories.RemoveRange(currentShelfCategories);
+        _db.StorageShelfCategories.AddRange(categoryIds.Select(categoryId => new StorageShelfCategory { ShelfId = shelf.Id, CategoryId = categoryId }));
         var oldName = shelf.Name;
         shelf.Name = shelfName;
         shelf.Capacity = request.Capacity;
@@ -369,7 +416,8 @@ public class BookCopiesController : ControllerBase
             .ExecuteUpdateAsync(update => update.SetProperty(copy => copy.Location, shelfName), ct);
         await _db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        return Ok(ApiResponse<object>.Ok(new { shelf.Id, shelf.Name, shelf.Capacity, copyCount = occupied, availableCapacity = shelf.Capacity - occupied }));
+        var categoryNames = await _db.Categories.Where(category => categoryIds.Contains(category.Id)).Select(category => category.Name).ToArrayAsync(ct);
+        return Ok(ApiResponse<object>.Ok(new { shelf.Id, shelf.Name, shelf.Capacity, categoryIds, categories = categoryNames, copyCount = occupied, availableCapacity = shelf.Capacity - occupied }));
     }
 
     [HttpDelete("locations/{id:guid}")]
@@ -420,6 +468,21 @@ public class BookCopiesController : ControllerBase
         if (targetNames.Any(name => !shelves.Any(shelf => shelf.Name == name)) ||
             sourceNames.Where(name => !string.IsNullOrWhiteSpace(name)).Any(name => !shelves.Any(shelf => shelf.Name == name)))
             return BadRequest(ApiResponse<object>.Fail("Một hoặc nhiều kệ nguồn hoặc kệ đích không còn hoạt động."));
+        var categoryIdsByBook = await _db.Books.AsNoTracking()
+            .Where(book => copies.Select(copy => copy.BookId).Distinct().Contains(book.Id))
+            .Select(book => new { book.Id, CategoryIds = book.Categories.Where(category => !category.IsDeleted).Select(category => category.Id).ToArray() })
+            .ToDictionaryAsync(book => book.Id, book => book.CategoryIds, ct);
+        var shelfCategoryIds = await _db.StorageShelfCategories.AsNoTracking()
+            .Where(item => shelves.Select(shelf => shelf.Id).Contains(item.ShelfId))
+            .GroupBy(item => item.ShelfId)
+            .ToDictionaryAsync(group => group.Key, group => group.Select(item => item.CategoryId).ToArray(), ct);
+        foreach (var copy in copies.Where(copy => !string.IsNullOrWhiteSpace(assignments[copy.Id])))
+        {
+            var shelf = shelves.First(item => item.Name == assignments[copy.Id]);
+            var assignedCategories = shelfCategoryIds.GetValueOrDefault(shelf.Id) ?? [];
+            if (assignedCategories.Length > 0 && !categoryIdsByBook.GetValueOrDefault(copy.BookId, []).Intersect(assignedCategories).Any())
+                return BadRequest(ApiResponse<object>.Fail($"Kệ {shelf.Name} được gán cho danh mục khác; đầu sách này không thuộc danh mục được gán cho kệ."));
+        }
         if (copies.Any(copy => !string.IsNullOrWhiteSpace(assignments[copy.Id]) &&
                                (!copy.IsAvailable || copy.Condition is BookCondition.Damaged or BookCondition.Lost)))
             return Conflict(ApiResponse<object>.Fail("Chỉ bản sao đang ở kho và còn tốt mới được chuyển lên kệ."));
@@ -494,6 +557,14 @@ public class BookCopiesController : ControllerBase
             var occupied = await _db.BookCopies.CountAsync(copy => !copy.IsDeleted && copy.Location == location, ct);
             if (occupied + shelfQuantity > shelf.Capacity)
                 return Conflict(ApiResponse<object>.Fail($"Kệ {shelf.Name} còn {Math.Max(0, shelf.Capacity - occupied)} chỗ, không đủ nhận {shelfQuantity} bản sao."));
+            if (shelfQuantity > 0)
+            {
+                var bookCategoryIds = await _db.Books.Where(item => item.Id == book.Id)
+                    .SelectMany(item => item.Categories.Where(category => !category.IsDeleted).Select(category => category.Id)).ToListAsync(ct);
+                var assignedCategoryIds = await _db.StorageShelfCategories.Where(item => item.ShelfId == shelf.Id).Select(item => item.CategoryId).ToListAsync(ct);
+                if (assignedCategoryIds.Count > 0 && !bookCategoryIds.Intersect(assignedCategoryIds).Any())
+                    return BadRequest(ApiResponse<object>.Fail($"Kệ {shelf.Name} được dành cho danh mục khác; đầu sách này không thuộc danh mục được gán cho kệ."));
+            }
         }
         var existingBarcodes = await _db.BookCopies
             .Where(copy => copy.BookId == book.Id)
@@ -666,7 +737,7 @@ public sealed record IntakeBookCopiesRequest(Guid BookId, int Quantity, string? 
 
 public sealed record UpdateBookCopyRequest(string? Location, BookCondition Condition);
 
-public sealed record SaveShelfRequest(string Name, int Capacity = 100);
+public sealed record SaveShelfRequest(string Name, int Capacity = 100, List<Guid>? CategoryIds = null);
 
 public sealed record TransferCopiesRequest(IReadOnlyList<CopyLocationAssignment> Assignments);
 

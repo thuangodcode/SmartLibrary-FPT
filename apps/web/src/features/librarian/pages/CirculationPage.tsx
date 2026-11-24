@@ -74,6 +74,12 @@ function dateOnly(value: Date): string {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
 }
 
+function pickupLocalHour(value: string): number {
+  return Number(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Ho_Chi_Minh', hour: 'numeric', hourCycle: 'h23',
+  }).format(new Date(value)));
+}
+
 function dayStart(value: string | null | undefined): number | null {
   if (!value) return null;
   const date = new Date(value);
@@ -919,7 +925,7 @@ function LoansView() {
                       {item.pickupAt ? (
                         <>
                           <span className="pickup-session-badge">
-                            {new Date(item.pickupAt).getUTCHours() < 7 ? 'Sáng (07:00 – 12:00)' : 'Chiều (13:00 – 17:00)'}
+                            {pickupLocalHour(item.pickupAt) < 12 ? 'Sáng (07:00 – 12:00)' : 'Chiều (13:00 – 17:00)'}
                           </span>
                           <div style={{ marginTop: '2px', fontSize: '11px', color: '#64748b' }}>
                             {formatDate(item.pickupAt)}

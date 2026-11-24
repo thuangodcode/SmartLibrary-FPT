@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<BookFieldConfiguration> BookFieldConfigurations => Set<BookFieldConfiguration>();
     public DbSet<BookCopy> BookCopies => Set<BookCopy>();
     public DbSet<StorageShelf> StorageShelves => Set<StorageShelf>();
+    public DbSet<StorageShelfCategory> StorageShelfCategories => Set<StorageShelfCategory>();
     public DbSet<Author> Authors => Set<Author>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Publisher> Publishers => Set<Publisher>();
@@ -201,6 +202,15 @@ public class AppDbContext : DbContext
             entity.Property(shelf => shelf.Capacity).HasDefaultValue(100);
             entity.Property(shelf => shelf.IsDeleted).HasDefaultValue(false);
             entity.HasIndex(shelf => shelf.Name).IsUnique().HasFilter("is_deleted = FALSE");
+        });
+
+        modelBuilder.Entity<StorageShelfCategory>(entity =>
+        {
+            entity.ToTable("storage_shelf_categories");
+            entity.HasKey(item => new { item.ShelfId, item.CategoryId });
+            entity.HasOne<StorageShelf>().WithMany().HasForeignKey(item => item.ShelfId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Category>().WithMany().HasForeignKey(item => item.CategoryId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(item => item.CategoryId);
         });
 
         modelBuilder.Entity<Review>(entity =>
