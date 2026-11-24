@@ -546,6 +546,31 @@ public class CirculationServiceTests
     }
 
     [Fact]
+    public async Task GetPickupSlots_WhenReaderHasActiveLoans_LimitsRemainingCapacityAcrossAllSlots()
+    {
+        var reader = ActiveReader();
+        _repo.Setup(x => x.FindReaderAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+        _repo.Setup(x => x.CountActiveLoansAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var slots = await _sut.GetPickupSlotsAsync(reader.Id);
+
+        slots.Should().NotBeEmpty();
+        slots.Should().OnlyContain(s => s.RemainingCapacity == 1 && s.Capacity == 2);
+    }
+
+    [Fact]
+    public async Task GetPickupSlots_WhenReaderReachesMaxLoanLimit_ReturnsNoSlots()
+    {
+        var reader = ActiveReader();
+        _repo.Setup(x => x.FindReaderAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(reader);
+        _repo.Setup(x => x.CountActiveLoansAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>())).ReturnsAsync(2);
+
+        var slots = await _sut.GetPickupSlotsAsync(reader.Id);
+
+        slots.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task CompleteCheckout_WhenApproved_StartsBorrowPeriodAndNotifiesReader()
     {
         var reader = ActiveReader();

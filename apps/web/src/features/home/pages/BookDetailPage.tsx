@@ -70,6 +70,7 @@ const BookDetailPage = () => {
   });
   const [draft, setDraft] = useState<ReviewDraft>({ reviewId: '', rating: 5, comment: '' });
   const [pickupSlots, setPickupSlots] = useState<PickupSlot[]>([]);
+  const [pickupSlotsVersion, setPickupSlotsVersion] = useState(0);
   const [selectedPickupAt, setSelectedPickupAt] = useState('');
   const [borrowSuccessOpen, setBorrowSuccessOpen] = useState(false);
   const [pickupSlotsError, setPickupSlotsError] = useState<string | null>(null);
@@ -143,7 +144,7 @@ const BookDetailPage = () => {
     };
     void loadPickupSlots();
     return () => controller.abort();
-  }, [accessToken, isReader]);
+  }, [accessToken, isReader, pickupSlotsVersion]);
 
   const invalidateBookData = async () => {
     await Promise.all([
@@ -180,13 +181,18 @@ const BookDetailPage = () => {
         throw new Error(result?.error || `Không gửi được yêu cầu mượn (HTTP ${response.status}).`);
       }
     },
-    onSuccess: async (_data, pickupAt) => {
+    onSuccess: async () => {
       setBorrowSuccessOpen(true);
       await queryClient.invalidateQueries({ queryKey: ['public-book-availability', bookId] });
       await queryClient.invalidateQueries({ queryKey: ['my-book-reservations', accessToken] });
-      setPickupSlots((slots) => slots
-        .map((slot) => slot.pickupAt === pickupAt ? { ...slot, remainingCapacity: slot.remainingCapacity - 1 } : slot)
-        .filter((slot) => slot.remainingCapacity > 0));
+      setPickupSlots((slots) => {
+        const nextSlots = slots
+          .map((slot) => ({ ...slot, remainingCapacity: slot.remainingCapacity - 1 }))
+          .filter((slot) => slot.remainingCapacity > 0);
+        setSelectedPickupAt((current) => (nextSlots.some((s) => s.pickupAt === current) ? current : nextSlots[0]?.pickupAt ?? ''));
+        return nextSlots;
+      });
+      setPickupSlotsVersion((v) => v + 1);
     },
     onError: (error) => showToast({ type: 'error', title: 'Không thể mượn sách', message: error.message }),
   });

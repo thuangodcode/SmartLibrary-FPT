@@ -154,17 +154,41 @@ public class CirculationService
         };
     }
 
-    public async Task<IReadOnlyList<PickupSlotDto>> GetPickupSlotsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<PickupSlotDto>> GetPickupSlotsAsync(Guid? readerId = null, CancellationToken ct = default)
     {
         await ExpireUncollectedPickupsAsync(ct);
         var settings = await _repository.GetSettingsAsync(ct);
         var slots = CirculationRules.PickupSlots(settings, DateTimeOffset.UtcNow);
         var counts = await _repository.GetPickupRequestCountsAsync(
             slots.Select(slot => slot.PickupAt.UtcDateTime).ToList(), ct);
-        return slots
-            .Select(slot => slot with
+
+        int? readerRemainingQuota = null;
+        int? readerMaxCapacity = null;
+        if (readerId.HasValue && readerId.Value != Guid.Empty)
+        {
+            var reader = await _repository.FindReaderAsync(readerId.Value.ToString(), ct);
+            if (reader != null)
             {
-                RemainingCapacity = Math.Max(0, slot.Capacity - counts.GetValueOrDefault(slot.PickupAt.UtcDateTime))
+                var maxBooks = CirculationRules.MaxBooksFor(settings, reader.ReaderType) ?? settings.MaxBooks ?? settings.PickupCapacityPerSlot;
+                var activeLoans = await _repository.CountActiveLoansAsync(reader.Id, null, ct);
+                readerRemainingQuota = Math.Max(0, maxBooks - activeLoans);
+                readerMaxCapacity = maxBooks;
+            }
+        }
+
+        return slots
+            .Select(slot =>
+            {
+                var slotRemaining = Math.Max(0, slot.Capacity - counts.GetValueOrDefault(slot.PickupAt.UtcDateTime));
+                var remaining = readerRemainingQuota.HasValue
+                    ? Math.Min(slotRemaining, readerRemainingQuota.Value)
+                    : slotRemaining;
+                var capacity = readerMaxCapacity ?? slot.Capacity;
+                return slot with
+                {
+                    RemainingCapacity = remaining,
+                    Capacity = capacity
+                };
             })
             .Where(slot => slot.RemainingCapacity > 0)
             .ToList();
