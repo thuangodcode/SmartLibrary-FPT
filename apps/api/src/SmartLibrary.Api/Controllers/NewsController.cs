@@ -126,9 +126,10 @@ public class NewsController : ControllerBase
         if (!articleExists)
             return NotFound(ApiResponse<object>.Fail("Không tìm thấy bài viết tin tức."));
 
-        // Ẩn bình luận: độc giả và thủ thư đều không thấy trong danh sách (tránh stub "đã ẩn")
+        // Độc giả/khách: chỉ bình luận chưa ẩn. Thủ thư/Admin: vẫn thấy cả bình luận đã ẩn.
+        var isLibraryStaff = User.IsInRole("Librarian") || User.IsInRole("Admin");
         var comments = await _db.NewsComments.AsNoTracking()
-            .Where(comment => comment.NewsArticleId == id && !comment.IsDeleted)
+            .Where(comment => comment.NewsArticleId == id && (isLibraryStaff || !comment.IsDeleted))
             .OrderBy(comment => comment.CreatedAt)
             .Take(500)
             .Select(comment => new NewsCommentDto(
@@ -223,10 +224,10 @@ public class NewsController : ControllerBase
         // Thủ thư không được chỉnh sửa bình luận của độc giả — chỉ ẩn hoặc xóa
         _ = (id, commentId, request);
         return BadRequest(ApiResponse<object>.Fail(
-            "Không được chỉnh sửa bình luận. Chỉ có thể ẩn hoặc xóa bình luận."));
+            "Không được chỉnh sửa bình luận. Chỉ có thể ẩn, hiện lại hoặc xóa bình luận."));
     }
 
-    /// <summary>Ẩn bình luận (soft-delete). Không còn hiện với độc giả và thủ thư.</summary>
+    /// <summary>Ẩn bình luận với độc giả (giữ nội dung để thủ thư vẫn xem / hiện lại được).</summary>
     [HttpDelete("{id:guid}/comments/{commentId:guid}")]
     [Authorize(Policy = "LibrarianOnly")]
     public async Task<IActionResult> HideComment(Guid id, Guid commentId, CancellationToken ct = default)
@@ -237,17 +238,14 @@ public class NewsController : ControllerBase
             return NotFound(ApiResponse<object>.Fail("Không tìm thấy bình luận."));
 
         var now = DateTime.UtcNow;
-        comment.Content = string.Empty;
         comment.IsDeleted = true;
         comment.UpdatedAt = now;
 
-        // Ẩn luôn phản hồi con để không còn sót trong luồng
         var replies = await _db.NewsComments
             .Where(item => item.ParentCommentId == commentId && !item.IsDeleted)
             .ToListAsync(ct);
         foreach (var reply in replies)
         {
-            reply.Content = string.Empty;
             reply.IsDeleted = true;
             reply.UpdatedAt = now;
         }
@@ -256,7 +254,46 @@ public class NewsController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Xóa vĩnh viễn bình luận khỏi hệ thống.</summary>
+    /// <summary>Hiện lại bình luận đã ẩn để độc giả nhìn thấy.</summary>
+    [HttpPost("{id:guid}/comments/{commentId:guid}/restore")]
+    [Authorize(Policy = "LibrarianOnly")]
+    public async Task<IActionResult> RestoreComment(Guid id, Guid commentId, CancellationToken ct = default)
+    {
+        var comment = await _db.NewsComments.FirstOrDefaultAsync(item =>
+            item.Id == commentId && item.NewsArticleId == id && item.IsDeleted, ct);
+        if (comment is null)
+            return NotFound(ApiResponse<object>.Fail("Không tìm thấy bình luận đã ẩn."));
+
+        // Không hiện lại nếu bình luận cha vẫn đang ẩn
+        if (comment.ParentCommentId.HasValue)
+        {
+            var parentHidden = await _db.NewsComments.AnyAsync(item =>
+                item.Id == comment.ParentCommentId.Value
+                && item.NewsArticleId == id
+                && item.IsDeleted, ct);
+            if (parentHidden)
+                return BadRequest(ApiResponse<object>.Fail(
+                    "Hãy hiện lại bình luận gốc trước khi hiện phản hồi."));
+        }
+
+        var now = DateTime.UtcNow;
+        comment.IsDeleted = false;
+        comment.UpdatedAt = now;
+
+        var replies = await _db.NewsComments
+            .Where(item => item.ParentCommentId == commentId && item.IsDeleted)
+            .ToListAsync(ct);
+        foreach (var reply in replies)
+        {
+            reply.IsDeleted = false;
+            reply.UpdatedAt = now;
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    /// <summary>Xóa vĩnh viễn bình luận (không còn nội dung trên hệ thống).</summary>
     [HttpDelete("{id:guid}/comments/{commentId:guid}/permanent")]
     [Authorize(Policy = "LibrarianOnly")]
     public async Task<IActionResult> PermanentlyDeleteComment(Guid id, Guid commentId, CancellationToken ct = default)

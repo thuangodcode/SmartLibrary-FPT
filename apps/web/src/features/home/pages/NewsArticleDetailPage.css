@@ -136,11 +136,35 @@ html.dark .news-detail-page {
 .news-comment-edit textarea:focus { border-color: var(--detail-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--detail-accent) 20%, transparent); }
 .news-comment-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; color: var(--detail-subtle); font-size: 12px; }
 .news-comment-primary,
-.news-comment-secondary { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 1px solid transparent; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; transition: transform 150ms ease, background 150ms ease; }
-.news-comment-primary { background: var(--detail-accent); color: #fff; }
-html.dark .news-comment-primary { color: #102017; }
-.news-comment-primary:hover:not(:disabled) { transform: translateY(-1px); background: var(--detail-accent-hover); }
-.news-comment-primary:disabled { cursor: not-allowed; opacity: .48; }
+.news-comment-secondary { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 1px solid transparent; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; transition: transform 150ms ease, background 150ms ease, color 150ms ease; }
+.news-comment-primary {
+  background: #f36f21;
+  border-color: #f36f21;
+  color: #ffffff;
+}
+.news-comment-primary svg {
+  color: #ffffff;
+  stroke: #ffffff;
+}
+.news-comment-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #e05f12;
+  border-color: #e05f12;
+  color: #ffffff;
+}
+.news-comment-primary:hover:not(:disabled) svg {
+  color: #ffffff;
+  stroke: #ffffff;
+}
+.news-comment-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  color: #ffffff;
+}
+html.dark .news-comment-primary,
+html.dark .news-comment-primary:hover:not(:disabled) {
+  color: #ffffff;
+}
 .news-comment-secondary { border-color: var(--detail-border); background: var(--detail-surface); color: var(--detail-ink); }
 
 .news-comment-signin { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 22px 0; padding: 16px 18px; border: 1px solid var(--detail-border); border-radius: 12px; background: var(--detail-soft); color: var(--detail-muted); font-size: 14px; }
@@ -159,10 +183,25 @@ html.dark .news-comment-signin a { color: #102017; }
 .news-comment-author time { color: var(--detail-subtle); font-size: 12px; }
 .news-librarian-badge { padding: 3px 7px; border-radius: 999px; background: color-mix(in srgb, var(--detail-accent) 15%, transparent); color: var(--detail-accent); font-size: 10px; font-weight: 800; }
 .news-comment-content { margin: 9px 0 0; color: var(--detail-ink); font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.news-comment.is-hidden { opacity: 0.78; }
+.news-comment.is-hidden .news-comment-content { color: var(--detail-subtle); }
+.news-comment-hidden-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #fff4e5;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 750;
+}
+html.dark .news-comment-hidden-badge { background: #3a2a18; color: #ffb566; }
 .news-comment-actions { display: flex; gap: 5px; }
 .news-comment-actions button { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--detail-muted); cursor: pointer; }
 .news-comment-actions button:hover { border-color: var(--detail-border); background: var(--detail-soft); color: var(--detail-ink); }
 .news-comment-actions button[aria-label="Ẩn bình luận"]:hover { color: #b45309; }
+.news-comment-actions button[aria-label="Hiện lại bình luận"]:hover { color: #15803d; }
 .news-comment-actions button[aria-label="Xóa bình luận"]:hover { color: #d34242; }
 .news-comment-reply-trigger { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 0; border: 0; background: none; color: var(--detail-accent); font-size: 12px; font-weight: 750; cursor: pointer; }
 .news-comment-reply-trigger:hover { text-decoration: underline; }
