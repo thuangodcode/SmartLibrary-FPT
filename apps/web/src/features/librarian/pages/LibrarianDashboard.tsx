@@ -95,7 +95,7 @@ const LibrarianDashboard: React.FC = () => {
       <header className="lib-page-heading">
         <div>
           <div className="lib-eyebrow">
-            <LayoutDashboard size={14} />
+            <LayoutDashboard size={16} />
             <span>KHÔNG GIAN THỦ THƯ • TỔNG QUAN HỆ THỐNG</span>
           </div>
           <h1>Tổng Quan Nghiệp Vụ Thư Viện</h1>
@@ -105,7 +105,7 @@ const LibrarianDashboard: React.FC = () => {
         </div>
         {loading && (
           <div className="lib-refresh-state">
-            <LoaderCircle className="lib-spin" size={16} />
+            <LoaderCircle className="lib-spin" size={18} />
             <span>Đang cập nhật số liệu...</span>
           </div>
         )}
@@ -118,9 +118,9 @@ const LibrarianDashboard: React.FC = () => {
             <>
               <div className="lib-metric-card-top">
                 <span className={`lib-metric-icon ${card.tone}`}>
-                  <card.icon size={19} />
+                  <card.icon size={22} />
                 </span>
-                {card.link && <ArrowUpRight className="lib-metric-arrow" size={18} />}
+                {card.link && <ArrowUpRight className="lib-metric-arrow" size={20} />}
               </div>
               <div className="lib-metric-value">{card.value}</div>
               <div className="lib-metric-label">{card.label}</div>
@@ -152,7 +152,7 @@ const LibrarianDashboard: React.FC = () => {
           <div className="lib-actions-grid">
             <Link to="/librarian/registrations" className="lib-action-card">
               <span className="lib-action-icon lib-tone-orange">
-                <FileCheck size={19} />
+                <FileCheck size={22} />
               </span>
               <div className="lib-action-info">
                 <strong>Duyệt Đăng Ký Tài Khoản</strong>
@@ -162,7 +162,7 @@ const LibrarianDashboard: React.FC = () => {
 
             <Link to="/librarian/registrations" className="lib-action-card">
               <span className="lib-action-icon lib-tone-blue">
-                <Upload size={19} />
+                <Upload size={22} />
               </span>
               <div className="lib-action-info">
                 <strong>Nhập Danh Sách Sinh Viên</strong>
@@ -172,7 +172,7 @@ const LibrarianDashboard: React.FC = () => {
 
             <Link to="/librarian/readers" className="lib-action-card">
               <span className="lib-action-icon lib-tone-purple">
-                <Users size={19} />
+                <Users size={22} />
               </span>
               <div className="lib-action-info">
                 <strong>Danh Sách Độc Giả</strong>
@@ -182,7 +182,7 @@ const LibrarianDashboard: React.FC = () => {
 
             <Link to="/librarian/books" className="lib-action-card">
               <span className="lib-action-icon lib-tone-green">
-                <BookOpen size={19} />
+                <BookOpen size={22} />
               </span>
               <div className="lib-action-info">
                 <strong>Quản Lý Kho Sách</strong>
