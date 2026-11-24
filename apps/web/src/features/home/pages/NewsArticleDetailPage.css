@@ -159,11 +159,11 @@ html.dark .news-comment-signin a { color: #102017; }
 .news-comment-author time { color: var(--detail-subtle); font-size: 12px; }
 .news-librarian-badge { padding: 3px 7px; border-radius: 999px; background: color-mix(in srgb, var(--detail-accent) 15%, transparent); color: var(--detail-accent); font-size: 10px; font-weight: 800; }
 .news-comment-content { margin: 9px 0 0; color: var(--detail-ink); font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
-.news-comment.is-removed .news-comment-content { color: var(--detail-subtle); font-style: italic; }
 .news-comment-actions { display: flex; gap: 5px; }
 .news-comment-actions button { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--detail-muted); cursor: pointer; }
 .news-comment-actions button:hover { border-color: var(--detail-border); background: var(--detail-soft); color: var(--detail-ink); }
-.news-comment-actions button:last-child:hover { color: #d34242; }
+.news-comment-actions button[aria-label="Ẩn bình luận"]:hover { color: #b45309; }
+.news-comment-actions button[aria-label="Xóa bình luận"]:hover { color: #d34242; }
 .news-comment-reply-trigger { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 0; border: 0; background: none; color: var(--detail-accent); font-size: 12px; font-weight: 750; cursor: pointer; }
 .news-comment-reply-trigger:hover { text-decoration: underline; }
 .news-comment--reply { margin-top: 14px; padding: 13px 15px; border: 1px solid var(--detail-border); border-radius: 12px; background: var(--detail-soft); }
