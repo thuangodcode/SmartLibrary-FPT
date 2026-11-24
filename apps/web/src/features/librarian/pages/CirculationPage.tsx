@@ -412,8 +412,8 @@ function Chrome({ tab, stats, loading }: { tab: CirculationTab; stats: Circulati
           <span><Wallet size={18} /></span>
           <div>
             <small>Tổng phí phạt</small>
-            <strong>{loading ? '—' : formatMoney(stats?.unpaidFines)}</strong>
-            <em>{stats ? formatDelta(stats.unpaidFinesDelta) : 'Đang tải...'}</em>
+            <strong>{loading ? '—' : formatMoney(stats?.totalFines)}</strong>
+            <em>{stats ? formatDelta(stats.totalFinesDelta) : 'Đang tải...'}</em>
           </div>
         </article>
       </section>

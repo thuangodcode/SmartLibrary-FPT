@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, Check, Clock3, Edit3, MessageCircle, Pin, Send, Share2, Trash2, UserRound } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Check, Clock3, Eye, EyeOff, MessageCircle, Pin, Send, Share2, Trash2, UserRound } from 'lucide-react';
 import HomeFooter from '../components/HomeFooter';
 import HomeNavbar from '../components/HomeNavbar';
 import { API_BASE_URL } from '../../../config';
@@ -50,8 +50,6 @@ const NewsArticleDetailPage: React.FC<{ librarianMode?: boolean }> = ({ libraria
   const [draft, setDraft] = useState('');
   const [replyTarget, setReplyTarget] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
   const canModerate = user?.role === 'Librarian' || user?.role === 'Admin';
@@ -69,7 +67,9 @@ const NewsArticleDetailPage: React.FC<{ librarianMode?: boolean }> = ({ libraria
     }
     setLoadingComments(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/news/${encodeURIComponent(articleId)}/comments`);
+      const headers: Record<string, string> = {};
+      if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+      const response = await fetch(`${API_BASE_URL}/api/v1/news/${encodeURIComponent(articleId)}/comments`, { headers });
       const result = await parseApiResponse<ApiEnvelope<NewsComment[]>>(response);
       if (!response.ok || !result?.success) throw new Error(result?.error || 'Không tải được bình luận.');
       setComments(result.data ?? []);
@@ -79,7 +79,7 @@ const NewsArticleDetailPage: React.FC<{ librarianMode?: boolean }> = ({ libraria
     } finally {
       setLoadingComments(false);
     }
-  }, [articleId]);
+  }, [articleId, accessToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,8 +111,19 @@ const NewsArticleDetailPage: React.FC<{ librarianMode?: boolean }> = ({ libraria
     return () => window.clearTimeout(timer);
   }, [loadComments]);
 
-  const topLevelComments = useMemo(() => comments.filter((comment) => !comment.parentCommentId), [comments]);
-  const replies = useMemo(() => comments.filter((comment) => comment.parentCommentId), [comments]);
+  // Độc giả chỉ thấy bình luận chưa ẩn; thủ thư vẫn thấy cả bình luận đã ẩn
+  const listedComments = useMemo(
+    () => (canModerate ? comments : comments.filter((comment) => !comment.isDeleted)),
+    [canModerate, comments],
+  );
+  const topLevelComments = useMemo(
+    () => listedComments.filter((comment) => !comment.parentCommentId),
+    [listedComments],
+  );
+  const replies = useMemo(
+    () => listedComments.filter((comment) => comment.parentCommentId),
+    [listedComments],
+  );
 
   const postComment = async (event: FormEvent, parentCommentId: string | null = null) => {
     event.preventDefault();
@@ -140,31 +151,22 @@ const NewsArticleDetailPage: React.FC<{ librarianMode?: boolean }> = ({ libraria
     }
   };
 
-  const saveEdit = async (comment: NewsComment) => {
-    const content = editDraft.trim();
-    if (!content || !accessToken || submitting) return;
-    setSubmitting(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/news/${encodeURIComponent(articleId)}/comments/${comment.id}`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
-      });
-      const result = await parseApiResponse<ApiEnvelope<NewsComment>>(response);
-      if (!response.ok || !result?.success || !result.data) throw new Error(result?.error || 'Chưa lưu được thay đổi.');
-      setComments((current) => current.map((item) => item.id === comment.id ? result.data! : item));
-      setEditingId(null);
-      setEditDraft('');
-      showToast({ type: 'success', title: 'Đã cập nhật bình luận', message: 'Thay đổi đã được lưu.' });
-    } catch (error) {
-      showToast({ type: 'error', title: 'Không thể cập nhật', message: error instanceof Error ? error.message : 'Vui lòng thử lại.' });
-    } finally {
-      setSubmitting(false);
-    }
+  const removeCommentFromList = (commentId: string) => {
+    setComments((current) => current.filter((item) => item.id !== commentId && item.parentCommentId !== commentId));
+    if (replyTarget === commentId) setReplyTarget(null);
   };
 
-  const deleteComment = async (comment: NewsComment) => {
-    if (!accessToken || submitting || !window.confirm('Ẩn bình luận này khỏi bài viết?')) return;
+  const setHiddenState = (commentId: string, isDeleted: boolean) => {
+    setComments((current) => current.map((item) => (
+      item.id === commentId || item.parentCommentId === commentId
+        ? { ...item, isDeleted }
+        : item
+    )));
+    if (isDeleted && replyTarget === commentId) setReplyTarget(null);
+  };
+
+  const hideComment = async (comment: NewsComment) => {
+    if (!accessToken || submitting || comment.isDeleted || !window.confirm('Ẩn bình luận này với độc giả? Bạn có thể hiện lại sau.')) return;
     setSubmitting(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/news/${encodeURIComponent(articleId)}/comments/${comment.id}`, {
@@ -174,13 +176,52 @@ const NewsArticleDetailPage: React.FC<{ librarianMode?: boolean }> = ({ libraria
         const result = await parseApiResponse<ApiEnvelope<unknown>>(response);
         throw new Error(result?.error || 'Chưa ẩn được bình luận.');
       }
-      setComments((current) => current.map((item) => item.id === comment.id
-        ? { ...item, content: 'Bình luận đã được ẩn bởi thư viện.', isDeleted: true }
-        : item));
-      if (replyTarget === comment.id) setReplyTarget(null);
-      showToast({ type: 'success', title: 'Đã ẩn bình luận', message: 'Bình luận không còn hiển thị nội dung với độc giả.' });
+      setHiddenState(comment.id, true);
+      showToast({ type: 'success', title: 'Đã ẩn bình luận', message: 'Độc giả không còn thấy; bạn vẫn xem và có thể hiện lại.' });
     } catch (error) {
       showToast({ type: 'error', title: 'Không thể ẩn bình luận', message: error instanceof Error ? error.message : 'Vui lòng thử lại.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const restoreComment = async (comment: NewsComment) => {
+    if (!accessToken || submitting || !comment.isDeleted) return;
+    setSubmitting(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/news/${encodeURIComponent(articleId)}/comments/${comment.id}/restore`,
+        { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      if (!response.ok) {
+        const result = await parseApiResponse<ApiEnvelope<unknown>>(response);
+        throw new Error(result?.error || 'Chưa hiện lại được bình luận.');
+      }
+      setHiddenState(comment.id, false);
+      showToast({ type: 'success', title: 'Đã hiện lại bình luận', message: 'Độc giả có thể nhìn thấy bình luận này trở lại.' });
+    } catch (error) {
+      showToast({ type: 'error', title: 'Không thể hiện lại', message: error instanceof Error ? error.message : 'Vui lòng thử lại.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const permanentlyDeleteComment = async (comment: NewsComment) => {
+    if (!accessToken || submitting || !window.confirm('Xóa vĩnh viễn bình luận này? Nội dung sẽ mất và không hiện lại được.')) return;
+    setSubmitting(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/news/${encodeURIComponent(articleId)}/comments/${comment.id}/permanent`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      if (!response.ok) {
+        const result = await parseApiResponse<ApiEnvelope<unknown>>(response);
+        throw new Error(result?.error || 'Chưa xóa được bình luận.');
+      }
+      removeCommentFromList(comment.id);
+      showToast({ type: 'success', title: 'Đã xóa bình luận', message: 'Bình luận và nội dung đã bị gỡ khỏi hệ thống.' });
+    } catch (error) {
+      showToast({ type: 'error', title: 'Không thể xóa bình luận', message: error instanceof Error ? error.message : 'Vui lòng thử lại.' });
     } finally {
       setSubmitting(false);
     }
@@ -197,7 +238,7 @@ const NewsArticleDetailPage: React.FC<{ librarianMode?: boolean }> = ({ libraria
   };
 
   const renderComment = (comment: NewsComment, isReply = false): ReactNode => (
-    <article className={`news-comment${isReply ? ' news-comment--reply' : ''}${comment.isDeleted ? ' is-removed' : ''}`} key={comment.id}>
+    <article className={`news-comment${isReply ? ' news-comment--reply' : ''}${comment.isDeleted ? ' is-hidden' : ''}`} key={comment.id}>
       <div className="news-comment-avatar">
         {comment.authorAvatarUrl ? <img src={comment.authorAvatarUrl} alt="" /> : <UserRound size={18} />}
       </div>
@@ -207,22 +248,33 @@ const NewsArticleDetailPage: React.FC<{ librarianMode?: boolean }> = ({ libraria
             <strong>{comment.authorName}</strong>
             {comment.authorRole === 'Librarian' && <span className="news-librarian-badge">Thủ thư</span>}
             {comment.authorRole === 'Admin' && <span className="news-librarian-badge">Quản trị</span>}
+            {comment.isDeleted && canModerate && <span className="news-comment-hidden-badge">Đã ẩn với độc giả</span>}
             <time>{formatDate(comment.createdAt)}</time>
           </div>
-          {canModerate && !comment.isDeleted && (
+          {canModerate && (
             <div className="news-comment-actions">
-              <button type="button" title="Chỉnh sửa bình luận" aria-label="Chỉnh sửa bình luận" onClick={() => { setEditingId(comment.id); setEditDraft(comment.content); setReplyTarget(null); }}><Edit3 size={15} /></button>
-              <button type="button" title="Ẩn bình luận" aria-label="Ẩn bình luận" onClick={() => void deleteComment(comment)}><Trash2 size={15} /></button>
+              {comment.isDeleted ? (
+                <button type="button" title="Hiện lại bình luận" aria-label="Hiện lại bình luận" onClick={() => void restoreComment(comment)}>
+                  <Eye size={15} />
+                </button>
+              ) : (
+                <button type="button" title="Ẩn bình luận" aria-label="Ẩn bình luận" onClick={() => void hideComment(comment)}>
+                  <EyeOff size={15} />
+                </button>
+              )}
+              <button type="button" title="Xóa bình luận" aria-label="Xóa bình luận" onClick={() => void permanentlyDeleteComment(comment)}>
+                <Trash2 size={15} />
+              </button>
             </div>
           )}
         </div>
-        {editingId === comment.id ? (
-          <div className="news-comment-edit">
-            <textarea maxLength={2000} value={editDraft} onChange={(event) => setEditDraft(event.target.value)} aria-label="Nội dung bình luận đã chỉnh sửa" />
-            <div><button type="button" className="news-comment-secondary" onClick={() => setEditingId(null)}>Hủy</button><button type="button" className="news-comment-primary" disabled={!editDraft.trim() || submitting} onClick={() => void saveEdit(comment)}><Check size={15} /> Lưu thay đổi</button></div>
-          </div>
-        ) : <p className="news-comment-content">{comment.content}</p>}
-        {canModerate && !comment.isDeleted && !isReply && editingId !== comment.id && (
+        <p className="news-comment-content">
+          {comment.content
+            || (canModerate && comment.isDeleted
+              ? 'Nội dung đã mất do lần ẩn trước (không khôi phục được). Bình luận ẩn mới sẽ vẫn giữ nội dung.'
+              : '')}
+        </p>
+        {canModerate && !isReply && !comment.isDeleted && (
           <button type="button" className="news-comment-reply-trigger" onClick={() => { setReplyTarget(replyTarget === comment.id ? null : comment.id); setReplyDraft(''); }}><MessageCircle size={14} /> Trả lời độc giả</button>
         )}
         {replyTarget === comment.id && (
@@ -277,7 +329,7 @@ const NewsArticleDetailPage: React.FC<{ librarianMode?: boolean }> = ({ libraria
             <section className="news-comments-section" aria-labelledby="news-comments-title">
               <header className="news-comments-heading">
                 <div><span className="news-comments-kicker">CÙNG TRAO ĐỔI</span><h2 id="news-comments-title">Bình luận</h2><p>Chia sẻ ý kiến hoặc đặt câu hỏi về thông tin trong bài viết.</p></div>
-                <span className="news-comments-count"><MessageCircle size={16} /> {comments.length}</span>
+                <span className="news-comments-count"><MessageCircle size={16} /> {listedComments.length}</span>
               </header>
               {canComment ? (
                 <form className="news-comment-form" onSubmit={(event) => void postComment(event)}>

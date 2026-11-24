@@ -13,6 +13,8 @@ public class CirculationStatsDto
     public int OverdueDelta { get; init; }
     public decimal UnpaidFines { get; init; }
     public decimal UnpaidFinesDelta { get; init; }
+    public decimal TotalFines { get; init; }
+    public decimal TotalFinesDelta { get; init; }
     public int DueSoon { get; init; }
     public int SuggestedFinePerDay { get; init; }
     public int BorrowDays { get; set; }

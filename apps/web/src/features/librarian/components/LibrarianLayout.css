@@ -670,9 +670,16 @@
 }
 
 .lib-content {
-  max-width: 1600px;
+  width: 100%;
+  max-width: 1680px;
   margin: 0 auto;
-  padding: 24px 28px 36px;
+  padding: 28px clamp(20px, 2.4vw, 40px) 48px;
+}
+
+/* Dashboard overview: use nearly full main-area width on desktop */
+.lib-content:has(.lib-overview) {
+  max-width: none;
+  padding: 28px clamp(20px, 2.2vw, 36px) 52px;
 }
 
 @media (max-width: 900px) {
