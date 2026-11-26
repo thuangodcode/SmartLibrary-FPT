@@ -2497,3 +2497,6 @@
   font-weight: 600;
   white-space: nowrap;
 }
+
+.circ-stat .circ-fee-breakdown { font-size: 12px; line-height: 1.5; color: #526354; margin-top: 6px; }
+.circ-stat .circ-fee-breakdown p { margin: 3px 0; }

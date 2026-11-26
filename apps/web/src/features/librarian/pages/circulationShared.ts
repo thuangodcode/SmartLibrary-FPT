@@ -12,6 +12,8 @@ export interface CirculationStats {
   overdueDelta: number;
   unpaidFines: number;
   unpaidFinesDelta: number;
+  penalties?: { paid: number; pending: number; waived: number };
+  serviceFees?: { paid: number; pending: number; waived: number };
   totalFines: number;
   totalFinesDelta: number;
   dueSoon: number;
@@ -92,6 +94,7 @@ export interface CirculationFine {
   barcode: string;
   amount: number;
   reason: string;
+  feeType?: 'Penalty' | 'ServiceFee';
   status: string;
   createdAt: string;
   paidAt?: string | null;

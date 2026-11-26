@@ -411,9 +411,13 @@ function Chrome({ tab, stats, loading }: { tab: CirculationTab; stats: Circulati
         <article className="circ-stat circ-stat--fine">
           <span><Wallet size={18} /></span>
           <div>
-            <small>Đã thu phí phạt</small>
+            <small>Tổng phí đã thu</small>
             <strong>{loading ? '—' : formatMoney(stats?.totalFines)}</strong>
             <em>{stats ? formatDelta(stats.totalFinesDelta) : 'Đang tải...'}</em>
+            {stats?.penalties && stats.serviceFees && <div className="circ-fee-breakdown">
+              <p>Phạt / bồi thường: {formatMoney(stats.penalties.paid)} · Còn nợ: {formatMoney(stats.penalties.pending)}</p>
+              <p>Dịch vụ: {formatMoney(stats.serviceFees.paid)} · Còn nợ: {formatMoney(stats.serviceFees.pending)}</p>
+            <p>Đã miễn: {formatMoney(stats.penalties.waived + stats.serviceFees.waived)}</p></div>}
           </div>
         </article>
       </section>
@@ -861,7 +865,7 @@ function LoansView() {
                       </div>
                       <div className={`circ-due-row__date${daysLeft <= 3 ? ' is-soon' : ''}`}>
                         <span>{daysLeft === 0 ? 'Đến hạn hôm nay' : `Còn ${daysLeft} ngày`}</span>
-                        <strong>{formatDate(loan.dueDate)}</strong>
+                        <strong>{formatDateTime(loan.dueDate)}</strong>
                       </div>
                       <button type="button" className="circ-btn" onClick={() => { setDetail(loan); setRenewConfirm(false); }}>
                         <Eye size={14} /> Xem phiếu
@@ -1001,7 +1005,7 @@ function LoansView() {
                       <tr key={loan.id}>
                         <td>{loan.code}</td>
                         <td>{formatDate(loan.borrowDate)}</td>
-                        <td>{formatDate(loan.dueDate)}</td>
+                        <td>{formatDateTime(loan.dueDate)}</td>
                         <td>
                           <span className="circ-reader">
                             <span className="circ-avatar">{initials(loan.readerName)}</span>
@@ -1089,7 +1093,7 @@ function LoansView() {
               <div><span>Bản sao hiện tại</span><strong>{({ LightDamaged: 'Hư nhẹ · còn sử dụng được', Damaged: 'Hư hỏng · chưa đủ điều kiện sử dụng', Lost: 'Thất lạc · chưa tìm thấy', New: 'Mới', Good: 'Tốt', Fair: 'Cũ, còn sử dụng được' } as Record<string, string>)[detail.copyCondition || ''] || 'Chưa xác định'}</strong></div>
               <div><span>Khoản phí</span><strong>{detail.hasOpenFine ? 'Còn khoản chưa thanh toán' : detail.hasFine ? 'Đã thanh toán hoặc miễn' : 'Chưa lập khoản phí'}</strong></div>
               <div><span>Ngày mượn</span><strong>{formatDateTime(detail.borrowDate)}</strong></div>
-              <div><span>Hạn trả</span><strong>{formatDate(detail.dueDate)}</strong></div>
+              <div><span>Hạn trả</span><strong>{formatDateTime(detail.dueDate)}</strong></div>
               {detail.returnDate && <div><span>Ngày ghi nhận trả</span><strong>{formatDateTime(detail.returnDate)}</strong></div>}
               <div><span>Số lần gia hạn</span><strong>{detail.renewalCount ?? 0}</strong></div>
             </div>
@@ -1531,7 +1535,7 @@ function ReturnView() {
                             <div className="circ-loan-card-meta">
                               <span>Mã vạch: <strong>{loan.barcode}</strong></span>
                               <span>Mượn: {formatDate(loan.borrowDate)}</span>
-                              <span>Hạn trả: <strong>{formatDate(loan.dueDate)}</strong></span>
+                              <span>Hạn trả: <strong>{formatDateTime(loan.dueDate)}</strong></span>
                             </div>
                             <div className="circ-loan-card-status">
                               <span className={`circ-badge is-${loan.status.toLowerCase()}`}>
@@ -2018,7 +2022,7 @@ function OverdueView() {
                   <tr key={loan.id}>
                     <td>{loan.readerName}</td>
                     <td>{loan.barcode} · {loan.bookTitle}</td>
-                    <td>{formatDate(loan.dueDate)}</td>
+                    <td>{formatDateTime(loan.dueDate)}</td>
                     <td><span className="circ-badge is-overdue">{loan.overdueDays} ngày</span></td>
                     <td>{loan.suggestedFine ? formatMoney(loan.suggestedFine) : 'Chưa có mức phạt trong chính sách'}</td>
                     <td>
@@ -2237,6 +2241,7 @@ function FinesView() {
   const [stats, setStats] = useState<CirculationStats | null>(null);
   const [items, setItems] = useState<CirculationFine[]>([]);
   const [status, setStatus] = useState('All');
+  const [feeType, setFeeType] = useState('All');
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -2260,6 +2265,7 @@ function FinesView() {
     try {
       const query = new URLSearchParams();
       if (search.trim()) query.set('search', search.trim());
+      if (feeType !== 'All') query.set('feeType', feeType);
       if (status !== 'All' && !(includePaidDuringCheckout && status === 'Pending')) {
         query.set('status', status);
       }
@@ -2275,7 +2281,7 @@ function FinesView() {
     } finally {
       if (!quiet) setLoading(false);
     }
-  }, [headers, search, showToast, status]);
+  }, [headers, search, showToast, status, feeType]);
 
   useEffect(() => { void Promise.resolve().then(() => load()); }, [load]);
 
@@ -2371,19 +2377,23 @@ function FinesView() {
       {message && <p className="circ-banner is-ok">{message}</p>}
       {error && <p className="circ-banner is-err">{error}</p>}
       <WorkflowTabs
-        label="Lọc danh sách phí phạt"
+        label="Lọc trạng thái khoản phí"
         value={status}
         onChange={setStatus}
         tabs={[
           { value: 'All', label: 'Tất cả' },
           { value: 'Pending', label: 'Chưa thanh toán' },
           { value: 'Paid', label: 'Đã thanh toán' },
+          { value: 'Waived', label: 'Được miễn' },
         ]}
       />
       <div className="circ-card" id={`circ-panel-${status}`} role="tabpanel" aria-labelledby={`circ-tab-${status}`} tabIndex={0}>
         <div className="circ-card-head">
-          <h2>Danh sách phí phạt</h2>
+          <h2>Danh sách khoản phí</h2>
           <div className="circ-toolbar">
+            <label>Loại khoản phí <select aria-label="Loại khoản phí" value={feeType} onChange={event => setFeeType(event.target.value)}>
+              <option value="All">Tất cả</option><option value="Penalty">Phạt / bồi thường</option><option value="ServiceFee">Phí dịch vụ</option>
+            </select></label>
             <input value={searchInput} placeholder="Tìm độc giả, mã vạch, sách..." onChange={(e) => setSearchInput(e.target.value)} />
             <button
               type="button"
@@ -2396,9 +2406,10 @@ function FinesView() {
             </button>
           </div>
         </div>
+        <p className="circ-hint">Danh sách hiển thị tối đa 100 khoản gần nhất theo bộ lọc; thống kê phía trên tính toàn bộ khoản phí.</p>
         {loading ? (
           <p className="circ-empty"><LoaderCircle className="spin" size={16} /> Đang tải danh sách phí phạt...</p>
-        ) : !items.length ? <p className="circ-empty">Chưa có khoản phạt.</p> : (
+        ) : !items.length ? <p className="circ-empty">Chưa có khoản phí.</p> : (
           <div className="circ-table-wrap">
             <table className="circ-table">
               <thead>
@@ -2412,7 +2423,7 @@ function FinesView() {
                     <td>{fine.code}</td>
                     <td>{fine.readerName}</td>
                     <td>{fine.barcode} · {fine.bookTitle}</td>
-                    <td>{fine.reason}</td>
+                    <td>{fine.reason}<small className="circ-payment-reference">{fine.feeType === 'ServiceFee' ? 'Phí dịch vụ' : 'Phạt / bồi thường'}</small></td>
                     <td>{formatMoney(fine.amount)}</td>
                     <td>{formatDate(fine.createdAt)}</td>
                     <td>
