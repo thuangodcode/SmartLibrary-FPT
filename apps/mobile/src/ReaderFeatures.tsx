@@ -8,6 +8,8 @@ import { apiRequest, getSessionAccessToken } from './api';
 import { realtimeLogger, startRealtime } from './realtime';
 import { API_BASE_URL } from './config';
 import { useSession } from './session';
+import { profileSessionPatch, readerVerificationMessage } from './readerVerification';
+import { pickupSessionText, dueDeadlineText } from './libraryTime';
 import type { Book, Loan, User } from './types';
 
 export type Palette = { bg: string; surface: string; ink: string; muted: string; green: string; orange: string; border: string; soft: string; cover: string; overlay: string };
@@ -93,9 +95,20 @@ type ComplaintReply = { id: string; senderName: string; message: string; created
 type Complaint = { id: string; requestType: string; content: string; status: string; createdAt: string; replies: ComplaintReply[] };
 export function SupportRequests({ token, colors }: Props) {
   const types = useRemote<RequestType[]>('/api/v1/support/request-types', token); const complaints = useRemote<Complaint[]>('/api/v1/support/complaints/mine', token); const [typeId, setTypeId] = useState(''); const [text, setText] = useState(''); const [attachment, setAttachment] = useState<ImagePicker.ImagePickerAsset | null>(null); const [busy, setBusy] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [replyId, setReplyId] = useState<string | null>(null);
+  const reply = async (item: Complaint) => {
+    const message = drafts[item.id]?.trim(); if (!message || replyId) return;
+    setReplyId(item.id);
+    try {
+      await apiRequest(`/api/v1/support/complaints/${item.id}/replies`, { method: 'POST', body: JSON.stringify({ message }) }, token);
+      setDrafts(current => ({ ...current, [item.id]: '' })); complaints.reload();
+      Alert.alert('Đã gửi thông tin bổ sung', 'Thủ thư sẽ tiếp tục xử lý đơn hỗ trợ của bạn.');
+    } catch (error) { Alert.alert('Không gửi được phản hồi', err(error)); } finally { setReplyId(null); }
+  };
   const send = async () => { if (!typeId || !text.trim() || busy) return; setBusy(true); try { const form = new FormData(); form.append('RequestTypeId', typeId); form.append('Content', text.trim()); if (attachment) form.append('Attachment', { uri: attachment.uri, name: attachment.fileName || 'attachment.jpg', type: attachment.mimeType || 'image/jpeg' } as unknown as Blob); await apiRequest('/api/v1/support/complaints', { method: 'POST', body: form }, token, 60_000); setText(''); setAttachment(null); complaints.reload(); Alert.alert('Đã gửi đơn', 'Thủ thư sẽ tiếp nhận yêu cầu của bạn.'); } catch (e) { Alert.alert('Không gửi được đơn', err(e)); } finally { setBusy(false); } };
   const pick = async () => { try { const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: .8 }); if (!result.canceled && validImage(result.assets[0])) setAttachment(result.assets[0]); } catch (e) { Alert.alert('Không mở được thư viện ảnh', err(e)); } };
-  return <View style={{ gap: 12 }}><Heading colors={colors}>Tạo đơn hỗ trợ</Heading><State {...types} colors={colors} retry={types.reload} /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>{types.data?.map(item => <Pressable key={item.id} onPress={() => setTypeId(item.id)} style={[f.tag, { backgroundColor: typeId === item.id ? colors.green : colors.surface, borderColor: colors.border }]}><Text style={{ color: typeId === item.id ? colors.bg : colors.ink }}>{item.name}</Text></Pressable>)}</ScrollView><Field colors={colors} value={text} onChangeText={setText} placeholder="Nội dung cần hỗ trợ" multiline /><Pressable onPress={() => void pick()}><Text style={[f.link, { color: colors.green }]}>{attachment ? `Ảnh: ${attachment.fileName || 'Đã chọn'} (chạm để đổi)` : 'Đính kèm ảnh (không bắt buộc)'}</Text></Pressable>{attachment ? <Pressable onPress={() => setAttachment(null)}><Text style={[f.link, { color: colors.orange }]}>Bỏ ảnh</Text></Pressable> : null}<Action title={busy ? 'Đang gửi…' : 'Gửi đơn'} colors={colors} disabled={busy || !typeId || !text.trim()} onPress={() => void send()} /><Heading colors={colors}>Đơn của tôi</Heading><State {...complaints} colors={colors} retry={complaints.reload} />{complaints.data?.length ? complaints.data.map(item => <Panel key={item.id} colors={colors}><Text style={[f.itemTitle, { color: colors.ink }]}>{item.requestType} · {item.status === 'Pending' ? 'Chờ tiếp nhận' : item.status === 'InProgress' ? 'Đang xử lý' : item.status === 'Resolved' ? 'Đã phản hồi' : item.status}</Text><Copy colors={colors}>{item.content}</Copy><Text style={[f.caption, { color: colors.muted }]}>{fmt(item.createdAt)}</Text>{item.replies?.map(r => <View key={r.id} style={[f.reply, { borderColor: colors.border }]}><Text style={[f.itemTitle, { color: colors.ink }]}>{r.senderName}</Text><Copy colors={colors}>{r.message}</Copy></View>)}</Panel>) : !complaints.loading && !complaints.error ? <Copy colors={colors}>Bạn chưa gửi đơn nào.</Copy> : null}</View>;
+  return <View style={{ gap: 12 }}><Heading colors={colors}>Tạo đơn hỗ trợ</Heading><State {...types} colors={colors} retry={types.reload} /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>{types.data?.map(item => <Pressable key={item.id} onPress={() => setTypeId(item.id)} style={[f.tag, { backgroundColor: typeId === item.id ? colors.green : colors.surface, borderColor: colors.border }]}><Text style={{ color: typeId === item.id ? colors.bg : colors.ink }}>{item.name}</Text></Pressable>)}</ScrollView><Field colors={colors} value={text} onChangeText={setText} placeholder="Nội dung cần hỗ trợ" multiline /><Pressable onPress={() => void pick()}><Text style={[f.link, { color: colors.green }]}>{attachment ? `Ảnh: ${attachment.fileName || 'Đã chọn'} (chạm để đổi)` : 'Đính kèm ảnh (không bắt buộc)'}</Text></Pressable>{attachment ? <Pressable onPress={() => setAttachment(null)}><Text style={[f.link, { color: colors.orange }]}>Bỏ ảnh</Text></Pressable> : null}<Action title={busy ? 'Đang gửi…' : 'Gửi đơn'} colors={colors} disabled={busy || !typeId || !text.trim()} onPress={() => void send()} /><Heading colors={colors}>Đơn của tôi</Heading><Action title="Làm mới đơn hỗ trợ" colors={colors} secondary disabled={complaints.loading} onPress={complaints.reload} /><State {...complaints} colors={colors} retry={complaints.reload} />{complaints.data?.length ? complaints.data.map(item => <Panel key={item.id} colors={colors}><Text style={[f.itemTitle, { color: colors.ink }]}>{item.requestType} · {item.status === 'Pending' ? 'Chờ tiếp nhận' : item.status === 'InProgress' ? 'Đang xử lý' : item.status === 'Resolved' ? 'Đã hoàn tất' : item.status === 'AwaitingReader' ? 'Chờ bạn bổ sung thông tin' : item.status}</Text><Copy colors={colors}>{item.content}</Copy><Text style={[f.caption, { color: colors.muted }]}>{fmt(item.createdAt)}</Text>{item.replies?.map(r => <View key={r.id} style={[f.reply, { borderColor: colors.border }]}><Text style={[f.itemTitle, { color: colors.ink }]}>{r.senderName}</Text><Copy colors={colors}>{r.message}</Copy></View>)}{item.status === 'AwaitingReader' ? <><Field colors={colors} value={drafts[item.id] || ''} onChangeText={value => setDrafts(current => ({ ...current, [item.id]: value.slice(0, 3000) }))} placeholder="Thông tin bổ sung cho thủ thư" multiline /><Action title={replyId === item.id ? 'Đang gửi…' : 'Gửi thông tin bổ sung'} colors={colors} disabled={!!replyId || !drafts[item.id]?.trim()} onPress={() => void reply(item)} /></> : null}</Panel>) : !complaints.loading && !complaints.error ? <Copy colors={colors}>Bạn chưa gửi đơn nào.</Copy> : null}</View>;
 }
 
 function PasswordChange({ token, colors }: Props) {
@@ -143,7 +156,7 @@ function ProfileEmailVerification({ token, colors, onVerified }: Props & { onVer
     try {
       const result = await apiRequest<ProfileData>('/api/v1/profile/email-verification/verify', { method: 'POST', body: JSON.stringify({ email: email.trim(), otp: otp.trim() }) }, token);
       if (!result.data) throw new Error('Không nhận được hồ sơ mới.');
-      await updateUser({ email: result.data.email, isVerified: result.data.isVerified });
+      await updateUser({ email: result.data.email, isVerified: result.data.isVerified }, result.data.id);
       onVerified(); Alert.alert('Đã xác minh và cập nhật email cá nhân');
     } catch (error) { Alert.alert('Không xác minh được email', err(error)); }
     finally { setBusy(false); }
@@ -155,13 +168,15 @@ function ProfileEmailVerification({ token, colors, onVerified }: Props & { onVer
   </Panel>;
 }
 
-type ProfileData = { id: string; email: string; fullName: string; avatarUrl: string | null; phone: string | null; studentId: string | null; teacherId: string | null; employeeId: string | null; address: string | null; dateOfBirth: string | null; frontDocUrl?: string | null; backDocUrl?: string | null; selfieDocUrl?: string | null; documentType?: string | null; isVerified?: boolean };
+type ProfileData = { id: string; email: string; fullName: string; avatarUrl: string | null; phone: string | null; studentId: string | null; teacherId: string | null; employeeId: string | null; address: string | null; dateOfBirth: string | null; frontDocUrl?: string | null; backDocUrl?: string | null; selfieDocUrl?: string | null; documentType?: string | null; isVerified?: boolean; accountStatus?: string | null; registrationStatus?: string | null };
 export function Profile({ token, colors, user }: Props & { user: User }) {
   const profile = useRemote<ProfileData>('/api/v1/profile', token);
   const { updateUser } = useSession();
+  const verification = useRemote<{ status: string; registration?: { status: string; rejectReason?: string | null; note?: string | null } | null }>(user.role === 'Reader' ? '/api/v1/me/verification' : null, token);
+  const reloadProfile = () => { profile.reload(); verification.reload(); };
   useEffect(() => {
     const p = profile.data;
-    if (p) void updateUser({ email: p.email, fullName: p.fullName, avatarUrl: p.avatarUrl, isVerified: p.isVerified, phone: p.phone, address: p.address, dateOfBirth: p.dateOfBirth }).catch(() => {});
+    if (p) void updateUser(profileSessionPatch(p), p.id).catch(() => {});
   }, [profile.data, updateUser]);
   const [editing, setEditing] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
@@ -178,11 +193,16 @@ export function Profile({ token, colors, user }: Props & { user: User }) {
     setBusy(true);
     try {
       const form = new FormData(); form.append('FullName', name.trim()); form.append('Phone', phone.trim()); form.append('Address', address.trim()); form.append('DateOfBirth', birth); form.append('ClearAvatar', String(clearAvatar));
+      const hasAllDocuments = (documents.FrontDoc || profile.data?.frontDocUrl) && (documents.BackDoc || profile.data?.backDocUrl) && (documents.SelfieDoc || profile.data?.selfieDocUrl);
+      const submitForReview = verificationMessage.canSubmit && !!hasAllDocuments;
+      if (submitForReview) form.append('SubmitForReview', 'true');
       if (avatar) form.append('Avatar', { uri: avatar.uri, name: avatar.fileName || 'avatar.jpg', type: avatar.mimeType || 'image/jpeg' } as unknown as Blob);
       Object.entries(documents).forEach(([key, image]) => form.append(key, { uri: image.uri, name: image.fileName || `${key}.jpg`, type: image.mimeType || 'image/jpeg' } as unknown as Blob));
       const result = await apiRequest<ProfileData>('/api/v1/profile', { method: 'PUT', body: form }, token, 60_000);
-      if (result.data) await updateUser({ email: result.data.email, fullName: result.data.fullName, avatarUrl: result.data.avatarUrl, isVerified: result.data.isVerified, phone: result.data.phone, address: result.data.address, dateOfBirth: result.data.dateOfBirth });
-      cancel(); profile.reload(); Alert.alert('Đã cập nhật hồ sơ');
+      if (result.data) await updateUser(profileSessionPatch(result.data), result.data.id);
+      const sentDocuments = submitForReview || Object.keys(documents).length > 0;
+      cancel(); profile.reload(); verification.reload();
+      Alert.alert(sentDocuments ? 'Đã gửi hồ sơ' : 'Đã cập nhật hồ sơ', sentDocuments ? 'Tài khoản sẽ được kích hoạt sau khi thủ thư kiểm tra và phê duyệt.' : undefined);
     } catch (e) { Alert.alert('Không cập nhật được hồ sơ', err(e)); } finally { setBusy(false); }
   };
   const pick = async (key = 'Avatar') => {
@@ -192,6 +212,8 @@ export function Profile({ token, colors, user }: Props & { user: User }) {
     } catch (e) { Alert.alert('Không mở được thư viện ảnh', err(e)); }
   };
   const p = profile.data;
+  const verificationMessage = readerVerificationMessage(p || {}, user);
+  const reviewNote = verification.data?.registration?.rejectReason || verification.data?.registration?.note;
   const docItems = p ? [
     { key: 'FrontDoc', label: 'Mặt trước giấy tờ', uri: documents.FrontDoc?.uri || p.frontDocUrl },
     { key: 'BackDoc', label: 'Mặt sau giấy tờ', uri: documents.BackDoc?.uri || p.backDocUrl },
@@ -200,8 +222,14 @@ export function Profile({ token, colors, user }: Props & { user: User }) {
   return <View style={{ gap: 12 }}>
     <State {...profile} colors={colors} retry={profile.reload} />
     {p ? <>
-      {p.email.toLowerCase().endsWith('@smartlibrary.local') ? <ProfileEmailVerification token={token} colors={colors} onVerified={profile.reload} /> : null}
-      {user.role === 'Reader' ? <Panel colors={colors}><Heading colors={colors}>{p.isVerified === false ? 'Hoàn tất xác thực tài khoản' : p.isVerified === true ? 'Tài khoản đã xác thực' : 'Thông tin xác thực'}</Heading>{p.isVerified === false ? <><Copy colors={colors}>Bổ sung số điện thoại, ngày sinh, địa chỉ và ảnh CCCD hai mặt cùng ảnh chân dung để dùng dịch vụ mượn sách và hỗ trợ.</Copy>{!editing ? <Action title="Bổ sung hồ sơ xác thực" colors={colors} onPress={begin} /> : null}</> : null}<Action title="Kiểm tra lại trạng thái" colors={colors} secondary disabled={profile.loading} onPress={profile.reload} /></Panel> : null}
+      {user.status === 'Active' && p.email.toLowerCase().endsWith('@smartlibrary.local') ? <ProfileEmailVerification token={token} colors={colors} onVerified={profile.reload} /> : null}
+      {user.role === 'Reader' ? <Panel colors={colors}>
+        <Heading colors={colors}>{verificationMessage.title}</Heading>
+        <Copy colors={colors}>{verificationMessage.body}</Copy>
+        {verification.error ? <Copy colors={colors}>Không tải được ghi chú xét duyệt: {verification.error}</Copy> : reviewNote && ['Rejected', 'NeedMoreInfo'].includes(p.registrationStatus || '') ? <Copy colors={colors}>Ghi chú của thủ thư: {reviewNote}</Copy> : null}
+        {verificationMessage.canSubmit && !editing ? <Action title="Bổ sung hồ sơ xác thực" colors={colors} onPress={begin} /> : null}
+        <Action title="Kiểm tra lại trạng thái" colors={colors} secondary disabled={profile.loading || verification.loading} onPress={reloadProfile} />
+      </Panel> : null}
       <Panel colors={colors}><View style={{ alignItems: 'center', gap: 8 }}>
         {!clearAvatar && (avatar?.uri || p.avatarUrl) ? <Image source={{ uri: avatar?.uri || p.avatarUrl || '' }} style={f.avatar} /> : <View style={[f.avatar, { backgroundColor: colors.soft, justifyContent: 'center', alignItems: 'center' }]}><Text style={{ color: colors.green, fontSize: 24, fontWeight: '700' }}>{p.fullName.split(' ').slice(-1)[0]?.charAt(0)}</Text></View>}
         <Text style={[f.itemTitle, { color: colors.ink, fontSize: 18 }]}>{p.fullName}</Text><Copy colors={colors}>{p.email}</Copy>
@@ -227,8 +255,8 @@ export function Profile({ token, colors, user }: Props & { user: User }) {
           {editing ? <><Pressable onPress={() => void pick(item.key)}><Text style={[f.link, { color: colors.green, paddingVertical: 7 }]}>{item.uri ? 'Thay ảnh' : 'Tải ảnh lên'}</Text></Pressable>{documents[item.key] ? <Pressable onPress={() => setDocuments(old => { const next = { ...old }; delete next[item.key]; return next; })}><Text style={[f.link, { color: colors.orange }]}>Hủy chọn ảnh mới</Text></Pressable> : null}</> : null}
         </View>) : null}
       </Panel>
-      {editing ? <><Action title={busy ? 'Đang lưu…' : 'Lưu thay đổi'} colors={colors} disabled={busy || !name.trim()} onPress={() => void save()} /><Action title="Hủy" colors={colors} secondary disabled={busy} onPress={cancel} /></> : <Action title="Chỉnh sửa hồ sơ" colors={colors} onPress={begin} />}
-      <PasswordChange token={token} colors={colors} />
+      {editing ? <><Action title={busy ? 'Đang lưu…' : verificationMessage.canSubmit ? 'Lưu và gửi hồ sơ xét duyệt' : 'Lưu thay đổi'} colors={colors} disabled={busy || !name.trim()} onPress={() => void save()} /><Action title="Hủy" colors={colors} secondary disabled={busy} onPress={cancel} /></> : <Action title="Chỉnh sửa hồ sơ" colors={colors} onPress={begin} />}
+      {user.status === 'Active' ? <PasswordChange token={token} colors={colors} /> : null}
       <Modal visible={!!preview} animationType="fade" onRequestClose={() => setPreview(null)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: '#101713' }} edges={['top', 'bottom']}><View style={{ padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><Text style={{ color: '#fff', fontSize: 17, fontWeight: '700', flex: 1 }}>{preview?.label}</Text><Pressable accessibilityRole="button" accessibilityLabel="Đóng ảnh" onPress={() => setPreview(null)}><Text style={{ color: '#fff', fontSize: 24, paddingHorizontal: 10 }}>✕</Text></Pressable></View>{preview ? <Image source={{ uri: preview.uri }} resizeMode="contain" style={{ flex: 1, width: '100%' }} /> : null}</SafeAreaView>
       </Modal>
@@ -250,7 +278,7 @@ export function BookDetails({ token, colors, book, onBorrow, isFavorite, toggleF
 }
 
 type ReaderLoan = Loan & { rejectionReason?: string | null; pickupAt?: string; returnDate?: string; acceptedAt?: string; librarianName?: string; canRenew?: boolean; renewalCount?: number; renewalUnavailableReason?: string; code?: string; hasOpenFine?: boolean; hasFine?: boolean; copyCondition?: string; suggestedFine?: number | null };
-type Fine = { id: string; code: string; bookTitle: string; barcode?: string; amount: number; reason: string; status: string; checkoutUrl?: string | null; createdAt: string; paidAt?: string | null; paymentMethod?: string | null; paymentReference?: string | null };
+type Fine = { id: string; code: string; bookTitle: string; barcode?: string; amount: number; reason: string; feeType?: 'Penalty' | 'ServiceFee'; status: string; checkoutUrl?: string | null; createdAt: string; paidAt?: string | null; paymentMethod?: string | null; paymentReference?: string | null };
 export type ReaderHistoryTab = 'loans' | 'fines' | 'reservations';
 export function LoanHistory({ token, colors, initialTab = 'loans', initialFocus, onBook, revision = 0, header, contentContainerStyle }: Props & {
   initialTab?: ReaderHistoryTab;
@@ -288,7 +316,7 @@ export function LoanHistory({ token, colors, initialTab = 'loans', initialFocus,
   return <ScrollView style={{ flex: 1 }} contentContainerStyle={contentContainerStyle} alwaysBounceVertical refreshControl={<RefreshControl refreshing={activeRemote.loading} onRefresh={refreshList} tintColor={colors.green} colors={[colors.green]} enabled={!busy} />} >
     {header}
     <View style={{ gap: 12 }}>
-    <View style={f.row}>{(['loans', 'reservations', 'fines'] as const).map(item => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: tab === item }} onPress={() => { setTab(item); setStatus('all'); setFocus(undefined); }} style={[f.tag, { flex: 1, minHeight: 44, paddingHorizontal: 8, backgroundColor: tab === item ? colors.green : colors.surface, borderColor: colors.border }]}><Text style={{ color: tab === item ? colors.bg : colors.ink, textAlign: 'center', fontWeight: '700' }}>{item === 'loans' ? 'Phiếu mượn' : item === 'fines' ? 'Phí phạt' : 'Đặt trước'}</Text></Pressable>)}</View>
+    <View style={f.row}>{(['loans', 'reservations', 'fines'] as const).map(item => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: tab === item }} onPress={() => { setTab(item); setStatus('all'); setFocus(undefined); }} style={[f.tag, { flex: 1, minHeight: 44, paddingHorizontal: 8, backgroundColor: tab === item ? colors.green : colors.surface, borderColor: colors.border }]}><Text style={{ color: tab === item ? colors.bg : colors.ink, textAlign: 'center', fontWeight: '700' }}>{item === 'loans' ? 'Phiếu mượn' : item === 'fines' ? 'Khoản phí' : 'Đặt trước'}</Text></Pressable>)}</View>
     {!focus?.loanId && !focus?.fineId && tab !== 'reservations' ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>{['all', ...(tab === 'loans' ? ['Pending', 'Approved', 'Borrowed', 'Overdue', 'Returned', 'Rejected', 'Cancelled'] : ['Pending', 'Paid', 'Waived'])].map(value => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: status === value }} onPress={() => setStatus(value)} style={[f.tag, { minHeight: 44, backgroundColor: status === value ? colors.soft : colors.surface, borderColor: colors.border }]}><Text style={{ color: colors.ink, fontSize: 12 }}>{value === 'all' ? 'Tất cả' : (tab === 'fines' && value === 'Pending' ? 'Chưa thanh toán' : labels[value] || value)}</Text></Pressable>)}</ScrollView> : null}
     <State {...activeRemote} colors={colors} retry={refresh} />
     {!activeRemote.loading && !activeRemote.error && (tab === 'loans' ? <>
@@ -297,9 +325,9 @@ export function LoanHistory({ token, colors, initialTab = 'loans', initialFocus,
         <Text style={[f.itemTitle, { color: colors.green, marginTop: 8 }]}>{labels[item.displayStatus || item.status || ''] || item.displayStatus || item.status || 'Đang xử lý'}</Text>
         <Copy colors={colors}>Mã phiếu: {item.code || '—'} · Bản sao: {item.barcode || '—'}</Copy>
         {['Rejected', 'Cancelled'].includes(item.status || '') && <Text style={f.error}>Lý do từ chối / hủy: {item.rejectionReason || 'Chưa có lý do được ghi nhận.'}</Text>}
-        {item.pickupAt && <Copy colors={colors}>Lịch nhận: {fmtTime(item.pickupAt)}</Copy>}
+        {item.pickupAt && <Copy colors={colors}>Lịch nhận: {pickupSessionText(item.pickupAt)}</Copy>}
         <Copy colors={colors}>Ngày mượn: {fmtTime(item.borrowDate)}</Copy>
-        <Copy colors={colors}>Hạn trả (hết ngày): {fmt(item.dueDate)}</Copy>
+        <Copy colors={colors}>Hạn trả: {dueDeadlineText(item.dueDate)}</Copy>
         {item.returnDate && <Copy colors={colors}>Ghi nhận trả: {fmtTime(item.returnDate)}</Copy>}
         {item.acceptedAt && <Copy colors={colors}>Tiếp nhận bởi {item.librarianName || 'thủ thư'}: {fmtTime(item.acceptedAt)}</Copy>}
         <Copy colors={colors}>Gia hạn: {item.renewalCount ?? 0} lần</Copy>
@@ -321,7 +349,7 @@ export function LoanHistory({ token, colors, initialTab = 'loans', initialFocus,
       </Panel>)}
       {!reservations.data?.length && <Copy colors={colors}>Bạn chưa có đặt trước.</Copy>}
     </> : <>
-      {fineItems.map(item => <Panel key={item.id} colors={colors}><Heading colors={colors}>{item.bookTitle}</Heading><Text style={[f.itemTitle, { color: colors.orange, marginTop: 8 }]}>{item.amount.toLocaleString('vi-VN')} ₫ · {labels[item.status] || (item.status === 'Pending' ? 'Chưa thanh toán' : item.status)}</Text><Copy colors={colors}>{item.reason} · {fmtTime(item.createdAt)}</Copy><Copy colors={colors}>Mã khoản phí: {item.code || '—'} · Bản sao: {item.barcode || '—'}</Copy>{item.paidAt && <Copy colors={colors}>Đã thanh toán: {fmtTime(item.paidAt)} · {item.paymentMethod || '—'}{item.paymentReference ? ` · ${item.paymentReference}` : ''}</Copy>}{item.status === 'Pending' && <Action title="Thanh toán qua PayOS" colors={colors} disabled={busy} onPress={() => pay(item)} />}</Panel>)}
+      {fineItems.map(item => <Panel key={item.id} colors={colors}><Heading colors={colors}>{item.bookTitle}</Heading><Text style={[f.itemTitle, { color: colors.orange, marginTop: 8 }]}>{item.amount.toLocaleString('vi-VN')} ₫ · {labels[item.status] || (item.status === 'Pending' ? 'Chưa thanh toán' : item.status)}</Text><Copy colors={colors}>{item.feeType === 'ServiceFee' ? 'Phí dịch vụ' : 'Phạt / bồi thường'} · {item.reason} · {fmtTime(item.createdAt)}</Copy><Copy colors={colors}>Mã khoản phí: {item.code || '—'} · Bản sao: {item.barcode || '—'}</Copy>{item.paidAt && <Copy colors={colors}>Đã thanh toán: {fmtTime(item.paidAt)} · {item.paymentMethod || '—'}{item.paymentReference ? ` · ${item.paymentReference}` : ''}</Copy>}{item.status === 'Pending' && <Action title="Thanh toán qua PayOS" colors={colors} disabled={busy} onPress={() => pay(item)} />}</Panel>)}
       {!fineItems.length && <Copy colors={colors}>{focus?.fineId ? 'Không tìm thấy khoản phí trong tài khoản của bạn.' : 'Chưa có khoản phí phù hợp.'}</Copy>}
     </>)}
     </View>
