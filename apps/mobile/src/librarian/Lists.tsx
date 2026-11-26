@@ -1,3 +1,4 @@
+import { pickupSessionText, dueDeadlineText } from '../libraryTime';
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ArrowRight, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react-native';
@@ -15,7 +16,7 @@ export function loanTone(status: string): Tone {
 export function LoanCard({ loan, onOpen }: { loan: StaffLoan; onOpen: (id: string) => void }) {
   const status = loan.displayStatus || loan.status;
   const action = loan.status === 'Pending' ? 'Tiếp nhận' : loan.status === 'Approved' ? 'Đối chiếu giao' : ['Borrowed', 'Overdue'].includes(loan.status) ? 'Nhận trả' : 'Xem kết quả';
-  const time = loan.status === 'Returned' ? `Đã trả ${dateTimeOf(loan.returnDate)}` : ['Pending', 'Approved'].includes(loan.status) ? `Lịch nhận ${dateTimeOf(loan.pickupAt)}` : loan.dueDate ? `Hạn ${dateOf(loan.dueDate)}` : 'Chưa có hạn trả';
+  const time = loan.status === 'Returned' ? `Đã trả ${dateTimeOf(loan.returnDate)}` : ['Pending', 'Approved'].includes(loan.status) ? `Lịch nhận ${pickupSessionText(loan.pickupAt)}` : loan.dueDate ? `Hạn ${dueDeadlineText(loan.dueDate)}` : 'Chưa có hạn trả';
   return <Pressable accessibilityRole="button" accessibilityLabel={`${action}: ${loan.bookTitle}, ${loan.barcode}, ${loan.readerName}, ${statusNames[status] || status}`} onPress={() => onOpen(loan.id)} style={({ pressed }) => [u.panel, pressed && u.pressed]}>
     <BookIdentity title={loan.bookTitle} code={loan.barcode} cover={loan.coverImageUrl} />
     <View style={u.row}><Text style={[u.itemTitle, u.grow, { fontSize: 14 }]} numberOfLines={1}>{loan.readerName}</Text><Text style={styles.meta}>{loan.code}</Text></View>
