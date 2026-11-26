@@ -25,7 +25,7 @@ async function session(initial = {}, googleSignIn = async () => null) {
   const provider = load('session.tsx', {
     react, 'react-native': { Alert:{alert:(...args)=>alerts.push(args)}, AppState:{ currentState:'active', addEventListener:()=>({remove(){}}) } },
     'expo-secure-store': { getItemAsync:async key=>storage.get(key)??null, setItemAsync:async(key,value)=>{storage.set(key,value);}, deleteItemAsync:async key=>{storage.delete(key);} },
-    './api':api, './tokenExpiry':expiry, './googleAuth': { googleSignIn },
+    './api':api, './tokenExpiry':expiry, './googleAuth': { googleSignIn }, './readerVerification': load('readerVerification.ts', {}),
   });
   const value = provider.SessionProvider({ children:null }).props.value;
   const user={id:'reader',role:'Reader',status:'Active'};
@@ -99,7 +99,7 @@ test('mobile cold start refreshes an expired access token before validating /aut
     if(path.endsWith('/refresh'))return {data:{accessToken:next,refreshToken:'rotated'}};
     assert.equal(await handler(),next);assert.equal(token,old);return {data:{user:{id:'reader',role:'Reader',status:'Active'}}};
   }};
-  const p=load('session.tsx',{react,'react-native':{Alert:{alert(){}},AppState:{}},'expo-secure-store':{getItemAsync:async k=>storage.get(k),setItemAsync:async(k,v)=>storage.set(k,v),deleteItemAsync:async k=>storage.delete(k)},'./api':api,'./tokenExpiry':load('tokenExpiry.ts',{}),'./googleAuth':{googleSignIn:async()=>null}});
+  const p=load('session.tsx',{react,'react-native':{Alert:{alert(){}},AppState:{}},'expo-secure-store':{getItemAsync:async k=>storage.get(k),setItemAsync:async(k,v)=>storage.set(k,v),deleteItemAsync:async k=>storage.delete(k)},'./api':api,'./tokenExpiry':load('tokenExpiry.ts',{}),'./googleAuth':{googleSignIn:async()=>null},'./readerVerification':load('readerVerification.ts',{})});
   p.SessionProvider({children:null});effects[0]();effects[1]();await new Promise(r=>setImmediate(r));
   assert.ok(calls.includes('/api/v1/auth/refresh'));assert.equal(storage.get('sl_access_token'),next);
 });
@@ -213,7 +213,7 @@ test('mobile Google uses PKCE and only exchanges a code from its own callback', 
 
 
 test('mobile unverified pending Reader can reach verification while suspended accounts stay blocked', async () => {
-  for (const status of ['PendingVerification', 'PendingDocuments', 'PendingApproval', 'Suspended']) {
+  for (const status of ['PendingVerification', 'PendingDocuments', 'PendingApproval', 'Rejected', 'Suspended']) {
     const r = await session({}, async () => ({ accessToken: jwt(3600), refreshToken: 'google-refresh', email: 'reader@example.test' }));
     r.setFetch(async () => response(200, { user: { ...r.user, status, isVerified: false } }));
     if (status === 'Suspended') {
@@ -224,4 +224,47 @@ test('mobile unverified pending Reader can reach verification while suspended ac
       assert.equal(JSON.parse(r.storage.get('sl_user')).status, status);
     }
   }
+});
+
+
+test('mobile rejected Reader signs in with password and persists approval after refresh', async () => {
+  const r = await session();
+  r.setFetch(async () => response(200, { accessToken: jwt(3600), refreshToken: 'rejected-refresh', user: { ...r.user, status: 'Rejected', isVerified: false } }));
+  await r.value.signIn('reader@example.test', 'test-password');
+  assert.equal(JSON.parse(r.storage.get('sl_user')).status, 'Rejected');
+  r.setFetch(async () => response(200, { user: { ...r.user, status: 'Active', isVerified: true } }));
+  await r.value.refreshUser();
+  assert.equal(JSON.parse(r.storage.get('sl_user')).status, 'Active');
+  assert.equal(JSON.parse(r.storage.get('sl_user')).isVerified, true);
+  assert.equal(r.storage.get('sl_refresh_token'), 'rejected-refresh');
+});
+
+test('mobile profile status and messages follow submitted, rejected and approved backend responses', () => {
+  const v = load('readerVerification.ts', {});
+  const user = { role: 'Reader', status: 'Rejected', isVerified: false };
+  assert.equal(v.needsReaderVerification(user), true);
+  const patch = v.profileSessionPatch({ email: 'reader@example.test', fullName: 'Reader', accountStatus: 'PendingApproval', registrationStatus: 'Submitted', isVerified: false });
+  assert.equal(patch.status, 'PendingApproval');
+  const pending = v.readerVerificationMessage({ accountStatus: 'PendingApproval', registrationStatus: 'Submitted' }, user);
+  assert.match(pending.title, /chờ thủ thư duyệt/); assert.equal(pending.canSubmit, false);
+  assert.equal(v.readerVerificationMessage({ registrationStatus: 'Rejected' }, user).canSubmit, true);
+  assert.equal(v.needsReaderVerification({ ...user, status: 'Active', isVerified: true }), false);
+  assert.equal(v.canUseMobileSession({ ...user, role: 'Librarian' }), false);
+  assert.equal(v.canUseMobileSession({ ...user, role: 'Admin', status: 'Active' }), false);
+});
+
+test('mobile pickup sessions and exact due deadlines use Vietnam time', () => {
+  const time = load('libraryTime.ts', {});
+  assert.match(time.pickupSessionText('2026-11-25T00:00:00Z'), /Buổi sáng/);
+  assert.match(time.pickupSessionText('2026-11-25T06:00:00Z'), /Buổi chiều/);
+  assert.match(time.dueDeadlineText('2026-11-25T05:00:00Z'), /12:00/);
+  assert.match(time.dueDeadlineText('2026-11-25T10:00:00Z'), /17:00/);
+});
+
+
+test('late profile response cannot overwrite a different signed-in reader', async () => {
+  const r = await session(); await r.login(jwt(3600));
+  await r.value.updateUser({ fullName: 'Wrong reader', status: 'PendingApproval' }, 'previous-reader');
+  assert.equal(JSON.parse(r.storage.get('sl_user')).status, 'Active');
+  assert.notEqual(JSON.parse(r.storage.get('sl_user')).fullName, 'Wrong reader');
 });
